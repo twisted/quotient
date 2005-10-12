@@ -543,15 +543,6 @@ class MIMEPart:
             o = o.parent
         return o
 
-class MIMEMessage(MIMEPart):
-    """A structured representation of a MIME email message.
-    """
-
-    parent = None
-
-    def __str__(self):
-        return '<MIMEMessage %r at 0x%x>' % (tuple(self.getItemPath()), id(self))
-
 
 def messageFromStructure(avatar, headers, parts):
     """Create a MIMEMessage from a structure.
@@ -597,13 +588,15 @@ def messageFromStructure(avatar, headers, parts):
 # message ended (body ends)
 
 class MIMEMessageReceiver:
-    def __init__(self, fileObj):
+    done = False
+
+    def __init__(self, fileObj, partFactory=MIMEPart):
         """
         @param fileObj: an AtomicFile to which the message will be written as
         it is parsed
         """
         self.file = fileObj
-        self.done = False
+        self.partFactory = partFactory
         self.lineReceived = self.firstLineReceived
 
     def firstLineReceived(self, line):
@@ -666,7 +659,7 @@ class MIMEMessageReceiver:
 
     def _deliverer(self, f):
         self.bytecount = 0
-        self.message = MIMEMessage()
+        self.message = self.partFactory()
         self.parser = MIMEMessageParser(self.message, None)
 
         try:
