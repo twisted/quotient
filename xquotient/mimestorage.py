@@ -1,5 +1,10 @@
+# -*- test-case-name: xquotient.test.test_mimepart -*-
+
+import itertools
 
 from axiom import item, attributes
+
+from xquotient import mimepart, exmess, equotient
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -7,12 +12,11 @@ class Header(item.Item):
 
     message = attributes.reference(
         "A reference to the stored top-level L{xquotient.exmess.Message} "
-        "object to which this header pertains.",
-        allowNone=False)
+        "object to which this header pertains.")
     part = attributes.reference(
         "A reference to the stored MIME part object to which this header "
-        "directly pertains.",
-        allowNone=False)
+        "directly pertains.")
+
     name = attributes.text(
         "The name of this header.  What it is called.",
         allowNone=False)
@@ -38,8 +42,10 @@ class Part(item.Item):
     source = attributes.path(
         "The file which contains this part, MIME-encoded.")
 
-    headerOffset = attributes.integer(
+    headersOffset = attributes.integer(
         "The byte offset within my source file where my headers begin.")
+    headersLength = attributes.integer(
+        "The length in bytes that all my headers consume within the source file.")
     bodyOffset = attributes.integer(
         "The byte offset within my source file where my body begins (4 bytes "
         "after where my headers end).")
@@ -47,8 +53,14 @@ class Part(item.Item):
         "The length in bytes that my body consumes within the source file.")
 
 
+    _partCounter = attributes.inmemory(
+        "Temporary Part-ID factory function used to assign IDs to parts "
+        "of this message.")
     _headers = attributes.inmemory(
         "Temporary storage for header data before this Part is added to "
+        "a database.")
+    _children = attributes.inmemory(
+        "Temporary storage for child parts before this Part is added to "
         "a database.")
 
     def addHeader(self, name, value):
@@ -57,16 +69,101 @@ class Part(item.Item):
                 "Don't add headers to in-database messages - they aren't mutable [yet?]")
         if not hasattr(self, '_headers'):
             self._headers = []
-        self._headers.append(Header(name=name.lower(),
+        self._headers.append(Header(name=name.lower().decode('ascii'),
                                     value=value,
                                     part=self,
                                     message=self.message,
                                     index=len(self._headers)))
 
     def getHeader(self, name):
+        for hdr in self.getHeaders(name, _limit=1):
+            return hdr.value
+        raise equotient.NoSuchHeader(name)
+
+    def getHeaders(self, name, _limit=None):
         name = name.lower()
-        if self.store is None:
+        if self.store is not None:
+            return self.store.query(
+                Header,
+                attributes.AND(Header.part == self,
+                               Header.name == name),
+                sort=Header.index.ascending,
+                limit=_limit)
+        else:
+            return (hdr for hdr in self._headers if hdr.name == name)
+
+    def getAllHeaders(self):
+        if self.store is not None:
+            return self.store.query(
+                Header,
+                Header.part == self,
+                sort=Header.index.ascending)
+        else:
+            if hasattr(self, '_headers'):
+                return iter(self._headers)
+            else:
+                return iter(())
+
+    def newChild(self):
+        if self.store is not None:
+            raise NotImplementedError(
+                "Don't add children to in-database messages - they aren't mutable [yet?]")
+        if not hasattr(self, '_children'):
+            self._children = []
+        p = Part(partID=self._partCounter(),
+                 source=self.source,
+                 _partCounter=self._partCounter)
+        self._children.append(p)
+        return p
+
+    def _addToStore(self, store):
+        self.store = store
+        if hasattr(self, '_headers'):
             for hdr in self._headers:
-                if hdr.name == name:
-                    return hdr.value
-            raise equotient.NoSuchHeader(
+                hdr.part = self
+                hdr.message = self.message
+                hdr.store = store
+        if hasattr(self, '_children'):
+            for child in self._children:
+                child.parent = self
+                child.message = self.message
+                child._addToStore(store)
+        del self._headers, self._children
+
+
+class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
+    def __init__(self, store, message, *a, **kw):
+        super(MIMEMessageStorer, self).__init__(*a, **kw)
+        self.store = store
+        self.message = message
+
+    def messageDone(self):
+        r = super(MIMEMessageStorer, self).messageDone()
+        self.message.store = self.store
+        self.part._addToStore(self.store)
+        return r
+
+# XXX Move this to a different module or something
+class MIMEPreserver(item.Item):
+    typeName = "quotient_mime_preserver"
+    schemaVersion = 1
+
+    messageCount = attributes.integer(default=0)
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        assert self.installedOn is None, "Cannot install a MIMEPreserver on more than one thing"
+        self.installedOn = other
+
+    def createMIMEReceiver(self):
+        fObj = self.installedOn.newFile('msgs', str(self.messageCount))
+        self.messageCount += 1
+        msg = exmess.Message()
+        partCounter = itertools.count().next
+        return MIMEMessageStorer(
+            self.installedOn, msg, fObj,
+            lambda **kw: Part(message=msg,
+                              partID=partCounter(),
+                              _partCounter=partCounter,
+                              **kw))
+

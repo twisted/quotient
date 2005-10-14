@@ -1,4 +1,4 @@
-# -*- test-case-name: xquotient.test.test_mimemessage -*-
+# -*- test-case-name: xquotient.test.test_mimepart -*-
 # Copyright 2005 Divmod, Inc.  See LICENSE file for details
 
 import re, rfc822, time, textwrap
@@ -12,15 +12,13 @@ from epsilon import cooperator
 from xmantissa.ixmantissa import INavigableElement
 from xmantissa import webnav
 
+from xquotient import equotient
+
 MIME_DEPTH_MAX = 50
 RECEIVED_HEADER_LIMIT = 100
 
 # content types partToDOM knows how to handle
 DOMablePartTypes = ['multipart/alternative', 'text/plain', 'text/html']
-
-class NoSuchHeader(Exception):
-    """Attempted to look up the value for a header which is not present.
-    """
 
 class IncomparableHeaders(Exception):
     """Attempted to compare the values of two different headers.
@@ -328,7 +326,7 @@ class Header(object):
             raise IncomparableHeaders()
         return cmp(self.value, other.value)
 
-class HeaderBodyParser:
+class HeaderBodyParser(object):
     def __init__(self, part, parent):
         self.parent = parent
         self.parsingHeaders = 1
@@ -410,7 +408,7 @@ class MIMEMessageParser(HeaderBodyParser):
             return
         try:
             ctype = self.part.getHeader('content-type')
-        except NoSuchHeader:
+        except equotient.NoSuchHeader:
             pass
         else:
             if ctype.split()[0].strip().lower() == 'message/rfc822':
@@ -426,7 +424,7 @@ class MIMEMessageParser(HeaderBodyParser):
     def _calcBoundary(self):
         try:
             ctype = self.part.getHeader('content-type')
-        except NoSuchHeader:
+        except equotient.NoSuchHeader:
             return None
         else:
             if ctype.strip().lower().startswith('multipart'):
@@ -497,7 +495,7 @@ class MIMEPartParser(MIMEMessageParser):
         np.lineReceived(line, linebegin, lineend)
         return np
 
-class MIMEPart:
+class MIMEPart(object):
     def __init__(self, parent=None):
         self.parent = parent
         if parent is None:
@@ -524,7 +522,7 @@ class MIMEPart:
     def getHeader(self, name):
         for hdr in self.getHeaders(name):
             return hdr.value
-        raise NoSuchHeader(name)
+        raise equotient.NoSuchHeader(name)
 
     def walk(self):
         yield self
@@ -587,7 +585,7 @@ def messageFromStructure(avatar, headers, parts):
 
 # message ended (body ends)
 
-class MIMEMessageReceiver:
+class MIMEMessageReceiver(object):
     done = False
 
     def __init__(self, fileObj, partFactory=MIMEPart):
@@ -615,7 +613,7 @@ class MIMEMessageReceiver:
             self.parser = newParser
 
     def _detectLoop(self):
-        receivedHeaderCount = len(list(self.message.getHeaders('received')))
+        receivedHeaderCount = len(list(self.part.getHeaders('received')))
         if receivedHeaderCount > RECEIVED_HEADER_LIMIT:
             raise ValueError("Mail loop detected, rejecting message")
 
@@ -631,13 +629,14 @@ class MIMEMessageReceiver:
         else:
             self.parser.part.bodyLength = (self.bytecount - self.parser.part.bodyOffset)
         try:
-            rdate = time.struct_time(rfc822.parsedate(self.message['received'].split(';')[-1]))
+            rdate = time.struct_time(rfc822.parsedate(self.part['received'].split(';')[-1]))
         except:
             rdate = gmtDate
 
         self._detectLoop()
 
-        self.message.addHeader('x-divmod-processed', rfc822.formatdate(localNow))
+        self.part.addHeader('x-divmod-processed', rfc822.formatdate(localNow))
+
 
     # utility methods
 
@@ -652,15 +651,15 @@ class MIMEMessageReceiver:
     def feedFileNow(self, fObj):
         for ign in self._deliverer(fObj):
             pass
-        return self.message
+        return self.part
 
     def feedStringNow(self, s):
         return self.feedFileNow(StringIO(s))
 
     def _deliverer(self, f):
         self.bytecount = 0
-        self.message = self.partFactory()
-        self.parser = MIMEMessageParser(self.message, None)
+        self.part = self.partFactory()
+        self.parser = MIMEMessageParser(self.part, None)
 
         try:
             while True:
@@ -675,7 +674,7 @@ class MIMEMessageReceiver:
             raise
         else:
             self.messageDone()
-            yield self.message
+            yield self.part
 
 class IMIMEDelivery(Interface):
     """I am a MIME delivery object.  I can wrap a storage avatar.

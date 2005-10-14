@@ -7,7 +7,7 @@ from twisted.python import filepath
 
 from axiom import store
 
-from xquotient import mimepart
+from xquotient import mimepart, mimestorage
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
@@ -24,18 +24,23 @@ Hello Bob,
 -A
 """)
 
-    def assertTrivialMessageStructure(self, msg):
-        self.assertEquals(
-            list(msg.getAllHeaders())[:-1],
-            [mimepart.Header("from", u"alice@example.com"),
-             mimepart.Header("to", u"bob@example.com"),
-             mimepart.Header("subject", u"a test message"),
-             mimepart.Header("date", 'Tue, 11 Oct 2005 14:25:12 GMT')])
+    def assertHeadersEqual(self, a, b):
+        self.assertEquals(a.name, b.name)
+        self.assertEquals(a.value, b.value)
 
-        self.assertEquals(msg.getHeader("from"), u"alice@example.com")
-        self.assertEquals(msg.getHeader("to"), u"bob@example.com")
-        self.assertEquals(msg.getHeader("subject"), u"a test message")
-        self.assertEquals(msg.getHeader("date"), 'Tue, 11 Oct 2005 14:25:12 GMT')
+    def assertTrivialMessageStructure(self, msg):
+        map(
+            self.assertHeadersEqual,
+            list(msg.getAllHeaders())[:-1],
+            [mimepart.Header(u"from", "alice@example.com"),
+             mimepart.Header(u"to", "bob@example.com"),
+             mimepart.Header(u"subject", "a test message"),
+             mimepart.Header(u"date", 'Tue, 11 Oct 2005 14:25:12 GMT')])
+
+        self.assertEquals(msg.getHeader(u"from"), "alice@example.com")
+        self.assertEquals(msg.getHeader(u"to"), "bob@example.com")
+        self.assertEquals(msg.getHeader(u"subject"), "a test message")
+        self.assertEquals(msg.getHeader(u"date"), 'Tue, 11 Oct 2005 14:25:12 GMT')
 
     def testTrivialMessage(self):
         self._messageTest(self.trivialMessage, self.assertTrivialMessageStructure)
@@ -162,7 +167,9 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         dbdir = self.mktemp()
         s = store.Store(dbdir)
-        mp = mimepart.MIMEPreserver(store=s)
+        mp = mimestorage.MIMEPreserver(store=s)
+        mp.installOn(s)
         mr = mp.createMIMEReceiver()
         msg = mr.feedStringNow(source)
+        print 'zam!!!!!!!'
         assertMethod(msg)
