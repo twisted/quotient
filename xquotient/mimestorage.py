@@ -2,9 +2,11 @@
 
 import itertools
 
+from zope.interface import implements
+
 from axiom import item, attributes
 
-from xquotient import mimepart, exmess, equotient
+from xquotient import iquotient, mimepart, exmess, equotient
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -145,6 +147,8 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
 
 # XXX Move this to a different module or something
 class MIMEPreserver(item.Item):
+    implements(iquotient.IMIMEDelivery)
+
     typeName = "quotient_mime_preserver"
     schemaVersion = 1
 
@@ -153,6 +157,7 @@ class MIMEPreserver(item.Item):
 
     def installOn(self, other):
         assert self.installedOn is None, "Cannot install a MIMEPreserver on more than one thing"
+        other.powerUp(self, iquotient.IMIMEDelivery)
         self.installedOn = other
 
     def createMIMEReceiver(self):

@@ -171,5 +171,4 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
         mp.installOn(s)
         mr = mp.createMIMEReceiver()
         msg = mr.feedStringNow(source)
-        print 'zam!!!!!!!'
         assertMethod(msg)

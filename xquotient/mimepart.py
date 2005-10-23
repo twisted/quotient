@@ -7,6 +7,8 @@ from zope.interface import Interface, implements
 
 from cStringIO import StringIO
 
+from twisted.mail import smtp
+
 from epsilon import cooperator
 
 from xmantissa.ixmantissa import INavigableElement
@@ -586,6 +588,8 @@ def messageFromStructure(avatar, headers, parts):
 # message ended (body ends)
 
 class MIMEMessageReceiver(object):
+    implements(smtp.IMessage)
+
     done = False
 
     def __init__(self, fileObj, partFactory=MIMEPart):
@@ -675,116 +679,3 @@ class MIMEMessageReceiver(object):
         else:
             self.messageDone()
             yield self.part
-
-class IMIMEDelivery(Interface):
-    """I am a MIME delivery object.  I can wrap a storage avatar.
-    """
-
-    def createMIMEReceiver(origin=None, route=(), provision=True, addressedTo=None):
-        """Create a MIME receiver.
-
-        @param route: A sequence of separated paths to route the message down.
-        For example, in the case of 'urgent.todo.amir@divmod.com', the route
-        would be ['urgent', 'todo'].  Anything but empty sequences are not yet
-        implemented.
-
-        @param provision: Provision this message.  Defaults to true.  Pass
-        'false' for things like bounce messages.
-
-        @param addressedTo: the email address (don't include a display name) to
-        which this message is addressed. This will find its way to the
-        addressedTo attribute of the MIMEMessage.
-        """
-
-    def getArrivalRef():
-        "Get a reference to the arrival Pool."
-
-class MIMEDeliverator:
-    implements(IMIMEDelivery)
-
-    def __init__(self, avatar, arrivalRef):
-        self.avatar = avatar
-        self.arrivalRef = arrivalRef
-
-    def getArrivalRef(self):
-        "get arrival reference"
-        return self.arrivalRef
-
-    def createMIMEReceiver(self, origin=None, route=(), provision=True, addressedTo=None):
-        """Create a MIME receiver that routes messages.
-
-        See IMIMEDelivery for details.
-        """
-        assert not route
-        arrivalPool = self.arrivalRef.getItem()
-        return MIMEMessageReceiver(self.avatar, arrivalPool.addItem, origin, addressedTo)
-
-
-class NullMIMEDeliverator(MIMEDeliverator):
-    """Pretend to deliver mail, but don't, actually.
-
-    This is useful when testing a mail delivering component (pop grabber,
-    incoming smtp...) but one wishes to bypass the overhead of running the
-    messages through spambayes, storing them in the pool, etc.
-    """
-    def createMIMEReceiver(self, origin=None, route=(), provision=True, addressedTo=None):
-        return MIMEMessageReceiver(self.avatar, lambda _: None, origin)
-
-
-class IEmailPowerup(Interface):
-    pass
-
-class EmailPowerup:
-    implements(IEmailPowerup, INavigableElement)
-
-    powerupName = 'Email'
-
-    startCost = 1
-
-    def getPlugIns(self, iface):
-        if iface is INavigableElement:
-            return [self]
-
-    # INavigableElement
-    def getTabs(self):
-        # XXX should live somewhere else?
-        return [webnav.Tab("Divmod", None, 1.0,
-                           [webnav.Tab("Folders", lambda x: self.mailFolders, 0.65)])]
-
-    def deleteDeep(self):
-        return [self.arrival]
-
-    def deleteShallow(self):
-        return [self.mailFolders, self.settings]
-
-    def setsStoreInterfaces(self):
-        return [IMIMEDelivery]
-
-    def itemAdded(self, item):
-        self.msgScope.record(msgs=1)
-        self.touch()
-
-    def itemRemoved(self, item):
-        pass
-
-    def itemChanged(self, item, changeData):
-        pass
-
-
-increment = (1).__add__
-decrement = (-1).__add__
-
-
-exts = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "gif": "image/gif",
-    "doc": "application/msword",
-    "xls": "application/vnd.ms-excel",
-    "ppt": "application/vnd.ms-powerpoint",
-    "pdf": "application/pdf",
-    "sxw": "application/vnd.sun.xml.writer",
-    "sxc": "application/vnd.sun.xml.calc",
-    "sxi": "application/vnd.sun.xml.impress",
-}
