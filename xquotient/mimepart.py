@@ -7,6 +7,7 @@ from zope.interface import Interface, implements
 
 from cStringIO import StringIO
 
+from twisted.internet import defer
 from twisted.mail import smtp
 
 from epsilon import cooperator
@@ -601,6 +602,11 @@ class MIMEMessageReceiver(object):
         self.partFactory = partFactory
         self.lineReceived = self.firstLineReceived
 
+        self.bytecount = 0
+        self.part = self.partFactory()
+        self.parser = MIMEMessageParser(self.part, None)
+
+
     def firstLineReceived(self, line):
         del self.lineReceived
         if line.startswith('From '):
@@ -615,6 +621,15 @@ class MIMEMessageReceiver(object):
         newParser = self.parser.lineReceived(line, linebegin, lineend)
         if newParser is not self.parser:
             self.parser = newParser
+
+    def eomReceived(self):
+        self.messageDone()
+        return defer.succeed(None)
+
+    def connectionLost(self, reason):
+        if not self.done:
+            self.file.abort()
+            self.done = True
 
     def _detectLoop(self):
         receivedHeaderCount = len(list(self.part.getHeaders('received')))
@@ -640,6 +655,7 @@ class MIMEMessageReceiver(object):
         self._detectLoop()
 
         self.part.addHeader('x-divmod-processed', rfc822.formatdate(localNow))
+        self.file.close()
 
 
     # utility methods
@@ -661,10 +677,6 @@ class MIMEMessageReceiver(object):
         return self.feedFileNow(StringIO(s))
 
     def _deliverer(self, f):
-        self.bytecount = 0
-        self.part = self.partFactory()
-        self.parser = MIMEMessageParser(self.part, None)
-
         try:
             while True:
                 line = f.readline()
