@@ -7,7 +7,7 @@ from twisted.python import filepath
 
 from axiom import store
 
-from xquotient import mimepart, mimestorage
+from xquotient import mail, mimepart
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
@@ -167,7 +167,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         dbdir = self.mktemp()
         s = store.Store(dbdir)
-        mp = mimestorage.MIMEPreserver(store=s)
+        mp = mail.MailTransferAgent(store=s)
         mp.installOn(s)
         mr = mp.createMIMEReceiver()
         msg = mr.feedStringNow(source)

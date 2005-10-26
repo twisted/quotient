@@ -1,12 +1,10 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
-import itertools
-
 from zope.interface import implements
 
 from axiom import item, attributes
 
-from xquotient import iquotient, mimepart, exmess, equotient
+from xquotient import iquotient, mimepart, equotient
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -144,31 +142,3 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         self.message.store = self.store
         self.part._addToStore(self.store)
         return r
-
-# XXX Move this to a different module or something
-class MIMEPreserver(item.Item):
-    implements(iquotient.IMIMEDelivery)
-
-    typeName = "quotient_mime_preserver"
-    schemaVersion = 1
-
-    messageCount = attributes.integer(default=0)
-    installedOn = attributes.reference()
-
-    def installOn(self, other):
-        assert self.installedOn is None, "Cannot install a MIMEPreserver on more than one thing"
-        other.powerUp(self, iquotient.IMIMEDelivery)
-        self.installedOn = other
-
-    def createMIMEReceiver(self):
-        fObj = self.installedOn.newFile('msgs', str(self.messageCount))
-        self.messageCount += 1
-        msg = exmess.Message()
-        partCounter = itertools.count().next
-        return MIMEMessageStorer(
-            self.installedOn, msg, fObj,
-            lambda **kw: Part(message=msg,
-                              partID=partCounter(),
-                              _partCounter=partCounter,
-                              **kw))
-

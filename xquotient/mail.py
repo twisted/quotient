@@ -1,4 +1,6 @@
 
+import itertools
+
 try:
     from OpenSSL import SSL
 except ImportError:
@@ -17,25 +19,11 @@ from vertex import sslverify
 
 from axiom import store, item, attributes, userbase
 
-from xquotient import iquotient
+from xquotient import iquotient, exmess, mimestorage
 
 class MailConfigurationError(RuntimeError):
     """You specified some invalid configuration.
     """
-
-class DeliveryFactory(object):
-    implements(smtp.IMessageDeliveryFactory)
-
-    def __init__(self, store):
-        self.store = store
-        realm = portal.IRealm(store)
-        chk = checkers.ICredentialsChecker(store)
-        self.portal = portal.Portal(realm, [chk])
-
-    def getMessageDelivery(self):
-        return MessageDelivery(self.portal)
-
-components.registerAdapter(DeliveryFactory, store.Store, smtp.IMessageDeliveryFactory)
 
 class MessageDelivery(object):
     implements(smtp.IMessageDelivery)
@@ -57,43 +45,83 @@ class MessageDelivery(object):
             log.msg("Failed validateTo")
             log.err(err)
             return defer.fail(smtp.SMTPBadRcpt("Denied!"))
-        creds = userbase.Preauthenticated('@'.join((user.local, user.domain)))
+        creds = userbase.Preauthenticated('@'.join((user.dest.local, user.dest.domain)))
         d = self.portal.login(creds, None, iquotient.IMIMEDelivery)
         d.addCallbacks(cbLogin, ebLogin)
         return d
 
-class MailTransferAgent(item.Item, service.Service):
+class DeliveryAgentMixin(object):
+    implements(iquotient.IMIMEDelivery)
+
+    def createMIMEReceiver(self):
+        fObj = self.installedOn.newFile('messages', str(self.messageCount))
+        self.messageCount += 1
+        msg = exmess.Message()
+        partCounter = itertools.count().next
+        return mimestorage.MIMEMessageStorer(
+            self.installedOn, msg, fObj,
+            lambda **kw: mimestorage.Part(message=msg,
+                                          partID=partCounter(),
+                                          _partCounter=partCounter,
+                                          **kw))
+
+
+class DeliveryFactoryMixin(object):
     implements(smtp.IMessageDeliveryFactory)
 
+    def getMessageDelivery(self):
+        return MessageDelivery(self.portal)
+
+
+class MailTransferAgent(item.Item, service.Service, DeliveryFactoryMixin, DeliveryAgentMixin):
     typeName = "mantissa_mta"
     schemaVersion = 1
 
     messageCount = attributes.integer(
         "The number of messages which have been delivered through this agent.",
         default=0)
-    installedOn = attributes.reference()
+    installedOn = attributes.reference(
+        "A reference to the store or avatar which we have powered up.")
 
-    portNumber = attributes.integer(default=0)
-    securePortNumber = attributes.integer(default=0)
-    certificateFile = attributes.bytes(default=None)
+    portNumber = attributes.integer(
+        "The TCP port to bind to serve SMTP.",
+        default=0)
+    securePortNumber = attributes.integer(
+        "The TCP port to bind to serve SMTP/SSL.",
+        default=0)
+    certificateFile = attributes.bytes(
+        "The name of a file on disk containing a private "
+        "key and certificate for use by the SMTP/SSL server.",
+        default=None)
 
-    domain = attributes.bytes(default=None)
+    domain = attributes.bytes(
+        "The canonical name of this host.  Used when greeting SMTP clients.",
+        default=None)
 
+    # These are for the Service stuff
     parent = attributes.inmemory()
     running = attributes.inmemory()
 
+    # A cred portal, a Twisted TCP factory and as many as two
+    # IListeningPorts
+    portal = attributes.inmemory()
+    factory = attributes.inmemory()
     port = attributes.inmemory()
     securePort = attributes.inmemory()
-    factory = attributes.inmemory()
 
+    # When enabled, toss all traffic into logfiles.
     debug = False
 
     def activate(self):
+        self.portal = None
+        self.factory = None
         self.port = None
         self.securePort = None
 
     def installOn(self, other):
         assert self.installedOn is None, "You cannot install a MailTransferAgent on more than one thing"
+        other.powerUp(self, service.IService)
+        other.powerUp(self, iquotient.IMIMEDelivery)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
         self.installedOn = other
         self.setServiceParent(other)
@@ -115,8 +143,8 @@ class MailTransferAgent(item.Item, service.Service):
                 "No checkers: "
                 "you need to install a userbase before using this service.")
 
-        p = portal.Portal(realm, [chk, checkers.AllowAnonymousAccess()])
-        self.factory = smtp.SMTPFactory(p)
+        self.portal = portal.Portal(realm, [chk, checkers.AllowAnonymousAccess()])
+        self.factory = smtp.SMTPFactory(self.portal)
         if self.domain is not None:
             self.factory.domain = self.domain
 

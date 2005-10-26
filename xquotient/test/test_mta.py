@@ -50,19 +50,25 @@ class MailTests(unittest.TestCase):
         self.failIfEqual(mta.securePort, None)
 
     def testMessageDeliveryObjects(self):
+        mta = mail.MailTransferAgent(store=self.store)
+        mta.installOn(self.store)
         factory = smtp.IMessageDeliveryFactory(self.store)
         delivery = factory.getMessageDelivery()
         self.failUnless(smtp.IMessageDelivery.providedBy(delivery))
 
     def testValidateTo(self):
+        mta = mail.MailTransferAgent(store=self.store)
+        mta.installOn(self.store)
         factory = smtp.IMessageDeliveryFactory(self.store)
         delivery = factory.getMessageDelivery()
 
         account = self.login.addAccount('testuser', 'example.com', None)
         subStore = account.avatars.open()
-        mimestorage.MIMEPreserver(store=subStore).installOn(subStore)
+        mail.MailTransferAgent(store=subStore).installOn(subStore)
 
-        d = delivery.validateTo(smtp.Address('testuser@example.com'))
+        d = delivery.validateTo(
+            smtp.User(smtp.Address('testuser@example.com'),
+                      None, None, None))
 
         def cbValidated(messageCallable):
             msg = messageCallable()

@@ -18,6 +18,7 @@ class MailConfiguration(usage.Options):
         ('port', 'p', None, 'TCP port over which to serve SMTP'),
         ('secure-port', 's', None, 'TCP port over which to server SMTP/SSL'),
         ('pem-file', 'f', None, 'Filename containing PEM-format private key and certificate'),
+        ('domain', 'd', None, 'Canonical domain name of this server'),
         ]
 
     didSomething = False
@@ -43,7 +44,7 @@ class MailConfiguration(usage.Options):
         s = self.parent.getStore()
 
         def _():
-            mta = s.findOrCreate(mail.MailTransferAgent)
+            mta = s.findOrCreate(mail.MailTransferAgent, lambda newItem: newItem.installOn(s))
 
             if self['port'] is not None:
                 mta.portNumber = int(self['port'])
