@@ -1,10 +1,11 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
 from zope.interface import implements
+from epsilon.extime import Time
 
 from axiom import item, attributes
 
-from xquotient import iquotient, mimepart, equotient
+from xquotient import iquotient, mimepart, equotient, mimeutil
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -140,5 +141,19 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
         self.message.store = self.store
+        self.message.received = Time()
+
+        for (attr, headers) in [
+            ('sender', [u'from', u'sender', u'reply-to']),
+            ('recipient', [u'to']),
+            ('subject', [u'subject'])]:
+            for h in headers:
+                try:
+                    v = self.part.getHeader(h)
+                except equotient.NoSuchHeader:
+                    continue
+                else:
+                    setattr(self.message, attr, mimeutil.headerToUnicode(v))
+                    break
         self.part._addToStore(self.store)
         return r

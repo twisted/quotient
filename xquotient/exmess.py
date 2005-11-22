@@ -8,3 +8,6 @@ class Message(item.Item):
     schemaVersion = 1
 
     received = attributes.timestamp()
+    sender = attributes.text()
+    recipient = attributes.text()
+    subject = attributes.text()
