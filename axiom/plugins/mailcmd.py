@@ -6,7 +6,7 @@ from twisted import plugin
 
 from axiom import iaxiom, errors as eaxiom
 
-from xquotient import mail
+from xquotient import mail, inbox
 
 class MailConfiguration(usage.Options):
     classProvides(plugin.IPlugin, iaxiom.IAxiomaticCommand)
@@ -19,6 +19,10 @@ class MailConfiguration(usage.Options):
         ('secure-port', 's', None, 'TCP port over which to server SMTP/SSL'),
         ('pem-file', 'f', None, 'Filename containing PEM-format private key and certificate'),
         ('domain', 'd', None, 'Canonical domain name of this server'),
+        ]
+
+    optFlags = [
+        ('mailbox', 'm', 'Install a mailbox viewer'),
         ]
 
     didSomething = False
@@ -45,6 +49,9 @@ class MailConfiguration(usage.Options):
 
         def _():
             mta = s.findOrCreate(mail.MailTransferAgent, lambda newItem: newItem.installOn(s))
+            if self['mailbox']:
+                s.findOrCreate(inbox.Inbox).installOn(s)
+                self.didSomething = True
 
             if self['port'] is not None:
                 mta.portNumber = int(self['port'])

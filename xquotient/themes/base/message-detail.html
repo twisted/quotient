@@ -1,0 +1,16 @@
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1">
+  <table nevow:render="headerPanel">
+    <tr>
+      <td>From</td><td><nevow:slot name="sender" /></td>
+    </tr>
+    <tr>
+      <td>To</td><td><nevow:slot name="recipient" /></td>
+    </tr>
+    <tr>
+      <td>Subject</td><td><nevow:slot name="subject" /></td>
+    </tr>
+  </table>
+
+  <div nevow:render="messageBody" />
+</div>
+

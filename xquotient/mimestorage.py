@@ -28,6 +28,7 @@ class Header(item.Item):
         "The position of this header within a part.",
         allowNone=False)
 
+
 class Part(item.Item):
     typeName = 'quotient_mime_part'
     schemaVersion = 1
@@ -76,6 +77,13 @@ class Part(item.Item):
                                     message=self.message,
                                     index=len(self._headers)))
 
+    def walk(self):
+        # this depends on the order the parts are returned by the query
+        yield self
+        for child in self.store.query(Part, Part.parent == self):
+            for grandchild in child.walk():
+                yield grandchild
+
     def getHeader(self, name):
         for hdr in self.getHeaders(name, _limit=1):
             return hdr.value
@@ -117,8 +125,16 @@ class Part(item.Item):
         self._children.append(p)
         return p
 
-    def _addToStore(self, store):
+
+    def _addToStore(self, store, message, sourcepath):
+        self.message = message
         self.store = store
+
+        if self.parent is None:
+            assert self.message.impl is None, "two top-level parts?!"
+            self.message.impl = self
+
+
         if hasattr(self, '_headers'):
             for hdr in self._headers:
                 hdr.part = self
@@ -128,8 +144,48 @@ class Part(item.Item):
             for child in self._children:
                 child.parent = self
                 child.message = self.message
-                child._addToStore(store)
+                child._addToStore(store, message, sourcepath)
+        self.source = sourcepath
         del self._headers, self._children
+
+
+    # implementation of IMessageIterator
+
+    def walkMessage(self): # XXX RENAME ME
+        """
+        Return an iterator of Paragraph, Extract, and Embedded instances for
+        this part of the message.
+        """
+        ctype = self.getHeader(u'content-type').split(';')[0].lower()
+        methodName = 'iterate_'+ctype.replace('/', '_')
+        method = getattr(self, methodName, None)
+        if method is None:
+            return () # XXX 'UNKNOWN PART' warning?
+        else:
+            return method()
+
+    def _getBody(self):
+        f = self.source.open()
+        f.seek(self.bodyOffset)
+        body = f.read(self.bodyLength)
+        # XXX decode?
+        return body
+    body = property(_getBody)
+
+    def iterate_text_plain(self):
+        return (self.body,)
+        #return splitIntoParagraphs(self.body)
+
+    def iterate_text_html(self):
+        # etc
+        pass
+
+    def iterate_multipart_alternative(self):
+        pass
+
+    def iterate_multipart_mixed(self):
+        pass
+
 
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
@@ -141,6 +197,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
         self.message.store = self.store
+        self.message.installOn(self.store)
         self.message.received = Time()
 
         for (attr, headers) in [
@@ -155,5 +212,5 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                 else:
                     setattr(self.message, attr, mimeutil.headerToUnicode(v))
                     break
-        self.part._addToStore(self.store)
+        self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
