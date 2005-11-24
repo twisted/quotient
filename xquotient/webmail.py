@@ -59,7 +59,6 @@ class ParagraphRenderer(rend.Fragment):
         slot color: The CSS color to use for this paragraph, pulled
             from the quoteColors list.
     """
-
     docFactory = getLoader('message-detail-patterns')
 
     def render_paragraph(self, context, data):
@@ -70,14 +69,15 @@ class ParagraphRenderer(rend.Fragment):
                 if isinstance(child, (str, unicode)):
                     yield SpacePreservingStringRenderer(child)
                 else:
-                    childPara = paraPattern()
-                    if 0 < child.depth:
+                    if hasattr(child, 'depth') and 0 < child.depth:
                         qc = quoteClasses[child.depth % len(quoteClasses)]
                     else:
                         qc = 'no-quote'
 
+                    childPara = paraPattern()
+                    childPara.fillSlots('content', ParagraphRenderer(child))
                     childPara.fillSlots('quote-class', qc)
-                    yield childPara.fillSlots('content', ParagraphRenderer(child))
+                    yield childPara
 
         context.fillSlots('content', render_children)
         return context.tag

@@ -2,9 +2,11 @@
 from zope.interface import classProvides
 
 from twisted.python import usage
+from twisted.python.util import sibpath
 from twisted import plugin
 
 from axiom import iaxiom, errors as eaxiom
+from xmantissa import website
 
 from xquotient import mail, inbox
 
@@ -48,9 +50,14 @@ class MailConfiguration(usage.Options):
         s = self.parent.getStore()
 
         def _():
+
             mta = s.findOrCreate(mail.MailTransferAgent, lambda newItem: newItem.installOn(s))
             if self['mailbox']:
                 s.findOrCreate(inbox.Inbox).installOn(s)
+                s.findOrCreate(website.StaticSite,
+                               prefixURL=u'static/quotient',
+                               staticContentPath=sibpath(mail.__file__, u'static')).installOn(s)
+
                 self.didSomething = True
 
             if self['port'] is not None:

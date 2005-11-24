@@ -55,8 +55,10 @@ class MessageDetail(rend.Fragment):
                                 'subject', self.original.subject)
 
     def render_messageBody(self, ctx, data):
-        paragraphs = (webmail.ParagraphRenderer(part)
-                        for part in self.original.walkMessage())
-        return ctx.tag[paragraphs]
+        paragraphs = list()
+        for part in self.original.walkMessage():
+            for child in part.children:
+                paragraphs.append(webmail.ParagraphRenderer(child))
+        return ctx.tag.fillSlots('paragraphs', paragraphs)
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

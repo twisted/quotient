@@ -250,20 +250,31 @@ class Part(item.Item):
 
     def iterate_text_html(self):
         assert False, 'dont look at text/html emails'
-        return (self.getUnicodeBody(),)
+        yield mimepart.HTMLPart(self.message.storeID, -1,
+                                self.getContentType(),
+                                children=[self.getUnicodeBody()])
 
-    def iterate_multipart_alternative(self):
-        assert False, 'dont look at multipart emails'
+    def _firstChildWithContentType(self, ctype='text/plain'):
         children = self.walk()
         children.next()
 
         for part in children:
-            if part.getContentType() == 'text/plain':
-                return part.walkMessage()
+            if part.getContentType() == ctype:
+                return part
+
+    def iterate_multipart_alternative(self):
+        part = self._firstChildWithContentType()
+        if part is not None:
+            return part.walkMessage()
+        else:
+            assert False, 'no text/plain'
 
     def iterate_multipart_mixed(self):
-        assert False, 'dont look at multipart emails'
-        pass
+        part = self._firstChildWithContentType()
+        if part is not None:
+            return part.walkMessage()
+        else:
+            assert False, 'no text/plain'
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, message, *a, **kw):

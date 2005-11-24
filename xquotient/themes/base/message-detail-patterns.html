@@ -1,0 +1,9 @@
+<nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
+  <nevow:invisible nevow:render="paragraph">
+    <div nevow:pattern="paragraph">
+      <nevow:attr name="class"><nevow:slot name="quote-class" /></nevow:attr>
+      <nevow:slot name="content" />
+    </div>
+    <nevow:slot name="content" />
+  </nevow:invisible>
+</nevow:invisible>

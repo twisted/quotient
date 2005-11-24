@@ -1,0 +1,16 @@
+.quote-one {
+    border-left: solid 1px red;
+    margin-left: 4px;
+    padding-left: 2px;
+}
+
+.quote-two {
+    border-left: solid 1px blue;
+    margin-left: 4px;
+    padding-left: 2px;
+}
+.quote-three {
+    border-left: solid 1px green;
+    margin-left: 4px;
+    padding-left: 2px;
+}
