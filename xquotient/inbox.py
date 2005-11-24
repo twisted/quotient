@@ -28,6 +28,10 @@ class DefaultingColumnView(tdbview.ColumnViewBase):
             value = value[:self.maxLength-3] + '...'
         return value
 
+class StoreIDColumnView(tdbview.ColumnViewBase):
+    def stanFromValue(self, idx, item, value):
+        return str(item.storeID)
+
 class EmailAddressColumnView(DefaultingColumnView):
     def stanFromValue(self, idx, item, value):
         if value is not None:
@@ -71,7 +75,8 @@ class InboxMessageView(tdbview.TabularDataView):
                           Message.received],
                 itemsPerPage=prefs.getPreferenceValue('itemsPerPage'))
 
-        views = [EmailAddressColumnView('sender', 'No Sender', maxLength=40),
+        views = [StoreIDColumnView('storeID'),
+                 EmailAddressColumnView('sender', 'No Sender', maxLength=40),
                  MessageLinkColumnView('subject', 'No Subject', maxLength=100),
                  tdbview.DateColumnView('received')]
 

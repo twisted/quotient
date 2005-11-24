@@ -54,7 +54,7 @@ class MessageDetail(rend.Fragment):
                                 'subject', self.original.subject)
 
     def render_messageBody(self, ctx, data):
-        (message,) = list(self.original.walkMessage())
+        message = '\n'.join(self.original.walkMessage())
         return ctx.tag[message]
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

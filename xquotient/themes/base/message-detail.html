@@ -1,5 +1,5 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1">
-  <table nevow:render="headerPanel">
+  <table class="control-table" cellspacing="0" nevow:render="headerPanel">
     <tr>
       <td>From</td><td><nevow:slot name="sender" /></td>
     </tr>
@@ -10,7 +10,7 @@
       <td>Subject</td><td><nevow:slot name="subject" /></td>
     </tr>
   </table>
-
-  <div nevow:render="messageBody" />
+  <p />
+  <pre style="width: 80%" nevow:render="messageBody" />
 </div>
 

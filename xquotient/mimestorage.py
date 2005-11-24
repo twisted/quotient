@@ -151,15 +151,24 @@ class Part(item.Item):
 
     # implementation of IMessageIterator
 
+    def _getContentType(self):
+        # XXX move this
+        try:
+            ctype = self.getHeader(u'content-type').split(';')[0].lower().strip()
+        except equotient.NoSuchHeader:
+            ctype = 'text/plain'
+        return ctype
+
     def walkMessage(self): # XXX RENAME ME
         """
         Return an iterator of Paragraph, Extract, and Embedded instances for
         this part of the message.
         """
-        ctype = self.getHeader(u'content-type').split(';')[0].lower()
+        ctype = self._getContentType()
         methodName = 'iterate_'+ctype.replace('/', '_')
         method = getattr(self, methodName, None)
         if method is None:
+            assert False
             return () # XXX 'UNKNOWN PART' warning?
         else:
             return method()
@@ -177,16 +186,18 @@ class Part(item.Item):
         #return splitIntoParagraphs(self.body)
 
     def iterate_text_html(self):
-        # etc
-        pass
+        return (self.body,)
 
     def iterate_multipart_alternative(self):
-        pass
+        children = self.walk()
+        children.next()
+
+        for part in children:
+            if part._getContentType() == 'text/plain':
+                return part.walkMessage()
 
     def iterate_multipart_mixed(self):
         pass
-
-
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, message, *a, **kw):
