@@ -3,9 +3,10 @@ from twisted.python.components import registerAdapter
 
 from nevow import rend
 
-from axiom.slotmachine import hyper as super;
+from axiom.slotmachine import hyper as super
 from axiom import item, attributes
 
+from xquotient import webmail
 from xmantissa import ixmantissa
 
 # The big kahuna.  This, along with some kind of Person object, is the
@@ -54,7 +55,8 @@ class MessageDetail(rend.Fragment):
                                 'subject', self.original.subject)
 
     def render_messageBody(self, ctx, data):
-        message = '\n'.join(self.original.walkMessage())
-        return ctx.tag[message]
+        paragraphs = (webmail.ParagraphRenderer(part)
+                        for part in self.original.walkMessage())
+        return ctx.tag[paragraphs]
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

@@ -691,3 +691,4 @@ class MIMEMessageReceiver(object):
         else:
             self.messageDone()
             yield self.part
+

@@ -1,11 +1,11 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
-from zope.interface import implements
 from epsilon.extime import Time
 
 from axiom import item, attributes
 
-from xquotient import iquotient, mimepart, equotient, mimeutil
+from xquotient import mimepart, equotient, mimeutil
+import quopri, binascii
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -27,7 +27,6 @@ class Header(item.Item):
     index = attributes.integer(
         "The position of this header within a part.",
         allowNone=False)
-
 
 class Part(item.Item):
     typeName = 'quotient_mime_part'
@@ -151,52 +150,119 @@ class Part(item.Item):
 
     # implementation of IMessageIterator
 
-    def _getContentType(self):
-        # XXX move this
+    def getContentType(self, default=None):
         try:
-            ctype = self.getHeader(u'content-type').split(';')[0].lower().strip()
+            value = self.getHeader(u'content-type')
         except equotient.NoSuchHeader:
-            ctype = 'text/plain'
+            return default
+
+        ctype = value.split(';', 1)[0].lower().strip()
+        if ctype.count('/') != 1:
+            return default
         return ctype
+
+    def getParam(self, param, default=None, header=u'content-type', un_quote=True):
+        try:
+            h = self.getHeader(header)
+        except equotient.NoSuchHeader:
+            return default
+        param = param.lower()
+        for pair in [x.split('=', 1) for x in h.split(';')[1:]]:
+            if pair[0].strip().lower() == param:
+                r = len(pair) == 2 and pair[1].strip() or ''
+                if un_quote:
+                    return mimepart.unquote(r)
+                return r
+        return default
+
+    def getContentTransferEncoding(self, default=None):
+        """
+        @returns: string like 'base64', 'quoted-printable' or '7bit'
+        """
+        try:
+            ctran = self.getHeader(u'content-transfer-encoding')
+        except equotient.NoSuchHeader:
+            return default
+
+        if ctran:
+            ct = ctran.lower().strip()
+            return ct
+        return default
+
+    def getBody(self, decode=False):
+        f = self.source.open()
+        offt = self.bodyOffset
+        leng = self.bodyLength
+        f.seek(offt)
+        data = f.read(leng)
+        if decode:
+            ct = self.getContentTransferEncoding()
+            if ct == 'quoted-printable':
+                return quopri.decodestring(data)
+            elif ct == 'base64':
+                for extraPadding in ('', '=', '=='):
+                    try:
+                        return (data + extraPadding).decode('base64')
+                    except binascii.Error:
+                        pass
+                return data
+            elif ct == '7bit':
+                return data
+        return data
+
+    def getUnicodeBody(self, default='utf-8'):
+        """Get the payload of this part as a unicode object."""
+        charset = self.getParam('charset', default=default)
+        payload = self.getBody(decode=True)
+
+        try:
+            return unicode(payload, charset, 'replace')
+        except LookupError:
+            return unicode(payload, default, 'replace')
+
 
     def walkMessage(self): # XXX RENAME ME
         """
         Return an iterator of Paragraph, Extract, and Embedded instances for
         this part of the message.
         """
-        ctype = self._getContentType()
+        ctype = self.getContentType(default='text/plain')
         methodName = 'iterate_'+ctype.replace('/', '_')
         method = getattr(self, methodName, None)
         if method is None:
-            assert False
-            return () # XXX 'UNKNOWN PART' warning?
+            assert False, 'no method for content type: %r' (ctype,)
         else:
             return method()
 
-    def _getBody(self):
-        f = self.source.open()
-        f.seek(self.bodyOffset)
-        body = f.read(self.bodyLength)
-        # XXX decode?
-        return body
-    body = property(_getBody)
-
     def iterate_text_plain(self):
-        return (self.body,)
-        #return splitIntoParagraphs(self.body)
+        content = self.getUnicodeBody()
+
+        if self.getParam('format') == 'flowed':
+            child = mimepart.FlowedParagraph.fromRFC2646(content)
+        else:
+            child = mimepart.FixedParagraph.fromString(content)
+
+        # i am pretty confused by the fact that mimestorage.Part
+        # and mimepart.Part seem to do totally different things
+
+        yield mimepart.Part(self.message.storeID, -1,
+                            self.getContentType(), children=[child])
 
     def iterate_text_html(self):
-        return (self.body,)
+        assert False, 'dont look at text/html emails'
+        return (self.getUnicodeBody(),)
 
     def iterate_multipart_alternative(self):
+        assert False, 'dont look at multipart emails'
         children = self.walk()
         children.next()
 
         for part in children:
-            if part._getContentType() == 'text/plain':
+            if part.getContentType() == 'text/plain':
                 return part.walkMessage()
 
     def iterate_multipart_mixed(self):
+        assert False, 'dont look at multipart emails'
         pass
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
