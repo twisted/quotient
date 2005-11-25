@@ -34,12 +34,14 @@ class Message(item.Item, item.InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
     def activate(self):
-        self._prefs = ixmantissa.IPreferenceAggregator(self.store, None)
+        self._prefs = None
 
     def getTabs(self):
         return ()
 
     def walkMessage(self):
+        if self._prefs is None:
+            self._prefs = ixmantissa.IPreferenceAggregator(self.store)
         preferred = self._prefs.getPreferenceValue('preferredMimeType')
         return self.impl.walkMessage(prefer=preferred)
 
