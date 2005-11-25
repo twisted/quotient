@@ -34,7 +34,7 @@ class Message(item.Item, item.InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
     def activate(self):
-        self._prefs = ixmantissa.IPreferenceAggregator(self.store)
+        self._prefs = ixmantissa.IPreferenceAggregator(self.store, None)
 
     def getTabs(self):
         return ()
