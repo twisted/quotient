@@ -1,6 +1,7 @@
 from zope.interface import implements
 from nevow import rend, inevow, tags
 from xmantissa.publicresource import getLoader
+from xmantissa import ixmantissa
 from itertools import imap
 
 class SpacePreservingStringRenderer(object):
@@ -63,7 +64,7 @@ class ParagraphRenderer(rend.Fragment):
 
     def render_paragraph(self, context, data):
         def render_children(context, data):
-            paraPattern = inevow.IQ(self.docFactory).patternGenerator('paragraph')
+            paraPattern = inevow.IQ(context).patternGenerator('paragraph')
 
             for child in self.original.children:
                 if isinstance(child, (str, unicode)):
@@ -81,3 +82,24 @@ class ParagraphRenderer(rend.Fragment):
 
         context.fillSlots('content', render_children)
         return context.tag
+
+class HTMLPartRenderer(object):
+    implements(inevow.IRenderer)
+
+    docFactory = getLoader('message-detail-patterns')
+    iframePattern = inevow.IQ(docFactory).patternGenerator('content-iframe')
+
+    def __init__(self, original):
+        self.original = original
+        # think about this some more - the messageID or partID could be the
+        # mangled storeID of the part to facilitate the making of child
+        # links here, but nobody except for us really needs to know about
+        # this.
+
+        self.urlPrefix = ixmantissa.IWebTranslator(
+                            original.part.store).linkTo(original.messageID)
+
+    def rend(self, ctx, data):
+        return self.iframePattern.fillSlots('location', # argh
+                '%s/%s' % (self.urlPrefix, self.original.identifier))
+

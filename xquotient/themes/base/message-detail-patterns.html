@@ -6,4 +6,7 @@
     </div>
     <nevow:slot name="content" />
   </nevow:invisible>
+  <iframe nevow:pattern="content-iframe" frameborder="0" width="100%" onload="resizeIFrame(this)">
+    <nevow:attr name="src"><nevow:slot name="location" /></nevow:attr>
+  </iframe>
 </nevow:invisible>

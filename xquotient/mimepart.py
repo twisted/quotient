@@ -67,11 +67,12 @@ class Part(Container):
 
     @ivar type: the MIME type of this part.
     """
-    def __init__(self, messageID, identifier, type, children=None):
+    def __init__(self, messageID, identifier, type, children=None, part=None):
         super(Part, self).__init__(children)
         self.messageID = messageID
         self.identifier = identifier
         self.type = type
+        self.part = part
 
     def hasHTML(self):
         return False
@@ -92,6 +93,7 @@ class HTMLPart(Part):
     def hasPlain(self):
         return False
 
+registerAdapter(webmail.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
 
 class Multipart(Part):
     """A Part subclass representing the MIME Multipart concept.

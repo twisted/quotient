@@ -84,6 +84,11 @@ class Part(item.Item):
             for grandchild in child.walk():
                 yield grandchild
 
+    def getSubPart(self, partID):
+        return self.store.findUnique(Part,
+                attributes.AND(Part.parent==self,
+                               Part.partID==partID))
+
     def getHeader(self, name):
         for hdr in self.getHeaders(name, _limit=1):
             return hdr.value
@@ -246,12 +251,14 @@ class Part(item.Item):
         # and mimepart.Part seem to do totally different things
 
         yield mimepart.Part(self.message.storeID, self.partID,
-                            self.getContentType(), children=[child])
+                            self.getContentType(), children=[child],
+                            part=self)
 
     def iterate_text_html(self):
         yield mimepart.HTMLPart(self.message.storeID, self.partID,
                                 self.getContentType(),
-                                children=[self.getUnicodeBody()])
+                                children=[self.getUnicodeBody()],
+                                part=self)
 
     def _firstChildWithContentType(self, ctype='text/plain'):
         children = self.walk()
