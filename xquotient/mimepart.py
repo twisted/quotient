@@ -8,14 +8,18 @@ from zope.interface import Interface, implements
 from cStringIO import StringIO
 
 from twisted.internet import defer
+from twisted.python.components import registerAdapter
+
 from twisted.mail import smtp
+
+from nevow import inevow
 
 from epsilon import cooperator
 
 from xmantissa.ixmantissa import INavigableElement
 from xmantissa import webnav
 
-from xquotient import equotient
+from xquotient import equotient, webmail
 
 MIME_DEPTH_MAX = 50
 RECEIVED_HEADER_LIMIT = 100
@@ -74,7 +78,6 @@ class Part(Container):
 
     def hasPlain(self):
         return self.type and 'text/plain' in self.type
-
 
 class HTMLPart(Part):
     """A Part subclass representing an HTML part. HTML parts
@@ -142,6 +145,7 @@ class Paragraph(Container):
         """
         raise NotImplementedError, 'implement in subclass'
 
+registerAdapter(webmail.ParagraphRenderer, Paragraph, inevow.IRenderer)
 
 class FixedParagraph(Paragraph):
     """A fixed paragraph is already wrapped.
