@@ -1,10 +1,18 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
+from twisted.protocols import sux
+from twisted.web.microdom import parseString
+
+from nevow.inevow import IRequest
 from epsilon.extime import Time
 
 from axiom import item, attributes
 
+from xmantissa import website
+
+from xquotient.scrubber import scrub
 from xquotient import mimepart, equotient, mimeutil
+
 import quopri, binascii
 
 class Header(item.Item):
@@ -302,3 +310,42 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                     break
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
+
+class PartData(item.Item, website.PrefixURLMixin):
+    """An object which knows how to render a Part.
+
+    - If rendered directly, it will simply render the original part, setting
+      the appropriate Content-type header.
+
+    - If the query argument 'untrusted' is present, the part is assumed
+      to be an HTML part which is not trusted. The HTML will be loaded,
+      parsed with microdom in 'lenient' mode, and scrubbed with
+      quotient.web.scrubber. The return result will be rendered.
+    """
+    typeName = 'quotient_part_data'
+    schemaVersion = 1
+
+    sessioned = True
+    sessionless = False
+
+    prefixURL = attributes.text()
+    part = attributes.reference()
+    installedOn = attributes.reference()
+
+    def renderHTTP(self, ctx):
+        payload = self.part.getBody(True)
+
+        if ctx.arg('untrusted'):
+            try:
+                dom = parseString(payload, beExtremelyLenient=True)
+            except sux.ParseError:
+                payload = 'Unable to parse badly formed HTML; unable to safely clean it.'
+            else:
+                scrub(dom)
+                payload = dom.toprettyxml()[21:] # Chop of the xml prolog output by microdom
+                # If the length of the xml prolog ever changes, we're screwed; microdom should be
+                # configurable not to spit it out if you want, anyway.
+
+        request = IRequest(ctx)
+        request.setHeader('content-type', self.part.getContentType())
+        return payload
