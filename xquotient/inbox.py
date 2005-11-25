@@ -6,7 +6,7 @@ from nevow import tags
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 from axiom.slotmachine import hyper as super
-from xmantissa import ixmantissa, tdb, tdbview, webnav
+from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs
 
 from xquotient.exmess import Message
 from xquotient.mimeutil import EmailAddress
@@ -47,6 +47,53 @@ class MessageLinkColumnView(DefaultingColumnView):
             self.translator = ixmantissa.IWebTranslator(item.store)
         linktext = DefaultingColumnView.stanFromValue(self, idx, item, value)
         return tags.a(href=self.translator.linkTo(item.storeID))[linktext]
+
+class PreferredMimeType(prefs.MultipleChoicePreference):
+    def valueToDisplay(self, value):
+        return value.capitalize()
+
+    def displayToValue(self, display):
+        return display.lower()
+
+class _PreferredMimeType(prefs.MultipleChoicePreference):
+    def __init__(self, value, collection):
+        valueToDisplay = {u'text/html':'Html', u'text/plain':'Text'}
+        desc = 'Your preferred format for display of email'
+
+        super(_PreferredMimeType, self).__init__('preferredMimeType',
+                                                 value,
+                                                 'Preferred Format',
+                                                 collection, desc,
+                                                 valueToDisplay)
+
+class QuotientPreferenceCollection(Item, InstallableMixin):
+    implements(ixmantissa.IPreferenceCollection)
+
+    schemaVersion = 1
+    typeName = 'quotient_preference_collection'
+    name = 'Email Preferences'
+
+    preferredMimeType = attributes.text(default=u'text/plain')
+    installedOn = attributes.reference()
+    _cachedPrefs = attributes.inmemory()
+
+    def installOn(self, other):
+        super(QuotientPreferenceCollection, self).installOn(other)
+        other.powerUp(self, ixmantissa.IPreferenceCollection)
+
+    def activate(self):
+        pmt = _PreferredMimeType(self.preferredMimeType, self)
+        self._cachedPrefs = dict(preferredMimeType=pmt)
+
+    # IPreferenceCollection
+    def getPreferences(self):
+        return self._cachedPrefs
+
+    def setPreferenceValue(self, pref, value):
+        # this ugliness is short lived
+        assert hasattr(self, pref.key)
+        setattr(pref, 'value', value)
+        self.store.transact(lambda: setattr(self, pref.key, value))
 
 class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)

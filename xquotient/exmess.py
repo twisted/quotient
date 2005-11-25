@@ -27,15 +27,21 @@ class Message(item.Item, item.InstallableMixin):
     subject = attributes.text()
     impl = attributes.reference()
 
+    _prefs = attributes.inmemory()
+
     def installOn(self, other):
         super(Message, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
+
+    def activate(self):
+        self._prefs = ixmantissa.IPreferenceAggregator(self.store)
 
     def getTabs(self):
         return ()
 
     def walkMessage(self):
-        return self.impl.walkMessage()
+        preferred = self._prefs.getPreferenceValue('preferredMimeType')
+        return self.impl.walkMessage(prefer=preferred)
 
     def getSubPart(self, partID):
         return self.impl.getSubPart(partID)

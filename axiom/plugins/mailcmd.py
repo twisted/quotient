@@ -57,6 +57,7 @@ class MailConfiguration(usage.Options):
                 s.findOrCreate(website.StaticSite,
                                prefixURL=u'static/quotient',
                                staticContentPath=sibpath(mail.__file__, u'static')).installOn(s)
+                s.findOrCreate(inbox.QuotientPreferenceCollection).installOn(s)
 
                 self.didSomething = True
 

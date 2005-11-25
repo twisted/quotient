@@ -226,18 +226,23 @@ class Part(item.Item):
             return unicode(payload, default, 'replace')
 
 
-    def walkMessage(self): # XXX RENAME ME
+    def walkMessage(self, prefer): # XXX RENAME ME
         """
         Return an iterator of Paragraph, Extract, and Embedded instances for
         this part of the message.
         """
         ctype = self.getContentType(default='text/plain')
+        if ctype.startswith('multipart'):
+            args = (prefer,)
+        else:
+            args = ()
+
         methodName = 'iterate_'+ctype.replace('/', '_')
         method = getattr(self, methodName, None)
         if method is None:
             assert False, 'no method for content type: %r' (ctype,)
         else:
-            return method()
+            return method(*args)
 
     def iterate_text_plain(self):
         content = self.getUnicodeBody()
@@ -268,17 +273,17 @@ class Part(item.Item):
             if part.getContentType() == ctype:
                 return part
 
-    def iterate_multipart_alternative(self):
-        part = self._firstChildWithContentType()
+    def iterate_multipart_alternative(self, prefer):
+        part = self._firstChildWithContentType(prefer)
         if part is not None:
-            return part.walkMessage()
+            return part.walkMessage(prefer)
         else:
             assert False, 'no text/plain'
 
-    def iterate_multipart_mixed(self):
-        part = self._firstChildWithContentType()
+    def iterate_multipart_mixed(self, prefer):
+        part = self._firstChildWithContentType(prefer)
         if part is not None:
-            return part.walkMessage()
+            return part.walkMessage(prefer)
         else:
             assert False, 'no text/plain'
 
