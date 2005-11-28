@@ -244,6 +244,21 @@ class Part(item.Item):
         else:
             return method(*args)
 
+    def getAttachments(self):
+        for part in self.walk():
+            try:
+                disposition = part.getHeader(u'content-disposition')
+            except equotient.NoSuchHeader:
+                disposition = ''
+
+            ctyp = part.getContentType()
+            if (not (ctyp.startswith('text') or ctyp.startswith('multipart'))
+                    or disposition.startswith('attachment')):
+
+                yield mimepart.AttachmentPart(self.message.storeID,
+                                              part.partID, ctyp,
+                                              disposition=disposition,
+                                              part=part)
     def iterate_text_plain(self):
         content = self.getUnicodeBody()
 
@@ -262,30 +277,35 @@ class Part(item.Item):
     def iterate_text_html(self):
         yield mimepart.HTMLPart(self.message.storeID, self.partID,
                                 self.getContentType(),
-                                children=[self.getUnicodeBody()],
                                 part=self)
 
-    def _firstChildWithContentType(self, ctype='text/plain'):
-        children = self.walk()
-        children.next()
 
-        for part in children:
-            if part.getContentType() == ctype:
+    def readableParts(self):
+        '''return all parts with a content type of text/*'''
+        return (part for part in self.walk()
+                    if part.getContentType().startswith('text/'))
+
+    def readablePart(self, prefer):
+        '''return one text/* part, preferably of type prefer.  or None'''
+        parts = list(self.readableParts())
+        if len(parts) == 0:
+            return None
+        for part in parts:
+            if part.getContentType() == prefer:
                 return part
+        return parts[0]
 
     def iterate_multipart_alternative(self, prefer):
-        part = self._firstChildWithContentType(prefer)
+        part = self.readablePart(prefer)
         if part is not None:
-            return part.walkMessage(prefer)
-        else:
-            assert False, 'no text/plain'
+            for child in part.walkMessage(prefer):
+                yield child
 
     def iterate_multipart_mixed(self, prefer):
-        part = self._firstChildWithContentType(prefer)
-        if part is not None:
-            return part.walkMessage(prefer)
-        else:
-            assert False, 'no text/plain'
+        # maybe dont shove these all on one page
+        for part in self.readableParts():
+            for child in part.walkMessage(prefer):
+                yield child
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, message, *a, **kw):

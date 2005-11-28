@@ -95,6 +95,17 @@ class HTMLPart(Part):
 
 registerAdapter(webmail.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
 
+class AttachmentPart(Part):
+    def __init__(self, messageID, identifier, type, part=None, disposition=None):
+        super(AttachmentPart, self).__init__(messageID, identifier, type, part=part)
+        self.disposition = disposition
+
+    def hasHTML(self):
+        return False
+
+    def hasPlain(self):
+        return False
+
 class Multipart(Part):
     """A Part subclass representing the MIME Multipart concept.
 

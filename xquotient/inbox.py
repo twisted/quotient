@@ -57,7 +57,7 @@ class PreferredMimeType(prefs.MultipleChoicePreference):
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):
-        valueToDisplay = {u'text/html':'Html', u'text/plain':'Text'}
+        valueToDisplay = {u'text/html':'HTML', u'text/plain':'Text'}
         desc = 'Your preferred format for display of email'
 
         super(_PreferredMimeType, self).__init__('preferredMimeType',
