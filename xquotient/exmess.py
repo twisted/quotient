@@ -194,12 +194,16 @@ class MessageDetail(webapp.NavMixin, rend.Page):
 
         if switch:
             op = operator.lt
-            sortColumn = sortColumn.ascending
         else:
             op = operator.gt
-            sortColumn = sortColumn.descending
 
         comparison = op(getattr(self.original, column), sortColumn)
+
+        if switch:
+            sortColumn = sortColumn.ascending
+        else:
+            sortColumn = sortColumn.descending
+
         if baseComparison is not None:
             comparison = attributes.AND(comparison, baseComparison)
 
@@ -231,8 +235,14 @@ class MessageDetail(webapp.NavMixin, rend.Page):
         return self.patterns['prev-message-link'].fillSlots(
                 'location', self._makeMessageLink(ctx, prev))
 
-    def render_nextUnreadLink(self, ctx, data):
-        pass
+    def render_nextUnreadMessageLink(self, ctx, data):
+        next = self._adjacentMessage(ctx, prev=False,
+                                     baseComparison=Message.read == False)
+        if next is None:
+            return self.patterns['no-next-unread-message']()
+
+        return self.patterns['next-unread-message-link'].fillSlots(
+                'location', self._makeMessageLink(ctx, next))
 
     def render_head(self, ctx, data):
         content = []
