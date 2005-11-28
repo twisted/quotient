@@ -244,7 +244,7 @@ class Part(item.Item):
         else:
             return method(*args)
 
-    def getAttachments(self):
+    def walkAttachments(self):
         for part in self.walk():
             try:
                 disposition = part.getHeader(u'content-disposition')

@@ -13,7 +13,15 @@
   </iframe>
 
   <div nevow:pattern="attachment">
-    Attachment! <nevow:slot name="filename" />
+    <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr><nevow:slot name="filename" /></a>
+  </div>
+
+  <div nevow:pattern="image-attachment">
+    <a>
+      <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+      <img><nevow:attr name="src"><nevow:slot name="location" /></nevow:attr></img>
+      <nevow:slot name="filename" />
+    </a>
   </div>
 
 </nevow:invisible>

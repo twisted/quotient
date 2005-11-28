@@ -2,6 +2,7 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 
 from nevow import rend, inevow, static
+from nevow.url import URL
 
 from axiom.slotmachine import hyper as super
 from axiom import item, attributes
@@ -55,8 +56,34 @@ class Message(item.Item, item.InstallableMixin):
             return self.impl
         return self.getSubPart(partID)
 
-    def getAttachments(self):
-        return self.impl.getAttachments()
+    def walkAttachments(self):
+        '''"attachments" are message parts that are not readable'''
+        return self.impl.walkAttachments()
+
+class PartDisplayer(rend.Page):
+    def locateChild(self, ctx, segments):
+        fname = getattr(self.original, 'filename', None)
+        if len(segments) == 1 and segments[0] == fname:
+            return self, ()
+        return rend.NotFound
+
+    def renderHTTP(self, ctx):
+        request = inevow.IRequest(ctx)
+        request.setHeader('content-type', self.original.type)
+
+        if hasattr(self.original, 'disposition'):
+            request.setHeader('content-disposition',
+                              self.original.disposition)
+
+        if self.original.type.startswith('text/'):
+            # FIXME weird to decode here.
+            # alse replace original.part with the Container.children idiom
+            # from mimepart.
+            content = self.original.part.getUnicodeBody().decode('utf-8')
+        else:
+            content = self.original.part.getBody(decode=True)
+
+        return content
 
 class MessageDetail(webapp.NavMixin, rend.Page):
     '''i represent the viewable facet of some kind of message'''
@@ -64,12 +91,16 @@ class MessageDetail(webapp.NavMixin, rend.Page):
     docFactory = getLoader('shell')
     contentFragment = getLoader('message-detail')
     patterns = PatternDictionary(getLoader('message-detail-patterns'))
+    _partsByID = None
 
     def __init__(self, original):
         rend.Page.__init__(self, original)
         webapp.NavMixin.__init__(self,
             original.store.findUnique(webapp.PrivateApplication),
             self._getPageComponents())
+
+        self.messageParts = original.walkMessage()
+        self.attachmentParts = original.walkAttachments()
 
     def _getPageComponents(self):
         # this is not nice.  it doesn't really make sense for webapp
@@ -91,15 +122,21 @@ class MessageDetail(webapp.NavMixin, rend.Page):
                                       s.findFirst(MyAccount))
 
     def locateChild(self, ctx, segments):
+        if self._partsByID is None:
+            byid = lambda i: dict((p.identifier, p) for p in i)
+            self._partsByID = byid(self.messageParts)
+            self._partsByID.update(byid(self.attachmentParts))
+
         try:
-            (segment,) = segments
-        except ValueError: # fix this at some point
+            partID = int(segments[0])
+        except ValueError:
             return rend.NotFound
 
-        part = self.original.getPart(int(segment))
-        body = part.getUnicodeBody().encode('utf-8')
-        resource = static.Data(body, part.getContentType())
-        return resource, ()
+        part = self._partsByID.get(partID)
+        if part is None or part.alwaysInline:
+            return rend.NotFound
+
+        return (PartDisplayer(part), segments[1:])
 
     def render_content(self, ctx, data):
         return ctx.tag[self.contentFragment]
@@ -111,15 +148,26 @@ class MessageDetail(webapp.NavMixin, rend.Page):
                                 'subject', self.original.subject)
 
     def render_attachmentPanel(self, ctx, data):
-        apattern = self.patterns['attachment']
+        requestURL = URL.fromContext(ctx)
+
         patterns = list()
-        for attachment in self.original.getAttachments():
-            patterns.append(apattern.fillSlots('filename', attachment.filename))
+        for attachment in self.attachmentParts:
+            if attachment.type.startswith('image/'):
+                pname = 'image-attachment'
+            else:
+                pname = 'attachment'
+
+            p = self.patterns[pname].fillSlots('filename', attachment.filename)
+            location = requestURL.child(attachment.identifier)
+            if attachment.filename is not None:
+                location = location.child(attachment.filename)
+            patterns.append(p.fillSlots('location', str(location)))
+
         return ctx.tag[patterns]
 
     def render_messageBody(self, ctx, data):
         paragraphs = list()
-        for part in self.original.walkMessage():
+        for part in self.messageParts:
             renderable = inevow.IRenderer(part, None)
             if renderable is None:
                 for child in part.children:

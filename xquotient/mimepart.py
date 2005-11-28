@@ -67,6 +67,9 @@ class Part(Container):
 
     @ivar type: the MIME type of this part.
     """
+
+    alwaysInline = True
+
     def __init__(self, messageID, identifier, type, children=None, part=None):
         super(Part, self).__init__(children)
         self.messageID = messageID
@@ -87,6 +90,9 @@ class HTMLPart(Part):
     them to prevent interference from other HTML parts and the application
     itself.
     """
+
+    alwaysInline = False
+
     def hasHTML(self):
         return True
 
@@ -96,6 +102,8 @@ class HTMLPart(Part):
 registerAdapter(webmail.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
 
 class AttachmentPart(Part):
+    alwaysInline = False
+
     def __init__(self, messageID, identifier, type,
                  part=None, disposition=None, filename=None):
         super(AttachmentPart, self).__init__(messageID, identifier, type, part=part)
