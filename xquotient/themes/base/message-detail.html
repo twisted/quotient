@@ -10,9 +10,17 @@
       <td>Subject</td><td><nevow:slot name="subject" /></td>
     </tr>
   </table>
-  <nevow:invisible nevow:render="prevMessageLink" />
-  <nevow:invisible nevow:render="nextMessageLink" />
-  <nevow:invisible nevow:render="nextUnreadMessageLink" />
+  <table style="width: 70%">
+    <tr valign="top">
+      <td>
+        <nevow:invisible nevow:render="prevMessageLink" />
+      </td>
+      <td align="right" style="text-align: right">
+        <nevow:invisible nevow:render="nextMessageLink" /> |
+        <nevow:invisible nevow:render="nextUnreadMessageLink" />
+      </td>
+    </tr>
+  </table>
   <p />
   <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
