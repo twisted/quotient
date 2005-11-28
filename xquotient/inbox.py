@@ -6,7 +6,10 @@ from nevow import tags
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 from axiom.slotmachine import hyper as super
+
 from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs
+from xmantissa.fragmentutils import PatternDictionary
+from xmantissa.publicresource import getLoader
 
 from xquotient.exmess import Message
 from xquotient.mimeutil import EmailAddress
@@ -41,19 +44,26 @@ class EmailAddressColumnView(DefaultingColumnView):
 
 class MessageLinkColumnView(DefaultingColumnView):
     translator = None
+    patterns = PatternDictionary(getLoader('message-detail-patterns'))
+
+    def __init__(self, tdb, attributeID, default, displayName=None,
+                 width=None, typeHint=None, maxLength=None):
+        DefaultingColumnView.__init__(self, attributeID, default, displayName,
+                                      width, typeHint, maxLength)
+        self.tdb = tdb
 
     def stanFromValue(self, idx, item, value):
         if self.translator is None:
             self.translator = ixmantissa.IWebTranslator(item.store)
-        linktext = DefaultingColumnView.stanFromValue(self, idx, item, value)
-        return tags.a(href=self.translator.linkTo(item.storeID))[linktext]
-
-class PreferredMimeType(prefs.MultipleChoicePreference):
-    def valueToDisplay(self, value):
-        return value.capitalize()
-
-    def displayToValue(self, display):
-        return display.lower()
+        # this is not good
+        location = self.translator.linkTo(item.storeID)
+        location += '?sort=%s&asc=%d' % (self.tdb.currentSortColumn.attributeID,
+                                         int(self.tdb.isAscending))
+        subject = DefaultingColumnView.stanFromValue(self, idx, item, value)
+        pname = ('unread-message-link', 'read-message-link')[item.read]
+        return self.patterns[pname].fillSlots(
+                'subject', subject).fillSlots(
+                'location', location)
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):
@@ -120,11 +130,13 @@ class InboxMessageView(tdbview.TabularDataView):
                 Message, [Message.sender,
                           Message.subject,
                           Message.received],
+                defaultSortColumn='received',
+                defaultSortAscending=False,
                 itemsPerPage=prefs.getPreferenceValue('itemsPerPage'))
 
         views = [StoreIDColumnView('storeID'),
                  EmailAddressColumnView('sender', 'No Sender', maxLength=40),
-                 MessageLinkColumnView('subject', 'No Subject', maxLength=100),
+                 MessageLinkColumnView(tdm, 'subject', 'No Subject', maxLength=100),
                  tdbview.DateColumnView('received')]
 
         tdbview.TabularDataView.__init__(self, tdm, views)

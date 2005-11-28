@@ -10,11 +10,13 @@
       <td>Subject</td><td><nevow:slot name="subject" /></td>
     </tr>
   </table>
-  <p />
-  <div style="width: 80%" nevow:render="attachmentPanel" />
+  <nevow:invisible nevow:render="prevMessageLink" />
+  <nevow:invisible nevow:render="nextMessageLink" />
   <p />
   <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
+  <p />
+  <div style="width: 80%" nevow:render="attachmentPanel" />
 </div>
 

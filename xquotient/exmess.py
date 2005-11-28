@@ -1,7 +1,9 @@
+import operator
+
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import rend, inevow, static
+from nevow import rend, inevow
 from nevow.url import URL
 
 from axiom.slotmachine import hyper as super
@@ -11,8 +13,6 @@ from xmantissa import ixmantissa, webapp, webnav, webtheme
 from xmantissa.publicresource import getLoader
 from xmantissa.myaccount import MyAccount
 from xmantissa.fragmentutils import PatternDictionary
-
-from xquotient import webmail
 
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
@@ -28,6 +28,8 @@ class Message(item.Item, item.InstallableMixin):
     sender = attributes.text()
     recipient = attributes.text()
     subject = attributes.text()
+    read = attributes.boolean(default=False)
+
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()
@@ -99,8 +101,12 @@ class MessageDetail(webapp.NavMixin, rend.Page):
             original.store.findUnique(webapp.PrivateApplication),
             self._getPageComponents())
 
-        self.messageParts = original.walkMessage()
-        self.attachmentParts = original.walkAttachments()
+        if not original.read:
+            original.read = True
+
+        self.messageParts = list(original.walkMessage())
+        self.attachmentParts = list(original.walkAttachments())
+        self.translator = ixmantissa.IWebTranslator(original.store)
 
     def _getPageComponents(self):
         # this is not nice.  it doesn't really make sense for webapp
@@ -178,6 +184,56 @@ class MessageDetail(webapp.NavMixin, rend.Page):
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
 
+    def _adjacentMessage(self, ctx, prev, baseComparison=None):
+        # prev is a boolean
+        args = inevow.IRequest(ctx).args
+        (column,) = args['sort']
+        (ascending,) = args['asc']
+        switch = prev ^ int(ascending)
+        sortColumn = getattr(Message, column)
+
+        if switch:
+            op = operator.lt
+            sortColumn = sortColumn.ascending
+        else:
+            op = operator.gt
+            sortColumn = sortColumn.descending
+
+        comparison = op(getattr(self.original, column), sortColumn)
+        if baseComparison is not None:
+            comparison = attributes.AND(comparison, baseComparison)
+
+        try:
+            return iter(self.original.store.query(Message,
+                            comparison, limit=1,
+                            sort=sortColumn)).next()
+        except StopIteration:
+            return None
+
+    def _makeMessageLink(self, ctx, item):
+        args = inevow.IRequest(ctx).args
+        return (self.translator.linkTo(item.storeID) +
+                '?sort=%s&asc=%s' % (args['sort'][0], args['asc'][0]))
+
+    def render_nextMessageLink(self, ctx, data):
+        next = self._adjacentMessage(ctx, prev=False)
+        if next is None:
+            return self.patterns['no-next-message']()
+
+        return self.patterns['next-message-link'].fillSlots(
+                    'location', self._makeMessageLink(ctx, next))
+
+    def render_prevMessageLink(self, ctx, data):
+        prev = self._adjacentMessage(ctx, prev=True)
+        if prev is None:
+            return self.patterns['no-prev-message']()
+
+        return self.patterns['prev-message-link'].fillSlots(
+                'location', self._makeMessageLink(ctx, prev))
+
+    def render_nextUnreadLink(self, ctx, data):
+        pass
+
     def render_head(self, ctx, data):
         content = []
         for theme in webtheme.getAllThemes():
@@ -186,5 +242,6 @@ class MessageDetail(webapp.NavMixin, rend.Page):
                 content.append(extra)
 
         return ctx.tag[content]
+
 
 registerAdapter(MessageDetail, Message, inevow.IResource)

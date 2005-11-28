@@ -6,22 +6,52 @@
       <nevow:slot name="content" />
     </div>
     <nevow:slot name="content" />
-    </nevow:invisible>
+  </nevow:invisible>
 
   <iframe nevow:pattern="content-iframe" frameborder="0" width="100%" onload="resizeIFrame(this)">
     <nevow:attr name="src"><nevow:slot name="location" /></nevow:attr>
   </iframe>
 
-  <div nevow:pattern="attachment">
+  <span nevow:pattern="attachment">
     <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr><nevow:slot name="filename" /></a>
-  </div>
+  </span>
 
-  <div nevow:pattern="image-attachment">
+  <span nevow:pattern="image-attachment">
+    <span style="width: 100%; background-color: #DADADA">
+      <nevow:slot name="filename" />
+    </span><br />
     <a>
       <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
       <img><nevow:attr name="src"><nevow:slot name="location" /></nevow:attr></img>
-      <nevow:slot name="filename" />
-    </a>
-  </div>
+    </a><br />
+  </span>
+
+  <a nevow:pattern="read-message-link">
+    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+    <nevow:slot name="subject" />
+  </a>
+
+  <a nevow:pattern="unread-message-link" style="font-weight: bold">
+    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+    <nevow:slot name="subject" />
+  </a>
+
+  <span nevow:pattern="no-prev-message">
+    Previous Message
+  </span>
+
+  <a nevow:pattern="prev-message-link">
+    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+    Previous Message
+  </a>
+
+  <span nevow:pattern="no-next-message">
+    Next Message
+  </span>
+
+  <a nevow:pattern="next-message-link">
+    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+    Next Message
+  </a>
 
 </nevow:invisible>

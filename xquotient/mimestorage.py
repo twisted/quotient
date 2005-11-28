@@ -252,7 +252,8 @@ class Part(item.Item):
                 disposition = ''
 
             ctyp = part.getContentType()
-            if (not (ctyp.startswith('text') or ctyp.startswith('multipart'))
+            if ctyp is not None and (not (ctyp.startswith('text')
+                or ctyp.startswith('multipart'))
                     or disposition.startswith('attachment')):
 
                 fname = part.getParam('filename', header=u'content-disposition')
