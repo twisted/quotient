@@ -6,6 +6,7 @@ from twisted.python.components import registerAdapter
 from nevow import rend, inevow
 from nevow.url import URL
 
+from axiom.tags import Catalog
 from axiom.slotmachine import hyper as super
 from axiom import item, attributes
 
@@ -146,6 +147,17 @@ class MessageDetail(webapp.NavMixin, rend.Page):
 
     def render_content(self, ctx, data):
         return ctx.tag[self.contentFragment]
+
+    def render_tags(self, ctx, data):
+        catalog = self.original.store.findOrCreate(Catalog)
+        tags = list()
+        for tag in catalog.tagsOf(self.original):
+            # make location be some link to see tagged messages
+            tags.append(dict(name=tag, location=''))
+
+        if 0 < len(tags):
+            return self.patterns['tag-list'](data=tags)
+        return ctx.tag
 
     def render_headerPanel(self, ctx, data):
         return ctx.tag.fillSlots(

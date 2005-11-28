@@ -14,3 +14,14 @@
     margin-left: 4px;
     padding-left: 2px;
 }
+
+.tag-panel {
+    border: solid 1px #000000;
+    background-color: #DADADA;
+    padding: 4px;
+}
+
+.tag-form {
+    text-align: right;
+    padding: 2px;
+}

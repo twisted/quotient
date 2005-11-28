@@ -22,10 +22,26 @@
     </tr>
   </table>
   <p />
-  <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
-    <nevow:slot name="paragraphs" />
-  </div>
-  <p />
-  <div style="width: 80%" nevow:render="attachmentPanel" />
+  <table>
+    <tr valign="top">
+      <td>
+        <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
+          <nevow:slot name="paragraphs" />
+        </div>
+        <p />
+        <div style="width: 80%" nevow:render="attachmentPanel" />
+      </td>
+      <td>
+        <div class="tag-panel">
+          <nevow:invisible nevow:render="tags" />
+          More Tags:
+          <form onsubmit="" class="tag-form">
+            <input type="text" /><br />
+            <input type="submit" value="Add"/>
+          </form>
+        </div>
+      </td>
+    </tr>
+  </table>
 </div>
 
