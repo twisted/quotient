@@ -79,7 +79,7 @@ class PartDisplayer(rend.Page):
             # FIXME weird to decode here.
             # alse replace original.part with the Container.children idiom
             # from mimepart.
-            content = self.original.part.getUnicodeBody().decode('utf-8')
+            content = self.original.part.getUnicodeBody().encode('utf-8')
         else:
             content = self.original.part.getBody(decode=True)
 
