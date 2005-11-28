@@ -6,10 +6,12 @@ from nevow import rend, inevow, static
 from axiom.slotmachine import hyper as super
 from axiom import item, attributes
 
-from xquotient import webmail
 from xmantissa import ixmantissa, webapp, webnav, webtheme
 from xmantissa.publicresource import getLoader
 from xmantissa.myaccount import MyAccount
+from xmantissa.fragmentutils import PatternDictionary
+
+from xquotient import webmail
 
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
@@ -53,11 +55,15 @@ class Message(item.Item, item.InstallableMixin):
             return self.impl
         return self.getSubPart(partID)
 
+    def getAttachments(self):
+        return self.impl.getAttachments()
+
 class MessageDetail(webapp.NavMixin, rend.Page):
     '''i represent the viewable facet of some kind of message'''
 
     docFactory = getLoader('shell')
     contentFragment = getLoader('message-detail')
+    patterns = PatternDictionary(getLoader('message-detail-patterns'))
 
     def __init__(self, original):
         rend.Page.__init__(self, original)
@@ -103,6 +109,13 @@ class MessageDetail(webapp.NavMixin, rend.Page):
                 'sender', self.original.sender).fillSlots(
                         'recipient', self.original.recipient).fillSlots(
                                 'subject', self.original.subject)
+
+    def render_attachmentPanel(self, ctx, data):
+        apattern = self.patterns['attachment']
+        patterns = list()
+        for attachment in self.original.getAttachments():
+            patterns.append(apattern.fillSlots('filename', attachment.filename))
+        return ctx.tag[patterns]
 
     def render_messageBody(self, ctx, data):
         paragraphs = list()

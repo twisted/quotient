@@ -96,9 +96,11 @@ class HTMLPart(Part):
 registerAdapter(webmail.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
 
 class AttachmentPart(Part):
-    def __init__(self, messageID, identifier, type, part=None, disposition=None):
+    def __init__(self, messageID, identifier, type,
+                 part=None, disposition=None, filename=None):
         super(AttachmentPart, self).__init__(messageID, identifier, type, part=part)
         self.disposition = disposition
+        self.filename = filename
 
     def hasHTML(self):
         return False

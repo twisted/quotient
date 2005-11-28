@@ -255,9 +255,11 @@ class Part(item.Item):
             if (not (ctyp.startswith('text') or ctyp.startswith('multipart'))
                     or disposition.startswith('attachment')):
 
+                fname = part.getParam('filename', header=u'content-disposition')
                 yield mimepart.AttachmentPart(self.message.storeID,
                                               part.partID, ctyp,
                                               disposition=disposition,
+                                              filename=fname,
                                               part=part)
     def iterate_text_plain(self):
         content = self.getUnicodeBody()
