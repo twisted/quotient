@@ -60,7 +60,10 @@ class ParagraphRenderer(rend.Fragment):
         slot color: The CSS color to use for this paragraph, pulled
             from the quoteColors list.
     """
-    docFactory = getLoader('message-detail-patterns')
+
+    def __init__(self, original):
+        rend.Fragment.__init__(self, original,
+                                getLoader('message-detail-patterns'))
 
     def render_paragraph(self, context, data):
         def render_children(context, data):
@@ -86,15 +89,15 @@ class ParagraphRenderer(rend.Fragment):
 class HTMLPartRenderer(object):
     implements(inevow.IRenderer)
 
-    docFactory = getLoader('message-detail-patterns')
-    iframePattern = inevow.IQ(docFactory).patternGenerator('content-iframe')
-
     def __init__(self, original):
         self.original = original
         # think about this some more - the messageID or partID could be the
         # mangled storeID of the part to facilitate the making of child
         # links here, but nobody except for us really needs to know about
         # this.
+        self.docFactory = getLoader('message-detail-patterns')
+        self.iframePattern = inevow.IQ(
+                self.docFactory).patternGenerator('content-iframe')
 
         self.urlPrefix = ixmantissa.IWebTranslator(
                             original.part.store).linkTo(original.messageID)

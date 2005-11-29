@@ -121,10 +121,10 @@ class MessageDetail(rend.Fragment):
     '''i represent the viewable facet of some kind of message'''
     implements(ixmantissa.INavigableFragment)
 
-    patterns = PatternDictionary(getLoader('message-detail-patterns'))
     _partsByID = None
 
     def __init__(self, original):
+        self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
         rend.Fragment.__init__(self, original, getLoader('message-detail'))
 
         if not original.read:

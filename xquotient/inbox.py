@@ -2,9 +2,11 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 
 from nevow import tags, livepage
+from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
+from axiom.tags import Catalog
 from axiom.slotmachine import hyper as super
 
 from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs
@@ -43,10 +45,12 @@ class EmailAddressColumnView(DefaultingColumnView):
         return DefaultingColumnView.stanFromValue(self, idx, item, value)
 
 class MessageLinkColumnView(DefaultingColumnView):
-    translator = None
-    patterns = PatternDictionary(getLoader('message-detail-patterns'))
+    patterns = None
 
     def stanFromValue(self, idx, item, value):
+        if self.patterns is None:
+            self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
+
         subject = DefaultingColumnView.stanFromValue(self, idx, item, value)
         pname = ('unread-message-link', 'read-message-link')[item.read]
         return self.patterns[pname].fillSlots(
@@ -109,8 +113,6 @@ class Inbox(Item, InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
 class InboxMessageView(tdbview.TabularDataView):
-    docFactory = getLoader('inbox')
-
     def __init__(self, original):
         prefs = ixmantissa.IPreferenceAggregator(original.store)
 
@@ -128,17 +130,32 @@ class InboxMessageView(tdbview.TabularDataView):
                  MessageLinkColumnView('subject', 'No Subject', maxLength=100),
                  tdbview.DateColumnView('received')]
 
+        self.docFactory = getLoader('inbox')
+        self.messageDetailPatterns = PatternDictionary(
+                                            getLoader('message-detail-patterns'))
+
         tdbview.TabularDataView.__init__(self, tdm, views)
+
+    def replaceTable(self):
+        yield tdbview.TabularDataView.replaceTable(self)
+        yield (livepage.js.fitMessageDetailToPage(), livepage.eol)
+
+    def _tagsForCurrentMessage(self):
+        catalog = self.original.store.findOrCreate(Catalog)
+        tags = list()
+        for tag in catalog.tagsOf(self.original):
+            tags.append(dict(name=tag, location=''))
+        return self.messageDetailPatterns['tag-list'](data=tags)
 
     def handle_loadMessage(self, ctx, targetID):
         modelData = list(self.original.currentPage())
-        target = modelData[int(targetID)]['__item__']
+        self.currentMessage = modelData[int(targetID)]['__item__']
         # we are sending too much stuff here - once it becomes apparent
         # that this is a viable way to do things, just fill in slots in
         # the inbox page with the data from the Message
-        html = ixmantissa.INavigableFragment(target).rend(ctx, None)
-        from nevow.flat import flatten
-        return (livepage.set('message-detail', flatten(html)), livepage.eol)
+        html = ixmantissa.INavigableFragment(self.currentMessage).rend(ctx, None)
+        yield (livepage.set('message-detail', flatten(html)), livepage.eol)
+        yield (livepage.set('message-tags', self._tagsForCurrentMessage()), livepage.eol)
 
 registerAdapter(InboxMessageView, Inbox, ixmantissa.INavigableFragment)
 

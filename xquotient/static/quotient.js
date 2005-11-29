@@ -50,11 +50,15 @@ function findPosY(obj) {
     return curtop;
 }
 
-function fitToPage(element) {
+function fitMessageDetailToPage() {
+    var element = document.getElementById("message-detail");
     element.style.height = document.documentElement.clientHeight - findPosY(element) - 20 + 'px';
 }
 
 function loadMessage(messageID) {
-    fitToPage(document.getElementById("message-detail"));
+    var cpanel = document.getElementById("message-control-panel");
+    if(cpanel.style.display == "none")
+        cpanel.style.display = "block";
+    fitMessageDetailToPage();
     server.handle('loadMessage', messageID);
 }
