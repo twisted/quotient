@@ -34,3 +34,27 @@ function resizeIFrameHeight(frame) {
     window.status = e.message;
   }
 }
+
+function findPosY(obj) {
+    var curtop = 0;
+    if (obj.offsetParent)
+    {
+        while (obj.offsetParent)
+        {
+            curtop += obj.offsetTop
+            obj = obj.offsetParent;
+        }
+    }
+    else if (obj.y)
+        curtop += obj.y;
+    return curtop;
+}
+
+function fitToPage(element) {
+    element.style.height = document.documentElement.clientHeight - findPosY(element) - 20 + 'px';
+}
+
+function loadMessage(messageID) {
+    fitToPage(document.getElementById("message-detail"));
+    server.handle('loadMessage', messageID);
+}

@@ -26,13 +26,13 @@
     </a><br />
   </span>
 
-  <a nevow:pattern="read-message-link">
-    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+  <a nevow:pattern="read-message-link" href="#">
+    <nevow:attr name="onclick"><nevow:slot name="onclick" /></nevow:attr>
     <nevow:slot name="subject" />
   </a>
 
-  <a nevow:pattern="unread-message-link" style="font-weight: bold">
-    <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+  <a nevow:pattern="unread-message-link" style="font-weight: bold" href="#">
+    <nevow:attr name="onclick"><nevow:slot name="onclick" /></nevow:attr>
     <nevow:slot name="subject" />
   </a>
 

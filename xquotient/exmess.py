@@ -19,31 +19,22 @@ from xmantissa.fragmentutils import PatternDictionary
 # core of Quotient.
 
 class Message(item.Item, item.InstallableMixin):
-    implements(ixmantissa.INavigableElement)
-
     typeName = 'quotient_message'
     schemaVersion = 1
 
-    # add installedOn
+    installedOn = attributes.reference()
+
     received = attributes.timestamp()
     sender = attributes.text()
     recipient = attributes.text()
     subject = attributes.text()
     read = attributes.boolean(default=False)
-
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()
 
-    def installOn(self, other):
-        super(Message, self).installOn(other)
-        other.powerUp(self, ixmantissa.INavigableElement)
-
     def activate(self):
         self._prefs = None
-
-    def getTabs(self):
-        return ()
 
     def walkMessage(self):
         if self._prefs is None:
@@ -88,19 +79,15 @@ class PartDisplayer(rend.Page):
 
         return content
 
-class MessageDetail(webapp.NavMixin, rend.Page):
+class MessageDetail(rend.Fragment):
     '''i represent the viewable facet of some kind of message'''
+    implements(ixmantissa.INavigableFragment)
 
-    docFactory = getLoader('shell')
-    contentFragment = getLoader('message-detail')
     patterns = PatternDictionary(getLoader('message-detail-patterns'))
     _partsByID = None
 
     def __init__(self, original):
-        rend.Page.__init__(self, original)
-        webapp.NavMixin.__init__(self,
-            original.store.findUnique(webapp.PrivateApplication),
-            self._getPageComponents())
+        rend.Fragment.__init__(self, original, getLoader('message-detail'))
 
         if not original.read:
             original.read = True
@@ -108,25 +95,6 @@ class MessageDetail(webapp.NavMixin, rend.Page):
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
-
-    def _getPageComponents(self):
-        # this is not nice.  it doesn't really make sense for webapp
-        # to pass _PageComponents to IResource implementors, but there
-        # is stuff in there that we need if we are going to convincingly
-        # pretend to be an INavigableFragment, so we'll get the stuff
-        # ourselves.  think about making this a function in webapp or a
-        # PageComponents.fromAvatar class method rather than something
-        # that happens in PrivateApplication.createResource
-
-        s = self.original.store
-        navigation = webnav.getTabs(s.powerupsFor(ixmantissa.INavigableElement))
-        searchAggregator = ixmantissa.ISearchAggregator(s, None)
-        staticShellContent = ixmantissa.IStaticShellContent(s, None)
-
-        return webapp._PageComponents(navigation,
-                                      searchAggregator,
-                                      staticShellContent,
-                                      s.findFirst(MyAccount))
 
     def locateChild(self, ctx, segments):
         if self._partsByID is None:
@@ -144,9 +112,6 @@ class MessageDetail(webapp.NavMixin, rend.Page):
             return rend.NotFound
 
         return (PartDisplayer(part), segments[1:])
-
-    def render_content(self, ctx, data):
-        return ctx.tag[self.contentFragment]
 
     def render_tags(self, ctx, data):
         catalog = self.original.store.findOrCreate(Catalog)
@@ -197,6 +162,7 @@ class MessageDetail(webapp.NavMixin, rend.Page):
         return ctx.tag.fillSlots('paragraphs', paragraphs)
 
     def _adjacentMessage(self, ctx, prev, baseComparison=None):
+        return None
         # prev is a boolean
         args = inevow.IRequest(ctx).args
         (column,) = args['sort']
@@ -256,14 +222,4 @@ class MessageDetail(webapp.NavMixin, rend.Page):
         return self.patterns['next-unread-message-link'].fillSlots(
                 'location', self._makeMessageLink(ctx, next))
 
-    def render_head(self, ctx, data):
-        content = []
-        for theme in webtheme.getAllThemes():
-            extra = theme.head()
-            if extra is not None:
-                content.append(extra)
-
-        return ctx.tag[content]
-
-
-registerAdapter(MessageDetail, Message, inevow.IResource)
+registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

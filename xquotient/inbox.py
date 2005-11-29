@@ -1,7 +1,7 @@
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import tags
+from nevow import tags, livepage
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -46,24 +46,12 @@ class MessageLinkColumnView(DefaultingColumnView):
     translator = None
     patterns = PatternDictionary(getLoader('message-detail-patterns'))
 
-    def __init__(self, tdb, attributeID, default, displayName=None,
-                 width=None, typeHint=None, maxLength=None):
-        DefaultingColumnView.__init__(self, attributeID, default, displayName,
-                                      width, typeHint, maxLength)
-        self.tdb = tdb
-
     def stanFromValue(self, idx, item, value):
-        if self.translator is None:
-            self.translator = ixmantissa.IWebTranslator(item.store)
-        # this is not good
-        location = self.translator.linkTo(item.storeID)
-        location += '?sort=%s&asc=%d' % (self.tdb.currentSortColumn.attributeID,
-                                         int(self.tdb.isAscending))
         subject = DefaultingColumnView.stanFromValue(self, idx, item, value)
         pname = ('unread-message-link', 'read-message-link')[item.read]
         return self.patterns[pname].fillSlots(
                 'subject', subject).fillSlots(
-                'location', location)
+                'onclick', 'loadMessage(%r); return false' % (idx,))
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):
@@ -121,6 +109,7 @@ class Inbox(Item, InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
 class InboxMessageView(tdbview.TabularDataView):
+    docFactory = getLoader('inbox')
 
     def __init__(self, original):
         prefs = ixmantissa.IPreferenceAggregator(original.store)
@@ -136,12 +125,20 @@ class InboxMessageView(tdbview.TabularDataView):
 
         views = [StoreIDColumnView('storeID'),
                  EmailAddressColumnView('sender', 'No Sender', maxLength=40),
-                 MessageLinkColumnView(tdm, 'subject', 'No Subject', maxLength=100),
+                 MessageLinkColumnView('subject', 'No Subject', maxLength=100),
                  tdbview.DateColumnView('received')]
 
         tdbview.TabularDataView.__init__(self, tdm, views)
 
-registerAdapter(InboxMessageView,
-                Inbox,
-                ixmantissa.INavigableFragment)
+    def handle_loadMessage(self, ctx, targetID):
+        modelData = list(self.original.currentPage())
+        target = modelData[int(targetID)]['__item__']
+        # we are sending too much stuff here - once it becomes apparent
+        # that this is a viable way to do things, just fill in slots in
+        # the inbox page with the data from the Message
+        html = ixmantissa.INavigableFragment(target).rend(ctx, None)
+        from nevow.flat import flatten
+        return (livepage.set('message-detail', flatten(html)), livepage.eol)
+
+registerAdapter(InboxMessageView, Inbox, ixmantissa.INavigableFragment)
 

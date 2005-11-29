@@ -25,3 +25,11 @@
     text-align: right;
     padding: 2px;
 }
+
+#message-detail {
+    overflow: auto;
+    margin-left: 1%; 
+    padding: 0;
+    padding-top: 4px;
+    height: 200px;
+}
