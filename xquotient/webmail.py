@@ -101,5 +101,6 @@ class HTMLPartRenderer(object):
 
     def rend(self, ctx, data):
         return self.iframePattern.fillSlots('location', # argh
-                '%s/%s' % (self.urlPrefix, self.original.identifier))
+                '/private/message-parts/%d/%d' % (self.original.messageID,
+                                                  self.original.identifier))
 

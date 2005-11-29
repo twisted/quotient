@@ -240,9 +240,14 @@ class Part(item.Item):
         methodName = 'iterate_'+ctype.replace('/', '_')
         method = getattr(self, methodName, None)
         if method is None:
-            assert False, 'no method for content type: %r' (ctype,)
+            assert False, 'no method for content type: %r' % (ctype,)
         else:
             return method(*args)
+
+    def getAttachment(self, partID):
+        for part in self.walkAttachments():
+            if part.identifier == partID:
+                return part
 
     def walkAttachments(self):
         for part in self.walk():
