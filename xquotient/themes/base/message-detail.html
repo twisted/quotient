@@ -9,10 +9,20 @@
     <tr>
       <td>Subject</td><td><nevow:slot name="subject" /></td>
     </tr>
-    <tr>
-      <td>Tags</td><td>
+    <tr valign="top">
+      <td>
+        Tags
+        <a href="#" class="hide-show-action" id="tags-plus" onclick="addTags(); return false">+</a>
+        <a href="#" class="hide-show-action" id="tags-minus" onclick="hideTags(); return false" style="display: none;">-</a>
+      </td>
+      <td>
         <span id="message-tags"><nevow:slot name="tags" /></span>
-        <a href="#" class="slight-link" onclick="addTags(); return false;">(add...)</a></td>
+        <form style="display: none;" id="add-tags-dialog" onsubmit="addTag(this); return false">
+          <input autocomplete="off" onkeypress="return onCompletionKeyDown(event);" 
+            oninput="completeCurrentTag(this.value)" id="add-tags-dialog-text-input" type="text" name="tag" />
+          <div id="tag-completions" />
+        </form>
+      </td>
     </tr>
   </table>
   <table style="width: 70%">

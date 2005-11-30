@@ -3,12 +3,12 @@ import operator
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import tags, livepage
+from nevow import tags, livepage, json
 from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
-from axiom.tags import Catalog
+from axiom.tags import Catalog, Tag
 from axiom.slotmachine import hyper as super
 
 from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs
@@ -168,6 +168,11 @@ class InboxMessageView(tdbview.TabularDataView):
             return iter(q).next()
         except StopIteration:
             return None
+
+    def goingLive(self, ctx, client):
+        tdbview.TabularDataView.goingLive(self, ctx, client)
+        tags = self.original.store.query(Tag).getColumn('name').distinct()
+        client.call('setTags', json.serialize(list(tags)))
 
     def handle_prevMessage(self, ctx):
         return self.loadMessage(ctx, self._adjacentMessage(prev=True))

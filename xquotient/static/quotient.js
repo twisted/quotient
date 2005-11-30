@@ -1,3 +1,5 @@
+var ALLTAGS = new Array();
+
 function resizeIFrame(frame) {
   // Code is from http://www.ozoneasylum.com/9671&latestPost=true
   try {
@@ -35,6 +37,8 @@ function resizeIFrameHeight(frame) {
   }
 }
 
+function setTags(tags) { ALLTAGS = ALLTAGS.concat(eval("(" + tags + ")")); }
+
 function findPosY(obj) {
     var curtop = 0;
     if (obj.offsetParent)
@@ -70,6 +74,76 @@ function fitMessageDetailToPage() {
     element.style.height = innerWindowHeight() - findPosY(element) - 20 + 'px';
 }
 
+function normalizeTag(tag) {
+    return tag.replace(/^\s+/, "").replace(/\s+$/, "").replace(/\s{2,}/, " ");
+}
+
+function startswith(needle, haystack) {
+    return haystack.slice(0, needle.length) == needle;
+}
+
+function completeCurrentTag(tags) {
+    var tags = tags.split(/,/);
+    var last = normalizeTag(tags[tags.length - 1]);
+
+    var complContainer = document.getElementById("tag-completions");
+    purgeChildren(complContainer);
+
+    if(last.length == 0)
+        return;
+
+    var completions = new Array();
+    for(var i = 0; i < ALLTAGS.length; i++)
+        if(startswith(last, ALLTAGS[i]))
+            completions.push(ALLTAGS[i]);
+
+    for(i = 0; i < completions.length; i++) {
+        var link = document.createElement("a");
+        link.setAttribute("href", "#");
+        link.setAttribute("onclick",
+                          "appendCompletion(this.firstChild.nodeValue); return false");
+        if(i == 0)
+            link.setAttribute("style", "font-weight: bold");
+        link.appendChild(document.createTextNode(completions[i]));
+        complContainer.appendChild(link);
+
+        if(i < completions.length-1)
+            complContainer.appendChild(document.createTextNode(", "))
+    }
+}
+
+function appendCompletion(word) {
+    var input = document.getElementById("add-tags-dialog-text-input");
+    var tags = input.value.split(/,/);
+    var last = normalizeTag(tags[tags.length-1]);
+    input.value += word.slice(last.length, word.length) + ", ";
+    purgeChildren(document.getElementById("tag-completions"));
+    input.focus();
+}
+
+function onCompletionKeyDown(event) {
+    if(event.keyCode == 9) { // tab was pressed
+        /* if we have at least one completion being displayed,
+           select the first one, and purge all completions */
+        var completions = document.getElementById("tag-completions");
+        if(0 < completions.childNodes.length) {
+            appendCompletion(completions.firstChild.firstChild.nodeValue);
+            purgeChildren(completions);
+        }
+        event.cancel = true;
+        event.returnValue = false;
+        event.preventDefault();
+        return false;
+    } else if(event.keyCode == 8) { // delete was pressed
+        // recalculate completions of current tag
+        var tags = event.originalTarget.value;
+        if(0 < tags.length)
+            tags = tags.slice(0, tags.length-1);
+        completeCurrentTag(tags);
+    }
+    return true;
+}
+
 function centerAndDisplayDialog(dialog) {
     var middleX = innerWindowWidth() / 2;
     var middleY = innerWindowHeight() / 2;
@@ -87,10 +161,18 @@ function purgeChildren(e) {
 }
 
 function addTags() {
+    document.getElementById("tags-plus").style.display = "none";
+    document.getElementById("tags-minus").style.display = "";
+
     var tagdialog = document.getElementById("add-tags-dialog");
-    purgeChildren(document.getElementById("add-tags-dialog-tag-list"));
-    centerAndDisplayDialog(tagdialog);
+    tagdialog.style.display = "";
     document.getElementById("add-tags-dialog-text-input").focus();
+}
+
+function hideTags() {
+    document.getElementById("tags-plus").style.display = "";
+    document.getElementById("tags-minus").style.display = "none";
+    document.getElementById("add-tags-dialog").style.display = "none";
 }
 
 function innerWindowHeight() {
@@ -113,16 +195,14 @@ function addTag(form) {
     else
         tags = [tag];
 
-    var taglist = document.getElementById("add-tags-dialog-tag-list");
-
     for(var i = 0; i < tags.length; i++) {
-        tag = tags[i].replace(/^\s+/, "").replace(/\s+$/, "").replace(/\s{2,}/, " ");
-        var li = document.createElement("li");
-        li.appendChild(document.createTextNode(tag));
-        taglist.appendChild(li);
-        server.handle('addTag', tag);
+        tag = normalizeTag(tags[i]);
+        ALLTAGS.push(tag);
+        if(0 < tag.length) // FIXME: add them all at once
+            server.handle("addTag", tag);
     }
     form.tag.value = ""; form.tag.focus();
+    hideTags();
 }
 
 function closeAddTagsDialog() {
