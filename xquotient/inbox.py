@@ -59,6 +59,20 @@ class MessageLinkColumnView(DefaultingColumnView):
                 'subject', subject).fillSlots(
                 'onclick', 'loadMessage(%r); return false' % (idx,))
 
+class ArchiveAction(tdbview.Action):
+    def __init__(self):
+        tdbview.Action.__init__(self, 'archive',
+                                '/static/quotient/images/archive.png',
+                                'Archive this message')
+
+    def performOn(self, message):
+        message.archived = True
+        return 'Archived message successfully'
+
+    def actionable(self, message):
+        return True
+
+
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):
         valueToDisplay = {u'text/html':'HTML', u'text/plain':'Text'}
@@ -108,7 +122,7 @@ class Inbox(Item, InstallableMixin):
     installedOn = attributes.reference()
 
     def getTabs(self):
-        return [webnav.Tab('Inbox', self.storeID, 0.0)]
+        return [webnav.Tab('Inbox', self.storeID, 0.6)]
 
     def installOn(self, other):
         super(Inbox, self).installOn(other)
@@ -123,6 +137,7 @@ class InboxMessageView(tdbview.TabularDataView):
                 Message, [Message.sender,
                           Message.subject,
                           Message.received],
+                baseComparison=Message.archived == False,
                 defaultSortColumn='received',
                 defaultSortAscending=False,
                 itemsPerPage=prefs.getPreferenceValue('itemsPerPage'))
@@ -137,7 +152,7 @@ class InboxMessageView(tdbview.TabularDataView):
         self.messageDetailPatterns = PatternDictionary(
                                             getLoader('message-detail-patterns'))
 
-        tdbview.TabularDataView.__init__(self, tdm, views)
+        tdbview.TabularDataView.__init__(self, tdm, views, (ArchiveAction(),))
 
     def _adjacentMessage(self, prev, baseComparison=None):
         # i dont know if this is worse or better than getting the
@@ -156,8 +171,9 @@ class InboxMessageView(tdbview.TabularDataView):
             op = operator.gt
             sortableColumn = sortableColumn.descending
 
-        comparison = op(sortColumn.extractValue(None, self.currentMessage),
-                        sortColumn.sortAttribute())
+        comparison = attributes.AND(op(sortColumn.extractValue(None, self.currentMessage),
+                                       sortColumn.sortAttribute()),
+                                    self.original.baseComparison)
 
         if baseComparison is not None:
             comparison = attributes.AND(comparison, baseComparison)

@@ -104,6 +104,8 @@ class Part(item.Item):
                 sort=Header.index.ascending,
                 limit=_limit)
         else:
+            if not hasattr(self, '_headers'):
+                self._headers = []
             return (hdr for hdr in self._headers if hdr.name == name)
 
     def getAllHeaders(self):

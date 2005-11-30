@@ -28,6 +28,7 @@ class Message(item.Item, item.InstallableMixin):
     recipient = attributes.text()
     subject = attributes.text()
     read = attributes.boolean(default=False)
+    archived = attributes.boolean(default=False)
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()

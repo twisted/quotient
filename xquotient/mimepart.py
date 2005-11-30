@@ -437,7 +437,7 @@ class MIMEMessageParser(HeaderBodyParser):
             self.bodyMode = 'preamble'
             return
         try:
-            ctype = self.part.getHeader('content-type')
+            ctype = self.part.getHeader(u'content-type')
         except equotient.NoSuchHeader:
             pass
         else:
