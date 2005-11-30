@@ -3,7 +3,7 @@ import operator
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import rend, inevow
+from nevow import rend, inevow, tags
 from nevow.url import URL
 
 from axiom.tags import Catalog
@@ -134,22 +134,23 @@ class MessageDetail(rend.Fragment):
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
 
-    def render_tags(self, ctx, data):
+    def tagsAsStan(self):
         catalog = self.original.store.findOrCreate(Catalog)
-        tags = list()
+        mtags = list()
         for tag in catalog.tagsOf(self.original):
-            # make location be some link to see tagged messages
-            tags.append(dict(name=tag, location=''))
-
-        if 0 < len(tags):
-            return self.patterns['tag-list'](data=tags)
-        return ctx.tag
+            mtags.extend((tags.a(href='')[tag], ', '))
+        if len(mtags) == 0:
+            mtags = ['No Tags']
+        else:
+            mtags = mtags[:-1]
+        return mtags
 
     def render_headerPanel(self, ctx, data):
         return ctx.tag.fillSlots(
                 'sender', self.original.sender).fillSlots(
                         'recipient', self.original.recipient).fillSlots(
-                                'subject', self.original.subject)
+                                'subject', self.original.subject).fillSlots(
+                                        'tags', self.tagsAsStan())
 
     def render_attachmentPanel(self, ctx, data):
         requestURL = URL.fromContext(ctx)
@@ -184,65 +185,5 @@ class MessageDetail(rend.Fragment):
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
 
-    def _adjacentMessage(self, ctx, prev, baseComparison=None):
-        return None
-        # prev is a boolean
-        args = inevow.IRequest(ctx).args
-        (column,) = args['sort']
-        (ascending,) = args['asc']
-        switch = prev ^ int(ascending)
-        sortColumn = getattr(Message, column)
-
-        if switch:
-            op = operator.lt
-        else:
-            op = operator.gt
-
-        comparison = op(getattr(self.original, column), sortColumn)
-
-        if switch:
-            sortColumn = sortColumn.ascending
-        else:
-            sortColumn = sortColumn.descending
-
-        if baseComparison is not None:
-            comparison = attributes.AND(comparison, baseComparison)
-
-        try:
-            return iter(self.original.store.query(Message,
-                            comparison, limit=1,
-                            sort=sortColumn)).next()
-        except StopIteration:
-            return None
-
-    def _makeMessageLink(self, ctx, item):
-        args = inevow.IRequest(ctx).args
-        return (self.translator.linkTo(item.storeID) +
-                '?sort=%s&asc=%s' % (args['sort'][0], args['asc'][0]))
-
-    def render_nextMessageLink(self, ctx, data):
-        next = self._adjacentMessage(ctx, prev=False)
-        if next is None:
-            return self.patterns['no-next-message']()
-
-        return self.patterns['next-message-link'].fillSlots(
-                    'location', self._makeMessageLink(ctx, next))
-
-    def render_prevMessageLink(self, ctx, data):
-        prev = self._adjacentMessage(ctx, prev=True)
-        if prev is None:
-            return self.patterns['no-prev-message']()
-
-        return self.patterns['prev-message-link'].fillSlots(
-                'location', self._makeMessageLink(ctx, prev))
-
-    def render_nextUnreadMessageLink(self, ctx, data):
-        next = self._adjacentMessage(ctx, prev=False,
-                                     baseComparison=Message.read == False)
-        if next is None:
-            return self.patterns['no-next-unread-message']()
-
-        return self.patterns['next-unread-message-link'].fillSlots(
-                'location', self._makeMessageLink(ctx, next))
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

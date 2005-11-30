@@ -63,16 +63,4 @@
     Next Unread Message
   </a>
 
-  <div nevow:pattern="tag-list">
-    Tags:
-    <ul nevow:render="sequence">
-      <li nevow:pattern="item" nevow:render="mapping">
-        <a>
-          <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
-          <nevow:slot name="name" />
-        </a>
-      </li>
-    </ul>
-  </div>
-
 </nevow:invisible>

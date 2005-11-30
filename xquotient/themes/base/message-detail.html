@@ -9,24 +9,54 @@
     <tr>
       <td>Subject</td><td><nevow:slot name="subject" /></td>
     </tr>
+    <tr>
+      <td>Tags</td><td>
+        <span id="message-tags"><nevow:slot name="tags" /></span>
+        <a href="#" class="slight-link" onclick="addTags(); return false;">(add...)</a></td>
+    </tr>
   </table>
-  <!--
   <table style="width: 70%">
     <tr valign="top">
       <td>
-        <nevow:invisible nevow:render="prevMessageLink" />
+        <a href="#" onclick="prevMessage(); return false">Previous Message</a>
       </td>
       <td align="right" style="text-align: right">
-        <nevow:invisible nevow:render="nextMessageLink" /> |
-        <nevow:invisible nevow:render="nextUnreadMessageLink" />
+        <a href="#" onclick="nextMessage(); return false">Next Message</a><br />
+        <a href="#" onclick="nextUnreadMessage(); return false">Next Unread Message</a>
       </td>
     </tr>
   </table>
-  -->
   <p />
   <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
   <div style="width: 80%" nevow:render="attachmentPanel" />
+  <!-- things that will appear at some point -->
+  <div id="add-tags-dialog" style="position:absolute;display:none;top:0;left:0">
+    <table class="quotient-dialog-table">
+      <thead>
+        <tr>
+          <td>Add Tags</td>
+          <td align="right">
+            <img onclick="closeAddTagsDialog();" src="/static/mantissa/images/delete.png" />
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="2">
+            <ul id="add-tags-dialog-tag-list" />
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <form onsubmit="addTag(this); return false;">
+              <input name="tag" type="text" id="add-tags-dialog-text-input"/>
+              <input type="submit" value="Add" />
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
-

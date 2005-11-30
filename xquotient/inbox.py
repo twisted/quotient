@@ -1,3 +1,5 @@
+import operator
+
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
@@ -18,7 +20,7 @@ from xquotient.mimeutil import EmailAddress
 
 class DefaultingColumnView(tdbview.ColumnViewBase):
     def __init__(self, attributeID, default, displayName=None,
-                 width=None, typeHint=None, maxLength=None):
+                 width=None, typeHint='tdb-mail-column', maxLength=None):
 
         self.default = default
         self.maxLength = maxLength
@@ -127,7 +129,8 @@ class InboxMessageView(tdbview.TabularDataView):
 
         views = [StoreIDColumnView('storeID'),
                  EmailAddressColumnView('sender', 'No Sender', maxLength=40),
-                 MessageLinkColumnView('subject', 'No Subject', maxLength=100),
+                 MessageLinkColumnView('subject', 'No Subject',
+                                       maxLength=100, width='100%'),
                  tdbview.DateColumnView('received')]
 
         self.docFactory = getLoader('inbox')
@@ -136,26 +139,65 @@ class InboxMessageView(tdbview.TabularDataView):
 
         tdbview.TabularDataView.__init__(self, tdm, views)
 
+    def _adjacentMessage(self, prev, baseComparison=None):
+        # i dont know if this is worse or better than getting the
+        # adjacent values from the tdb.  on the edges, we'd have
+        # to call nextPage or prevPage and do fiddly things.
+        # but its not so great reimplementing part of it here.
+
+        switch = prev ^ self.original.isAscending
+        sortColumn = self.original.currentSortColumn
+        sortableColumn = sortColumn.sortAttribute()
+
+        if switch:
+            op = operator.lt
+            sortableColumn = sortableColumn.ascending
+        else:
+            op = operator.gt
+            sortableColumn = sortableColumn.descending
+
+        comparison = op(sortColumn.extractValue(None, self.currentMessage),
+                        sortColumn.sortAttribute())
+
+        if baseComparison is not None:
+            comparison = attributes.AND(comparison, baseComparison)
+
+        q = self.original.store.query(Message, comparison,
+                                      limit=1, sort=sortableColumn)
+        try:
+            return iter(q).next()
+        except StopIteration:
+            return None
+
+    def handle_prevMessage(self, ctx):
+        return self.loadMessage(ctx, self._adjacentMessage(prev=True))
+
+    def handle_nextMessage(self, ctx):
+        return self.loadMessage(ctx, self._adjacentMessage(prev=False))
+
+    def handle_nextUnreadMessage(self, ctx):
+        return self.loadMessage(ctx, self._adjacentMessage(prev=False,
+                                        baseComparison=Message.read == False))
+
+    def handle_loadMessage(self, ctx, targetID):
+        modelData = list(self.original.currentPage())
+        return self.loadMessage(ctx, self.itemFromTargetID(int(targetID)))
+
+    def handle_addTag(self, ctx, tag):
+        catalog = self.original.store.findOrCreate(Catalog)
+        catalog.tag(self.currentMessage, unicode(tag))
+        return livepage.set('message-tags', flatten(self.currentMessageDetail.tagsAsStan()))
+
     def replaceTable(self):
         yield tdbview.TabularDataView.replaceTable(self)
         yield (livepage.js.fitMessageDetailToPage(), livepage.eol)
 
-    def _tagsForCurrentMessage(self):
-        catalog = self.original.store.findOrCreate(Catalog)
-        tags = list()
-        for tag in catalog.tagsOf(self.original):
-            tags.append(dict(name=tag, location=''))
-        return self.messageDetailPatterns['tag-list'](data=tags)
+    def loadMessage(self, ctx, message):
+        self.currentMessage = message
+        self.currentMessageDetail = ixmantissa.INavigableFragment(message)
+        html = self.currentMessageDetail.rend(ctx, None)
+        return (livepage.set('message-detail', flatten(html)), livepage.eol)
 
-    def handle_loadMessage(self, ctx, targetID):
-        modelData = list(self.original.currentPage())
-        self.currentMessage = modelData[int(targetID)]['__item__']
-        # we are sending too much stuff here - once it becomes apparent
-        # that this is a viable way to do things, just fill in slots in
-        # the inbox page with the data from the Message
-        html = ixmantissa.INavigableFragment(self.currentMessage).rend(ctx, None)
-        yield (livepage.set('message-detail', flatten(html)), livepage.eol)
-        yield (livepage.set('message-tags', self._tagsForCurrentMessage()), livepage.eol)
 
 registerAdapter(InboxMessageView, Inbox, ixmantissa.INavigableFragment)
 

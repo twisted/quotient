@@ -33,3 +33,32 @@
     padding-top: 4px;
     height: 200px;
 }
+
+#message-control-panel {
+    margin-left: 1%;
+    border: solid 1px #DADADA;
+}
+
+.slight-link {
+    font-size: .9em;
+    font-style: italic;
+}
+
+table.quotient-dialog-table {
+    margin: 12px;
+    background-color: #FFFFFF;
+    border-spacing: 0;
+    border: solid 1px #B0B0B0;
+}
+
+table.quotient-dialog-table > thead {
+    background-color: #DADADA;
+    font-style: italic;
+}
+
+table.quotient-dialog-table > thead > tr > td {
+    border-bottom: solid 1px #B0B0B0;
+    padding: 2px;
+}
+
+table.quotient-dialog-table > tbody > tr > td { padding: 4px; }
