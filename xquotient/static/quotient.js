@@ -67,13 +67,12 @@ function findPosX(obj) {
 
 function fitMessageDetailToPage() {
     var element = document.getElementById("message-detail");
-    element.style.height = document.documentElement.clientHeight - findPosY(element) - 20 + 'px';
+    element.style.height = innerWindowHeight() - findPosY(element) - 20 + 'px';
 }
 
 function centerAndDisplayDialog(dialog) {
-    var body = document.getElementsByTagName("body")[0];
-    var middleX = body.clientWidth / 2;
-    var middleY = body.clientHeight / 2;
+    var middleX = innerWindowWidth() / 2;
+    var middleY = innerWindowHeight() / 2;
 
     dialog.style.display = "";
     dialog.style.visibility = "hidden";
@@ -82,24 +81,48 @@ function centerAndDisplayDialog(dialog) {
     dialog.style.visibility = "visible";
 }
 
+function purgeChildren(e) {
+    while(0 < e.childNodes.length)
+        e.removeChild(e.firstChild);
+}
+
 function addTags() {
     var tagdialog = document.getElementById("add-tags-dialog");
+    purgeChildren(document.getElementById("add-tags-dialog-tag-list"));
     centerAndDisplayDialog(tagdialog);
     document.getElementById("add-tags-dialog-text-input").focus();
 }
 
+function innerWindowHeight() {
+    return document.getElementsByTagName("body")[0].clientHeight;
+}
+
+function innerWindowWidth() {
+    return document.getElementsByTagName("body")[0].clientWidth;
+}
+
 function addTag(form) {
     var mtags = document.getElementById("message-tags");
-    while(0 < mtags.childNodes.length)
-        mtags.removeChild(mtags.firstChild);
+    purgeChildren(mtags);
     mtags.appendChild(document.createTextNode("Loading..."));
 
     var tag = form.tag.value;
-    var li = document.createElement("li");
-    li.appendChild(document.createTextNode(tag));
-    document.getElementById("add-tags-dialog-tag-list").appendChild(li);
+    var tags = null;
+    if(tag.match(/,/))
+        tags = tag.split(/,/);
+    else
+        tags = [tag];
+
+    var taglist = document.getElementById("add-tags-dialog-tag-list");
+
+    for(var i = 0; i < tags.length; i++) {
+        tag = tags[i].replace(/^\s+/, "").replace(/\s+$/, "").replace(/\s{2,}/, " ");
+        var li = document.createElement("li");
+        li.appendChild(document.createTextNode(tag));
+        taglist.appendChild(li);
+        server.handle('addTag', tag);
+    }
     form.tag.value = ""; form.tag.focus();
-    server.handle('addTag', tag);
 }
 
 function closeAddTagsDialog() {
