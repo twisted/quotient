@@ -38,6 +38,10 @@ function resizeIFrameHeight(frame) {
   }
 }
 
+function addPerson(plink, targetID) {
+    server.handle('addPerson', targetID);
+}
+
 function setTags(tags) { ALLTAGS = ALLTAGS.concat(eval("(" + tags + ")")); }
 
 function findPosY(obj) {
@@ -72,9 +76,7 @@ function findPosX(obj) {
 
 function fitMessageDetailToPage() {
     var element = document.getElementById("split-message-detail");
-    /* this is a hack */
-    if(0 < element.childNodes.length)
-        element.style.height = innerWindowHeight() - findPosY(element) - 20 + 'px';
+    element.style.height = document.documentElement.clientHeight - findPosY(element) - 15 + "px";
 }
 
 function normalizeTag(tag) {

@@ -3,7 +3,7 @@ import operator
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import livepage, json
+from nevow import livepage, json, tags
 from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
@@ -12,7 +12,7 @@ from axiom.tags import Catalog, Tag
 from axiom.slotmachine import hyper as super
 from axiom.upgrade import registerUpgrader
 
-from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs
+from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs, people
 from xmantissa.fragmentutils import PatternDictionary
 from xmantissa.publicresource import getLoader
 
@@ -40,12 +40,77 @@ class StoreIDColumnView(tdbview.ColumnViewBase):
     def stanFromValue(self, idx, item, value):
         return str(item.storeID)
 
-class EmailAddressColumnView(DefaultingColumnView):
-    def stanFromValue(self, idx, item, value):
-        if value is not None:
-            value = EmailAddress(value, mimeEncoded=False).anyDisplayName()
+class EmailAddressColumnView(tdbview.ColumnViewBase):
+    # there is a lot of optimization here, and it's ugly.  but at 
+    # 20 items per page, if the user is sorting on the sender address,
+    # there would be a bunch of redundant queries
 
-        return DefaultingColumnView.stanFromValue(self, idx, item, value)
+    _translator = None
+
+    def __init__(self, *args, **kwargs):
+        tdbview.ColumnViewBase.__init__(self, *args, **kwargs)
+
+        self._cachedPeople = dict()
+        self._cachedNotPeople = list()
+        self._cachedNames = dict()
+
+    def _personFromAddress(self, message, address):
+        # return a people.Person instance if there is one already
+        # existing that corresponds to 'address', otherwise None
+        person = self._cachedPeople.get(address.email)
+        if person is None and address.email not in self._cachedNotPeople:
+            # at some point differentiate between people belonging to
+            # different organizers, or something
+            person = message.store.findUnique(people.Person,
+                        people.Person.name == address.email,
+                        default=None)
+            if person is None:
+                self._cachedNotPeople.append(address.email)
+            else:
+                self._cachedPeople[address.email] = person
+        return person
+
+    def personAdded(self, person):
+        self._cachedPeople[person.name] = person
+        if person.name in self._cachedNotPeople:
+            self._cachedNotPeople.remove(person.name)
+
+    def _realNameFromPerson(self, person):
+        if person.name not in self._cachedNames:
+            rn = person.store.findUnique(people.RealName,
+                                         people.RealName.person==person,
+                                         default=None)
+            self._cachedNames[person.name] = rn
+        return self._cachedNames[person.name]
+
+    def stanFromValue(self, idx, item, value):
+        address = EmailAddress(value, mimeEncoded=False)
+        person = self._personFromAddress(item, address)
+
+        if person is not None:
+            if self._translator is None:
+                self._translator = ixmantissa.IWebTranslator(item.store)
+
+            personLink = tags.a(href=self._translator.linkTo(person.storeID))
+            realName = self._realNameFromPerson(person)
+            if realName is None:
+                personLink[person.name]
+            else:
+                if realName.last is None:
+                    last = ''
+                else:
+                    last = ' ' + realName.last
+                personLink[realName.first + last]
+            icon = tags.img(src='/static/quotient/images/person.png',
+                            style='padding: 2px;')
+            personStan = (icon, personLink)
+        else:
+            link = tags.a(href='#', onclick='addPerson(this, %r); return false' % (idx,))
+            icon = tags.img(src='/static/quotient/images/add-person.png',
+                            border=0, style='padding: 2px')
+            personStan = (link[icon], address.anyDisplayName())
+
+        return personStan
 
 class MessageLinkColumnView(DefaultingColumnView):
     patterns = None
@@ -197,8 +262,10 @@ class InboxMessageView(tdbview.TabularDataView):
                 defaultSortAscending=False,
                 itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
 
+        self.emailAddressColumnView = EmailAddressColumnView('sender', 'No Sender')
+
         views = [StoreIDColumnView('storeID'),
-                 EmailAddressColumnView('sender', 'No Sender', maxLength=40),
+                 self.emailAddressColumnView,
                  MessageLinkColumnView('subject', 'No Subject',
                                        maxLength=100, width='100%'),
                  tdbview.DateColumnView('received')]
@@ -215,6 +282,28 @@ class InboxMessageView(tdbview.TabularDataView):
         tdbview.TabularDataView.goingLive(self, ctx, client)
         tags = self.original.store.query(Tag).getColumn('name').distinct()
         client.call('setTags', json.serialize(list(tags)))
+
+    def handle_addPerson(self, ctx, targetID):
+        message = self.itemFromTargetID(int(targetID))
+        address = EmailAddress(message.sender)
+        organizer = self.original.store.findOrCreate(people.Organizer)
+        person = organizer.personByName(address.email)
+        self.emailAddressColumnView.personAdded(person)
+
+        # mimeutil.EmailAddress hadssome integration with the quotient
+        # addressbook, that might be something we want to revamp for this,
+        # thought this doesn't seem bad for now
+
+        realName = self.original.store.findOrCreate(people.RealName, person=person)
+
+        if ' ' in address.display:
+            (realName.first, realName.last) = address.display.split(' ', 1)
+        elif 0 < len(address.display):
+            realName.first = address.display
+        else:
+            realName.first = address.email
+
+        return self.replaceTable()
 
     def handle_prevMessage(self, ctx):
         assert self._havePrevMessage(), 'there isnt a prev message'
