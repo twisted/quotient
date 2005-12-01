@@ -1,4 +1,5 @@
 var ALLTAGS = new Array();
+var LAST_SELECTED_ROW = null;
 
 function resizeIFrame(frame) {
   // Code is from http://www.ozoneasylum.com/9671&latestPost=true
@@ -70,8 +71,10 @@ function findPosX(obj) {
 }
 
 function fitMessageDetailToPage() {
-    var element = document.getElementById("message-detail");
-    element.style.height = innerWindowHeight() - findPosY(element) - 20 + 'px';
+    var element = document.getElementById("split-message-detail");
+    /* this is a hack */
+    if(0 < element.childNodes.length)
+        element.style.height = innerWindowHeight() - findPosY(element) - 20 + 'px';
 }
 
 function normalizeTag(tag) {
@@ -213,7 +216,29 @@ function closeAddTagsDialog() {
     }
 }
 
-function loadMessage(messageID) {
+function setChildBGColors(e, color) {
+    for(var i = 0; i < e.childNodes.length; i++)
+        if(e.childNodes[i].tagName)
+            e.childNodes[i].style.backgroundColor = color;
+}
+
+function highlightMessageAtOffset(offset) {
+    var row = document.getElementById("tdb-item-" + offset);
+    if(LAST_SELECTED_ROW)
+        setChildBGColors(LAST_SELECTED_ROW, "");
+    LAST_SELECTED_ROW = row;
+    setChildBGColors(row, "#FFFF00");
+}
+
+function loadMessage(messageLink, messageID) {
+    /*
+    if(LAST_SELECTED_ROW)
+        setChildBGColors(LAST_SELECTED_ROW, "");
+
+    var parentRow = messageLink.parentNode.parentNode;
+    setChildBGColors(parentRow, "#FFFF00");
+    LAST_SELECTED_ROW = parentRow;
+    */
     fitMessageDetailToPage();
     server.handle('loadMessage', messageID);
 }

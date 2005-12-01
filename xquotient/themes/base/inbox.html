@@ -1,36 +1,6 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1">
   <div nevow:render="navigation" />
+  <div id="full-message-detail" style="position: relative; top: 0; left: 0;" />
   <div nevow:render="table" id="tdb" />
-  <div id="message-detail" />
-  <!-- things that will appear at some point -->
-  <div id="add-tags-dialog" style="position:absolute;display:none;top:0;left:0">
-    <!--
-    <table class="quotient-dialog-table">
-      <thead>
-        <tr>
-          <td>Add Tags</td>
-          <td align="right">
-            <img onclick="closeAddTagsDialog();" src="/static/mantissa/images/delete.png" />
-          </td>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td colspan="2">
-            enter a tag or a comma delimited list of tags:
-            <ul id="add-tags-dialog-tag-list" />
-          </td>
-        </tr>
-        <tr>
-          <td colspan="2">
-            <form onsubmit="addTag(this); return false;">
-              <input name="tag" type="text" id="add-tags-dialog-text-input"/>
-              <input type="submit" value="Add" />
-            </form>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    -->
-  </div>
+  <div id="split-message-detail" />
 </div>

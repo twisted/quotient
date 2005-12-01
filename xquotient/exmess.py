@@ -1,5 +1,3 @@
-import operator
-
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
@@ -7,7 +5,6 @@ from nevow import rend, inevow, tags
 from nevow.url import URL
 
 from axiom.tags import Catalog
-from axiom.slotmachine import hyper as super
 from axiom import item, attributes
 
 from xmantissa import ixmantissa, website
