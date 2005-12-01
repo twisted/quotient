@@ -6,7 +6,7 @@ from twisted.python.util import sibpath
 from twisted import plugin
 
 from axiom import iaxiom, errors as eaxiom
-from xmantissa import website
+from xmantissa import website, people
 
 from xquotient import mail, inbox, exmess
 
@@ -53,8 +53,9 @@ class MailConfiguration(usage.Options):
 
             mta = s.findOrCreate(mail.MailTransferAgent, lambda newItem: newItem.installOn(s))
             if self['mailbox']:
-                s.findOrCreate(exmess.MessagePartView).installOn(s)
+                s.findOrCreate(people.Organizer).installOn(s)
                 s.findOrCreate(inbox.Inbox).installOn(s)
+                s.findOrCreate(exmess.MessagePartView).installOn(s)
                 s.findOrCreate(website.StaticSite,
                                prefixURL=u'static/quotient',
                                staticContentPath=sibpath(mail.__file__, u'static')).installOn(s)

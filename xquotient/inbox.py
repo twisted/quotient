@@ -60,6 +60,34 @@ class MessageLinkColumnView(DefaultingColumnView):
                 'subject', subject).fillSlots(
                 'onclick', 'loadMessage(this, %r); return false' % (idx,))
 
+class MarkUnreadAction(tdbview.Action):
+    def __init__(self):
+        tdbview.Action.__init__(self, 'mark-unread',
+                                '/static/quotient/images/mark-unread.png',
+                                'Mark this message as unread',
+                                '/static/quotient/images/mark-unread-disabled.png')
+
+    def performOn(self, message):
+        message.read = False
+        return 'Marked Message: Unread'
+
+    def actionable(self, message):
+        return message.read
+
+class MarkReadAction(tdbview.Action):
+    def __init__(self):
+        tdbview.Action.__init__(self, 'mark-read',
+                                '/static/quotient/images/mark-read.png',
+                                'Mark this message as read',
+                                '/static/quotient/images/mark-read-disabled.png')
+
+    def performOn(self, message):
+        message.read = True
+        return 'Marked Message: Read'
+
+    def actionable(self, message):
+        return not message.read
+
 class ArchiveAction(tdbview.Action):
     def __init__(self):
         tdbview.Action.__init__(self, 'archive',
@@ -178,7 +206,9 @@ class InboxMessageView(tdbview.TabularDataView):
         self.messageDetailPatterns = PatternDictionary(
                                             getLoader('message-detail-patterns'))
 
-        tdbview.TabularDataView.__init__(self, tdm, views, (ArchiveAction(),))
+        tdbview.TabularDataView.__init__(self, tdm, views, (ArchiveAction(),
+                                                            MarkReadAction(),
+                                                            MarkUnreadAction()))
         self.docFactory = getLoader('inbox')
 
     def goingLive(self, ctx, client):
@@ -211,8 +241,22 @@ class InboxMessageView(tdbview.TabularDataView):
         yield self.loadMessage(ctx, newOffset)
 
     def handle_nextUnreadMessage(self, ctx):
-        return self.loadMessage(ctx, self._adjacentMessage(prev=False,
-                                        baseComparison=Message.read == False))
+        assert self._haveNextUnreadMessage(), 'there arent any more unread messages'
+        next = self._findNextUnread()
+
+        newOffset = None
+        while newOffset is None:
+            curpage = self.original.currentPage()
+            for (i, row) in enumerate(curpage):
+                if row['__item__'].storeID == next.storeID:
+                    newOffset = i
+                    break
+            else:
+                assert self.original.hasNextPage(), 'something went horribly wrong'
+                self.original.nextPage()
+
+        yield self.replaceTable()
+        yield self.loadMessage(ctx, newOffset)
 
     def _havePrevMessage(self):
         return not (self.currentMessageOffset - 1 < 0
