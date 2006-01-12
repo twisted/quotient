@@ -1,3 +1,83 @@
+.unread-message {
+    font-weight: bold;
+}
+
+#add-person-fragment {
+    position: absolute;
+    padding: 4px;
+    border: solid 1px #000000;
+}
+
+/* the header table */
+
+table.header-table {
+    border: solid 1px #CACACA;
+    border-top: none;
+    width: 100%;
+    border-right: none;
+}
+
+.header-table-last-col {
+    width: 100%;
+}
+
+.embedded-action-dialog {
+    font-size: 1.4em;
+    text-align: center;
+}
+
+/* put a grey border around all other rows */
+table.header-table > tbody > tr > td {
+    border-right: solid 1px #CACACA;
+    border-top: solid 1px #CACACA;
+    padding: 5px;
+}
+
+/* gallery stuff */
+
+.gallery-image {
+    background-image: url(/Quotient/static/images/slide-dark.png);
+    float: left;
+    padding: 4px;
+    margin-right: 4px;
+    width: 180px;
+    height: 180px;
+    background-position: top right;
+    background-repeat: no-repeat;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    cursor: pointer;
+}
+
+.gallery-image-alt {
+    background-image: url(/Quotient/static/images/slide.png);
+    float: left;
+    padding: 4px;
+    margin-right: 4px;
+    width: 180px;
+    height: 180px;
+    background-position: top right;
+    background-repeat: no-repeat;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+}
+
+img.thumbnail { border: none; }
+
+#address-completions {
+    border: solid 1px #000000;
+    background-color: #FFFFFF;
+    padding: 2px;
+    overflow: hidden;
+    font-size: 1.1em;
+}
+
+.selected-address-completion {
+    background-color: #F1F1F1;
+}
+
 .quote-one {
     border-left: solid 1px red;
     margin-left: 4px;
@@ -32,6 +112,10 @@
     padding: 0;
     padding-top: 4px;
     height: 200px;
+}
+
+#message-detail {
+    padding-left: 4px;
 }
 
 .hide-show-link {

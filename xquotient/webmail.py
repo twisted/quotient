@@ -1,5 +1,5 @@
 from zope.interface import implements
-from nevow import rend, inevow, tags
+from nevow import rend, inevow, tags, stan
 from xmantissa.publicresource import getLoader
 from xmantissa import ixmantissa
 from itertools import imap
@@ -72,6 +72,8 @@ class ParagraphRenderer(rend.Fragment):
             for child in self.original.children:
                 if isinstance(child, (str, unicode)):
                     yield SpacePreservingStringRenderer(child)
+                elif isinstance(child, stan.Tag): # argh
+                    yield child
                 else:
                     if hasattr(child, 'depth') and 0 < child.depth:
                         qc = quoteClasses[child.depth % len(quoteClasses)]

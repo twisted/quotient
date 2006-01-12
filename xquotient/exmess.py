@@ -1,15 +1,34 @@
+from os import path
+
 from zope.interface import implements
 from twisted.python.components import registerAdapter
+from twisted.python.util import sibpath
 
 from nevow import rend, inevow, tags
-from nevow.url import URL
 
 from axiom.tags import Catalog
 from axiom import item, attributes
 
-from xmantissa import ixmantissa, website
+from xmantissa import ixmantissa, website, people
 from xmantissa.publicresource import getLoader
-from xmantissa.fragmentutils import PatternDictionary
+from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
+
+from xquotient import gallery
+from xquotient.actions import SenderPersonFragment
+
+LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
+
+def mimeTypeToIcon(mtype,
+                   webIconPath='/Quotient/static/images/attachment-types',
+                   localIconPath=LOCAL_ICON_PATH,
+                   extension='png',
+                   defaultIconPath='/Quotient/static/images/attachment-types/generic.png'):
+
+    lastpart = mtype.replace('/', '-') + '.' + extension
+    localpath = path.join(localIconPath, lastpart)
+    if path.exists(localpath):
+        return webIconPath + '/' + lastpart
+    return defaultIconPath
 
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
@@ -20,12 +39,18 @@ class Message(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
+    sent = attributes.timestamp()
     received = attributes.timestamp()
     sender = attributes.text()
+    senderDisplay = attributes.text()
     recipient = attributes.text()
     subject = attributes.text()
+
+    attachments = attributes.integer(default=0)
+
     read = attributes.boolean(default=False)
     archived = attributes.boolean(default=False)
+    deleted = attributes.boolean(default=False)
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()
@@ -33,10 +58,11 @@ class Message(item.Item, item.InstallableMixin):
     def activate(self):
         self._prefs = None
 
-    def walkMessage(self):
-        if self._prefs is None:
-            self._prefs = ixmantissa.IPreferenceAggregator(self.store)
-        preferred = self._prefs.getPreferenceValue('preferredMimeType')
+    def walkMessage(self, preferred=None):
+        if preferred is None:
+            if self._prefs is None:
+                self._prefs = ixmantissa.IPreferenceAggregator(self.store)
+            preferred = self._prefs.getPreferenceValue('preferredMimeType')
         return self.impl.walkMessage(prefer=preferred)
 
     def getSubPart(self, partID):
@@ -53,6 +79,14 @@ class Message(item.Item, item.InstallableMixin):
 
     def getAttachment(self, partID):
         return self.impl.getAttachment(partID)
+
+class Correspondent(item.Item):
+    typeName = 'quotient_correspondent'
+    schemaVersion = 1
+
+    relation = attributes.text(allowNone=False) # sender|recipient|copy|blind-copy
+    message = attributes.reference(allowNone=False)
+    address = attributes.text(allowNone=False)
 
 # on a scale of 1 to 10, how bad is this
 class PartDisplayer(rend.Page):
@@ -84,9 +118,9 @@ class PartDisplayer(rend.Page):
 
         request.setHeader('content-type', part.type)
 
-        if hasattr(part, 'disposition'):
-            request.setHeader('content-disposition',
-                              part.disposition)
+        #if hasattr(part, 'disposition'):
+        #    request.setHeader('content-disposition',
+        #                      part.disposition)
 
         if part.type.startswith('text/'):
             # FIXME weird to decode here.
@@ -118,6 +152,8 @@ class MessagePartView(item.Item, website.PrefixURLMixin):
 class MessageDetail(rend.Fragment):
     '''i represent the viewable facet of some kind of message'''
     implements(ixmantissa.INavigableFragment)
+    fragmentName = 'message-detail'
+    live = False
 
     _partsByID = None
 
@@ -125,12 +161,14 @@ class MessageDetail(rend.Fragment):
         self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
         rend.Fragment.__init__(self, original, getLoader('message-detail'))
 
-        if not original.read:
-            original.read = True
-
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
+        self.organizer = original.store.findUnique(people.Organizer)
+
+    def head(self):
+        return tags.script(type='text/javascript',
+                           src='/Mantissa/js/people.js')
 
     def tagsAsStan(self):
         catalog = self.original.store.findOrCreate(Catalog)
@@ -144,31 +182,51 @@ class MessageDetail(rend.Fragment):
         return mtags
 
     def render_headerPanel(self, ctx, data):
-        return ctx.tag.fillSlots(
-                'sender', self.original.sender).fillSlots(
-                        'recipient', self.original.recipient).fillSlots(
-                                'subject', self.original.subject).fillSlots(
-                                        'tags', self.tagsAsStan())
+        p = self.organizer.personByEmailAddress(self.original.sender)
+        if p is None:
+            personStan = SenderPersonFragment(self.original)
+        else:
+            personStan = people.PersonFragment(p, self.original.sender)
+        personStan.page = self.page
+
+        return dictFillSlots(ctx.tag,
+                dict(sender=personStan,
+                     recipient=self.original.recipient,
+                     subject=self.original.subject,
+                     tags=self.tagsAsStan()))
+
+    def _messagePartLink(self, attachment):
+        return '/private/message-parts/%s/%s' % (self.original.storeID,
+                                                 attachment.identifier)
 
     def render_attachmentPanel(self, ctx, data):
-        requestURL = URL.fromContext(ctx)
-
         patterns = list()
         for attachment in self.attachmentParts:
-            if attachment.type.startswith('image/'):
-                pname = 'image-attachment'
-            else:
-                pname = 'attachment'
+            if not attachment.type.startswith('image/'):
+                p = dictFillSlots(self.patterns['attachment'],
+                                            dict(filename=attachment.filename,
+                                                 icon=mimeTypeToIcon(attachment.type)))
 
-            p = self.patterns[pname].fillSlots('filename', attachment.filename)
-            location = requestURL.child(attachment.identifier)
-            location = '/private/message-parts/%d/%d' % (self.original.storeID,
-                                                         attachment.identifier)
-            if attachment.filename is not None:
-                location += '/' + attachment.filename
-            patterns.append(p.fillSlots('location', str(location)))
+                location = self._messagePartLink(attachment)
+                if attachment.filename is not None:
+                    location += '/' + attachment.filename
+                patterns.append(p.fillSlots('location', str(location)))
 
         return ctx.tag[patterns]
+
+    def render_imagePanel(self, ctx, data):
+        images = self.original.store.query(
+                    gallery.Image,
+                    gallery.Image.message == self.original)
+
+        for image in images:
+            loc = '/private/message-parts/%s/%s' % (image.message.storeID,
+                                                    image.part.partID)
+            tloc = '/private/thumbnails/' + str(image.storeID)
+
+            yield self.patterns['image-attachment'].fillSlots(
+                    'location', loc).fillSlots(
+                    'thumbnail-location', tloc)
 
     def render_messageBody(self, ctx, data):
         paragraphs = list()

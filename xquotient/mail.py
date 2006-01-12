@@ -85,7 +85,7 @@ class MailTransferAgent(item.Item, service.Service, DeliveryFactoryMixin, Delive
 
     portNumber = attributes.integer(
         "The TCP port to bind to serve SMTP.",
-        default=0)
+        default=6025)
     securePortNumber = attributes.integer(
         "The TCP port to bind to serve SMTP/SSL.",
         default=0)
@@ -172,3 +172,4 @@ class MailTransferAgent(item.Item, service.Service, DeliveryFactoryMixin, Delive
             L.append(defer.maybeDeferred(self.securePort.stopListening))
             self.securePort = None
         return defer.DeferredList(L)
+

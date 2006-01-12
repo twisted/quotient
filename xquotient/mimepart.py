@@ -3,7 +3,7 @@
 
 import re, rfc822, time, textwrap
 
-from zope.interface import Interface, implements
+from zope.interface import implements
 
 from cStringIO import StringIO
 
@@ -15,9 +15,6 @@ from twisted.mail import smtp
 from nevow import inevow
 
 from epsilon import cooperator
-
-from xmantissa.ixmantissa import INavigableElement
-from xmantissa import webnav
 
 from xquotient import equotient, webmail
 
@@ -152,11 +149,9 @@ class Paragraph(Container):
         """
         if not len(self.children):
             self.children.append(child)
-
-        elif isinstance(self.children[-1], (str, unicode)) \
-        and isinstance(child, (str, unicode)):
+        elif (isinstance(self.children[-1], (str, unicode))
+                and isinstance(child, (str, unicode))):
             self.children[-1] += child
-
         else:
             self.children.append(child)
 
@@ -184,6 +179,7 @@ class FixedParagraph(Paragraph):
         """Return a new FixedParagraph instance initailized from some string."""
         self = klass()
         self._addChild(text.replace('\r\n', '\n'))
+
         return self
 
     fromString = classmethod(fromString)
@@ -227,18 +223,13 @@ class FlowedParagraph(Paragraph):
         # otherwise untouched.
 
         paragraphs = []
-
-        for line in text.rstrip('\r\n').split('\n'):
-            line = line.rstrip('\r')    # allow \r\n, or just \n, although the latter is not allowed by the RFC.
+        lines = list(line.rstrip('\r') for line in text.rstrip('\r\n').split('\n'))
+        for line in lines:
             depth = _quoteDepth(line)
-
-            if paragraphs \
-            and depth == paragraphs[-1][0]:
+            if paragraphs and depth == paragraphs[-1][0]:
                 paragraphs[-1][1].append(line)
             else:
                 paragraphs.append((depth, [line]))
-
-        # now, create nested instances
 
         results = [klass([], 0)]
 
@@ -261,8 +252,7 @@ class FlowedParagraph(Paragraph):
                 line = line[depth:]             # remove quote characters
                 if line.startswith(' '):
                     line = line[1:]             # remove space-stuffing
-                if not line.endswith(' ') \
-                or line == '-- ':
+                if not line.endswith(' ') or line == '-- ':
                     line += '\n'
                 results[-1]._addChild(line)
 

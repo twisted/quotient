@@ -4,7 +4,8 @@ from epsilon.extime import Time
 
 from axiom import item, attributes
 
-from xquotient import mimepart, equotient, mimeutil
+from xquotient import mimepart, equotient, mimeutil, exmess, extract, iquotient
+from xquotient.indexinghelp import SyncIndexer
 
 import quopri, binascii
 
@@ -153,6 +154,11 @@ class Part(item.Item):
                 child.parent = self
                 child._addToStore(store, message, sourcepath)
 
+        if self.parent is None:
+            message.attachments = len(list(self.walkAttachments()))
+            extract.extract(message)
+            store.findUnique(SyncIndexer).indexMessage(message)
+
         del self._headers, self._children
 
     # implementation of IMessageIterator
@@ -227,6 +233,10 @@ class Part(item.Item):
         except LookupError:
             return unicode(payload, default, 'replace')
 
+    def getTypedParts(self, *types):
+        for part in self.walk():
+            if part.getContentType() in types:
+                yield part
 
     def walkMessage(self, prefer): # XXX RENAME ME
         """
@@ -273,15 +283,14 @@ class Part(item.Item):
         content = self.getUnicodeBody()
 
         if self.getParam('format') == 'flowed':
-            child = mimepart.FlowedParagraph.fromRFC2646(content)
+            pfactory = mimepart.FlowedParagraph.fromRFC2646
         else:
-            child = mimepart.FixedParagraph.fromString(content)
+            pfactory = mimepart.FixedParagraph.fromString
 
-        # i am pretty confused by the fact that mimestorage.Part
-        # and mimepart.Part seem to do totally different things
+        paragraph = pfactory(content)
 
         yield mimepart.Part(self.message.storeID, self.partID,
-                            self.getContentType(), children=[child],
+                            self.getContentType(), children=[paragraph],
                             part=self)
 
     def iterate_text_html(self):
@@ -329,8 +338,20 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         self.message.installOn(self.store)
         self.message.received = Time()
 
+        try:
+            sent = self.part.getHeader(u'date')
+        except equotient.NoSuchHeader:
+            sent = None
+        else:
+            try:
+                sent = Time.fromRFC2822(sent)
+            except ValueError:
+                sent = None
+        if sent is None:
+            sent = self.message.received
+        self.message.sent = sent
+
         for (attr, headers) in [
-            ('sender', [u'from', u'sender', u'reply-to']),
             ('recipient', [u'to']),
             ('subject', [u'subject'])]:
             for h in headers:
@@ -341,6 +362,38 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                 else:
                     setattr(self.message, attr, mimeutil.headerToUnicode(v))
                     break
+
+        for header in (u'from', u'sender', u'reply-to'):
+            try:
+                v = self.part.getHeader(header)
+            except equotient.NoSuchHeader:
+                continue
+
+            email = mimeutil.EmailAddress(v)
+            self.message.sender = unicode(email.email)
+            self.message.senderDisplay = unicode(email.anyDisplayName())
+            break
+
+        for (relation, address) in ((u'sender', self.message.sender),
+                                    (u'recipient', self.message.recipient)):
+
+            if address is not None and 0 < len(address):
+                exmess.Correspondent(store=self.store,
+                                     message=self.message,
+                                     relation=relation,
+                                     address=address)
+
+        try:
+            copied = self.part.getHeader(u'cc')
+        except equotient.NoSuchHeader:
+            pass
+        else:
+            for address in mimeutil.parseEmailAddresses(copied):
+                exmess.Correspondent(store=self.store,
+                                     message=self.message,
+                                     relation=u'copy',
+                                     address=unicode(address.email))
+
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
 

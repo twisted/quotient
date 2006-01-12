@@ -1,6 +1,58 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1">
-  <div nevow:render="navigation" />
-  <div id="full-message-detail" style="position: relative; top: 0; left: 0;" />
-  <div nevow:render="table" id="tdb" />
-  <div id="split-message-detail" />
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  nevow:render="liveFragment">
+  <!--
+  <div id="loading-dialog" style="font-size: 2.4em;">
+    Loading...
+  </div>
+  -->
+  <div id="add-person-fragment" style="display: none; background-color: #FFFFFF">
+    <nevow:invisible nevow:render="addPersonFragment" />
+  </div>
+
+  <div id="mailbox-meat">
+    <span id="throbber" style="visibility: hidden; position: absolute; top: 0; left: 0">
+      <img style="padding: 4px;" src="/Quotient/static/images/circle-throbber.gif" />
+    </span>
+    <div id="time-report-box" />
+
+    <table style="width: 100%; border-spacing: 0px">
+      <tr valign="top">
+        <td id="tdb-container">
+          <nevow:invisible nevow:render="inboxTDB" />
+
+          <center id="view-options">
+            <a href="#" onclick="quotient_prevPage(); return false">page up</a>
+            | <a href="#" onclick="quotient_nextPage();return false">page down</a>
+            <span id="show-read-outer-container">
+              show read:
+              <span id="show-read-container" nevow:render="showRead">
+                <input nevow:pattern="show-read-on" type="checkbox" checked="true"
+                  onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead()" />
+                <input nevow:pattern="show-read-off" type="checkbox"
+                  onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead();" />
+              </span></span>
+            <table>
+              <tr>
+                <td>View by</td>
+                <td>
+                  <select id="more-views-select" onchange="Quotient.Mailbox.Controller.get(this).viewChanged()"
+                    ><option value="tag">tag</option><option value="person">person</option></select>
+                </td>
+                <td>
+                  <select style="width: 200px; overflow: hidden" id="tag-select"
+                    onchange="Quotient.Mailbox.Controller.get(this).viewByTagChanged(this)"/>
+                  <select style="display: none; width: 200px; overflow: hidden;" id="person-select"
+                    onchange="Quotient.Mailbox.Controller.get(this).viewByPersonChanged(this)"/>
+                </td>
+              </tr>
+            </table>
+            <div id="mailbox-log" />
+          </center>
+        </td>
+        <td style="width: 100%">
+          <div id="message-detail" />
+        </td>
+      </tr>
+    </table>
+  </div>
 </div>

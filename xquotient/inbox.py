@@ -3,42 +3,68 @@ import operator
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import livepage, json, tags
+from nevow import tags, inevow, athena
 from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 from axiom.tags import Catalog, Tag
 from axiom.slotmachine import hyper as super
-from axiom.upgrade import registerUpgrader
 
-from xmantissa import ixmantissa, tdb, tdbview, webnav, prefs, people
+from xmantissa import ixmantissa, tdb, tdbview, webnav, people
 from xmantissa.fragmentutils import PatternDictionary
 from xmantissa.publicresource import getLoader
 
 from xquotient.exmess import Message
-from xquotient.mimeutil import EmailAddress
+from xquotient import mimepart, equotient, extract
+from xquotient.actions import SenderPersonFragment
 
-class DefaultingColumnView(tdbview.ColumnViewBase):
-    def __init__(self, attributeID, default, displayName=None,
-                 width=None, typeHint='tdb-mail-column', maxLength=None):
+def quoteBody(m, maxwidth=78):
+    for part in m.walkMessage(preferred='text/plain'):
+        if part.type is None or part.type == 'text/plain':
+            break
+    else:
+        return ''
 
-        self.default = default
-        self.maxLength = maxLength
-        tdbview.ColumnViewBase.__init__(self, attributeID, displayName,
-                                        width, typeHint)
+    format = part.part.getParam('format')
+    payload = part.part.getUnicodeBody()
+    if format == 'flowed':
+        para = mimepart.FlowedParagraph.fromRFC2646(payload)
+    else:
+        para = mimepart.FixedParagraph.fromString(payload)
+    newtext = para.asRFC2646(maxwidth-2).split('\r\n')
 
-    def stanFromValue(self, idx, item, value):
-        if value is None:
-            return self.default
+    if m.sender is not None:
+        origfrom = m.sender
+    else:
+        origfrom = "someone who chose not to be identified"
 
-        if self.maxLength is not None and self.maxLength < len(value):
-            value = value[:self.maxLength-3] + '...'
-        return value
+    if m.sent is not None:
+        origdate = m.sent.asHumanly()
+    else:
+        origdate = "an indeterminate time in the past"
 
-class StoreIDColumnView(tdbview.ColumnViewBase):
-    def stanFromValue(self, idx, item, value):
-        return str(item.storeID)
+    replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
+
+    newtext = [ '\n>'.join(newtext) ]
+    return '\n\n\n' + replyhead + (u'\n> '.join(newtext))
+
+def reSubject(m, pfx='Re: '):
+    try:
+        newsubject = m.impl.getHeader(u'subject')
+    except equotient.NoSuchHeader:
+        newsubject = ''
+
+    if not newsubject.lower().startswith(pfx.lower()):
+        newsubject = pfx + newsubject
+    return newsubject
+
+def replyTo(m):
+    try:
+        recipient = m.impl.getHeader(u'reply-to')
+    except equotient.NoSuchHeader:
+        recipient = m.sender
+    return recipient
 
 class EmailAddressColumnView(tdbview.ColumnViewBase):
     # there is a lot of optimization here, and it's ugly.  but at 
@@ -46,6 +72,7 @@ class EmailAddressColumnView(tdbview.ColumnViewBase):
     # there would be a bunch of redundant queries
 
     _translator = None
+    _personActions = None
 
     def __init__(self, *args, **kwargs):
         tdbview.ColumnViewBase.__init__(self, *args, **kwargs)
@@ -57,17 +84,17 @@ class EmailAddressColumnView(tdbview.ColumnViewBase):
     def _personFromAddress(self, message, address):
         # return a people.Person instance if there is one already
         # existing that corresponds to 'address', otherwise None
-        person = self._cachedPeople.get(address.email)
-        if person is None and address.email not in self._cachedNotPeople:
+        person = self._cachedPeople.get(address)
+        if person is None and address not in self._cachedNotPeople:
             # at some point differentiate between people belonging to
             # different organizers, or something
-            person = message.store.findUnique(people.Person,
-                        people.Person.name == address.email,
-                        default=None)
+            organizer = message.store.findOrCreate(people.Organizer)
+            person = organizer.personByEmailAddress(address)
+
             if person is None:
-                self._cachedNotPeople.append(address.email)
+                self._cachedNotPeople.append(address)
             else:
-                self._cachedPeople[address.email] = person
+                self._cachedPeople[address] = person
         return person
 
     def personAdded(self, person):
@@ -75,163 +102,90 @@ class EmailAddressColumnView(tdbview.ColumnViewBase):
         if person.name in self._cachedNotPeople:
             self._cachedNotPeople.remove(person.name)
 
-    def _realNameFromPerson(self, person):
-        if person.name not in self._cachedNames:
-            rn = person.store.findUnique(people.RealName,
-                                         people.RealName.person==person,
-                                         default=None)
-            self._cachedNames[person.name] = rn
-        return self._cachedNames[person.name]
-
-    def stanFromValue(self, idx, item, value):
-        address = EmailAddress(value, mimeEncoded=False)
-        person = self._personFromAddress(item, address)
-
-        if person is not None:
-            if self._translator is None:
-                self._translator = ixmantissa.IWebTranslator(item.store)
-
-            personLink = tags.a(href=self._translator.linkTo(person.storeID))
-            realName = self._realNameFromPerson(person)
-            if realName is None:
-                personLink[person.name]
-            else:
-                if realName.last is None:
-                    last = ''
-                else:
-                    last = ' ' + realName.last
-                personLink[realName.first + last]
-            icon = tags.img(src='/static/quotient/images/person.png',
-                            style='padding: 2px;')
-            personStan = (icon, personLink)
+    def stanFromValue(self, idx, msg, value):
+        person = self._personFromAddress(msg, msg.sender)
+        if person is None:
+            display = SenderPersonFragment(msg)
         else:
-            link = tags.a(href='#', onclick='addPerson(this, %r); return false' % (idx,))
-            icon = tags.img(src='/static/quotient/images/add-person.png',
-                            border=0, style='padding: 2px')
-            personStan = (link[icon], address.anyDisplayName())
+            display = people.PersonFragment(person)
+        display.setFragmentParent(self.fragmentParent)
+        return display
 
-        return personStan
-
-class MessageLinkColumnView(DefaultingColumnView):
-    patterns = None
+class CompoundColumnView(EmailAddressColumnView):
+    def __init__(self, *args, **kwargs):
+        EmailAddressColumnView.__init__(self, *args, **kwargs)
+        self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
 
     def stanFromValue(self, idx, item, value):
-        if self.patterns is None:
-            self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
+        # FIXME - this & EmailAddressColumnView.stanFromValue should use
+        # template patterns
+        senderStan = EmailAddressColumnView.stanFromValue(self, idx, item, value)
 
-        subject = DefaultingColumnView.stanFromValue(self, idx, item, value)
-        pname = ('unread-message-link', 'read-message-link')[item.read]
-        return self.patterns[pname].fillSlots(
-                'subject', subject).fillSlots(
-                'onclick', 'loadMessage(this, %r); return false' % (idx,))
+        subjectStan = item.subject
 
-class MarkUnreadAction(tdbview.Action):
-    def __init__(self):
-        tdbview.Action.__init__(self, 'mark-unread',
-                                '/static/quotient/images/mark-unread.png',
-                                'Mark this message as unread',
-                                '/static/quotient/images/mark-unread-disabled.png')
+        if 0 < item.attachments:
+            # put a paperclip icon here
+            subjectStan = ('(%d) - ' % (item.attachments,), subjectStan)
 
-    def performOn(self, message):
-        message.read = False
-        return 'Marked Message: Unread'
+        className = ('unread-message', 'read-message')[item.read]
+        subjectStan = tags.div(style='overflow: hidden')[subjectStan]
+        return tags.div(**{'class': className})[(senderStan, subjectStan)]
 
-    def actionable(self, message):
-        return message.read
+    def onclick(self, idx, item, value):
+        return 'return quotient_loadMessage(event, %r)' % (idx,)
 
-class MarkReadAction(tdbview.Action):
-    def __init__(self):
-        tdbview.Action.__init__(self, 'mark-read',
-                                '/static/quotient/images/mark-read.png',
-                                'Mark this message as read',
-                                '/static/quotient/images/mark-read-disabled.png')
+# we want to allow linking to the archive/trash views from outside of the
+# inbox page, so we'll make some items with strange adaptors
 
-    def performOn(self, message):
-        message.read = True
-        return 'Marked Message: Read'
+class Archive(Item, InstallableMixin):
+    implements(ixmantissa.INavigableElement)
 
-    def actionable(self, message):
-        return not message.read
-
-class ArchiveAction(tdbview.Action):
-    def __init__(self):
-        tdbview.Action.__init__(self, 'archive',
-                                '/static/quotient/images/archive.png',
-                                'Archive this message')
-
-    def performOn(self, message):
-        message.archived = True
-        return 'Archived message successfully'
-
-    def actionable(self, message):
-        return True
-
-
-class _PreferredMimeType(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {u'text/html':'HTML', u'text/plain':'Text'}
-        desc = 'Your preferred format for display of email'
-
-        super(_PreferredMimeType, self).__init__('preferredMimeType',
-                                                 value,
-                                                 'Preferred Format',
-                                                 collection, desc,
-                                                 valueToDisplay)
-
-class _PreferredMessageDisplay(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {u'split':'Split Screen',u'full':'Full Screen'}
-        desc = 'Your preferred message detail value'
-
-        super(_PreferredMessageDisplay, self).__init__('preferredMessageDisplay',
-                                                       value,
-                                                       'Preferred Message Display',
-                                                       collection, desc,
-                                                       valueToDisplay)
-
-class QuotientPreferenceCollection(Item, InstallableMixin):
-    implements(ixmantissa.IPreferenceCollection)
-
-    schemaVersion = 2
-    typeName = 'quotient_preference_collection'
-    name = 'Email Preferences'
-
-    preferredMimeType = attributes.text(default=u'text/plain')
-    preferredMessageDisplay = attributes.text(default=u'split')
+    typeName = 'quotient_archive'
+    schemaVersion = 1
 
     installedOn = attributes.reference()
-    _cachedPrefs = attributes.inmemory()
 
     def installOn(self, other):
-        super(QuotientPreferenceCollection, self).installOn(other)
-        other.powerUp(self, ixmantissa.IPreferenceCollection)
+        super(Archive, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
 
-    def activate(self):
-        pmt = _PreferredMimeType(self.preferredMimeType, self)
-        pmd = _PreferredMessageDisplay(self.preferredMessageDisplay, self)
+    def getTabs(self):
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('All Mail', self.storeID, 0.3)],
+                authoritative=False)]
 
-        self._cachedPrefs = dict(preferredMimeType=pmt,
-                                 preferredMessageDisplay=pmd)
+def archiveScreen(archiveItem):
+    inbox = archiveItem.store.findUnique(Inbox)
+    inboxScreen = ixmantissa.INavigableFragment(inbox)
+    inboxScreen.inArchiveView = True
+    return inboxScreen
 
-    # IPreferenceCollection
-    def getPreferences(self):
-        return self._cachedPrefs
+registerAdapter(archiveScreen, Archive, ixmantissa.INavigableFragment)
 
-    def setPreferenceValue(self, pref, value):
-        # this ugliness is short lived
-        assert hasattr(self, pref.key)
-        setattr(pref, 'value', value)
-        self.store.transact(lambda: setattr(self, pref.key, value))
+class Trash(Item, InstallableMixin):
+    implements(ixmantissa.INavigableElement)
 
-def preferenceCollection1To2(old):
-    return old.upgradeVersion('quotient_preference_collection', 1, 2,
-                              preferredMimeType=old.preferredMimeType,
-                              preferredMessageDisplay=u'split',
-                              installedOn=old.installedOn)
+    typeName = 'quotient_trash'
+    schemaVersion = 1
 
-registerUpgrader(preferenceCollection1To2,
-                 'quotient_preference_collection',
-                 1, 2)
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(Trash, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
+
+    def getTabs(self):
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('Trash', self.storeID, 0.2)],
+                authoritative=False)]
+
+def trashScreen(trashItem):
+    inbox = trashItem.store.findUnique(Inbox)
+    inboxScreen = ixmantissa.INavigableFragment(inbox)
+    inboxScreen.inTrashView = True
+    return inboxScreen
+
+registerAdapter(trashScreen, Trash, ixmantissa.INavigableFragment)
 
 class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
@@ -242,118 +196,298 @@ class Inbox(Item, InstallableMixin):
     installedOn = attributes.reference()
 
     def getTabs(self):
-        return [webnav.Tab('Inbox', self.storeID, 0.6)]
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('Inbox', self.storeID, 0.4)],
+                authoritative=True)]
 
     def installOn(self, other):
         super(Inbox, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
 
 class InboxMessageView(tdbview.TabularDataView):
-    def __init__(self, original):
+    def __init__(self, original, baseComparison=None):
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
 
         tdm = tdb.TabularDataModel(
                 original.store,
-                Message, [Message.sender,
-                          Message.subject,
-                          Message.received],
-                baseComparison=Message.archived == False,
-                defaultSortColumn='received',
+                Message, [Message.sent],
+                baseComparison=baseComparison,
+                defaultSortColumn='sent',
                 defaultSortAscending=False,
                 itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
 
-        self.emailAddressColumnView = EmailAddressColumnView('sender', 'No Sender')
+        self.emailAddressColumnView = CompoundColumnView('sender',
+                                                typeHint='quotient-reader-column')
 
-        views = [StoreIDColumnView('storeID'),
-                 self.emailAddressColumnView,
-                 MessageLinkColumnView('subject', 'No Subject',
-                                       maxLength=100, width='100%'),
-                 tdbview.DateColumnView('received')]
-
+        views = [self.emailAddressColumnView]
         self.messageDetailPatterns = PatternDictionary(
                                             getLoader('message-detail-patterns'))
+        tdbview.TabularDataView.__init__(self, tdm, views, width='340px')
 
-        tdbview.TabularDataView.__init__(self, tdm, views, (ArchiveAction(),
-                                                            MarkReadAction(),
-                                                            MarkUnreadAction()))
-        self.docFactory = getLoader('inbox')
+def _fillSlots(tag, slotmap):
+    for (k, v) in slotmap.iteritems():
+        tag = tag.fillSlots(k, v)
+    return tag
 
-    def goingLive(self, ctx, client):
-        tdbview.TabularDataView.goingLive(self, ctx, client)
-        tags = self.original.store.query(Tag).getColumn('name').distinct()
-        client.call('setTags', json.serialize(list(tags)))
+class InboxScreen(athena.LiveFragment):
+    implements(ixmantissa.INavigableFragment)
 
-    def handle_addPerson(self, ctx, targetID):
-        message = self.itemFromTargetID(int(targetID))
-        address = EmailAddress(message.sender)
-        organizer = self.original.store.findOrCreate(people.Organizer)
-        person = organizer.personByName(address.email)
-        self.emailAddressColumnView.personAdded(person)
+    fragmentName = 'inbox'
+    live = 'athena'
+    title = ''
+    jsClass = 'Quotient.Mailbox.Controller'
 
-        # mimeutil.EmailAddress hadssome integration with the quotient
-        # addressbook, that might be something we want to revamp for this,
-        # thought this doesn't seem bad for now
+    inArchiveView = False
+    inTrashView = False
+    viewingByTag = None
+    viewingByPerson = None
+    currentMessage = None
 
-        realName = self.original.store.findOrCreate(people.RealName, person=person)
+    translator = None
+    _inboxTDB = None
 
-        if ' ' in address.display:
-            (realName.first, realName.last) = address.display.split(' ', 1)
-        elif 0 < len(address.display):
-            realName.first = address.display
-        else:
-            realName.first = address.email
+    iface = allowedMethods = dict(
+                toggleShowRead=True, newMessage=True,      addTags=True,
+                archiveMessage=True, deleteMessage=True,
+                archiveView=True,    trashView=True,       inboxView=True,
+                viewByTag=True,      viewByAllTags=True,   markCurrentMessageUnread=True,
+                viewByPerson=True,   viewByAllPeople=True, nextMessage=True,
+                getTags=True,        getMessageContent=True,
 
-        return self.replaceTable()
+                markCurrentMessageRead=True,
+                attachPhoneToSender=True,
+                incrementItemsPerPage=True,
+                archiveCurrentMessage=True,
+                deleteCurrentMessage=True,
+                replyToCurrentMessage=True)
 
-    def handle_prevMessage(self, ctx):
-        assert self._havePrevMessage(), 'there isnt a prev message'
+    def __init__(self, original):
+        athena.LiveFragment.__init__(self, original)
+        self.prefs = ixmantissa.IPreferenceAggregator(original.store)
+        self.organizer = original.store.findOrCreate(people.Organizer)
+        self.showRead = self.prefs.getPreferenceValue('showRead')
 
-        if self.currentMessageOffset == 0:
-            newOffset = self.original.itemsPerPage - 1
-            self.original.prevPage()
-            yield self.replaceTable()
-        else:
-            newOffset = self.currentMessageOffset - 1
+    def _getInboxTDB(self):
+        if self._inboxTDB is None:
+            inboxTDB = InboxMessageView(
+                    self.original, self._getBaseComparison())
+            inboxTDB.docFactory = getLoader(inboxTDB.fragmentName)
+            inboxTDB.setFragmentParent(self)
+            inboxTDB.emailAddressColumnView.fragmentParent = self
+            self._inboxTDB = inboxTDB
+        return self._inboxTDB
+    inboxTDB = property(_getInboxTDB)
 
-        yield self.loadMessage(ctx, newOffset)
+    def locateMethod(self, ctx, method):
+        try:
+            return athena.LiveFragment.locateMethod(self, ctx, method)
+        except AttributeError:
+            return self.inboxTDB.locateMethod(ctx, method)
 
-    def handle_nextMessage(self, ctx):
-        assert self._haveNextMessage(), 'there isnt a next message'
+    def incrementItemsPerPage(self, n):
+        self.inboxTDB.original.itemsPerPage += int(n)
+        self.inboxTDB.original.firstPage()
+        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
 
-        if self.currentMessageOffset == self.original.itemsPerPage - 1:
-            newOffset = 0
-            self.original.nextPage()
-            yield self.replaceTable()
-        else:
+    # current message actions
+    def markCurrentMessageUnread(self):
+        self.currentMessage.read = False
+        return self.nextMessage(markUnread=False)
+
+    def markCurrentMessageRead(self):
+        self.currentMessage.read = True
+
+    def deleteCurrentMessage(self):
+        self.currentMessage.deleted = True
+        return self.nextMessage(augmentIndex=-1)
+
+    def archiveCurrentMessage(self):
+        self.currentMessage.archived = True
+        return self.nextMessage(augmentIndex=-1)
+
+    def replyToCurrentMessage(self):
+        assert False, 'dont do this right now'
+        composeDialog = self.composePatterns['compose-dialog']
+        composeDialog = _fillSlots(composeDialog(),
+                            dict(to=replyTo(self.currentMessage),
+                                 subject=reSubject(self.currentMessage),
+                                 body=quoteBody(self.currentMessage)))
+        return unicode(flatten(composeDialog), 'utf-8')
+
+    # other things
+    def nextMessage(self, augmentIndex=0, markUnread=True):
+        if self._haveNextMessage():
             newOffset = self.currentMessageOffset + 1
-
-        yield self.loadMessage(ctx, newOffset)
-
-    def handle_nextUnreadMessage(self, ctx):
-        assert self._haveNextUnreadMessage(), 'there arent any more unread messages'
-        next = self._findNextUnread()
-
-        newOffset = None
-        while newOffset is None:
-            curpage = self.original.currentPage()
-            for (i, row) in enumerate(curpage):
-                if row['__item__'].storeID == next.storeID:
-                    newOffset = i
-                    break
+            if self.prefs.getPreferenceValue('itemsPerPage') < newOffset:
+                newOffset = 0
+                self.inboxTDB.original.nextPage()
             else:
-                assert self.original.hasNextPage(), 'something went horribly wrong'
-                self.original.nextPage()
+                newOffset += augmentIndex
 
-        yield self.replaceTable()
-        yield self.loadMessage(ctx, newOffset)
+            self.callRemote(
+                    'replaceTDB', self.inboxTDB.replaceTable()).addCallback(
+                        lambda ign: self.callRemote('prepareForMessage', newOffset))
+            return self.getMessageContent(newOffset, markUnread=markUnread)
+        else:
+            raise ValueError('no next message')
+
+    def newMessage(self):
+        pass
+
+    def _changeComparisonReplaceTable(self):
+        self.inboxTDB.original.baseComparison = self._getBaseComparison()
+        self.inboxTDB.original.firstPage()
+        return self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
+
+    def viewByTag(self, tag):
+        self.viewingByTag = tag
+        self._changeComparisonReplaceTable()
+
+    def viewByPerson(self, person):
+        self.viewingByPerson = person
+        self._changeComparisonReplaceTable()
+
+    def viewByAllTags(self):
+        self.viewingByTag = None
+        self._changeComparisonReplaceTable()
+
+    def viewByAllPeople(self):
+        self.viewingByPerson = None
+        self._changeComparisonReplaceTable()
+
+    def toggleShowRead(self):
+        self.showRead = not self.showRead
+        self._changeComparisonReplaceTable()
+        return unicode(flatten(self._getShowReadPattern()), 'utf-8')
+
+    def archiveMessage(self, index):
+        msg = self.inboxTDB.itemFromTargetID(int(index))
+        msg.archived = True
+        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
+
+    def deleteMessage(self, index):
+        msg = self.inboxTDB.itemFromTargetID(int(index))
+        msg.deleted = True
+        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
+
+    def getTags(self):
+        return self.original.store.query(Tag).getColumn('name').distinct()
+
+    def addTags(self, tags):
+        catalog = self.original.store.findOrCreate(Catalog)
+        for tag in tags:
+            catalog.tag(self.currentMessage, unicode(tag))
+        return unicode(flatten(self.currentMessageDetail.tagsAsStan()), 'utf-8')
+
+    def attachPhoneToSender(self, number):
+        person = self.organizer.personByEmailAddress(self.currentMessage.sender)
+
+        people.PhoneNumber(store=person.store,
+                           person=person,
+                           number=number)
+
+
+        print 'trying to find an extract with text = %r' % (number,)
+        ex = person.store.findUnique(extract.PhoneNumberExtract,
+                            attributes.AND(extract.PhoneNumberExtract.message == self.currentMessage,
+                                           extract.PhoneNumberExtract.text == number))
+        ex.actedUpon = True
+
+    def _getMessageMetadata(self):
+        # FIXME this and some other functions need to be commuted
+        # to exmess.MessageDetail so the standalone message detail
+        # it not entirely broken
+
+        # at some point send extract type names and regular expressions
+        # when the page loads
+
+        person = self.organizer.personByEmailAddress(self.currentMessage.sender)
+        isPerson = person is not None
+
+        edata = {}
+        data  = {u'sender': {u'is-person': isPerson},
+                 u'message': {u'extracts': edata,
+                              u'read': self.currentMessage.read}}
+
+        for (ename, etype) in extract.extractTypes.iteritems():
+            edata[unicode(ename)] = {u'pattern': etype.regex.pattern}
+            for ex in self.original.store.query(etype, etype.message==self.currentMessage):
+                if ex.actedUpon:
+                    v = u'acted-upon'
+                elif ex.ignored:
+                    v = u'ignored'
+                else:
+                    v = u'unused'
+
+                edata[ename][ex.text] = v
+
+        return data
+
+    def getMessageContent(self, idx, markUnread=True):
+        # i load and display the message at offset 'idx' in the current
+        # result set of the underlying tdb model
+
+        message = self.inboxTDB.itemFromTargetID(idx)
+
+        self.currentMessage = message
+        self.currentMessageOffset = idx
+        self.currentMessageDetail = ixmantissa.INavigableFragment(message)
+        self.currentMessageDetail.page = self.page
+        return (self._getMessageMetadata(),
+                unicode(flatten(self.currentMessageDetail), 'utf-8'))
+
+    def _getBaseComparison(self):
+        # the only mutually exclusive views are "show read" and archive/trash,
+        # so you could look at all messages in trash, tagged with "boring"
+        # sent by the Person with name "Joe" or whatever
+        comparison = Message.deleted == self.inTrashView
+        if not self.inArchiveView:
+            comparison = attributes.AND(comparison, Message.archived == False)
+
+        if self.viewingByTag is not None:
+            comparison = attributes.AND(
+                Tag.object == Message.storeID,
+                Tag.name == self.viewingByTag,
+                comparison)
+
+        if self.viewingByPerson is not None:
+            comparison = attributes.AND(
+                 Message.sender == people.EmailAddress.address,
+                 people.EmailAddress.person == people.Person.storeID,
+                 people.Person.name == self.viewingByPerson,
+                 comparison)
+
+        if not self.showRead and not (self.inArchiveView or self.inTrashView):
+            comparison = attributes.AND(comparison,
+                                        Message.read == False)
+        return comparison
+
+    def render_inboxTDB(self, ctx, data):
+        return ctx.tag[self.inboxTDB]
+
+    def render_addPersonFragment(self, ctx, data):
+        # the person form is a fair amount of html,
+        # so we'll only include it once
+
+        self.addPersonFragment = people.AddPersonFragment(self)
+        self.addPersonFragment.setFragmentParent(self)
+        self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
+        return self.addPersonFragment
+
+    def _getShowReadPattern(self):
+        pname = ['show-read-off', 'show-read-on'][self.showRead]
+        return inevow.IQ(self.docFactory).onePattern(pname)
+
+    def render_showRead(self, ctx, data):
+        return ctx.tag[self._getShowReadPattern()]
 
     def _havePrevMessage(self):
         return not (self.currentMessageOffset - 1 < 0
                         and not self.original.hasPrevPage())
 
     def _haveNextMessage(self):
-        return not (self.original.itemsPerPage < self.currentMessageOffset + 1
-                        and not self.original.hasNextPage())
+        return not (self.prefs.getPreferenceValue('itemsPerPage') < self.currentMessageOffset + 1
+                        and not self.inboxTDB.original.hasNextPage())
 
     def _haveNextUnreadMessage(self):
         return self._haveNextMessage() and self._findNextUnread() is not None
@@ -384,43 +518,10 @@ class InboxMessageView(tdbview.TabularDataView):
         except StopIteration:
             return None
 
-    def handle_loadMessage(self, ctx, targetID):
-        #if not self._havePrevMessage():
-        #   yield (livepage.js.disablePrevMessage(), livepage.eol)
-        #if not self._haveNextMessage():
-        #    yield (livepage.js.disableNextMessage(), livepage.eol)
-        #elif not self._haveNextUnreadMessage():
-        #    yield (livepage.js.disableNextUnreadMessage(), livepage.eol)
-        yield self.loadMessage(ctx, int(targetID))
-
-    def handle_addTag(self, ctx, tag):
-        catalog = self.original.store.findOrCreate(Catalog)
-        catalog.tag(self.currentMessage, unicode(tag))
-        return livepage.set('message-tags', flatten(self.currentMessageDetail.tagsAsStan()))
-
-    def replaceTable(self):
-        # override TabularDataView.replaceTable in order to
-        # resize the message view in the case that there are
-        # less items on the new page.
-        yield tdbview.TabularDataView.replaceTable(self)
-        yield (livepage.js.fitMessageDetailToPage(), livepage.eol)
-
-    def loadMessage(self, ctx, idx):
-        # i load and display the message at offset 'idx' in the current
-        # result set of the underlying tdb model
-
-        message = self.itemFromTargetID(idx)
-
-        self.currentMessage = message
-        self.currentMessageOffset = idx
-        self.currentMessageDetail = ixmantissa.INavigableFragment(message)
-
-        html = self.currentMessageDetail.rend(ctx, None)
-        view = self.prefs.getPreferenceValue('preferredMessageDisplay')
-
-        yield (livepage.js.highlightMessageAtOffset(idx), livepage.eol)
-        yield (livepage.set('%s-message-detail' % (view,), flatten(html)), livepage.eol)
+    def head(self):
+        return tags.link(rel='stylesheet', type='text/css',
+                         href='/Quotient/static/reader.css')
 
 
-registerAdapter(InboxMessageView, Inbox, ixmantissa.INavigableFragment)
+registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
 

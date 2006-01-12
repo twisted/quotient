@@ -1,30 +1,29 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
   <nevow:invisible nevow:render="paragraph">
-    <div nevow:pattern="paragraph">
+    <div class="text-paragraph" nevow:pattern="paragraph">
       <nevow:attr name="class"><nevow:slot name="quote-class" /></nevow:attr>
       <nevow:slot name="content" />
     </div>
     <nevow:slot name="content" />
   </nevow:invisible>
 
-  <iframe nevow:pattern="content-iframe" frameborder="0" width="100%" onload="resizeIFrame(this)">
+  <iframe id="content-iframe" nevow:pattern="content-iframe" frameborder="0" width="100%" onload="resizeIFrame(this)">
     <nevow:attr name="src"><nevow:slot name="location" /></nevow:attr>
   </iframe>
 
-  <span nevow:pattern="attachment">
-    <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr><nevow:slot name="filename" /></a>
-  </span>
+  <div nevow:pattern="attachment" style="text-align: center">
+    <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
+    <img border="0"><nevow:attr name="src"><nevow:slot name="icon" /></nevow:attr></img><br />
+      <nevow:slot name="filename" /></a>
+  </div>
 
-  <span nevow:pattern="image-attachment">
-    <span style="width: 100%; background-color: #DADADA">
-      <nevow:slot name="filename" />
-    </span><br />
+  <div style="float: left" nevow:pattern="image-attachment">
     <a>
       <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
-      <img><nevow:attr name="src"><nevow:slot name="location" /></nevow:attr></img>
+      <img><nevow:attr name="src"><nevow:slot name="thumbnail-location" /></nevow:attr></img>
     </a><br />
-  </span>
+  </div>
 
   <a nevow:pattern="read-message-link" href="#">
     <nevow:attr name="onclick"><nevow:slot name="onclick" /></nevow:attr>

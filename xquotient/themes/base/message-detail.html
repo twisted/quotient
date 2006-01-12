@@ -1,44 +1,68 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1">
-  <table class="control-table" cellspacing="0" nevow:render="headerPanel">
-    <tr>
-      <td>From</td><td><nevow:slot name="sender" /></td>
-    </tr>
-    <tr>
-      <td>To</td><td><nevow:slot name="recipient" /></td>
-    </tr>
-    <tr>
-      <td>Subject</td><td><nevow:slot name="subject" /></td>
-    </tr>
-    <tr valign="top">
-      <td>
-        Tags
-        <a href="#" class="hide-show-action" id="tags-plus" onclick="addTags(); return false">+</a>
-        <a href="#" class="hide-show-action" id="tags-minus" onclick="hideTags(); return false" style="display: none;">-</a>
-      </td>
-      <td>
-        <span id="message-tags"><nevow:slot name="tags" /></span>
-        <form style="display: none;" id="add-tags-dialog" onsubmit="addTag(this); return false">
-          <input autocomplete="off" onkeypress="return onCompletionKeyDown(event);" 
-            oninput="completeCurrentTag(this.value)" id="add-tags-dialog-text-input" type="text" name="tag" />
-          <div id="tag-completions" />
-        </form>
-      </td>
-    </tr>
-  </table>
-  <table style="width: 70%">
-    <tr valign="top">
-      <td>
-        <a href="#" onclick="prevMessage(); return false">Previous Message</a>
-      </td>
-      <td align="right" style="text-align: right">
-        <a href="#" onclick="nextMessage(); return false">Next Message</a><br />
-        <a href="#" onclick="nextUnreadMessage(); return false">Next Unread Message</a>
-      </td>
-    </tr>
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding-left: 12px;">
+  <div class="actions-container">
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).markThisUnread(); return false"
+      >mark unread</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(); return false"
+      >archive</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(); return false"
+      >delete</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToThis(); return false"
+      >reply</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToAllThis(); return false"
+      >reply all</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(); return false"
+      >forward</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).redirectThis(); return false"
+      >redirect</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).thisIsSpam(); return false"
+      >this is spam</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deferThis(); return false"
+      >defer</a> |
+    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).todoThis(); return false"
+      >todo</a>
+  </div>
+  <table class="header-table" cellspacing="0" nevow:render="headerPanel">
+    <tbody>
+      <tr>
+        <td class="header-table-first-col">From</td>
+        <td class="header-table-last-col" id="message-detail-sender"><nevow:slot name="sender" /></td>
+      </tr>
+      <tr>
+        <td class="header-table-first-col">To</td>
+        <td class="header-table-last-col"><nevow:slot name="recipient" /></td>
+      </tr>
+      <tr>
+        <td class="header-table-first-col">Subject</td>
+        <td class="header-table-last-col"><nevow:slot name="subject" /></td>
+      </tr>
+      <tr valign="top">
+        <td class="header-table-first-col">
+          Tags
+          <a href="#" class="hide-show-action" id="tags-plus"
+            onclick="Quotient.Mailbox.Controller.get(this).showTagEntry(); return false"
+            >+</a>
+          <a href="#" class="hide-show-action" id="tags-minus"
+            onclick="Quotient.Mailbox.Controller.get(this).hideTagEntry(); return false"
+            style="display: none;">-</a>
+        </td>
+        <td class="header-table-last-col">
+          <span id="message-tags"><nevow:slot name="tags" /></span>
+          <form style="display: none;" id="add-tags-dialog"
+            onsubmit="Quotient.Mailbox.Controller.get(this).addTags(this); return false">
+            <input autocomplete="off"
+              onkeypress="return Quotient.Mailbox.Controller.get(this).tagAutocompleteKeyDown(event)" 
+              oninput="Quotient.Mailbox.Controller.get(this).completeCurrentTag(this.value)"
+                id="add-tags-dialog-text-input" type="text" name="tag" />
+            <div id="tag-completions" />
+          </form>
+        </td>
+      </tr>
+    </tbody>
   </table>
   <p />
-  <div style="font-family: monospace; width: 80%" nevow:render="messageBody">
+  <div nevow:render="attachmentPanel" style="float: right" />
+  <div id="message-body" style="font-family: monospace; width: 80%; font-size: 1.3em;" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
-  <div style="width: 80%" nevow:render="attachmentPanel" />
+  <nevow:invisible nevow:render="imagePanel" />
 </div>

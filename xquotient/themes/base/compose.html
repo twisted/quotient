@@ -1,0 +1,52 @@
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  nevow:render="liveFragment">
+
+  <nevow:invisible nevow:render="compose">
+    <span id="address-completions" style="display: none; position: absolute" />
+    <table>
+      <tr>
+        <td>
+          <table class="header-table" cellspacing="0">
+            <tbody>
+              <tr valign="top">
+                <td class="header-table-first-col">To</td>
+                <td class="header-table-last-col">
+                  <textarea 
+                    onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
+                    oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
+                    id="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
+              </tr>
+              <tr>
+                <td class="header-table-first-col">Subject</td>
+                <td class="header-table-last-col">
+                  <input type="text" name="subject" style="width: 98%"
+                    ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input></td>
+              </tr>
+              <tr>
+                <td class="header-table-first-col">Attachments</td>
+                <td class="header-table-last-col"
+                  ><input type="file" id="file-upload-1" style="display: none;" />
+                  <a href="#"
+                    onclick="Quotient.Compose.Controller.get(this).addAttachment(this); return false"
+                    >attach a file</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <textarea id="message-body" cols="80" rows="10">
+            Type message here
+          </textarea>
+        </td>
+      </tr>
+      <tr>
+        <td align="right">
+          <input type="submit" value="Send" />
+        </td>
+      </tr>
+    </table>
+  </nevow:invisible>
+</div>
