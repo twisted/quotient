@@ -371,7 +371,8 @@ class InboxScreen(athena.LiveFragment):
         self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
 
     def getTags(self):
-        return self.original.store.query(Tag).getColumn('name').distinct()
+        return list(
+            self.original.store.query(Tag).getColumn('name').distinct())
 
     def addTags(self, tags):
         catalog = self.original.store.findOrCreate(Catalog)
