@@ -20,7 +20,9 @@
     font-weight: bold;
 }
 
-.tdb-navigation-panel { display: none; }
+/* XXX shouldn't be an ID.  can we do selectors by athena:class?
+ */
+#mailbox-meat .tdb-navigation-panel { display: none; }
 
 table.tdb > tbody > tr > td { cursor: pointer; }
 .embedded-action { float: right; display: block; }
