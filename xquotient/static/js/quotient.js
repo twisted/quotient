@@ -57,7 +57,7 @@ Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass();
 Quotient.Mailbox.Controller.prototype.loaded = function() {
     var outerthis = this;
 
-    window.onresize = function() { outerthis.checkTDBSize() }
+    //window.onresize = function() { outerthis.checkTDBSize() }
     //setTimeout(function() { outerthis.checkTDBSize() }, 100);
     this.allTags   = new Array();
     this.selectedRow = null;
@@ -106,6 +106,7 @@ function quotient_loadMessage(event, idx) {
     mailboxController.loadMessage(idx);
 }
 
+/*
 Quotient.Mailbox.Controller.prototype.checkTDBSize = function() {
     var row = MochiKit.DOM.getElement("tdb-item-1");
     if(!row) {
@@ -135,6 +136,7 @@ Quotient.Mailbox.Controller.prototype.checkTDBSize = function() {
             MochiKit.DOM.hideElement("loading-dialog");
             MochiKit.DOM.getElement("mailbox-meat").style.visibility = 'visible' });
 }
+*/
 
 Quotient.Mailbox.Controller.prototype.stuffTagsInDropdown = function() {
     var select = MochiKit.DOM.getElement("tag-select");
