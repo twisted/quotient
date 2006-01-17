@@ -1,33 +1,5 @@
 /* this javascript file should be included by all quotient pages */
 
-var TDB_Y_POS = null;
-var TDB_X_POS = null;
-
-/* 
-   these two functions are optimizations, so we don't have to
-   traverse the DOM all the way up to the document element in
-   order to figure out the height of some element that is inside
-   the tdb 
-*/
-
-function quotient_findRelPosX(e) {
-    var x = TDB_X_POS;
-    while(e.id != "tdb-container") {
-        x += e.offsetLeft;
-        e = e.offsetParent;
-    }
-    return x;
-}
-
-function quotient_findRelPosY(e) {
-    var y = TDB_Y_POS;
-    while(e.id != "tdb-container") {
-        y += e.offsetTop;
-        e = e.offsetParent;
-    }
-    return y;
-}
-
 function quotient_stripLeadingTrailingWS(s) {
     return s.replace(/^\s+/, "").replace(/\s+$/, "");
 }
@@ -41,13 +13,6 @@ function quotient_normalizeTag(tag) {
 }
 
 function quotient_exposeActions(event) {
-/*
-    if(!TDB_X_POS) {
-        var tdbc = MochiKit.DOM.getElement("tdb-container");
-        TDB_X_POS = quotient_findPosX(tdbc);
-        TDB_Y_POS = quotient_findPosY(tdbc);
-    }
-*/
     var actions = Nevow.Athena.NodeByAttribute(
         event.originalTarget.parentNode, "class", "person-actions"
     );
@@ -132,105 +97,119 @@ if(typeof(Quotient.Common) == "undefined") {
     Quotient.Common = {};
 }
 
+Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass();
+
+Quotient.Common.AddPerson.method('replaceAddPersonHTMLWithPersonHTML',
+    function(self, identifier) {
+        var D = self.callRemote('getPersonHTML');
+        D.addCallback(function(HTML) {
+            var personIdentifiers = Nevow.Athena.NodesByAttribute(
+                                      document.documentElement, 'class', 'person-identifier');
+            var e = null;
+            for(var i = 0; i < personIdentifiers.length; i++) {
+                e = personIdentifiers[i];
+                if(e.firstChild.nodeValue == identifier) {
+                    e.parentNode.innerHTML = HTML;
+                }
+            }
+        });
+    });
+
 Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass();
 
-Quotient.Common.SenderPerson.prototype.replaceWithPersonHTML = function(personHTML, node) {
-    /* we have to find other person-identifier elements with the same person identifier
-       as ours and replace them with the person html we got in addPerson() (so that
-       they dont prompt the user to add a person they just added via a different link)
-       it is unfortunate we have to do this, but it is the price we pay for no page loads */
+Quotient.Common.SenderPerson.method('addEventListener',
+    function(self, type, f, useCapture) {
+        self.addPersonFragment.addEventListener(type, f, useCapture);
+    });
 
-    var personIdentifiers = Nevow.Athena.NodesByAttribute(
-                                document.documentElement, 'class', 'person-identifier');
-    var identifier = Nevow.Athena.NodeByAttribute(
-                        node, 'class', 'person-identifier').firstChild.nodeValue;
-
-    var e = null;
-    for(var i = 0; i < personIdentifiers.length; i++) {
-        e = personIdentifiers[i];
-        if(e.firstChild.nodeValue == identifier) {
-            e.parentNode.innerHTML = personHTML;
+Quotient.Common.SenderPerson.method('showAddPerson',
+    function(self, node, event) {
+        if(self.working == true) {
+            return;
         }
-    }
-}
 
-Quotient.Common.SenderPerson.prototype.addEventListener = function(type, f, useCapture) {
-    f = MochiKit.Base.bind(f, this);
-    this.addPersonFragment.addEventListener(type, f, useCapture);
-    const outerThis = this;
-    return function() {
-        outerThis.addPersonFragment.removeEventListener(type, f, useCapture);
-    }
-}
+        self.working = true;
+        self.node = node;
+        self.popdownTimeout = null;
 
-Quotient.Common.SenderPerson.prototype.showAddPerson = function(node, event) {
-    if(this.working == true) {
-        return;
-    }
+        var name = self.nodeByAttribute('class', 'person-name').firstChild.nodeValue;
+        var first = '';
+        var last = '';
 
-    this.working = true;
-    this.node = node;
-    this.popdownTimeout = null;
+        if(name.match(/\s+/)) {
+            var parts = name.split(/\s+/, 2);
+            first = parts[0];
+            last  = parts[1];
+        } else {
+            first = name;
+        }
 
-    var name = this.nodeByAttribute('class', 'person-name').firstChild.nodeValue;
-    var first = '';
-    var last = ''
-    if(name.match(/\s+/)) {
-        var parts = name.split(/\s+/, 2);
-        first = parts[0];
-        last  = parts[1];
-    } else {
-        first = name;
-    }
-    var email = this.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
+        self.email = self.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
 
-    this.addPersonFragment = MochiKit.DOM.getElement("add-person-fragment");
-    var outerThis = this;
+        self.addPersonFragment = MochiKit.DOM.getElement("add-person-fragment");
 
-    function setValueOfFormElement(name, value) {
-        var e = Nevow.Athena.NodeByAttribute(outerThis.addPersonFragment, 'name', name);
-        e.value = value;
-    }
+        function setValueOfFormElement(name, value) {
+            var e = Nevow.Athena.NodeByAttribute(self.addPersonFragment, 'name', name);
+            e.value = value;
+        }
 
-    setValueOfFormElement('firstname', first);
-    setValueOfFormElement('nickname', first);
-    setValueOfFormElement('lastname', last);
-    setValueOfFormElement('email', email);
+        setValueOfFormElement('firstname', first);
+        setValueOfFormElement('nickname', first);
+        setValueOfFormElement('lastname', last);
+        setValueOfFormElement('email', self.email);
 
-    this.addPersonFragment.style.top = event.pageY + 'px';
-    this.addPersonFragment.style.left = event.pageX + 25 + 'px';
+        self.addPersonFragment.style.top = event.pageY + 'px';
+        self.addPersonFragment.style.left = event.pageX + 25 + 'px';
 
-    var undoMouseover = this.addEventListener("mouseover",
-                                function() { this.engagedPopup() }, true);
-    var undoMouseout  = this.addEventListener("mouseout",
-                                function() { this.hideAddPersonFragment(false) }, true);
+        self.mouseoverFunction = function() { self.engagedPopup() };
+        self.mouseoutFunction  = function() { self.disengagedPopup() };
 
-    this.removeEventListeners = function() {
-        undoMouseover();
-        undoMouseout();
-    }
+        self.addEventListener("mouseover", self.mouseoverFunction, true);
+        self.addEventListener("mouseout", self.mouseoutFunction, true);
 
-    MochiKit.DOM.showElement(this.addPersonFragment);
-}
+        self.form = self.addPersonFragment.getElementsByTagName("form")[0];
+        self.submitFunction = function() { self.submitForm() };
 
-Quotient.Common.SenderPerson.prototype.engagedPopup = function() {
-    if(this.popdownTimeout != null) {
-        clearTimeout(this.popdownTimeout);
-    }
-}
+        self.form.addEventListener("submit", self.submitFunction, true);
 
-Quotient.Common.SenderPerson.prototype.hideAddPersonFragment = function(force) {
-    var outerThis = this;
+        MochiKit.DOM.showElement(self.addPersonFragment);
+    });
 
-    function reallyHide() {
-        MochiKit.DOM.hideElement(outerThis.addPersonFragment);
-        outerThis.removeEventListeners();
-        outerThis.working = false;
-    }
+Quotient.Common.SenderPerson.method('submitForm',
+    function(self) {
+        var node = Nevow.Athena.NodeByAttribute(self.addPersonFragment, "class", "add-person");
+        Quotient.Common.AddPerson.get(node).replaceAddPersonHTMLWithPersonHTML(self.email);
+    });
 
-    if(force) {
-        reallyHide();
-    } else {
-        this.popdownTimeout = setTimeout(reallyHide, 1000);
-    }
-}
+Quotient.Common.SenderPerson.method('disengagedPopup',
+    function(self) { self.hideAddPersonFragment(false) });
+
+Quotient.Common.SenderPerson.method('removeEventListeners',
+    function(self) {
+        self.addPersonFragment.removeEventListener("mouseover", self.mouseoverFunction, true);
+        self.addPersonFragment.removeEventListener("mouseout", self.mouseoutFunction, true);
+        self.form.removeEventListener("submit", self.submitFunction, true);
+    });
+
+Quotient.Common.SenderPerson.method('engagedPopup',
+    function(self) {
+        if(self.popdownTimeout != null) {
+            clearTimeout(self.popdownTimeout);
+        }
+    });
+
+Quotient.Common.SenderPerson.method('hideAddPersonFragment',
+    function(self, force) {
+
+        function reallyHide() {
+            MochiKit.DOM.hideElement(self.addPersonFragment);
+            self.removeEventListeners();
+            self.working = false;
+        }
+
+        if(force) {
+            reallyHide();
+        } else {
+            self.popdownTimeout = setTimeout(reallyHide, 1000);
+        }
+    });

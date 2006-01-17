@@ -135,15 +135,31 @@ class CompoundColumnView(EmailAddressColumnView):
     def onclick(self, idx, item, value):
         return 'return quotient_loadMessage(event, %r)' % (idx,)
 
-# we want to allow linking to the archive/trash views from outside of the
-# inbox page, so we'll make some items with strange adaptors
-
 class AddPersonFragment(people.AddPersonFragment):
+    jsClass = 'Quotient.Common.AddPerson'
+
+    iface = allowedMethods = dict(getPersonHTML=True)
+    lastPerson = None
 
     def makePerson(self, nickname):
         person = super(AddPersonFragment, self).makePerson(nickname)
         EmailActions(store=self.original.store).installOn(person)
+        self.lastPerson = person
         return person
+
+    def getPersonHTML(self):
+        # come up with a better way to identify people.
+        # i kind of hate that we have to do this at all, it's really, really ugly.
+        # once we have some kind of history thing set up, we should just
+        # reload the page instead of dousing ourselves with petrol
+        # and jumping through flaming hoops
+        assert self.lastPerson is not None
+        personFrag = people.PersonFragment(self.lastPerson)
+        personFrag.setFragmentParent(self)
+        return unicode(flatten(personFrag), 'utf-8')
+
+# we want to allow linking to the archive/trash views from outside of the
+# inbox page, so we'll make some items with strange adaptors
 
 class Archive(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
