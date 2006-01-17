@@ -302,12 +302,6 @@ class InboxScreen(athena.LiveFragment):
         return self._inboxTDB
     inboxTDB = property(_getInboxTDB)
 
-    def locateMethod(self, ctx, method):
-        try:
-            return athena.LiveFragment.locateMethod(self, ctx, method)
-        except AttributeError:
-            return self.inboxTDB.locateMethod(ctx, method)
-
     def incrementItemsPerPage(self, n):
         self.inboxTDB.original.itemsPerPage += int(n)
         self.inboxTDB.original.firstPage()
