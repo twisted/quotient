@@ -1,9 +1,11 @@
+/*
 if(tinyMCE) {
     tinyMCE.init({
         mode: "exact",
         elements: "message-body",
         theme: "simple"});
 }
+*/
 
 // import Quotient.Common
 
@@ -46,22 +48,20 @@ Quotient.Compose.Controller.prototype.stuffPeopleInDropdown = function() {
 }
 
 Quotient.Compose.Controller.prototype.addrAutocompleteKeyDown = function(event) {
-    const TAB = 9; const ENTER = 13; const ESC = 27;
-    const UP = 38; const DN = 40;
-
+    var TAB = 9;
     var completions = MochiKit.DOM.getElement("address-completions");
 
     if(completions.style.display == "none")
         return true;
 
-    if(event.keyCode == ENTER || event.keyCode == TAB) {
+    if(event.keyCode == event.DOM_VK_ENTER || event.keyCode == TAB) {
         if(0 < completions.childNodes.length) {
             this.appendAddrCompletionToList(this.selectedAddrCompletion());
         }
         return this.dontBubbleEvent(event);
-    } else if(event.keyCode == DN) {
+    } else if(event.keyCode == event.DOM_VK_DOWN) {
         this.shiftAddrCompletionHighlightDown();
-    } else if(event.keyCode == UP) {
+    } else if(event.keyCode == event.DOM_VK_UP) {
         this.shiftAddrCompletionHighlightUp();
     } else {
         this.emptyAndHideAddressCompletions();

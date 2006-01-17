@@ -365,7 +365,7 @@ Quotient.Mailbox.Controller.prototype._lookupExtractState = function(etype, extr
 }
 
 Quotient.Mailbox.Controller.prototype.transformPhoneNumber = function(s) {
-    const enabled = this.messageMetadata["sender"]["is-person"] &&
+    var enabled = this.messageMetadata["sender"]["is-person"] &&
                         this._lookupExtractState("phone number", s) == "unused";
     var icon = null;
 
@@ -411,7 +411,7 @@ Quotient.Mailbox.Controller.prototype.highlightExtracts = function(outerp) {
     var i = null;
     var elem = null;
     var regex = null;
-    const etypes = this.messageMetadata["message"]["extracts"];
+    var etypes = this.messageMetadata["message"]["extracts"];
 
     for(var k in etypes) {
         etype = etypes[k];
@@ -510,8 +510,8 @@ Quotient.Mailbox.Controller.prototype.dontBubbleEvent = function(event) {
 }
 
 Quotient.Mailbox.Controller.prototype.tagAutocompleteKeyDown = function(event) {
-    const TAB = 9;
-    const DEL = 8;
+    var TAB = 9;
+    var DEL = 8;
 
     if(event.keyCode == TAB) {
         var completions = MochiKit.DOM.getElement("tag-completions");
@@ -585,13 +585,23 @@ Quotient.Mailbox.Controller.prototype.addTags = function(form) {
                                 MochiKit.Base.map(quotient_normalizeTag, tags));
 
     var newTags = 0;
-    for(var i = 0; i < tags.length; i++) {
-        for(var j = 0; j < this.allTags.length; j++) {
-            if(this.allTags[j] == tags[i]) {
-                newTags++;
-                this.allTags.push(tags[i]);
-                break;
+    var i = 0;
+    var j = 0;
+    var outerThis = this;
+
+    var allTagsContains = function(tag) {
+        for(j = 0; j < outerThis.allTags.length; j++) {
+            if(outerThis.allTags[j] == tag) {
+                return true;
             }
+        }
+        return false;
+    }
+
+    for(i = 0; i < tags.length; i++) {
+        if(!allTagsContains(tags[i])) {
+            newTags++;
+            this.allTags.push(tags[i]);
         }
     }
 
