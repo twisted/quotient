@@ -154,15 +154,6 @@ Quotient.Common.SenderPerson.prototype.replaceWithPersonHTML = function(personHT
     }
 }
 
-/*
-Quotient.Common.SenderPerson.prototype.addPerson = function(node) {
-    var addPersonFragment = MochiKit.DOM.getElement("addPersonFragment");
-
-    this.callRemote('addPerson').addCallback(
-        MochiKit.Base.bind(function(html) { this.replaceWithPersonHTML(html, node) }, this));
-}
-*/
-
 Quotient.Common.SenderPerson.prototype.addEventListener = function(type, f, useCapture) {
     f = MochiKit.Base.bind(f, this);
     this.addPersonFragment.addEventListener(type, f, useCapture);
