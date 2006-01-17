@@ -37,7 +37,7 @@ class EmailActions(Item, InstallableMixin):
             return self.translator.linkTo(self.store.findUnique(typeClass).storeID)
 
         sendMailLink = tags.a(href='%s?recipient=%s' % (linkTo(compose.Composer),
-                                                        urllib.quote(self.installedOn.email)))
+                                                        urllib.quote(self.installedOn.getEmailAddress())))
         return sendMailLink['Send an email!']
 
 class LinkToColumnView(tdbview.ColumnViewBase):

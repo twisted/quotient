@@ -478,7 +478,7 @@ class InboxScreen(athena.LiveFragment):
         # the person form is a fair amount of html,
         # so we'll only include it once
 
-        self.addPersonFragment = AddPersonFragment(self)
+        self.addPersonFragment = AddPersonFragment(self.original)
         self.addPersonFragment.setFragmentParent(self)
         self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
         return self.addPersonFragment
