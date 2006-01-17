@@ -157,7 +157,9 @@ class Part(item.Item):
         if self.parent is None:
             message.attachments = len(list(self.walkAttachments()))
             extract.extract(message)
-            store.findUnique(SyncIndexer).indexMessage(message)
+            indexer = store.findUnique(SyncIndexer, default=None)
+            if indexer is not None:
+                indexer.indexMessage(message)
 
         del self._headers, self._children
 
