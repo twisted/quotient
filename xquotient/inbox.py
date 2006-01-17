@@ -17,6 +17,7 @@ from xmantissa.publicresource import getLoader
 
 from xquotient.exmess import Message
 from xquotient import mimepart, equotient, extract
+from xquotient.qpeople import EmailActions
 from xquotient.actions import SenderPersonFragment
 
 def quoteBody(m, maxwidth=78):
@@ -136,6 +137,13 @@ class CompoundColumnView(EmailAddressColumnView):
 
 # we want to allow linking to the archive/trash views from outside of the
 # inbox page, so we'll make some items with strange adaptors
+
+class AddPersonFragment(people.AddPersonFragment):
+
+    def makePerson(self, nickname):
+        person = super(AddPersonFragment, self).makePerson(nickname)
+        EmailActions(store=self.original.store).installOn(person)
+        return person
 
 class Archive(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
@@ -470,7 +478,7 @@ class InboxScreen(athena.LiveFragment):
         # the person form is a fair amount of html,
         # so we'll only include it once
 
-        self.addPersonFragment = people.AddPersonFragment(self)
+        self.addPersonFragment = AddPersonFragment(self)
         self.addPersonFragment.setFragmentParent(self)
         self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
         return self.addPersonFragment
