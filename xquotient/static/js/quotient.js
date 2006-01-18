@@ -1,11 +1,6 @@
 // import Quotient.Common
 // import Mantissa.People
 
-
-/* these quotient_* functions are necessary because we are supplying
-   alternative TDB navigation buttons that are outside the jurisdiction
-   of the TDB's containing node */
-
 function _quotient_getTDBController() {
     return Mantissa.TDB.Controller.get(
         Nevow.Athena.NodeByAttribute(
@@ -33,14 +28,6 @@ if(typeof(Quotient) == "undefined") {
 if(typeof(Quotient.Mailbox) == "undefined") {
     Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
 }
-/*
-Array.method("contains", function(e) {
-    for(var i = 0; i < self.length; i++)
-        if(self[i] == e)
-            return true;
-    return false;
-}
-*/
 
 function mailboxFeedback(message) {
     log(message);
@@ -56,8 +43,13 @@ Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass();
 
 Quotient.Mailbox.Controller.method("loaded",
     function(self) {
-        //window.onresize = function() { self.checkTDBSize() }
-        //setTimeout(function() { self.checkTDBSize() }, 100);
+        var tdbContainer = self.nodeByAttribute("class", "inbox-tdb-container");
+        var tdbNode = Nevow.Athena.NodeByAttribute(tdbContainer,
+                                                   "athena:class",
+                                                   "Mantissa.TDB.Controller");
+
+        self.inboxTDB = Mantissa.TDB.Controller.get(tdbNode);
+        
         self.allTags   = new Array();
         self.selectedRow = null;
         self.selectedRowOffset = null;
@@ -69,14 +61,6 @@ Quotient.Mailbox.Controller.method("loaded",
             });
 
     });
-
-function quotient_prevPage() {
-    tdbController.prevPage();
-}
-
-function quotient_nextPage() {
-    tdbController.nextPage();
-}
 
 function quotient_addPerson(targetID) {
     mailboxController.callRemote("addPerson", targetID);
@@ -130,6 +114,16 @@ Quotient.Mailbox.Controller.method("checkTDBSize", function() {
             document.getElementById("mailbox-meat").style.visibility = 'visible' });
 }
 */
+
+Quotient.Mailbox.Controller.method("nextPage",
+    function(self) {
+        self.inboxTDB.nextPage();
+    });
+
+Quotient.Mailbox.Controller.method("prevPage",
+    function(self) {
+        self.inboxTDB.prevPage();
+    });
 
 Quotient.Mailbox.Controller.method("stuffTagsInDropdown",
     function(self) {

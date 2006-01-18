@@ -17,12 +17,12 @@
 
     <table style="width: 100%; border-spacing: 0px">
       <tr valign="top">
-        <td id="tdb-container">
+        <td class="inbox-tdb-container">
           <nevow:invisible nevow:render="inboxTDB" />
 
           <center id="view-options">
-            <a href="#" onclick="quotient_prevPage(); return false">page up</a>
-            | <a href="#" onclick="quotient_nextPage();return false">page down</a>
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).prevPage(); return false">page up</a>
+            | <a href="#" onclick="Quotient.Mailbox.Controller.get(this).nextPage();return false">page down</a>
             <span id="show-read-outer-container">
               show read:
               <span id="show-read-container" nevow:render="showRead">
