@@ -1,33 +1,12 @@
 // import Quotient.Common
 // import Mantissa.People
 
-function _quotient_getMailboxController() {
-    return Quotient.Mailbox.Controller.get(
-        Nevow.Athena.NodeByAttribute(
-            document.documentElement, "athena:class", "Quotient.Mailbox.Controller"
-        ));
-}
-
-var mailboxController = null;
-
-MochiKit.DOM.addLoadEvent(function() { mailboxController = _quotient_getMailboxController(); });
-
 if(typeof(Quotient) == "undefined") {
     Quotient = {};
 }
 
 if(typeof(Quotient.Mailbox) == "undefined") {
     Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
-}
-
-function mailboxFeedback(message) {
-    log(message);
-}
-
-function log(msg) {
-    var d = document.createElement("div");
-    d.appendChild(document.createTextNode(msg));
-    document.getElementById("mailbox-log").appendChild(d);
 }
 
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass();
@@ -52,14 +31,6 @@ Quotient.Mailbox.Controller.method("loaded",
             });
 
     });
-
-function _quotient_replaceWithDialog(index, dialog) {
-    var row = document.getElementById("tdb-row-" + index);
-    mailboxController.setChildBGColors(row, "");
-    var cell = row.getElementsByTagName("td")[0];
-    MochiKit.DOM.replaceChildNodes(cell,
-        MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
-}
 
 /*
 Quotient.Mailbox.Controller.method("checkTDBSize", function() {
@@ -92,6 +63,21 @@ Quotient.Mailbox.Controller.method("checkTDBSize", function() {
             document.getElementById("mailbox-meat").style.visibility = 'visible' });
 }
 */
+
+Quotient.Mailbox.Controller.method("mailboxFeedback",
+    function(msg) {
+        document.getElementById("mailbox-log").appendChild(
+            MochiKit.DOM.DIV(null, msg));
+    });
+
+Quotient.Mailbox.Controller.method("replaceWithDialog",
+    function(self, index, dialog) {
+        var newlySelectedRow = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
+        self.setChildBGColors(row, "");
+        var cell = row.getElementsByTagName("td")[0];
+        MochiKit.DOM.replaceChildNodes(cell,
+            MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
+    });
 
 Quotient.Mailbox.Controller.method("nextPage",
     function(self) {
@@ -155,7 +141,8 @@ Quotient.Mailbox.Controller.method("viewByPersonChanged",
         if(selectedValue == select.firstChild.value) {
             self.callRemote("viewByAllPeople");
         } else {
-            self.callRemote("viewByPerson", selectedValue).addErrback(mailboxFeedback);
+            self.callRemote("viewByPerson", selectedValue).addErrback(
+                function(err) { self.mailboxFeedback(err) });
         }
     });
 
@@ -623,7 +610,7 @@ Quotient.Mailbox.Controller.method("addTags",
         MochiKit.DOM.replaceChildNodes("tag-completions");
         self.callRemote("addTags", tags).addCallback(
             function(tl) { self.gotUpdatedTagList(tl) }).addErrback(
-                function(err) { mailboxFeedback(err) });
+                function(err) { self.mailboxFeedback(err) });
     });
 
 Quotient.Mailbox.Controller.method("_makeHandler",
@@ -668,21 +655,21 @@ Quotient.Mailbox.Controller.method("addAttachment",
 
 Quotient.Mailbox.Controller.method("markThisUnread",
     function(self) {
-        _quotient_replaceWithDialog(self.selectedRowOffset, "Marking Unread...");
+        self.replaceWithDialog(self.selectedRowOffset, "Marking Unread...");
         self.callRemote('markCurrentMessageUnread').addCallback(
             function(data) { self.setMessageContent(data) });
     });
 
 Quotient.Mailbox.Controller.method("archiveThis",
     function(self) {
-        _quotient_replaceWithDialog(self.selectedRowOffset, "Archiving...");
+        self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
         self.callRemote('archiveCurrentMessage').addCallback(
             function(data) { self.setMessageContent(data) });
     });
 
 Quotient.Mailbox.Controller.method("deleteThis",
     function(self) {
-        _quotient_replaceWithDialog(self.selectedRowOffset, "Deleting...");
+        self.replaceWithDialog(self.selectedRowOffset, "Deleting...");
         self.callRemote('deleteCurrentMessage').addCallback(
             function(data) { self.setMessageContent(data) });
     });
@@ -694,5 +681,5 @@ Quotient.Mailbox.Controller.method("replyToThis",
         self.callRemote("replyToCurrentMessage").addCallback(
             function(data) { self.setMessageContent(data) }).addCallback(
                 function(ign) { self.fitMessageBodyToPage() }).addErrback(
-                    mailboxFeedback);
+                    function(err) { self.mailboxFeedback(err) });
     });
