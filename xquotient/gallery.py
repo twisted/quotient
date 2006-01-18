@@ -45,14 +45,20 @@ class Image(Item):
 
 class ThumbnailDisplay(rend.Page):
 
-    def locateChild(self, ctx, segments):
-        try:
-            (storeID,) = segments
-            image = self.original.store.getItemByID(long(storeID))
-        except (ValueError, KeyError):
-            return rend.NotFound
+    def __init__(self, original):
+        self.translator = ixmantissa.IWebTranslator(original.store)
+        rend.Page.__init__(self, original)
 
-        return (static.File(image.thumbnailPath.path), ())
+    def locateChild(self, ctx, segments):
+        if len(segments) == 1:
+            imageWebID = segments[0]
+            imageStoreID = self.translator.linkFrom(imageWebID)
+
+            if imageStoreID is not None:
+                image = self.original.store.getItemByID(imageStoreID)
+                return (static.File(image.thumbnailPath.path), ())
+
+        return rend.NotFound
 
 class ThumbnailDisplayer(Item, website.PrefixURLMixin):
     typeName = 'quotient_thumbnail_displayer'
@@ -118,6 +124,8 @@ class GalleryScreen(athena.LiveFragment):
         imageClasses = itertools.cycle(('gallery-image', 'gallery-image-alt'))
         placedImages = 0
 
+        linkTo = lambda item: self.translator.linkTo(item.storeID)[len('/private'):]
+
         for (i, image) in enumerate(self.items):
             if 0 < i and i % self.itemsPerRow == 0:
                 yield patterns['row-separator']()
@@ -127,9 +135,8 @@ class GalleryScreen(athena.LiveFragment):
                 imageClass = imageClasses.next()
                 lastMessageID = message.storeID
 
-            imageURL = '/private/message-parts/%s/%s' % (message.storeID,
-                                                            image.part.partID)
-            thumbURL = '/private/thumbnails/' + str(image.storeID)
+            imageURL = '/private/message-parts' + linkTo(image.part)
+            thumbURL = '/private/thumbnails' + linkTo(image)
 
             person = self.organizer.personByEmailAddress(message.sender)
             if person is None:

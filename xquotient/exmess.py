@@ -58,12 +58,12 @@ class Message(item.Item, item.InstallableMixin):
     def activate(self):
         self._prefs = None
 
-    def walkMessage(self, preferred=None):
-        if preferred is None:
+    def walkMessage(self, prefer=None):
+        if prefer is None:
             if self._prefs is None:
                 self._prefs = ixmantissa.IPreferenceAggregator(self.store)
-            preferred = self._prefs.getPreferenceValue('preferredMimeType')
-        return self.impl.walkMessage(prefer=preferred)
+            prefer = self._prefs.getPreferenceValue('preferredMimeType')
+        return self.impl.walkMessage(prefer)
 
     def getSubPart(self, partID):
         return self.impl.getSubPart(partID)
@@ -88,47 +88,39 @@ class Correspondent(item.Item):
     message = attributes.reference(allowNone=False)
     address = attributes.text(allowNone=False)
 
-# on a scale of 1 to 10, how bad is this
 class PartDisplayer(rend.Page):
-    message = None
     part = None
+    filename = None
+
+    def __init__(self, original):
+        self.translator = ixmantissa.IWebTranslator(original.store)
+        rend.Page.__init__(self, original)
 
     def locateChild(self, ctx, segments):
-        if len(segments) in (2, 3):
-            (messageID, partID) = map(int, segments[:2])
-            self.message = self.original.store.getItemByID(int(messageID))
-            self.part = self.message.getPart(int(partID))
-            segments = segments[2:]
-            if len(segments) == 1:
-                self.filename = segments[0]
-            return self, ()
+        if len(segments) in (1, 2):
+
+            partWebID = segments[0]
+            partStoreID = self.translator.linkFrom(partWebID)
+
+            if partStoreID is not None:
+                self.part = self.original.store.getItemByID(partStoreID)
+                segments = segments[1:]
+                if segments:
+                    self.filename = segments[0]
+                return (self, ())
+
         return rend.NotFound
 
     def renderHTTP(self, ctx):
         request = inevow.IRequest(ctx)
-        # we can do this because no multipart part would make
-        # sense to display stand-alone.  this is weird though,
-        # we should ideally be able to do IDisplayable(part)
-        # or whatever to get a mimepart.Container subclass
 
-        if self.part.getContentType() == 'text/html':
-            (part,) = list(self.part.walkMessage(None))
+        ctype = self.part.getContentType()
+        request.setHeader('content-type', ctype)
+
+        if ctype.startswith('text/'):
+            content = self.part.getUnicodeBody().encode('utf-8')
         else:
-            part = self.message.getAttachment(self.part.partID)
-
-        request.setHeader('content-type', part.type)
-
-        #if hasattr(part, 'disposition'):
-        #    request.setHeader('content-disposition',
-        #                      part.disposition)
-
-        if part.type.startswith('text/'):
-            # FIXME weird to decode here.
-            # alse replace original.part with the Container.children idiom
-            # from mimepart.
-            content = part.part.getUnicodeBody().encode('utf-8')
-        else:
-            content = part.part.getBody(decode=True)
+            content = self.part.getBody(decode=True)
 
         return content
 
@@ -195,9 +187,14 @@ class MessageDetail(rend.Fragment):
                      subject=self.original.subject,
                      tags=self.tagsAsStan()))
 
-    def _messagePartLink(self, attachment):
-        return '/private/message-parts/%s/%s' % (self.original.storeID,
-                                                 attachment.identifier)
+    def _childLink(self, webItem, item):
+        return '/' + webItem.prefixURL + self.translator.linkTo(item.storeID)[len('/private'):]
+
+    def _partLink(self, part):
+        return self._childLink(MessagePartView, part)
+
+    def _thumbnailLink(self, image):
+        return self._childLink(gallery.ThumbnailDisplayer, image)
 
     def render_attachmentPanel(self, ctx, data):
         patterns = list()
@@ -207,7 +204,7 @@ class MessageDetail(rend.Fragment):
                                             dict(filename=attachment.filename,
                                                  icon=mimeTypeToIcon(attachment.type)))
 
-                location = self._messagePartLink(attachment)
+                location = self._partLink(attachment.part)
                 if attachment.filename is not None:
                     location += '/' + attachment.filename
                 patterns.append(p.fillSlots('location', str(location)))
@@ -220,13 +217,11 @@ class MessageDetail(rend.Fragment):
                     gallery.Image.message == self.original)
 
         for image in images:
-            loc = '/private/message-parts/%s/%s' % (image.message.storeID,
-                                                    image.part.partID)
-            tloc = '/private/thumbnails/' + str(image.storeID)
-
-            yield self.patterns['image-attachment'].fillSlots(
-                    'location', loc).fillSlots(
-                    'thumbnail-location', tloc)
+            location = self._partLink(image.part)
+            if image.part.
+            yield dictFillSlots(self.patterns['image-attachment'],
+                                {'location': self._partLink(image.part),
+                                 'thumbnail-location': self._thumbnailLink(image)})
 
     def render_messageBody(self, ctx, data):
         paragraphs = list()
