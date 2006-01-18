@@ -116,6 +116,10 @@ class MessageList(tdbview.TabularDataView):
         tdbview.TabularDataView.__init__(self, tdm, views)
         self.docFactory = getLoader(self.fragmentName)
 
+    def setFragmentParent(self, parent):
+        self.personFragmentColumnView.page = parent
+        super(MessageList, self).setFragmentParent(parent)
+
 class ImageList(gallery.GalleryScreen):
     implements(ixmantissa.IPersonFragment)
     title = 'Images'
