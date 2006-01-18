@@ -218,7 +218,6 @@ class MessageDetail(rend.Fragment):
 
         for image in images:
             location = self._partLink(image.part)
-            if image.part.
             yield dictFillSlots(self.patterns['image-attachment'],
                                 {'location': self._partLink(image.part),
                                  'thumbnail-location': self._thumbnailLink(image)})
