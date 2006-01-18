@@ -133,7 +133,7 @@ class CompoundColumnView(EmailAddressColumnView):
         return tags.div(**{'class': className})[(senderStan, subjectStan)]
 
     def onclick(self, idx, item, value):
-        return 'return quotient_loadMessage(event, %r)' % (idx,)
+        return 'Nevow.Athena.Widget.get(this).widgetParent.loadMessage(%r)' % (idx,)
 
 class AddPersonFragment(people.AddPersonFragment):
     jsClass = 'Quotient.Common.AddPerson'

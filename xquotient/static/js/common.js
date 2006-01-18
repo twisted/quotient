@@ -1,78 +1,16 @@
 /* this javascript file should be included by all quotient pages */
 
-function quotient_stripLeadingTrailingWS(s) {
-    return s.replace(/^\s+/, "").replace(/\s+$/, "");
+if(typeof(Quotient) == "undefined") {
+    Quotient = {};
 }
 
-function quotient_startswith(needle, haystack) {
-    return haystack.toLowerCase().slice(0, needle.length) == needle.toLowerCase();
+if(typeof(Quotient.Common) == "undefined") {
+    Quotient.Common = {};
 }
 
-function quotient_normalizeTag(tag) {
-    return quotient_stripLeadingTrailingWS(tag).replace(/\s{2,}/, " ").toLowerCase();
-}
+Quotient.Common.Util = Nevow.Athena.Widget.subclass();
 
-function quotient_exposeActions(event) {
-    var actions = Nevow.Athena.NodeByAttribute(
-        event.originalTarget.parentNode, "class", "person-actions"
-    );
-
-    var xpos = quotient_findPosX(event.originalTarget);
-    var ypos = quotient_findPosY(event.originalTarget);
-
-    actions.style.top  = ypos + "px";
-    actions.style.left = xpos + "px";
-    MochiKit.DOM.showElement(actions);
-
-    var body = document.getElementsByTagName("body")[0];
-
-    actions.onclick = function() {
-        // stop this event from reaching the <body> onclick handler
-        if(event.originalTarget.tagName == "A") {
-            body.onclick = null;
-            return true;
-        }
-        event.stopPropagation();
-        return false;
-    }
-
-    function addClickHandler() {
-        body.onclick = function() {
-            body.onclick = null;
-            actions.style.display = "none";
-        };
-    }
-
-    setTimeout(addClickHandler, 100);
-}
-
-function resizeIFrame(frame) {
-  // Code is from http://www.ozoneasylum.com/9671&latestPost=true
-  try {
-    innerDoc = (frame.contentDocument) ? frame.contentDocument : frame.contentWindow.document;
-    objToResize = (frame.style) ? frame.style : frame;
-    objToResize.height = innerDoc.body.scrollHeight + 20 + 'px';
-    objToResize.width = innerDoc.body.scrollWidth + 5 + 'px';
-  }
-  catch (e) {}
-}
-
-function quotient_findPosY(obj) {
-    var curtop = 0;
-    if (obj.offsetParent)
-    {
-        while (obj.offsetParent)
-        {
-            curtop += obj.offsetTop
-            obj = obj.offsetParent;
-        }
-    }
-    else if (obj.y)
-        curtop += obj.y;
-    return curtop;
-}
-
-function quotient_findPosX(obj) {
+Quotient.Common.Util.findPosX = function(obj) {
     var curleft = 0;
     if (obj.offsetParent)
     {
@@ -87,14 +25,42 @@ function quotient_findPosX(obj) {
     return curleft;
 }
 
-
-
-if(typeof(Quotient) == "undefined") {
-    Quotient = {};
+Quotient.Common.Util.findPosY = function(obj) {
+    var curtop = 0;
+    if (obj.offsetParent)
+    {
+        while (obj.offsetParent)
+        {
+            curtop += obj.offsetTop
+            obj = obj.offsetParent;
+        }
+    }
+    else if (obj.y)
+        curtop += obj.y;
+    return curtop;
 }
 
-if(typeof(Quotient.Common) == "undefined") {
-    Quotient.Common = {};
+Quotient.Common.Util.stripLeadingTrailingWS = function(str) {
+    return str.replace(/^\s+/, "").replace(/\s+$/, "");
+}
+
+Quotient.Common.Util.startswith = function(needle, haystack) {
+    return haystack.toLowerCase().slice(0, needle.length) == needle.toLowerCase();
+}
+
+Quotient.Common.Util.normalizeTag = function(tag) {
+    return Quotient.Common.Util.stripLeadingTrailingWS(tag).replace(/\s{2,}/, " ").toLowerCase();
+}
+
+Quotient.Common.Util.resizeIFrame = function(frame) {
+    // Code is from http://www.ozoneasylum.com/9671&latestPost=true
+    try {
+        innerDoc = (frame.contentDocument) ? frame.contentDocument : frame.contentWindow.document;
+        objToResize = (frame.style) ? frame.style : frame;
+        objToResize.height = innerDoc.body.scrollHeight + 20 + 'px';
+        objToResize.width = innerDoc.body.scrollWidth + 5 + 'px';
+    }
+    catch (e) {}
 }
 
 Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass();
