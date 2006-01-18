@@ -8,13 +8,6 @@ if(typeof(Quotient.Gallery) == "undefined") {
     Quotient.Gallery = {};
 }
 
-function quotient_addPerson(targetID) {
-    Quotient.Gallery.Controller.get(
-        Nevow.Athena.NodeByAttribute(
-            document.documentElement, "athena:class", "Quotient.Gallery.Controller"
-        )).callRemote("addPerson", targetID);
-}
-
 Quotient.Gallery.Controller = Nevow.Athena.Widget.subclass();
 
 Quotient.Gallery.Controller.method("setGalleryState",

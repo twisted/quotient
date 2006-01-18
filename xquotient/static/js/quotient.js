@@ -1,13 +1,6 @@
 // import Quotient.Common
 // import Mantissa.People
 
-function _quotient_getTDBController() {
-    return Mantissa.TDB.Controller.get(
-        Nevow.Athena.NodeByAttribute(
-            document.documentElement, "athena:class", "Mantissa.TDB.Controller"
-        ));
-}
-
 function _quotient_getMailboxController() {
     return Quotient.Mailbox.Controller.get(
         Nevow.Athena.NodeByAttribute(
@@ -16,10 +9,8 @@ function _quotient_getMailboxController() {
 }
 
 var mailboxController = null;
-var tdbController = null;
 
-MochiKit.DOM.addLoadEvent(function() { mailboxController = _quotient_getMailboxController();
-                                       tdbController = _quotient_getTDBController(); });
+MochiKit.DOM.addLoadEvent(function() { mailboxController = _quotient_getMailboxController(); });
 
 if(typeof(Quotient) == "undefined") {
     Quotient = {};
@@ -62,25 +53,12 @@ Quotient.Mailbox.Controller.method("loaded",
 
     });
 
-function quotient_addPerson(targetID) {
-    mailboxController.callRemote("addPerson", targetID);
-}
-
 function _quotient_replaceWithDialog(index, dialog) {
     var row = document.getElementById("tdb-row-" + index);
     mailboxController.setChildBGColors(row, "");
     var cell = row.getElementsByTagName("td")[0];
     MochiKit.DOM.replaceChildNodes(cell,
         MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
-}
-
-function quotient_archiveMessage(index) {
-    mailboxController.callRemote("archiveMessage", index);
-}
-
-function quotient_deleteMessage(index) {
-    _quotient_replaceWithDialog(index, "Deleting...");
-    mailboxController.callRemote("deleteMessage", index);
 }
 
 /*
@@ -184,7 +162,7 @@ Quotient.Mailbox.Controller.method("viewByPersonChanged",
 
 Quotient.Mailbox.Controller.method("replaceTDB",
     function(self, data) {
-        tdbController._setTableContent(data[0]);
+        self.inboxTDB._setTableContent(data[0]);
     });
 
 Quotient.Mailbox.Controller.method("replaceSender",
@@ -296,7 +274,7 @@ Quotient.Mailbox.Controller.method("prepareForMessage",
         }
 
         self.selectedRowOffset = offset;
-        var newlySelectedRow = tdbController.nodeByAttribute('class', 'tdb-row-' + offset);
+        var newlySelectedRow = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
 
         if(self.selectedRow != null && self.selectedRow != newlySelectedRow)
             self.setChildBGColors(self.selectedRow, "");
