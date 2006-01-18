@@ -398,4 +398,5 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
 
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
+    messageDone = item.transacted(messageDone)
 
