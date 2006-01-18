@@ -4,7 +4,7 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 
-from nevow import rend, inevow, tags
+from nevow import rend, inevow, tags, athena
 
 from axiom.tags import Catalog
 from axiom import item, attributes
@@ -141,17 +141,19 @@ class MessagePartView(item.Item, website.PrefixURLMixin):
     def createResource(self):
         return PartDisplayer(self)
 
-class MessageDetail(rend.Fragment):
+class MessageDetail(athena.LiveFragment):
     '''i represent the viewable facet of some kind of message'''
+
     implements(ixmantissa.INavigableFragment)
     fragmentName = 'message-detail'
-    live = False
+    live = 'athena'
+    jsClass = 'Quotient.Mailbox.MessageDetail'
 
     _partsByID = None
 
     def __init__(self, original):
         self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
-        rend.Fragment.__init__(self, original, getLoader('message-detail'))
+        athena.LiveFragment.__init__(self, original, getLoader('message-detail'))
 
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
@@ -159,8 +161,7 @@ class MessageDetail(rend.Fragment):
         self.organizer = original.store.findUnique(people.Organizer)
 
     def head(self):
-        return tags.script(type='text/javascript',
-                           src='/Mantissa/js/people.js')
+        return None
 
     def tagsAsStan(self):
         catalog = self.original.store.findOrCreate(Catalog)

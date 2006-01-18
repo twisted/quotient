@@ -9,6 +9,8 @@ if(typeof(Quotient.Mailbox) == "undefined") {
     Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
 }
 
+Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
+
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass();
 
 Quotient.Mailbox.Controller.method("loaded",
