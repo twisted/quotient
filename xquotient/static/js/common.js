@@ -104,8 +104,6 @@ Quotient.Common.SenderPerson.method('showAddPerson',
             parts["firstname"] = name;
         }
 
-        parts["nickname"] = parts["firstname"];
-
         self.email = self.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
         parts["email"] = self.email;
 
@@ -132,11 +130,20 @@ Quotient.Common.SenderPerson.method('showAddPerson',
             }
         }
 
+        self.eventTarget = event.target.parentNode;
+
+        self.eventTarget.onclick = function() {
+            self.body.onclick = null;
+            self.hideAddPerson();
+            return false
+        }
+
         self.body.onclick = function(_event) {
             if(event.target == _event.target) {
                 return false;
             }
-            var e = _event.target;
+
+            e = _event.target;
             while(e && e.id != self.addPersonFragment.id) {
                 e = e.parentNode;
             }
@@ -160,8 +167,8 @@ Quotient.Common.SenderPerson.method('hideAddPerson',
     function(self) {
         MochiKit.DOM.hideElement(self.addPersonFragment);
         self.form.removeEventListener("submit", self.submitFunction, true);
-        //self.eventTarget.onclick = function(event) {
-        //    self.showAddPerson(self.node, event);
-        //    return false;
-        //}
+        self.eventTarget.onclick = function(event) {
+            self.showAddPerson(self.node, event);
+            return false;
+        }
     });
