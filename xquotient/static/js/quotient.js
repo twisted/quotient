@@ -215,6 +215,14 @@ Quotient.Mailbox.Controller.method("loadMessage",
             function(data) { self.setMessageContent(data) });
     });
 
+Quotient.Mailbox.Controller.method("maybeLoadMessage",
+    function(self, event, index) {
+        if(event.target.tagName == "A" || event.target.tagName == "IMG") {
+            return;
+        }
+        self.loadMessage(idx);
+    });
+
 Quotient.Mailbox.Controller.method("applyToChildren", 
     function(self, f, parent) {
         MochiKit.Base.map(function(e) { if(e.tagName) { f(e) }}, parent.childNodes);
