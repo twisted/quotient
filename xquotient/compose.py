@@ -37,8 +37,10 @@ class ComposeFragment(athena.LiveFragment):
     iface = allowedMethods = dict(getPeople=True)
 
     def getPeople(self):
+        peeps = []
         for person in self.original.store.query(people.Person):
-            yield (person.name, person.email)
+            peeps.append((person.name, person.getEmailAddress()))
+        return peeps
 
     def render_compose(self, ctx, data):
         to = ','.join(inevow.IRequest(ctx).args.get('recipient', ()))
