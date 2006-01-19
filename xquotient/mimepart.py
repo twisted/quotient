@@ -654,7 +654,6 @@ class MIMEMessageReceiver(object):
             raise ValueError("Mail loop detected, rejecting message")
 
     def messageDone(self):
-        self.done = True
         localNow = time.time()
         gmtDate = time.gmtime(localNow)
         if not hasattr(self.parser.part, 'bodyOffset'):
@@ -673,6 +672,7 @@ class MIMEMessageReceiver(object):
 
         self.part.addHeader('x-divmod-processed', rfc822.formatdate(localNow))
         self.file.close()
+        self.done = True
 
 
     # utility methods
