@@ -1,5 +1,6 @@
 // import Quotient.Common
 // import Mantissa.People
+// import LightBox
 
 if(typeof(Quotient) == "undefined") {
     Quotient = {};
@@ -74,7 +75,7 @@ Quotient.Mailbox.Controller.method("mailboxFeedback",
 
 Quotient.Mailbox.Controller.method("replaceWithDialog",
     function(self, index, dialog) {
-        var newlySelectedRow = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
+        var row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
         self.setChildBGColors(row, "");
         var cell = row.getElementsByTagName("td")[0];
         MochiKit.DOM.replaceChildNodes(cell,
@@ -288,33 +289,34 @@ Quotient.Mailbox.Controller.method("fitMessageBodyToPage",
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 35 + "px";
     });
 
-function quotient_intermingle(string, regex, transformation) {
-    var lpiece = null;
-    var mpiece = null;
-    var rpiece = null;
-    var piece  = null;
-    var match  = null;
-    var matches = null;
+Quotient.Mailbox.Controller.method("intermingle",
+    function(self, string, regex, transformation) {
+        var lpiece = null;
+        var mpiece = null;
+        var rpiece = null;
+        var piece  = null;
+        var match  = null;
+        var matches = null;
 
-    var pieces = [string];
+        var pieces = [string];
 
-    while(true) {
-        piece = pieces[pieces.length-1];
-        match = regex.exec(piece);
-        if(match) {
-            matches++;
-            lpiece = piece.slice(0, match.index);
-            mpiece = match[0];
-            rpiece = piece.slice(match.index+mpiece.length, piece.length);
-            pieces.pop();
-            pieces = pieces.concat([lpiece, transformation(mpiece), rpiece]);
-        } else { break }
-    }
-    if(matches) {
-        return pieces;
-    }
-    return null;
-}
+        while(true) {
+            piece = pieces[pieces.length-1];
+            match = regex.exec(piece);
+            if(match) {
+                matches++;
+                lpiece = piece.slice(0, match.index);
+                mpiece = match[0];
+                rpiece = piece.slice(match.index+mpiece.length, piece.length);
+                pieces.pop();
+                pieces = pieces.concat([lpiece, transformation(mpiece), rpiece]);
+            } else { break }
+        }
+        if(matches) {
+            return pieces;
+        }
+        return null;
+    });
 
 Quotient.Mailbox.Controller.method("attachPhoneToSender",
     function(self, number, node) {
@@ -377,18 +379,16 @@ Quotient.Mailbox.Controller.method("getTransformationForExtractType",
         var f = null;
 
         if(etype == "url") {
-            f = self.transformURL;
+            return function(URL) { return self.transformURL(URL) };
         } else if(etype == "phone number") {
-            f = self.transformPhoneNumber;
+            return function(phone) { return self.transformPhoneNumber(phone) };
         } else if(etype == "email address") {
-            f = self.transformEmailAddress;
+            return function(addr) { return self.transformEmailAddress(addr) };
         }
-
-        return f;
     });
 
 Quotient.Mailbox.Controller.method("highlightExtracts",
-    function(self, outerp) {
+    function(self) {
         var body = document.getElementById("message-body");
         var replacements = null;
         var replacement = null;
@@ -398,10 +398,8 @@ Quotient.Mailbox.Controller.method("highlightExtracts",
         var elem = null;
         var regex = null;
         var etypes = self.messageMetadata["message"]["extracts"];
-
         for(var k in etypes) {
             etype = etypes[k];
-
             i = 0;
 
             while(true) {
@@ -410,7 +408,7 @@ Quotient.Mailbox.Controller.method("highlightExtracts",
                 if(!elem) { break };
                 if(elem.tagName) { i++; continue };
 
-                replacements = quotient_intermingle(
+                replacements = self.intermingle(
                                     elem.nodeValue, etype["pattern"], self.getTransformationForExtractType(k));
 
                 if(!replacements) { i++; continue };
@@ -452,6 +450,7 @@ Quotient.Mailbox.Controller.method("setMessageContent",
         self.highlightExtracts();
         self.extractEnd = new Date();
         self.reportTimes();
+        initLightbox();
     });
 
 Quotient.Mailbox.Controller.method("reportTimes",

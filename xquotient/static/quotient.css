@@ -1,3 +1,29 @@
+#overlay {
+    background-image: url(/Quotient/static/images/overlay.png);
+}
+
+* html #overlay{
+    background-color: #000;
+    back\ground-color: transparent;
+    background-image: url(/Quotient/static/images/blank.gif);
+    filter: progid:DXImageTransform.Microsoft.AlphaImageLoader(src="overlay.png", sizingMethod="scale");
+}
+
+#lightbox {
+    background-color:#eee;
+    padding: 10px;
+    border-bottom: 2px solid #666;
+    border-right: 2px solid #666;
+}
+
+#lightboxCaption {
+    font-size: 0.8em;
+    padding-top: 0.4em;
+}
+
+#lightbox img { border: none; }
+#overlay img { border: none; }
+
 .unread-message {
     font-weight: bold;
 }

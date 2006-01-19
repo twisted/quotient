@@ -9,4 +9,6 @@ quotient = athena.JSPackage({
     u'Quotient.Common':  jsdir.child('common.js').path,
     u'Quotient.Mailbox': jsdir.child('quotient.js').path,
     u'Quotient.Compose': jsdir.child('compose.js').path,
-    u'Quotient.Gallery': jsdir.child('gallery.js').path})
+    u'Quotient.Gallery': jsdir.child('gallery.js').path,
+    u'LightBox': jsdir.child('lightbox.js').path
+})

@@ -1,4 +1,5 @@
 // import Quotient.Common
+// import LightBox
 
 if(typeof(Quotient) == "undefined") {
     Quotient = {};
@@ -14,6 +15,7 @@ Quotient.Gallery.Controller.method("setGalleryState",
     function(self, data) {
         document.getElementById("images").innerHTML = data[0];
         document.getElementById("pagination-links").innerHTML = data[1];
+        initLightbox();
     });
 
 Quotient.Gallery.Controller.method("prevPage",
