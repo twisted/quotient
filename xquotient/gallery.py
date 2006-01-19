@@ -126,32 +126,35 @@ class GalleryScreen(athena.LiveFragment):
 
         linkTo = lambda item: self.translator.linkTo(item.storeID)[len('/private'):]
 
-        for (i, image) in enumerate(self.items):
-            if 0 < i and i % self.itemsPerRow == 0:
-                yield patterns['row-separator']()
+        if 0 < len(self.items):
+            for (i, image) in enumerate(self.items):
+                if 0 < i and i % self.itemsPerRow == 0:
+                    yield patterns['row-separator']()
 
-            message = image.message
-            if message.storeID != lastMessageID:
-                imageClass = imageClasses.next()
-                lastMessageID = message.storeID
+                message = image.message
+                if message.storeID != lastMessageID:
+                    imageClass = imageClasses.next()
+                    lastMessageID = message.storeID
 
-            imageURL = '/private/message-parts' + linkTo(image.part)
-            thumbURL = '/private/thumbnails' + linkTo(image)
+                imageURL = '/private/message-parts' + linkTo(image.part)
+                thumbURL = '/private/thumbnails' + linkTo(image)
 
-            person = self.organizer.personByEmailAddress(message.sender)
-            if person is None:
-                personStan = SenderPersonFragment(message)
-            else:
-                personStan = people.PersonFragment(person)
-            personStan.page = self.page
+                person = self.organizer.personByEmailAddress(message.sender)
+                if person is None:
+                    personStan = SenderPersonFragment(message)
+                else:
+                    personStan = people.PersonFragment(person)
+                personStan.page = self.page
 
-            yield dictFillSlots(patterns['image'],
-                                    {'image-url': imageURL,
-                                     'thumb-url': thumbURL,
-                                     'message-url': self.translator.linkTo(message.storeID),
-                                     'message-subject': message.subject,
-                                     'sender-stan': personStan,
-                                     'class': imageClass})
+                yield dictFillSlots(patterns['image'],
+                                        {'image-url': imageURL,
+                                        'thumb-url': thumbURL,
+                                        'message-url': self.translator.linkTo(message.storeID),
+                                        'message-subject': message.subject,
+                                        'sender-stan': personStan,
+                                        'class': imageClass})
+        else:
+            yield patterns['no-images']()
 
     def render_images(self, ctx, data):
         return ctx.tag[self._currentPage()]
