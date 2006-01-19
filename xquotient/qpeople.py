@@ -9,6 +9,7 @@ from axiom import attributes
 
 from xmantissa import tdb, tdbview, ixmantissa, people
 from xmantissa.webtheme import getLoader
+from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
 from xquotient import gallery, extract, compose
 from xquotient.exmess import Message
@@ -135,6 +136,47 @@ class ImageList(gallery.GalleryScreen):
                 Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == self.person)
 
+class ExtractViewer(tdbview.TabularDataView):
+
+    def __init__(self, *a, **k):
+        super(ExtractViewer, self).__init__(*a, **k)
+        self.extractViewerPatterns = PatternDictionary(getLoader('extract-viewer'))
+
+        for cview in self.columnViews:
+            if cview.attributeID == 'excerpt':
+                self.excerptColumn = cview
+                self.columnViews.remove(cview)
+                break
+
+    def constructRows(self, modelData):
+        excerptRowPattern = self.extractViewerPatterns['excerpt-row']
+        columnRowPattern = self.patterns['row']
+        cellPattern = self.patterns['cell']
+
+        for (idx, row) in enumerate(modelData):
+            cells = []
+            for cview in self.columnViews:
+                if cview.attributeID == 'excerpt':
+                    continue
+                value = row.get(cview.attributeID)
+                cellContents = cview.stanFromValue(
+                                idx, row['__item__'], value)
+                handler = cview.onclick(idx, row['__item__'], value)
+                cellStan = dictFillSlots(cellPattern,
+                                         {'value': cellContents,
+                                          'onclick': handler,
+                                          'class': cview.typeHint})
+                cells.append(cellStan)
+
+            yield dictFillSlots(columnRowPattern,
+                                {'cells': cells,
+                                 'class': 'tdb-row-%s' % (idx,)})
+
+            yield excerptRowPattern.fillSlots('col-value',
+                    self.excerptColumn.stanFromValue(
+                        idx, row['__item__'], row.get('excerpt')))
+                        
+        
 class ExtractList(rend.Fragment):
     implements(ixmantissa.IPersonFragment)
     title = 'Extracts'
@@ -164,7 +206,7 @@ class ExtractList(rend.Fragment):
                  StripTimeColumnView('timestamp'),
                  ExcerptColumnView('excerpt'))
 
-        return tdbview.TabularDataView(tdm, views)
+        return ExtractViewer(tdm, views)
 
     def data_extractTabs(self, ctx, data):
         etypes = (('URLs', extract.URLExtract),
