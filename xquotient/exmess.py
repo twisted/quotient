@@ -13,7 +13,7 @@ from xmantissa import ixmantissa, website, people
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery
+from xquotient import gallery, equotient
 from xquotient.actions import SenderPersonFragment
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -97,16 +97,13 @@ class PartDisplayer(rend.Page):
         rend.Page.__init__(self, original)
 
     def locateChild(self, ctx, segments):
-        if len(segments) in (1, 2):
+        if len(segments) == 1:
 
             partWebID = segments[0]
             partStoreID = self.translator.linkFrom(partWebID)
 
             if partStoreID is not None:
                 self.part = self.original.store.getItemByID(partStoreID)
-                segments = segments[1:]
-                if segments:
-                    self.filename = segments[0]
                 return (self, ())
 
         return rend.NotFound
@@ -121,6 +118,13 @@ class PartDisplayer(rend.Page):
             content = self.part.getUnicodeBody().encode('utf-8')
         else:
             content = self.part.getBody(decode=True)
+
+        if 'withfilename' in request.args:
+            try:
+                request.setHeader('content-disposition',
+                                    self.part.getHeader(u'content-disposition'))
+            except equotient.NoSuchHeader:
+                pass
 
         return content
 
@@ -218,9 +222,10 @@ class MessageDetail(athena.LiveFragment):
                     gallery.Image.message == self.original)
 
         for image in images:
-            location = self._partLink(image.part)
+            location = self._partLink(image.part) + '?withfilename=1'
+
             yield dictFillSlots(self.patterns['image-attachment'],
-                                {'location': self._partLink(image.part),
+                                {'location': location,
                                  'thumbnail-location': self._thumbnailLink(image)})
 
     def render_messageBody(self, ctx, data):

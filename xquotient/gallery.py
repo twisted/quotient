@@ -3,7 +3,7 @@ import itertools
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import rend, static, tags, flat, athena
+from nevow import rend, static, flat, athena
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -12,6 +12,7 @@ from xmantissa import ixmantissa, webnav, website, people, tdb
 from xmantissa.fragmentutils import dictFillSlots, PatternDictionary
 
 from xquotient.actions import SenderPersonFragment
+from xquotient import equotient
 
 from PIL import Image as PilImage
 from cStringIO import StringIO
@@ -136,7 +137,7 @@ class GalleryScreen(athena.LiveFragment):
                     imageClass = imageClasses.next()
                     lastMessageID = message.storeID
 
-                imageURL = '/private/message-parts' + linkTo(image.part)
+                imageURL = '/private/message-parts' + linkTo(image.part) + '?withfilename=1'
                 thumbURL = '/private/thumbnails' + linkTo(image)
 
                 person = self.organizer.personByEmailAddress(message.sender)
