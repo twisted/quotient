@@ -86,44 +86,67 @@ Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass();
 Quotient.Common.SenderPerson.method('showAddPerson',
     function(self, node, event) {
         self.node = node;
+        self.body = document.getElementsByTagName("body")[0];
 
         var name = self.nodeByAttribute('class', 'person-name').firstChild.nodeValue;
-        var first = '';
-        var last = '';
+        var parts = new Object();
+
+        parts["firstname"] = '';
+        parts["lastname"] = '';
 
         if(name.match(/\s+/)) {
-            var parts = name.split(/\s+/, 2);
-            first = parts[0];
-            last  = parts[1];
-        } else {
-            first = name;
+            var split = name.split(/\s+/, 2);
+            parts["firstname"] = split[0];
+            parts["lastname"]  = split[1];
+        } else if(name.match(/@/)) {
+            parts["firstname"] = name.split(/@/, 2)[0];
+        } else { 
+            parts["firstname"] = name;
         }
 
-        self.eventTarget = event.target.parentNode;
-        self.eventTarget.onclick = function() { self.hideAddPerson(); return false };
+        parts["nickname"] = parts["firstname"];
 
         self.email = self.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
+        parts["email"] = self.email;
+
         self.addPersonFragment = MochiKit.DOM.getElement("add-person-fragment");
-
-        function setValueOfFormElement(name, value) {
-            var e = Nevow.Athena.NodeByAttribute(self.addPersonFragment, 'name', name);
-            e.value = value;
-        }
-
-        setValueOfFormElement('firstname', first);
-        setValueOfFormElement('nickname', first);
-        setValueOfFormElement('lastname', last);
-        setValueOfFormElement('email', self.email);
 
         self.addPersonFragment.style.top = event.pageY + 'px';
         self.addPersonFragment.style.left = event.pageX + 25 + 'px';
-
 
         self.form = self.addPersonFragment.getElementsByTagName("form")[0];
         self.submitFunction = function() { self.submitForm() };
 
         self.form.addEventListener("submit", self.submitFunction, true);
 
+        var inputs = Nevow.Athena.NodesByAttribute(self.addPersonFragment, 'type', 'text');
+
+        for(var i = 0; i < inputs.length; i++) {
+            if(inputs[i].name == "firstname") {
+                inputs[i].focus();
+            }
+            if(inputs[i].name in parts) {
+                inputs[i].value = parts[inputs[i].name];
+            } else {
+                inputs[i].value = "";
+            }
+        }
+
+        self.body.onclick = function(_event) {
+            if(event.target == _event.target) {
+                return false;
+            }
+            var e = _event.target;
+            while(e && e.id != self.addPersonFragment.id) {
+                e = e.parentNode;
+            }
+            if (e) {
+                return false;
+            }
+            self.hideAddPerson();
+            self.body.onclick = null;
+            return false;
+        }
         MochiKit.DOM.showElement(self.addPersonFragment);
     });
 
@@ -137,8 +160,8 @@ Quotient.Common.SenderPerson.method('hideAddPerson',
     function(self) {
         MochiKit.DOM.hideElement(self.addPersonFragment);
         self.form.removeEventListener("submit", self.submitFunction, true);
-        self.eventTarget.onclick = function(event) {
-            self.showAddPerson(self.node, event);
-            return false;
-        }
+        //self.eventTarget.onclick = function(event) {
+        //    self.showAddPerson(self.node, event);
+        //    return false;
+        //}
     });

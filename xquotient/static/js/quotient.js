@@ -220,7 +220,7 @@ Quotient.Mailbox.Controller.method("maybeLoadMessage",
         if(event.target.tagName == "A" || event.target.tagName == "IMG") {
             return;
         }
-        self.loadMessage(idx);
+        self.loadMessage(index);
     });
 
 Quotient.Mailbox.Controller.method("applyToChildren", 
