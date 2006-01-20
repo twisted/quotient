@@ -93,7 +93,7 @@ Quotient.Mailbox.Controller.methods(
     },
 */
 
-    function mailboxFeedback(msg) {
+    function mailboxFeedback(self, msg) {
         document.getElementById("mailbox-log").appendChild(
             MochiKit.DOM.DIV(null, msg));
     },
