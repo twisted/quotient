@@ -9,24 +9,21 @@ if(typeof(Quotient.Gallery) == "undefined") {
     Quotient.Gallery = {};
 }
 
-Quotient.Gallery.Controller = Nevow.Athena.Widget.subclass();
+Quotient.Gallery.Controller = Nevow.Athena.Widget.subclass("Quotient.Gallery.Controller");
 
-Quotient.Gallery.Controller.method("setGalleryState",
-    function(self, data) {
+Quotient.Gallery.Controller.methods(
+    function setGalleryState(self, data) {
         document.getElementById("images").innerHTML = data[0];
         document.getElementById("pagination-links").innerHTML = data[1];
         initLightbox();
-    });
+    },
 
-Quotient.Gallery.Controller.method("prevPage",
-    function(self) {
+    function prevPage(self) {
         self.callRemote('prevPage').addCallback(
             function(gs) { self.setGalleryState(gs) });
-    });
+    },
 
-Quotient.Gallery.Controller.method("nextPage",
-    function(self) {
+    function nextPage(self) {
         self.callRemote('nextPage').addCallback(
             function(gs) { self.setGalleryState(gs) });
     });
-

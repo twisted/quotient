@@ -17,10 +17,9 @@ if(typeof(Quotient.Compose) == "undefined") {
     Quotient.Compose = {};
 }
 
-Quotient.Compose.Controller = Nevow.Athena.Widget.subclass();
-
-Quotient.Compose.Controller.method("loaded",
-    function(self) {
+Quotient.Compose.Controller = Nevow.Athena.Widget.subclass('Quotient.Compose.Controller');
+Quotient.Compose.Controller.methods(
+    function loaded(self) {
         //self.fitMessageBodyToPage();
         self.allPeople = new Array();
 
@@ -29,16 +28,14 @@ Quotient.Compose.Controller.method("loaded",
                 self.allPeople = self.allPeople.concat(people);
                 self.stuffPeopleInDropdown();
             });
-    });
+    },
 
-Quotient.Compose.Controller.method("fitMessageBodyToPage", 
-    function(self) {
+    function fitMessageBodyToPage(self) {
         var e = document.getElementById("message-body");
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 55 + "px";
-    });
+    },
 
-Quotient.Compose.Controller.method("stuffPeopleInDropdown",
-    function(self) {
+    function stuffPeopleInDropdown(self) {
         var select = document.getElementById("person-select");
         MochiKit.DOM.replaceChildNodes(select);
         select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
@@ -46,10 +43,9 @@ Quotient.Compose.Controller.method("stuffPeopleInDropdown",
         for(i = 0; i < self.allPeople.length; i++)
             select.appendChild(
                 MochiKit.DOM.createDOM("OPTION", {"value":self.allPeople[i]}, self.allPeople[i]));
-    });
+    },
 
-Quotient.Compose.Controller.method("addrAutocompleteKeyDown",
-    function(self, event) {
+    function addrAutocompleteKeyDown(self, event) {
         var TAB = 9;
         var completions = document.getElementById("address-completions");
 
@@ -69,18 +65,16 @@ Quotient.Compose.Controller.method("addrAutocompleteKeyDown",
             self.emptyAndHideAddressCompletions();
         }
         return true;
-    });
+    },
 
-Quotient.Compose.Controller.method("dontBubbleEvent",
-    function(self, event) {
+    function dontBubbleEvent(self, event) {
         event.cancel = true;
         event.returnValue = false;
         event.preventDefault();
         return false;
-    });
+    },
 
-Quotient.Compose.Controller.method("shiftAddrCompletionHighlightDown",
-    function(self) {
+    function shiftAddrCompletionHighlightDown(self) {
         var completions = document.getElementById("address-completions");
         var selectedOffset = self.selectedAddrCompletion();
         if(selectedOffset == completions.childNodes.length-1)
@@ -88,16 +82,14 @@ Quotient.Compose.Controller.method("shiftAddrCompletionHighlightDown",
         var currentCompletion = completions.childNodes[selectedOffset];
         currentCompletion.className = "";
         currentCompletion.nextSibling.className = "selected-address-completion";
-    });
+    },
 
-Quotient.Compose.Controller.method("highlightFirstAddrCompletion",
-    function(self) {
+    function highlightFirstAddrCompletion(self) {
         var completions = document.getElementById("address-completions");
         completions.firstChild.className = "selected-address-completion";
-    });
+    },
 
-Quotient.Compose.Controller.method("shiftAddrCompletionHighlightUp",
-    function(self) {
+    function shiftAddrCompletionHighlightUp(self) {
         var completions = document.getElementById("address-completions");
         var selectedOffset = self.selectedAddrCompletion();
         if(selectedOffset == 0)
@@ -105,28 +97,25 @@ Quotient.Compose.Controller.method("shiftAddrCompletionHighlightUp",
         var currentCompletion = completions.childNodes[selectedOffset];
         currentCompletion.className = "";
         currentCompletion.previousSibling.className = "selected-address-completion";
-    });
+    },
 
-Quotient.Compose.Controller.method("selectedAddrCompletion",
-    function(self) {
+    function selectedAddrCompletion(self) {
         var completions = document.getElementById("address-completions");
         for(var i = 0; i < completions.childNodes.length; i++)
             if(completions.childNodes[i].className == "selected-address-completion")
                 return i;
         return null;
-    });
+    },
 
-Quotient.Compose.Controller.method("emptyAndHideAddressCompletions",
-    function (self) {
+    function emptyAndHideAddressCompletions(self) {
         with(MochiKit.DOM) {
             var completions = getElement("address-completions");
             replaceChildNodes(completions);
             hideElement(completions);
         }
-    });
+    },
 
-Quotient.Compose.Controller.method("appendAddrCompletionToList",
-    function(self, offset) {
+    function appendAddrCompletionToList(self, offset) {
         var input = document.getElementById("compose-to-address");
         var addrs = input.value.split(/,/);
         var lastAddr = Quotient.Common.Util.stripLeadingTrailingWS(addrs[addrs.length - 1]);
@@ -138,15 +127,13 @@ Quotient.Compose.Controller.method("appendAddrCompletionToList",
         // then replace it with the completion
         input.value += word + ", ";
         self.emptyAndHideAddressCompletions();
-    });
+    },
 
-Quotient.Compose.Controller.method("reconstituteAddress",
-    function(self, nameaddr) {
+    function reconstituteAddress(self, nameaddr) {
         return '"' + nameaddr[0] + '" <' + nameaddr[1] + '>';
-    });
+    },
 
-Quotient.Compose.Controller.method("completeCurrentAddr",
-    function(self, addresses) {
+    function completeCurrentAddr(self, addresses) {
         addresses = addresses.split(/,/);
 
         if(addresses.length == 0)
@@ -186,10 +173,9 @@ Quotient.Compose.Controller.method("completeCurrentAddr",
             completionContainer.style.left = Quotient.Common.Util.findPosX(input) + "px";
             self.highlightFirstAddrCompletion();
         }
-    });
+    },
 
-Quotient.Compose.Controller.method("setAttachment",
-    function(self, input) {
+    function setAttachment(self, input) {
         MochiKit.DOM.hideElement(input);
         MochiKit.DOM.appendChildNodes(input.parentNode,
             MochiKit.DOM.SPAN({"style":"font-weight: bold"}, input.value + " | "),
@@ -198,18 +184,16 @@ Quotient.Compose.Controller.method("setAttachment",
             MochiKit.DOM.BR(),
             MochiKit.DOM.A({"href":"#",
                 "onclick":self._makeHandler("addAttachment(this)")}, "Attach another file"));
-    });
+    },
 
-Quotient.Compose.Controller.method("removeAttachment",
-    function(self, link) {
+    function removeAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link.previousSibling);
         parent.removeChild(link.nextSibling);
         parent.removeChild(link);
-    });
+    },
 
-Quotient.Compose.Controller.method("addAttachment",
-    function(self, link) {
+    function addAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link);
         parent.appendChild(MochiKit.DOM.INPUT(

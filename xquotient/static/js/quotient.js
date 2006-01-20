@@ -12,17 +12,44 @@ if(typeof(Quotient.Mailbox) == "undefined") {
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 
-Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass();
+function quotient_intermingle(string, regex, transformation) {
+    var lpiece = null;
+    var mpiece = null;
+    var rpiece = null;
+    var piece  = null;
+    var match  = null;
+    var matches = null;
 
-Quotient.Mailbox.Controller.method("loaded",
-    function(self) {
+    var pieces = [string];
+
+    while(true) {
+        piece = pieces[pieces.length-1];
+        match = regex.exec(piece);
+        if(match) {
+            matches++;
+            lpiece = piece.slice(0, match.index);
+            mpiece = match[0];
+            rpiece = piece.slice(match.index+mpiece.length, piece.length);
+            pieces.pop();
+            pieces = pieces.concat([lpiece, transformation(mpiece), rpiece]);
+        } else { break }
+    }
+    if(matches) {
+        return pieces;
+    }
+    return null;
+}
+
+Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
+Quotient.Mailbox.Controller.methods(
+    function loaded(self) {
         var tdbContainer = self.nodeByAttribute("class", "inbox-tdb-container");
         var tdbNode = Nevow.Athena.NodeByAttribute(tdbContainer,
                                                    "athena:class",
                                                    "Mantissa.TDB.Controller");
 
         self.inboxTDB = Mantissa.TDB.Controller.get(tdbNode);
-        
+
         self.allTags   = new Array();
         self.selectedRow = null;
         self.selectedRowOffset = null;
@@ -33,67 +60,61 @@ Quotient.Mailbox.Controller.method("loaded",
                 self.stuffTagsInDropdown();
             });
 
-    });
+    },
 
 /*
-Quotient.Mailbox.Controller.method("checkTDBSize", function() {
-    var row = document.getElementById("tdb-item-1");
-    if(!row) {
-        var outerself = self;
-        return setTimeout(function() { outerself.checkTDBSize() }, 100);
-    }
+    function checkTDBSize(self) {
+        var row = document.getElementById("tdb-item-1");
+        if(!row) {
+            return setTimeout(function() { self.checkTDBSize() }, 100);
+        }
 
-    self.loadMessageStart = null;
-    self.loadMessageEnd = null;
-    self.replaceMessageDOMStart = null;
-    self.replaceMessageDOMEnd = null;
-    self.extractStart = null;
-    self.extractEnd = null;
-    self.everythingStart = null;
-    self.everythingEnd = null;
+        self.loadMessageStart = null;
+        self.loadMessageEnd = null;
+        self.replaceMessageDOMStart = null;
+        self.replaceMessageDOMEnd = null;
+        self.extractStart = null;
+        self.extractEnd = null;
+        self.everythingStart = null;
+        self.everythingEnd = null;
 
-    var tdb = Nevow.Athena.NodeByAttribute(
-        document.getElementById("tdb-container"), "athena:class", "Mantissa.TDB.Controller"
-    );
-    var tdbEnd = quotient_findPosY(tdb) + tdb.clientHeight;
-    var viewOpts = document.getElementById("view-options");
-    tdbEnd += viewOpts.clientHeight;
-    // + 15 because of padding and whatever
-    var moreRows = Math.floor((document.documentElement.clientHeight - tdbEnd) / (row.clientHeight + 15)) - 1;
-    self.callRemote('incrementItemsPerPage', moreRows).addCallback(
-        function() {
-            MochiKit.DOM.hideElement("loading-dialog");
-            document.getElementById("mailbox-meat").style.visibility = 'visible' });
-}
+        var tdb = Nevow.Athena.NodeByAttribute(
+            document.getElementById("tdb-container"), "athena:class", "Mantissa.TDB.Controller"
+        );
+        var tdbEnd = quotient_findPosY(tdb) + tdb.clientHeight;
+        var viewOpts = document.getElementById("view-options");
+        tdbEnd += viewOpts.clientHeight;
+        // + 15 because of padding and whatever
+        var moreRows = Math.floor((document.documentElement.clientHeight - tdbEnd) / (row.clientHeight + 15)) - 1;
+        self.callRemote('incrementItemsPerPage', moreRows).addCallback(
+            function() {
+                MochiKit.DOM.hideElement("loading-dialog");
+                document.getElementById("mailbox-meat").style.visibility = 'visible' });
+    },
 */
 
-Quotient.Mailbox.Controller.method("mailboxFeedback",
-    function(msg) {
+    function mailboxFeedback(msg) {
         document.getElementById("mailbox-log").appendChild(
             MochiKit.DOM.DIV(null, msg));
-    });
+    },
 
-Quotient.Mailbox.Controller.method("replaceWithDialog",
-    function(self, index, dialog) {
+    function replaceWithDialog(self, index, dialog) {
         var row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
         self.setChildBGColors(row, "");
         var cell = row.getElementsByTagName("td")[0];
         MochiKit.DOM.replaceChildNodes(cell,
             MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
-    });
+    },
 
-Quotient.Mailbox.Controller.method("nextPage",
-    function(self) {
+    function nextPage(self) {
         self.inboxTDB.nextPage();
-    });
+    },
 
-Quotient.Mailbox.Controller.method("prevPage",
-    function(self) {
+    function prevPage(self) {
         self.inboxTDB.prevPage();
-    });
+    },
 
-Quotient.Mailbox.Controller.method("stuffTagsInDropdown",
-    function(self) {
+    function stuffTagsInDropdown(self) {
         var select = document.getElementById("tag-select");
         MochiKit.DOM.replaceChildNodes(select);
         select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
@@ -101,19 +122,17 @@ Quotient.Mailbox.Controller.method("stuffTagsInDropdown",
         for(i = 0; i < self.allTags.length; i++)
             select.appendChild(
                 MochiKit.DOM.createDOM("OPTION", {"value":self.allTags[i]}, self.allTags[i]));
-    });
+    },
 
-Quotient.Mailbox.Controller.method("viewChanged",
-    function(self) {
+    function viewChanged(self) {
         var vselect = document.getElementById("more-views-select");
         for(var i = 0; i < vselect.childNodes.length; i++) {
             var subvselect = document.getElementById(vselect.childNodes[i].value + "-select");
             subvselect.style.display = (i == vselect.selectedIndex) ?  "" : "none";
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("viewByTagChanged",
-    function(self, select) {
+    function viewByTagChanged(self, select) {
         var options = 0; var selectedValue = null;
         for(var i = 0; i < select.childNodes.length; i++) {
             if(options == select.selectedIndex) {
@@ -128,10 +147,9 @@ Quotient.Mailbox.Controller.method("viewByTagChanged",
         } else {
             self.callRemote("viewByTag", selectedValue);
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("viewByPersonChanged",
-    function(self, select) {
+    function viewByPersonChanged(self, select) {
         var options = 0; var selectedValue = null;
         for(var i = 0; i < select.childNodes.length; i++) {
             if(options == select.selectedIndex) {
@@ -147,63 +165,51 @@ Quotient.Mailbox.Controller.method("viewByPersonChanged",
             self.callRemote("viewByPerson", selectedValue).addErrback(
                 function(err) { self.mailboxFeedback(err) });
         }
-    });
+    },
 
 
-Quotient.Mailbox.Controller.method("replaceTDB",
-    function(self, data) {
+    function replaceTDB(self, data) {
         self.inboxTDB._setTableContent(data[0]);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("replaceSender",
-    function(self, data) {
+    function replaceSender(self, data) {
         document.getElementById("message-detail-sender").innerHTML = data;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("toggleShowRead",
-    function(self) {
+    function toggleShowRead(self) {
         self.callRemote("toggleShowRead").addCallback(
             function(linkHTML) { self.setShowReadLinks(linkHTML) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("_changeView",
-    function(self, viewName) {
+    function _changeView(self, viewName) {
         self.callRemote(viewname).addCallback(
             function(linkHTML) { self.setViewLinks(linkHTML) }).addCallback(
                 function(ign) { self.hideShowReadLinks() });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("trashView",
-    function(self) { self._changeView("trashView") });
+    function trashView(self) { self._changeView("trashView") },
 
-Quotient.Mailbox.Controller.method("archiveView",
-    function(self) { self._changeView("archiveView") });
+    function archiveView(self) { self._changeView("archiveView") },
 
-Quotient.Mailbox.Controller.method("inboxView",
-    function(self) { self._changeView("inboxView") });
+    function inboxView(self) { self._changeView("inboxView") },
 
-Quotient.Mailbox.Controller.method("setViewLinks",
-    function(self, html) {
+    function setViewLinks(self, html) {
         document.getElementById("view-container").innerHTML = html;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("showShowReadLinks",
-    function(self) {
+    function showShowReadLinks(self) {
         MochiKit.DOM.setDisplayForElement("", "show-read-outer-container");
-    });
+    },
 
-Quotient.Mailbox.Controller.method("hideShowReadLinks",
-    function(self) {
+    function hideShowReadLinks(self) {
         MochiKit.DOM.hideElement("show-read-outer-container");
-    });
+    },
 
-Quotient.Mailbox.Controller.method("setShowReadLinks",
-    function(self, html) {
+    function setShowReadLinks(self, html) {
         document.getElementById("show-read-container").innerHTML = html;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("loadMessage",
-    function(self, index) {
+    function loadMessage(self, index) {
         var md = document.getElementById("message-detail");
         md.style.opacity = '.3';
         md.style.backgroundColor = '#CACACA';
@@ -213,48 +219,40 @@ Quotient.Mailbox.Controller.method("loadMessage",
         self.prepareForMessage(index);
         self.callRemote("getMessageContent", index).addCallback(
             function(data) { self.setMessageContent(data) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("maybeLoadMessage",
-    function(self, event, index) {
+    function maybeLoadMessage(self, event, index) {
         if(event.target.tagName == "A" || event.target.tagName == "IMG") {
             return;
         }
         self.loadMessage(index);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("applyToChildren", 
-    function(self, f, parent) {
+    function applyToChildren(self, f, parent) {
         MochiKit.Base.map(function(e) { if(e.tagName) { f(e) }}, parent.childNodes);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("setChildBGColors",
-    function(self, parent, color) {
+    function setChildBGColors(self, parent, color) {
         self.applyToChildren(function(e) { e.style.backgroundColor = color }, parent);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("setChildBorders",
-    function(self, parent, style) {
+    function setChildBorders(self, parent, style) {
         self.applyToChildren(function(e) { e.style.border = style }, parent);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("showThrobber",
-    function(self) {
+    function showThrobber(self) {
         document.getElementById("throbber").style.visibility = "visible";
-    });
+    },
 
-Quotient.Mailbox.Controller.method("hideThrobber",
-    function(self) {
+    function hideThrobber(self) {
         document.getElementById("throbber").style.visibility = "hidden";
-    });
+    },
 
-Quotient.Mailbox.Controller.method("reselectMessage",
-    function(self) {
+    function reselectMessage(self) {
         self.prepareForMessage(self.selectedRowOffset);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("prepareForMessage",
-    function(self, offset) {
+    function prepareForMessage(self, offset) {
         /* if we are selecting a message, and there was a message selected before self */
         if(self.selectedRow) {
             /* and it hadn't been read before */
@@ -280,25 +278,22 @@ Quotient.Mailbox.Controller.method("prepareForMessage",
         self.setChildBGColors(newlySelectedRow, Quotient.Mailbox.selectedMessageColor);
         self.setChildBorders(newlySelectedRow, "");
         self.selectedRow = newlySelectedRow;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("newMessage",
-    function(self) {
+    function newMessage(self) {
         if(self.selectedRow)
             self.setChildBGColors(self.selectedRow, "");
         self.callRemote("newMessage").addCallback(
             function(data) { self.setMessageContent(data) }).addCallback(
                 function(ign) { self.fitMessageBodyToPage() });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("fitMessageBodyToPage",
-    function(self) {
+    function fitMessageBodyToPage(self) {
         var e = document.getElementById("message-body");
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 35 + "px";
-    });
+    },
 
-Quotient.Mailbox.Controller.method("intermingle",
-    function(self, string, regex, transformation) {
+    function intermingle(self, string, regex, transformation) {
         var lpiece = null;
         var mpiece = null;
         var rpiece = null;
@@ -324,10 +319,9 @@ Quotient.Mailbox.Controller.method("intermingle",
             return pieces;
         }
         return null;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("attachPhoneToSender",
-    function(self, number, node) {
+    function attachPhoneToSender(self, number, node) {
         function swapImages(ign) {
             var newimg = MochiKit.DOM.IMG({"src": "/Quotient/static/images/attach-data-disabled.png"});
             node.parentNode.insertBefore(newimg, node);
@@ -335,29 +329,25 @@ Quotient.Mailbox.Controller.method("attachPhoneToSender",
             self._setExtractState("phone number", number, "acted-upon");
         }
         self.callRemote('attachPhoneToSender', number).addCallback(swapImages);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("transformURL",
-    function(self, s) {
+    function transformURL(self, s) {
         var target = s
         if(Quotient.Common.Util.startswith('www', s)) {
             target = 'http://' + target;
         }
         return MochiKit.DOM.A({"href":target}, s);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("_setExtractState",
-    function(self, etype, extract, state) {
+    function _setExtractState(self, etype, extract, state) {
         self.messageMetadata["message"]["extracts"][type][extract] = state;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("_lookupExtractState",
-    function(self, etype, extract) {
+    function _lookupExtractState(self, etype, extract) {
         return self.messageMetadata["message"]["extracts"][etype][extract];
-    });
+    },
 
-Quotient.Mailbox.Controller.method("transformPhoneNumber",
-    function(self, s) {
+    function transformPhoneNumber(self, s) {
         var enabled = self.messageMetadata["sender"]["is-person"] &&
                             self._lookupExtractState("phone number", s) == "unused";
         var icon = null;
@@ -375,15 +365,13 @@ Quotient.Mailbox.Controller.method("transformPhoneNumber",
         }
 
         return MochiKit.DOM.SPAN({}, [s, icon]);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("transformEmailAddress",
-    function(self, s) {
+    function transformEmailAddress(self, s) {
         return MochiKit.DOM.A({"href":"mailto:" + s}, s);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("getTransformationForExtractType",
-    function(self, etype) {
+    function getTransformationForExtractType(self, etype) {
         var f = null;
 
         if(etype == "url") {
@@ -393,10 +381,9 @@ Quotient.Mailbox.Controller.method("getTransformationForExtractType",
         } else if(etype == "email address") {
             return function(addr) { return self.transformEmailAddress(addr) };
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("highlightExtracts",
-    function(self) {
+    function highlightExtracts(self) {
         var body = document.getElementById("message-body");
         var replacements = null;
         var replacement = null;
@@ -432,10 +419,9 @@ Quotient.Mailbox.Controller.method("highlightExtracts",
                 i += j;
             }
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("setMessageContent",
-    function(self, data) {
+    function setMessageContent(self, data) {
         self.messageMetadata = data[0];
         var extractDict = self.messageMetadata["message"]["extracts"];
         for(var etypename in extractDict) {
@@ -459,10 +445,9 @@ Quotient.Mailbox.Controller.method("setMessageContent",
         self.extractEnd = new Date();
         self.reportTimes();
         initLightbox();
-    });
+    },
 
-Quotient.Mailbox.Controller.method("reportTimes",
-    function(self) {
+    function reportTimes(self) {
         self.everythingEnd = new Date();
         function deltaInMsecs(first, last) {
             return last.getTime() - first.getTime();
@@ -479,37 +464,33 @@ Quotient.Mailbox.Controller.method("reportTimes",
         }
 
         trb.firstChild.nodeValue = report;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("showTagEntry",
-    function(self) {
+    function showTagEntry(self) {
         with(MochiKit.DOM) {
             hideElement("tags-plus");
             setDisplayForElement("", "tags-minus");
             setDisplayForElement("", "add-tags-dialog");
             getElement("add-tags-dialog-text-input").focus();
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("hideTagEntry",
-    function(self) {
+    function hideTagEntry(self) {
         with(MochiKit.DOM) {
             setDisplayForElement("", "tags-plus");
             hideElement("tags-minus");
             hideElement("add-tags-dialog");
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("dontBubbleEvent",
-    function(self, event) {
+    function dontBubbleEvent(self, event) {
         event.cancel = true;
         event.returnValue = false;
         event.preventDefault();
         return false;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("tagAutocompleteKeyDown",
-    function(self, event) {
+    function tagAutocompleteKeyDown(self, event) {
         var TAB = 9;
         var DEL = 8;
 
@@ -528,10 +509,9 @@ Quotient.Mailbox.Controller.method("tagAutocompleteKeyDown",
             self.completeCurrentTag(tags);
         }
         return true;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("completeCurrentTag",
-    function(self, tags) {
+    function completeCurrentTag(self, tags) {
         tags = tags.split(/,/);
         var last = Quotient.Common.Util.normalizeTag(tags[tags.length - 1]);
 
@@ -562,25 +542,22 @@ Quotient.Mailbox.Controller.method("completeCurrentTag",
                 completionContainer.appendChild(
                     document.createTextNode(", "));
         }
-    });
+    },
 
-Quotient.Mailbox.Controller.method("appendTagCompletionToEntry",
-    function(self, completion) {
+    function appendTagCompletionToEntry(self, completion) {
         var input = document.getElementById("add-tags-dialog-text-input");
         var tags = input.value.split(/,/);
         var last = Quotient.Common.Util.normalizeTag(tags[tags.length-1]);
         input.value += completion.slice(last.length, completion.length) + ", ";
         MochiKit.DOM.replaceChildNodes("tag-completions");
         input.focus();
-    });
+    },
 
-Quotient.Mailbox.Controller.method("gotUpdatedTagList",
-    function(self, html) {
+    function gotUpdatedTagList(self, html) {
         document.getElementById("message-tags").innerHTML = html;
-    });
+    },
 
-Quotient.Mailbox.Controller.method("addTags",
-    function(self, form) {
+    function addTags(self, form) {
         var mtags = document.getElementById("message-tags");
         MochiKit.DOM.replaceChildNodes(mtags);
         mtags.appendChild(document.createTextNode("Loading..."));
@@ -620,16 +597,13 @@ Quotient.Mailbox.Controller.method("addTags",
         self.callRemote("addTags", tags).addCallback(
             function(tl) { self.gotUpdatedTagList(tl) }).addErrback(
                 function(err) { self.mailboxFeedback(err) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("_makeHandler",
-    function(self, fdesc) {
+    function _makeHandler(self, fdesc) {
         return "Quotient.Mailbox.Controller.get(self)." + fdesc + ";return false";
+    },
 
-    });
-
-Quotient.Mailbox.Controller.method("setAttachment",
-    function(self, input) {
+    function setAttachment(self, input) {
         MochiKit.DOM.hideElement(input);
         MochiKit.DOM.appendChildNodes(input.parentNode,
             MochiKit.DOM.SPAN({"style":"font-weight: bold"}, input.value + " | "),
@@ -638,53 +612,47 @@ Quotient.Mailbox.Controller.method("setAttachment",
             MochiKit.DOM.BR(),
             MochiKit.DOM.A({"href":"#",
                 "onclick":self._makeHandler("addAttachment(this)")}, "Attach another file"));
-    });
+    },
 
-Quotient.Mailbox.Controller.method("removeAttachment",
-    function(self, link) {
+    function removeAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link.previousSibling);
         parent.removeChild(link.nextSibling);
         parent.removeChild(link);
-    });
+    },
 
-Quotient.Mailbox.Controller.method("addAttachment",
-    function(self, link) {
+    function addAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link);
         parent.appendChild(MochiKit.DOM.INPUT(
             {"type":"file", "style":"display: block",
             "onchange":self._makeHandler("setAttachment(self)")}));
-    });
+    },
 
 /* message actions - each of these asks the server to modify
    the current message somehow, and expects to receive the 
    content of the next message as a result, or a ValueError
    if there is no next message */
 
-Quotient.Mailbox.Controller.method("markThisUnread",
-    function(self) {
+    function markThisUnread(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Marking Unread...");
         self.callRemote('markCurrentMessageUnread').addCallback(
             function(data) { self.setMessageContent(data) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("archiveThis",
-    function(self) {
+    function archiveThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
         self.callRemote('archiveCurrentMessage').addCallback(
             function(data) { self.setMessageContent(data) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("deleteThis",
-    function(self) {
+    function deleteThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Deleting...");
         self.callRemote('deleteCurrentMessage').addCallback(
             function(data) { self.setMessageContent(data) });
-    });
+    },
 
-Quotient.Mailbox.Controller.method("replyToThis",
-    function(self) {
+    function replyToThis(self) {
         if(self.selectedRow)
             self.setChildBGColors(self.selectedRow, "");
         self.callRemote("replyToCurrentMessage").addCallback(

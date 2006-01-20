@@ -8,7 +8,7 @@ if(typeof(Quotient.Common) == "undefined") {
     Quotient.Common = {};
 }
 
-Quotient.Common.Util = Nevow.Athena.Widget.subclass();
+Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
 Quotient.Common.Util.findPosX = function(obj) {
     var curleft = 0;
@@ -63,10 +63,9 @@ Quotient.Common.Util.resizeIFrame = function(frame) {
     catch (e) {}
 }
 
-Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass();
-
-Quotient.Common.AddPerson.method('replaceAddPersonHTMLWithPersonHTML',
-    function(self, identifier) {
+Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass('Quotient.Common.AddPerson');
+Quotient.Common.AddPerson.methods(
+    function replaceAddPersonHTMLWithPersonHTML(self, identifier) {
         var D = self.callRemote('getPersonHTML');
         D.addCallback(function(HTML) {
             var personIdentifiers = Nevow.Athena.NodesByAttribute(
@@ -81,10 +80,9 @@ Quotient.Common.AddPerson.method('replaceAddPersonHTMLWithPersonHTML',
         });
     });
 
-Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass();
-
-Quotient.Common.SenderPerson.method('showAddPerson',
-    function(self, node, event) {
+Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass("Quotient.Common.SenderPerson");
+Quotient.Common.SenderPerson.methods(
+    function showAddPerson(self, node, event) {
         self.node = node;
         self.body = document.getElementsByTagName("body")[0];
 
@@ -155,16 +153,14 @@ Quotient.Common.SenderPerson.method('showAddPerson',
             return false;
         }
         MochiKit.DOM.showElement(self.addPersonFragment);
-    });
+    },
 
-Quotient.Common.SenderPerson.method('submitForm',
-    function(self) {
+    function submitForm(self) {
         var node = Nevow.Athena.NodeByAttribute(self.addPersonFragment, "class", "add-person");
         Quotient.Common.AddPerson.get(node).replaceAddPersonHTMLWithPersonHTML(self.email);
-    });
+    },
 
-Quotient.Common.SenderPerson.method('hideAddPerson',
-    function(self) {
+    function hideAddPerson(self) {
         MochiKit.DOM.hideElement(self.addPersonFragment);
         self.form.removeEventListener("submit", self.submitFunction, true);
         self.eventTarget.onclick = function(event) {
