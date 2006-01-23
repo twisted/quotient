@@ -188,11 +188,15 @@ class ExtractList(athena.LiveFragment):
 
         self.prefs = ixmantissa.IPreferenceAggregator(person.store)
 
+    def _getComparison(self, extractType):
+        # this could be optimized
+        return attributes.AND(
+                  extractType.message == Message.storeID,
+                  Message.sender == people.EmailAddress.address,
+                  people.EmailAddress.person == self.person)
+
     def _makeExtractTDB(self, extractType):
-        comparison = attributes.AND(
-                        extractType.message == Message.storeID,
-                        Message.sender == people.EmailAddress.address,
-                        people.EmailAddress.person == self.person)
+        comparison = self._getComparison(extractType)
 
         tdm = tdb.TabularDataModel(
                 self.person.store,
@@ -208,6 +212,9 @@ class ExtractList(athena.LiveFragment):
 
         return ExtractViewer(tdm, views)
 
+    def _countExtracts(self, extractType):
+        return self.person.store.count(extractType, self._getComparison(extractType))
+
     def render_extractPanes(self, ctx, data):
         etypes = (('URLs', extract.URLExtract),
                   ('Phone Numbers', extract.PhoneNumberExtract),
@@ -220,8 +227,9 @@ class ExtractList(athena.LiveFragment):
             tdb = self._makeExtractTDB(etype)
             tdb.docFactory = getLoader(tdb.fragmentName)
             tdb.setFragmentParent(self.page)
+            count = self._countExtracts(etype)
             stan.append(dictFillSlots(patterns['horizontal-pane'],
-                            dict(title=title,
+                            dict(title=title + ' (%s)' % (count,),
                                  body=tdb)))
 
         return stan
