@@ -195,7 +195,7 @@ class ExtractList(athena.LiveFragment):
                   Message.sender == people.EmailAddress.address,
                   people.EmailAddress.person == self.person)
 
-    def _makeExtractTDB(self, extractType):
+    def _makeExtractTDB(self, extractType, itemsCalled):
         comparison = self._getComparison(extractType)
 
         tdm = tdb.TabularDataModel(
@@ -210,7 +210,7 @@ class ExtractList(athena.LiveFragment):
                  StripTimeColumnView('timestamp'),
                  ExcerptColumnView('excerpt'))
 
-        return ExtractViewer(tdm, views)
+        return ExtractViewer(tdm, views, itemsCalled=itemsCalled)
 
     def _countExtracts(self, extractType):
         return self.person.store.count(extractType, self._getComparison(extractType))
@@ -224,7 +224,7 @@ class ExtractList(athena.LiveFragment):
 
         stan = list()
         for (title, etype) in etypes:
-            tdb = self._makeExtractTDB(etype)
+            tdb = self._makeExtractTDB(etype, title)
             tdb.docFactory = getLoader(tdb.fragmentName)
             tdb.setFragmentParent(self.page)
             count = self._countExtracts(etype)

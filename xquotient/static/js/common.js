@@ -172,17 +172,15 @@ Quotient.Common.CollapsiblePane = Nevow.Athena.Widget.subclass('Quotient.Common.
 Quotient.Common.CollapsiblePane.method(
     function toggle(self, element) {
         var body = Nevow.Athena.NodeByAttribute(element.parentNode, 'class', 'pane-body');
-        var sigil = null;
+        var img = null;
 
         if(body.style.display == "none") {
             body.style.display = "block";
-            sigil = "\u21E9";
+            img = "/Quotient/static/images/outline-expanded.png";
         } else {
             body.style.display = "none";
-            sigil = "\u21E8";
+            img = "/Quotient/static/images/outline-collapsed.png";
         }
 
-        element = Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow");
-        element.firstChild.nodeValue = sigil;
-        element.blur();
+        Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow").src = img;
     });
