@@ -1,8 +1,7 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding: 8px;" nevow:render="liveFragment">
   <div nevow:pattern="horizontal-pane">
-    <div class="collapsible-pane">
-      <a href="#" class="collapse-arrow"
-        onclick="Quotient.Common.CollapsiblePane.get(this).toggle(this); return false">&#8680;</a>
+    <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.get(this).toggle(this); return false">
+      <span class="collapse-arrow">&#8680;</span>
       <nevow:slot name="title" /></div>
     <div class="pane-body" style="display: none;">
       <nevow:slot name="body" />

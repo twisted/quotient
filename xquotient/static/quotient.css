@@ -17,6 +17,7 @@ a.collapse-arrow {
 .collapsible-pane {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
     padding: 2px;
+    cursor: pointer;
 }
 
 .pane-body {
