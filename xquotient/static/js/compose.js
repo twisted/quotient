@@ -7,11 +7,8 @@ if(tinyMCE) {
 }
 */
 
+// import Quotient
 // import Quotient.Common
-
-if(typeof(Quotient) == "undefined") {
-    Quotient = {};
-}
 
 if(typeof(Quotient.Compose) == "undefined") {
     Quotient.Compose = {};

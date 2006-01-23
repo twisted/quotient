@@ -1,9 +1,5 @@
-
+// import Quotient
 // import Nevow.Athena
-
-if (typeof Quotient == 'undefined') {
-    Quotient = {};
-}
 
 Quotient.Grabber = {};
 

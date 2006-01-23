@@ -1,9 +1,6 @@
 /* this javascript file should be included by all quotient pages */
+// import Quotient
 // import Mantissa.People
-
-if(typeof(Quotient) == "undefined") {
-    Quotient = {};
-}
 
 if(typeof(Quotient.Common) == "undefined") {
     Quotient.Common = {};

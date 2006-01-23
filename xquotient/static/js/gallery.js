@@ -1,9 +1,6 @@
+// import Quotient
 // import Quotient.Common
 // import LightBox
-
-if(typeof(Quotient) == "undefined") {
-    Quotient = {};
-}
 
 if(typeof(Quotient.Gallery) == "undefined") {
     Quotient.Gallery = {};
