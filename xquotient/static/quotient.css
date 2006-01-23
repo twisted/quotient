@@ -6,7 +6,16 @@
     background-color: #000;
     back\ground-color: transparent;
     background-image: url(/Quotient/static/images/blank.gif);
-    filter: progid:DXImageTransform.Microsoft.AlphaImageLoader(src="overlay.png", sizingMethod="scale");
+}
+
+a.collapse-arrow {
+    color: #000000;
+    font-weight: bold;
+}
+
+.collapsible-pane {
+    background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
+    height: 26px;
 }
 
 #lightbox {
