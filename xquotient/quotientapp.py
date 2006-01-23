@@ -1,5 +1,7 @@
 from zope.interface import implements
 
+from nevow import tags
+
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 
@@ -44,6 +46,25 @@ class QuotientSearchProvider(Item, InstallableMixin):
                                       summary=document.text[:200],
                                       timestamp=msg.sent,
                                       score=0)
+
+class StaticShellContent(Item, InstallableMixin):
+    implements(ixmantissa.IStaticShellContent)
+
+    schemaVersion = 2
+    typeName = 'clickchronicle_static_shell_content'
+
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(StaticShellContent, self).installOn(other)
+        other.powerUp(self, ixmantissa.IStaticShellContent)
+
+    def getHeader(self):
+        return tags.img(src='/Quotient/static/images/logo.png')
+
+    def getFooter(self):
+        return None
+
 class QuotientBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
@@ -83,6 +104,7 @@ class QuotientBenefactor(Item):
 
         avatar.findOrCreate(SyncIndexer)
         avatar.findOrCreate(QuotientSearchProvider).installOn(avatar)
+        avatar.findOrCreate(StaticShellContent).installOn(avatar)
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):
