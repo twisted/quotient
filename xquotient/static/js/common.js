@@ -1,4 +1,5 @@
 /* this javascript file should be included by all quotient pages */
+// import Mantissa.People
 
 if(typeof(Quotient) == "undefined") {
     Quotient = {};
@@ -167,4 +168,23 @@ Quotient.Common.SenderPerson.methods(
             self.showAddPerson(self.node, event);
             return false;
         }
+    });
+
+Quotient.Common.CollapsiblePane = Nevow.Athena.Widget.subclass('Quotient.Common.CollapsiblePane');
+
+Quotient.Common.CollapsiblePane.method(
+    function toggle(self, element) {
+        var body = Nevow.Athena.NodeByAttribute(element.parentNode.parentNode, 'class', 'pane-body');
+        var sigil = null;
+
+        if(body.style.display == "none") {
+            body.style.display = "block";
+            sigil = "\u21E9";
+        } else {
+            body.style.display = "none";
+            sigil = "\u21E8";
+        }
+
+        element.firstChild.nodeValue = sigil;
+        element.blur();
     });

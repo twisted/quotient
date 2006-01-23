@@ -11,11 +11,12 @@
 a.collapse-arrow {
     color: #000000;
     font-weight: bold;
+    font-size: 1.2em;
 }
 
 .collapsible-pane {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
-    height: 26px;
+    padding: 2px;
 }
 
 #lightbox {

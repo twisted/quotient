@@ -1,8 +1,7 @@
 import urllib
 from zope.interface import implements
 
-from nevow import tags, rend
-from nevow.taglibrary import tabbedPane
+from nevow import tags, rend, athena
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -175,11 +174,12 @@ class ExtractViewer(tdbview.TabularDataView):
             yield excerptRowPattern.fillSlots('col-value',
                     self.excerptColumn.stanFromValue(
                         idx, row['__item__'], row.get('excerpt')))
-                        
-        
-class ExtractList(rend.Fragment):
+
+class ExtractList(athena.LiveFragment):
     implements(ixmantissa.IPersonFragment)
     title = 'Extracts'
+    jsClass = u'Quotient.Common.CollapsiblePane'
+    live = 'athena'
 
     def __init__(self, person):
         self.person = person
@@ -208,23 +208,23 @@ class ExtractList(rend.Fragment):
 
         return ExtractViewer(tdm, views)
 
-    def data_extractTabs(self, ctx, data):
+    def render_extractPanes(self, ctx, data):
         etypes = (('URLs', extract.URLExtract),
                   ('Phone Numbers', extract.PhoneNumberExtract),
                   ('Email Addresses', extract.EmailAddressExtract))
 
-        tabs = list()
+        patterns = PatternDictionary(self.docFactory)
+
+        stan = list()
         for (title, etype) in etypes:
             tdb = self._makeExtractTDB(etype)
             tdb.docFactory = getLoader(tdb.fragmentName)
-            tdb.setFragmentParent(self.fragmentParent)
-            tabs.append((title, tdb))
+            tdb.setFragmentParent(self.page)
+            stan.append(dictFillSlots(patterns['horizontal-pane'],
+                            dict(title=title,
+                                 body=tdb)))
 
-        return tabbedPane.tabbedPane(ctx, dict(pages=tabs,
-                                               name='extractPane'))
-
-    def setFragmentParent(self, parent):
-        self.fragmentParent = parent
+        return stan
 
 
 class MessageLister(Item, InstallableMixin):

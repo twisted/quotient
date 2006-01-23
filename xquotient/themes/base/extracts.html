@@ -1,3 +1,12 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="margin-top: 12px;">
-  <nevow:invisible nevow:render="data" nevow:data="extractTabs" />
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding: 8px;" nevow:render="liveFragment">
+  <div nevow:pattern="horizontal-pane">
+    <div class="collapsible-pane">
+      <a href="#" class="collapse-arrow"
+        onclick="Quotient.Common.CollapsiblePane.get(this).toggle(this); return false">&#8680;</a>
+      <nevow:slot name="title" /></div>
+    <div class="pane-body" style="display: none;">
+      <nevow:slot name="body" />
+    </div>
+  </div>
+  <nevow:invisible nevow:render="extractPanes" />
 </div>
