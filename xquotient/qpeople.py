@@ -178,7 +178,6 @@ class ExtractViewer(tdbview.TabularDataView):
 class ExtractList(athena.LiveFragment):
     implements(ixmantissa.IPersonFragment)
     title = 'Extracts'
-    jsClass = u'Quotient.Common.CollapsiblePane'
     live = 'athena'
 
     def __init__(self, person):

@@ -9,6 +9,30 @@
     <nevow:invisible nevow:render="addPersonFragment" />
   </div>
 
+  <div>
+    <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
+      <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
+      Views</div>
+    <div class="pane-body" style="display: none;">
+      <table>
+        <tr>
+          <td>
+            <select onchange="Quotient.Mailbox.Controller.get(this).changedView(this)" class="select-one" size="5" style="width: 160px">
+              <option>Tags</option>
+              <option>People</option>
+            </select>
+          </td>
+          <td>
+            <select class="select-two" size="5" style="width: 160px; opacity: .3" />
+          </td>
+          <td>
+            <select class="select-three" size="5" style="width: 160px; opacity: .3" />
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
   <div class="mailbox-container">
     <span id="throbber" style="visibility: hidden; position: absolute; top: 0; left: 0">
       <img style="padding: 4px;" src="/Quotient/static/images/circle-throbber.gif" />
@@ -30,7 +54,7 @@
                   onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead()" />
                 <input nevow:pattern="show-read-off" type="checkbox"
                   onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead();" />
-              </span></span>
+            </span></span>
             <table>
               <tr>
                 <td>View by</td>

@@ -278,6 +278,7 @@ class InboxScreen(athena.LiveFragment):
                 viewByPerson=True,   viewByAllPeople=True, nextMessage=True,
                 getTags=True,        getMessageContent=True,
 
+                fetchFilteredCounts=True,
                 markCurrentMessageRead=True,
                 attachPhoneToSender=True,
                 incrementItemsPerPage=True,
@@ -397,6 +398,27 @@ class InboxScreen(athena.LiveFragment):
         for tag in tags:
             catalog.tag(self.currentMessage, unicode(tag))
         return unicode(flatten(self.currentMessageDetail.tagsAsStan()), 'utf-8')
+
+    def fetchFilteredCounts(self, filters):
+        (first, second) = filters
+        labels = list()
+        if first == 'tags':
+            for (name, clauses) in ((u'All Messages',  ()),
+                                    (u'New Messages',  (Message.read == False,
+                                                        Message.archived == False,
+                                                        Message.deleted == False)),
+                                    (u'Sent Messages', (Message.deleted == False,)), # fix this
+                                    (u'Trash',         (Message.deleted == True,))):
+
+                count = self.original.store.count(Tag,
+                                        attributes.AND(Tag.object == Message.storeID,
+                                                    Tag.name == second,
+                                                    *clauses))
+                labels.append((name, count))
+        else:
+            assert False
+
+        return labels
 
     def attachPhoneToSender(self, number):
         person = self.organizer.personByEmailAddress(self.currentMessage.sender)

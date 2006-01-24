@@ -95,6 +95,71 @@ Quotient.Mailbox.Controller.methods(
             MochiKit.DOM.DIV(null, msg));
     },
 
+    function changedView(self, select) {
+        var options = select.getElementsByTagName("option");
+        var newView = options[select.selectedIndex].firstChild.nodeValue;
+        if(newView == "Tags") {
+            self.filterByTag(select);
+        } else if(newView == "People") {
+            self.filterByPeople(select);
+        }
+    },
+
+    function filterByTag(self, select) {
+        var secondSelect = Nevow.Athena.NodeByAttribute(select.parentNode.parentNode,
+                                                        'class',
+                                                        'select-two');
+        for(var i = 0; i < self.allTags.length; i++) {
+            secondSelect.appendChild(MochiKit.DOM.OPTION(null, self.allTags[i]));
+        }
+        secondSelect.style.opacity = '1';
+        var thirdSelect = Nevow.Athena.NodeByAttribute(select.parentNode.parentNode,
+                                                       'class',
+                                                       'select-three');
+
+        secondSelect.onchange = function() { self.fetchCountsForThirdSelect(thirdSelect) };
+    
+    },
+
+    function fetchCountsForThirdSelect(self, thirdSelect) {
+        while(0 < thirdSelect.childNodes.length) {
+            thirdSelect.removeChild(thirdSelect.firstChild);
+        }
+
+        var parent = thirdSelect.parentNode.parentNode;
+        var filters = [self._getFilter(parent, 'select-one'),
+                       self._getFilter(parent, 'select-two')];
+        self.callRemote('fetchFilteredCounts', filters).addCallback(
+            function(labels) { self.populateThirdSelect(labels, thirdSelect) });
+    },
+
+    function _getFilter(self, parent, className) {
+        var select = Nevow.Athena.NodeByAttribute(parent, 'class', className);
+        var options = select.getElementsByTagName('option');
+        return options[select.selectedIndex].firstChild.nodeValue.toLowerCase();
+    },
+    
+    function populateThirdSelect(self, labels, thirdSelect) {
+        var nodeArgs = null;
+        for(var i = 0; i < labels.length; i++) {
+            if(labels[i][1] == 0) {
+                nodeArgs = {"disabled": true};
+            } else {
+                nodeArgs = null;
+            }
+            thirdSelect.appendChild(
+                    MochiKit.DOM.OPTION(nodeArgs,
+                        labels[i][0] + " (" + labels[i][1] + ")"));
+        }
+        thirdSelect.style.opacity = '1';
+        thirdSelect.onchange = function() { 
+            self.filterMessages(thirdSelect.parentNode.parentNode) };
+    },
+    
+    function filterMessages(self, parent) {
+        return;
+    },
+
     function replaceWithDialog(self, index, dialog) {
         var row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
         self.setChildBGColors(row, "");

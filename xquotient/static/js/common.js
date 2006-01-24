@@ -167,20 +167,19 @@ Quotient.Common.SenderPerson.methods(
         }
     });
 
-Quotient.Common.CollapsiblePane = Nevow.Athena.Widget.subclass('Quotient.Common.CollapsiblePane');
+Quotient.Common.CollapsiblePane = {};
 
-Quotient.Common.CollapsiblePane.method(
-    function toggle(self, element) {
-        var body = Nevow.Athena.NodeByAttribute(element.parentNode, 'class', 'pane-body');
-        var img = null;
+Quotient.Common.CollapsiblePane.toggle = function(element) {
+    var body = Nevow.Athena.NodeByAttribute(element.parentNode, 'class', 'pane-body');
+    var img = null;
 
-        if(body.style.display == "none") {
-            body.style.display = "block";
-            img = "/Quotient/static/images/outline-expanded.png";
-        } else {
-            body.style.display = "none";
-            img = "/Quotient/static/images/outline-collapsed.png";
-        }
+    if(body.style.display == "none") {
+        body.style.display = "block";
+        img = "/Quotient/static/images/outline-expanded.png";
+    } else {
+        body.style.display = "none";
+        img = "/Quotient/static/images/outline-collapsed.png";
+    }
 
-        Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow").src = img;
-    });
+    Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow").src = img;
+}
