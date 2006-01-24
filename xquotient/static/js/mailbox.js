@@ -96,30 +96,56 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function changedView(self, select) {
+        self.emptySecondAndThirdSelects(select.parentNode.parentNode);
         var options = select.getElementsByTagName("option");
         var newView = options[select.selectedIndex].firstChild.nodeValue;
+
         if(newView == "Tags") {
             self.filterByTag(select);
         } else if(newView == "People") {
-            self.filterByPeople(select);
+            self.filterByPerson(select);
         }
     },
 
-    function filterByTag(self, select) {
-        var secondSelect = Nevow.Athena.NodeByAttribute(select.parentNode.parentNode,
-                                                        'class',
-                                                        'select-two');
-        for(var i = 0; i < self.allTags.length; i++) {
-            secondSelect.appendChild(MochiKit.DOM.OPTION(null, self.allTags[i]));
+    function filterByTag(self, firstSelect) {
+        self.populateSecondSelect(firstSelect.parentNode.parentNode, self.allTags);
+    },
+
+    function filterByPerson(self, firstSelect) {
+        var select = self.lookBusy(firstSelect.parentNode.parentNode, 2);
+        self.callRemote("getPeople").addCallback(
+            function(people) {
+                self.populateSecondSelect(firstSelect.parentNode.parentNode, people);
+                select.style.opacity = '1';
+            }).addErrback(alert);
+    },
+
+    function emptySecondAndThirdSelects(self, container) {
+        var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
+
+        while(0 < secondSelect.childNodes.length) {
+            secondSelect.removeChild(secondSelect.firstChild);
+        }
+
+        var thirdSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-3');
+
+        while(0 < thirdSelect.childNodes.length) {
+            thirdSelect.removeChild(thirdSelect.firstChild);
+        }
+    },
+
+    function populateSecondSelect(self, container, list) {
+        var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
+
+        for(var i = 0; i < list.length; i++) {
+            secondSelect.appendChild(
+                MochiKit.DOM.OPTION(null, list[i]));
         }
         secondSelect.style.opacity = '1';
-        var thirdSelect = Nevow.Athena.NodeByAttribute(select.parentNode.parentNode,
-                                                       'class',
-                                                       'select-three');
-
-        secondSelect.onchange = function() { self.fetchCountsForThirdSelect(thirdSelect) };
-    
+        secondSelect.onchange = function() { 
+            self.fetchCountsForThirdSelect(self.lookBusy(container, 3)) };
     },
+    
 
     function fetchCountsForThirdSelect(self, thirdSelect) {
         while(0 < thirdSelect.childNodes.length) {
@@ -127,24 +153,26 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var parent = thirdSelect.parentNode.parentNode.parentNode;
-        var filters = [self._getFilter(parent, 'select-one'),
-                       self._getFilter(parent, 'select-two')];
-
-        var throbber = Nevow.Athena.NodeByAttribute(thirdSelect.parentNode, 'class', 'browser-throbber');
-        throbber.style.display = "inline";
-        thirdSelect.style.opacity = ".3";
+        var filters = [self._getFilter(parent, 'select-1'),
+                       self._getFilter(parent, 'select-2')];
 
         self.callRemote('fetchFilteredCounts', filters).addCallback(
-            function(labels) { self.populateThirdSelect(labels, thirdSelect, throbber) });
+            function(labels) { self.populateThirdSelect(labels, thirdSelect) });
+    },
+
+    function lookBusy(self, containingNode, listOffset) {
+        var select = Nevow.Athena.NodeByAttribute(containingNode, 'class', 'select-' + listOffset);
+        select.style.opacity = '.3';
+        return select;
     },
 
     function _getFilter(self, parent, className) {
         var select = Nevow.Athena.NodeByAttribute(parent, 'class', className);
         var options = select.getElementsByTagName('option');
-        return options[select.selectedIndex].firstChild.nodeValue.toLowerCase();
+        return options[select.selectedIndex].firstChild.nodeValue;
     },
     
-    function populateThirdSelect(self, labels, thirdSelect, throbber) {
+    function populateThirdSelect(self, labels, thirdSelect) {
         
         var nodeArgs = null;
         for(var i = 0; i < labels.length; i++) {
@@ -157,14 +185,20 @@ Quotient.Mailbox.Controller.methods(
                     MochiKit.DOM.OPTION(nodeArgs,
                         labels[i][0] + " (" + labels[i][1] + ")"));
         }
-        throbber.style.display = "none";
         thirdSelect.style.opacity = '1';
         thirdSelect.onchange = function() { 
             self.filterMessages(thirdSelect.parentNode.parentNode) };
     },
     
     function filterMessages(self, parent) {
-        return;
+        var filters = [self._getFilter(parent, 'select-1'),
+                       self._getFilter(parent, 'select-2'),
+                       self._getFilter(parent, 'select-3')];
+
+        filters[2] = filters[2].substr(0, filters[2].match(/\(/).index - 1);
+        self.callRemote('filterMessages', filters).addCallback(
+            function(data) { self.replaceTDB(data) });
+
     },
 
     function replaceWithDialog(self, index, dialog) {

@@ -271,12 +271,12 @@ class InboxScreen(athena.LiveFragment):
     _inboxTDB = None
 
     iface = allowedMethods = dict(
-                toggleShowRead=True, newMessage=True,      addTags=True,
-                archiveMessage=True, deleteMessage=True,
-                archiveView=True,    trashView=True,       inboxView=True,
-                viewByTag=True,      viewByAllTags=True,   markCurrentMessageUnread=True,
-                viewByPerson=True,   viewByAllPeople=True, nextMessage=True,
-                getTags=True,        getMessageContent=True,
+                toggleShowRead=True, newMessage=True,        addTags=True,
+                archiveMessage=True, deleteMessage=True,     getPeople=True,
+                archiveView=True,    trashView=True,         inboxView=True,
+                viewByTag=True,      viewByAllTags=True,     markCurrentMessageUnread=True,
+                viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
+                getTags=True,        getMessageContent=True, filterMessages=True,
 
                 fetchFilteredCounts=True,
                 markCurrentMessageRead=True,
@@ -393,30 +393,51 @@ class InboxScreen(athena.LiveFragment):
         return list(
             self.original.store.query(Tag).getColumn('name').distinct())
 
+    def getPeople(self):
+        return list(
+            self.original.store.query(people.Person).getColumn('name'))
+
     def addTags(self, tags):
         catalog = self.original.store.findOrCreate(Catalog)
         for tag in tags:
             catalog.tag(self.currentMessage, unicode(tag))
         return unicode(flatten(self.currentMessageDetail.tagsAsStan()), 'utf-8')
 
-    def fetchFilteredCounts(self, filters):
-        (first, second) = filters
-        labels = list()
-        if first == 'tags':
-            for (name, clauses) in ((u'All Messages',  ()),
-                                    (u'New Messages',  (Message.read == False,
-                                                        Message.archived == False,
-                                                        Message.deleted == False)),
-                                    (u'Sent Messages', (Message.deleted == False,)), # fix this
-                                    (u'Trash',         (Message.deleted == True,))):
+    filterNamesAndClauses =  {u'All Messages':  (),
+                              u'New Messages':  (Message.read == False,
+                                                 Message.archived == False,
+                                                 Message.deleted == False),
+                              u'Sent Messages': (Message.deleted == False,), # fix this
+                              u'Trash':         (Message.deleted == True,)}
 
-                count = self.original.store.count(Tag,
-                                        attributes.AND(Tag.object == Message.storeID,
-                                                    Tag.name == second,
-                                                    *clauses))
-                labels.append((name, count))
-        else:
-            assert False
+    def filterMessages(self, (filterType, filterValue, messageFilterType)):
+        (typeClass, comparison) = self._queryForFilterType(
+                                         filterType,
+                                         filterValue,
+                                         self.filterNamesAndClauses[messageFilterType])
+
+        self.inboxTDB.original.baseComparison = comparison
+        self.inboxTDB.original.firstPage()
+        return self.inboxTDB.replaceTable()
+
+    def _queryForFilterType(self, filterType, filterValue, clauses):
+        if filterType == 'Tags':
+            return (Tag, attributes.AND(Tag.object == Message.storeID,
+                                        Tag.name == filterValue,
+                                        *clauses))
+        if filterType == 'People':
+            return (Message, attributes.AND(Message.sender == people.EmailAddress.address,
+                                            people.EmailAddress.person == people.Person.storeID,
+                                            people.Person.name == filterValue,
+                                            *clauses))
+
+    def fetchFilteredCounts(self, (filterType, filterValue)):
+        labels = list()
+
+        for (name, clauses) in self.filterNamesAndClauses.iteritems():
+            count = self.original.store.count(
+                            *self._queryForFilterType(filterType, filterValue, clauses))
+            labels.append((name, count))
 
         return labels
 

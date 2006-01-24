@@ -14,26 +14,12 @@
       <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
       Views</div>
     <div class="pane-body" style="display: none;">
-      <table>
-        <tr>
-          <td>
-            <select onchange="Quotient.Mailbox.Controller.get(this).changedView(this)" class="select-one" size="5" style="width: 160px">
-              <option>Tags</option>
-              <option>People</option>
-            </select>
-          </td>
-          <td>
-            <select class="select-two" size="5" style="width: 160px; opacity: .3" />
-          </td>
-          <td>
-            <div>
-              <select class="select-three" size="5" style="width: 160px; position: relative; z-index: 1; opacity: .3" />
-              <img src="/Quotient/static/images/circle-throbber.gif" class="browser-throbber"
-                style="position: relative; z-index: 2; top: -35px; left: -100px; opacity: .3; display: none;" />
-            </div>
-          </td>
-        </tr>
-      </table>
+      <select onchange="Quotient.Mailbox.Controller.get(this).changedView(this)" class="select-1" size="5" style="width: 160px">
+        <option>Tags</option>
+        <option>People</option>
+      </select>
+      <select class="select-2" size="5" style="width: 160px; opacity: .3; position: relative; z-index: 3" />
+      <select class="select-3" size="5" style="width: 160px; position: relative; z-index: 5; opacity: .3" />
     </div>
   </div>
 
