@@ -126,11 +126,16 @@ Quotient.Mailbox.Controller.methods(
             thirdSelect.removeChild(thirdSelect.firstChild);
         }
 
-        var parent = thirdSelect.parentNode.parentNode;
+        var parent = thirdSelect.parentNode.parentNode.parentNode;
         var filters = [self._getFilter(parent, 'select-one'),
                        self._getFilter(parent, 'select-two')];
+
+        var throbber = Nevow.Athena.NodeByAttribute(thirdSelect.parentNode, 'class', 'browser-throbber');
+        throbber.style.display = "inline";
+        thirdSelect.style.opacity = ".3";
+
         self.callRemote('fetchFilteredCounts', filters).addCallback(
-            function(labels) { self.populateThirdSelect(labels, thirdSelect) });
+            function(labels) { self.populateThirdSelect(labels, thirdSelect, throbber) });
     },
 
     function _getFilter(self, parent, className) {
@@ -139,7 +144,8 @@ Quotient.Mailbox.Controller.methods(
         return options[select.selectedIndex].firstChild.nodeValue.toLowerCase();
     },
     
-    function populateThirdSelect(self, labels, thirdSelect) {
+    function populateThirdSelect(self, labels, thirdSelect, throbber) {
+        
         var nodeArgs = null;
         for(var i = 0; i < labels.length; i++) {
             if(labels[i][1] == 0) {
@@ -151,6 +157,7 @@ Quotient.Mailbox.Controller.methods(
                     MochiKit.DOM.OPTION(nodeArgs,
                         labels[i][0] + " (" + labels[i][1] + ")"));
         }
+        throbber.style.display = "none";
         thirdSelect.style.opacity = '1';
         thirdSelect.onchange = function() { 
             self.filterMessages(thirdSelect.parentNode.parentNode) };
