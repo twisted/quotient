@@ -51,7 +51,7 @@ class StaticShellContent(Item, InstallableMixin):
     implements(ixmantissa.IStaticShellContent)
 
     schemaVersion = 2
-    typeName = 'clickchronicle_static_shell_content'
+    typeName = 'quotient_static_shell_content'
 
     installedOn = attributes.reference()
 
