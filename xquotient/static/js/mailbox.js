@@ -104,8 +104,24 @@ Quotient.Mailbox.Controller.methods(
             self.filterByTag(select);
         } else if(newView == "People") {
             self.filterByPerson(select);
+        } else if(newView == "Mail") {
+            self.filterMail(select);
         }
     },
+
+    function filterMail(self, firstSelect) {
+        var container = firstSelect.parentNode.parentNode.parentNode;
+        self.callRemote("fetchFilteredCounts", ["Mail", null]).addCallback(
+            function(counts) {
+                var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2'); 
+                self.populateSelectWithLabels(counts, secondSelect);
+
+                secondSelect.onchange = function() {
+                    self.filterMessages(container);
+                }
+            });
+    },
+
 
     function filterByTag(self, firstSelect) {
         self.populateSecondSelect(firstSelect.parentNode.parentNode, self.allTags);
@@ -127,6 +143,10 @@ Quotient.Mailbox.Controller.methods(
             secondSelect.removeChild(secondSelect.firstChild);
         }
 
+        self.emptyThirdSelect(container);
+    },
+
+    function emptyThirdSelect(self, container) {
         var thirdSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-3');
 
         while(0 < thirdSelect.childNodes.length) {
@@ -143,6 +163,7 @@ Quotient.Mailbox.Controller.methods(
         }
         secondSelect.style.opacity = '1';
         secondSelect.onchange = function() { 
+            self.emptyThirdSelect(container);
             self.fetchCountsForThirdSelect(self.lookBusy(container, 3)) };
     },
     
@@ -157,7 +178,12 @@ Quotient.Mailbox.Controller.methods(
                        self._getFilter(parent, 'select-2')];
 
         self.callRemote('fetchFilteredCounts', filters).addCallback(
-            function(labels) { self.populateThirdSelect(labels, thirdSelect) });
+            function(labels) {
+                self.populateSelectWithLabels(labels, thirdSelect);
+                thirdSelect.onchange = function() { 
+                    self.filterMessages(thirdSelect.parentNode.parentNode)
+                };
+            });
     },
 
     function lookBusy(self, containingNode, listOffset) {
@@ -169,10 +195,13 @@ Quotient.Mailbox.Controller.methods(
     function _getFilter(self, parent, className) {
         var select = Nevow.Athena.NodeByAttribute(parent, 'class', className);
         var options = select.getElementsByTagName('option');
+        if(options.length == 0) {
+            return null;
+        }
         return options[select.selectedIndex].firstChild.nodeValue;
     },
     
-    function populateThirdSelect(self, labels, thirdSelect) {
+    function populateSelectWithLabels(self, labels, select) {
         
         var nodeArgs = null;
         for(var i = 0; i < labels.length; i++) {
@@ -181,13 +210,11 @@ Quotient.Mailbox.Controller.methods(
             } else {
                 nodeArgs = null;
             }
-            thirdSelect.appendChild(
+            select.appendChild(
                     MochiKit.DOM.OPTION(nodeArgs,
                         labels[i][0] + " (" + labels[i][1] + ")"));
         }
-        thirdSelect.style.opacity = '1';
-        thirdSelect.onchange = function() { 
-            self.filterMessages(thirdSelect.parentNode.parentNode) };
+        select.style.opacity = '1';
     },
     
     function filterMessages(self, parent) {
@@ -195,7 +222,13 @@ Quotient.Mailbox.Controller.methods(
                        self._getFilter(parent, 'select-2'),
                        self._getFilter(parent, 'select-3')];
 
+        if(!filters[2]) {
+            filters[2] = filters[1];
+            filters[1] = null;
+        }
+
         filters[2] = filters[2].substr(0, filters[2].match(/\(/).index - 1);
+
         self.callRemote('filterMessages', filters).addCallback(
             function(data) { self.replaceTDB(data) });
 

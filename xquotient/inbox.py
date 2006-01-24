@@ -430,6 +430,10 @@ class InboxScreen(athena.LiveFragment):
                                             people.EmailAddress.person == people.Person.storeID,
                                             people.Person.name == filterValue,
                                             *clauses))
+        if filterType == 'Mail':
+            if 0 < len(clauses):
+                return (Message, attributes.AND(*clauses))
+            return (Message, None)
 
     def fetchFilteredCounts(self, (filterType, filterValue)):
         labels = list()
