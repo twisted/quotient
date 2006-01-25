@@ -84,7 +84,7 @@ Quotient.Common.SenderPerson.methods(
         self.node = node;
         self.body = document.getElementsByTagName("body")[0];
 
-        var name = self.nodeByAttribute('class', 'person-name').firstChild.nodeValue;
+        var name = self.nodeByAttribute('class', 'sender-person-name').firstChild.nodeValue;
         var parts = new Object();
 
         parts["firstname"] = '';
@@ -140,6 +140,9 @@ Quotient.Common.SenderPerson.methods(
             }
 
             e = _event.target;
+            if(e.tagName == "INPUT") {
+                return true;
+            }
             while(e && e.id != self.addPersonFragment.id) {
                 e = e.parentNode;
             }
@@ -156,6 +159,7 @@ Quotient.Common.SenderPerson.methods(
     function submitForm(self) {
         var node = Nevow.Athena.NodeByAttribute(self.addPersonFragment, "class", "add-person");
         Quotient.Common.AddPerson.get(node).replaceAddPersonHTMLWithPersonHTML(self.email);
+        self.hideAddPerson();
     },
 
     function hideAddPerson(self) {
