@@ -403,18 +403,18 @@ class InboxScreen(athena.LiveFragment):
             catalog.tag(self.currentMessage, unicode(tag))
         return unicode(flatten(self.currentMessageDetail.tagsAsStan()), 'utf-8')
 
-    filterNamesAndClauses =  {u'All Messages':  (),
-                              u'New Messages':  (Message.read == False,
-                                                 Message.archived == False,
-                                                 Message.deleted == False),
-                              u'Sent Messages': (Message.deleted == False,), # fix this
-                              u'Trash':         (Message.deleted == True,)}
+    filterNamesAndClauses =  ((u'All Messages',  ()),
+                              (u'New Messages',  (Message.read == False,
+                                                  Message.archived == False,
+                                                  Message.deleted == False)),
+                              (u'Sent Messages', (Message.deleted == False,)), # fix this
+                              (u'Trash',         (Message.deleted == True,)))
 
     def filterMessages(self, (filterType, filterValue, messageFilterType)):
         (typeClass, comparison) = self._queryForFilterType(
                                          filterType,
                                          filterValue,
-                                         self.filterNamesAndClauses[messageFilterType])
+                                         dict(self.filterNamesAndClauses)[messageFilterType])
 
         self.inboxTDB.original.baseComparison = comparison
         self.inboxTDB.original.firstPage()
@@ -438,7 +438,7 @@ class InboxScreen(athena.LiveFragment):
     def fetchFilteredCounts(self, (filterType, filterValue)):
         labels = list()
 
-        for (name, clauses) in self.filterNamesAndClauses.iteritems():
+        for (name, clauses) in self.filterNamesAndClauses:
             count = self.original.store.count(
                             *self._queryForFilterType(filterType, filterValue, clauses))
             labels.append((name, count))
