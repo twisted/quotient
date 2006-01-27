@@ -183,6 +183,10 @@ Quotient.Compose.Controller.methods(
                 "onclick":self._makeHandler("addAttachment(this)")}, "Attach another file"));
     },
 
+    function _makeHandler(self, f) {
+        return "Quotient.Compose.Controller.get(this)." + f + "; return false";
+    },
+    
     function removeAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link.previousSibling);
