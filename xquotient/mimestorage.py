@@ -1,5 +1,7 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
+import itertools
+
 from epsilon.extime import Time
 
 from axiom import item, attributes
@@ -329,16 +331,18 @@ class Part(item.Item):
                 yield child
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
-    def __init__(self, store, message, *a, **kw):
-        super(MIMEMessageStorer, self).__init__(*a, **kw)
+    def __init__(self, store, fObj):
+        super(MIMEMessageStorer, self).__init__(
+            fObj,
+            lambda *a, **kw: Part(_partCounter=itertools.count().next,
+                                  *a,
+                                  **kw))
         self.store = store
-        self.message = message
 
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
-        self.message.store = self.store
+        self.message = exmess.Message(store=self.store, received=Time())
         self.message.installOn(self.store)
-        self.message.received = Time()
 
         try:
             sent = self.part.getHeader(u'date')

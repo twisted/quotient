@@ -56,14 +56,8 @@ class DeliveryAgentMixin(object):
     def createMIMEReceiver(self):
         fObj = self.installedOn.newFile('messages', str(self.messageCount))
         self.messageCount += 1
-        msg = exmess.Message()
-        partCounter = itertools.count().next
         return mimestorage.MIMEMessageStorer(
-            self.installedOn, msg, fObj,
-            lambda **kw: mimestorage.Part(message=msg,
-                                          partID=partCounter(),
-                                          _partCounter=partCounter,
-                                          **kw))
+            self.installedOn, fObj)
 
 
 class DeliveryFactoryMixin(object):
