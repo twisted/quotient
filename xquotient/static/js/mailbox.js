@@ -373,6 +373,7 @@ Quotient.Mailbox.Controller.methods(
                     if(node) {
                         node.className = 'read-message';
                     }
+                    self.twiddleUnreadMessageCount(-1);
                 } catch(e) {}
             }
         }
@@ -736,10 +737,22 @@ Quotient.Mailbox.Controller.methods(
             "onchange":self._makeHandler("setAttachment(self)")}));
     },
 
+    function _twiddleCount(self, className, howMuch) {
+        var node = self.nodeByAttribute('class', className);
+        node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) + howMuch;
+    },
+
     function twiddleMessageCount(self, howMuch) {
-        var mcNode = self.nodeByAttribute('class', 'message-count');
-        var currentMc = parseInt(mcNode.firstChild.nodeValue);
-        mcNode.firstChild.nodeValue = currentMc + howMuch;
+        self._twiddleCount('message-count', howMuch);
+        /* we'll make the assumption that you cannot act on
+           messages that are not loaded into message detail */
+        if(!self.messageMetadata["message"]["read"]) {
+            self.twiddleUnreadMessageCount(howMuch);
+        }
+    },
+
+    function twiddleUnreadMessageCount(self, howMuch) {
+        self._twiddleCount('unread-message-count', howMuch);
     },
 
 /* message actions - each of these asks the server to modify
@@ -756,15 +769,15 @@ Quotient.Mailbox.Controller.methods(
     function archiveThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
         self.callRemote('archiveCurrentMessage').addCallback(
-            function(data) { self.setMessageContent(data) }).addCallback(
-            function(ign) { self.twiddleMessageCount(-1) });
+            function(ign) { self.twiddleMessageCount(-1) }).addCallback(
+            function(data) { self.setMessageContent(data) });
     },
 
     function deleteThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Deleting...");
         self.callRemote('deleteCurrentMessage').addCallback(
-            function(data) { self.setMessageContent(data) }).addCallback(
-            function(ign) { self.twiddleMessageCount(-1) });
+            function(ign) { self.twiddleMessageCount(-1) }).addCallback(
+            function(data) { self.setMessageContent(data) });
     },
 
     function replyToThis(self) {

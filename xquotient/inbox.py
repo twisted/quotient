@@ -534,6 +534,11 @@ class InboxScreen(athena.LiveFragment):
     def render_messageCount(self, ctx, data):
         return self.inboxTDB.original.totalItems
 
+    def render_unreadMessageCount(self, ctx, data):
+        return self.original.store.count(Message,
+                    attributes.AND(Message.read == False,
+                                   self._getBaseComparison()))
+
     def render_addPersonFragment(self, ctx, data):
         # the person form is a fair amount of html,
         # so we'll only include it once
