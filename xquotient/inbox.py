@@ -470,22 +470,21 @@ class InboxScreen(athena.LiveFragment):
         person = self.organizer.personByEmailAddress(self.currentMessage.sender)
         isPerson = person is not None
 
-        edata = {}
         data  = {u'sender': {u'is-person': isPerson},
-                 u'message': {u'extracts': edata,
+                 u'message': {u'extracts': {u'url': extract.URLExtract.regex.pattern},
                               u'read': self.currentMessage.read}}
 
-        for (ename, etype) in extract.extractTypes.iteritems():
-            edata[unicode(ename)] = {u'pattern': etype.regex.pattern}
-            for ex in self.original.store.query(etype, etype.message==self.currentMessage):
-                if ex.actedUpon:
-                    v = u'acted-upon'
-                elif ex.ignored:
-                    v = u'ignored'
-                else:
-                    v = u'unused'
-
-                edata[ename][ex.text] = v
+        #for (ename, etype) in extract.extractTypes.iteritems():
+        #    edata[unicode(ename)] = {u'pattern': etype.regex.pattern}
+        #    for ex in self.original.store.query(etype, etype.message==self.currentMessage):
+        #        if ex.actedUpon:
+        #            v = u'acted-upon'
+        #        elif ex.ignored:
+        #            v = u'ignored'
+        #        else:
+        #            v = u'unused'
+        #
+        #        edata[ename][ex.text] = v
 
         return data
 
