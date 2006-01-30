@@ -4,13 +4,11 @@
   <div id="loading-dialog" style="font-size: 2.4em;">
     Loading...
   </div>
-  -->
-
+  
   <div id="add-person-fragment" style="display: none; background-color: #FFFFFF">
     <nevow:invisible nevow:render="addPersonFragment" />
   </div>
 
-  <!--
   <div>
     <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
       <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
@@ -32,8 +30,9 @@
       <img style="padding: 4px;" src="/Quotient/static/images/circle-throbber.gif" />
     </span>
     <div id="time-report-box" />
-
-    <table style="width: 100%; border-spacing: 0px">
+    <span class="message-count"
+      ><nevow:invisible nevow:render="messageCount" /></span> messages
+    <table style="width: 100%; border-spacing: 0px;">
       <tr valign="top">
         <td class="inbox-tdb-container">
           <nevow:invisible nevow:render="inboxTDB" />
@@ -41,7 +40,7 @@
           <center id="view-options">
             <a href="#" onclick="Quotient.Mailbox.Controller.get(this).prevPage(); return false">page up</a>
             | <a href="#" onclick="Quotient.Mailbox.Controller.get(this).nextPage();return false">page down</a>
-            <span id="show-read-outer-container">
+            <!--<span id="show-read-outer-container">
               show read:
               <span id="show-read-container" nevow:render="showRead">
                 <input nevow:pattern="show-read-on" type="checkbox" checked="true"
@@ -49,7 +48,6 @@
                 <input nevow:pattern="show-read-off" type="checkbox"
                   onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead();" />
               </span></span>
-            <!--
             <table>
               <tr>
                 <td>View by</td>

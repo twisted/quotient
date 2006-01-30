@@ -550,7 +550,7 @@ Quotient.Mailbox.Controller.methods(
         self.extractStart = new Date();
         self.highlightExtracts();
         self.extractEnd = new Date();
-        self.reportTimes();
+        //self.reportTimes();
         initLightbox();
     },
 

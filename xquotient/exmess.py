@@ -179,15 +179,15 @@ class MessageDetail(athena.LiveFragment):
         return mtags
 
     def render_headerPanel(self, ctx, data):
-        p = None#self.organizer.personByEmailAddress(self.original.sender)
-        if p is None:
-            personStan = SenderPersonFragment(self.original)
-        else:
-            personStan = people.PersonFragment(p, self.original.sender)
-        personStan.page = self.page
+        #self.organizer.personByEmailAddress(self.original.sender)
+        #if p is None:
+        #    personStan = SenderPersonFragment(self.original)
+        #else:
+        #    personStan = people.PersonFragment(p, self.original.sender)
+        #personStan.page = self.page
 
         return dictFillSlots(ctx.tag,
-                dict(sender=personStan,
+                dict(sender=self.original.sender,
                      recipient=self.original.recipient,
                      subject=self.original.subject,
                      tags=self.tagsAsStan()))

@@ -104,13 +104,14 @@ class EmailAddressColumnView(tdbview.ColumnViewBase):
             self._cachedNotPeople.remove(person.name)
 
     def stanFromValue(self, idx, msg, value):
-        person = self._personFromAddress(msg, msg.sender)
-        if person is None:
-            display = SenderPersonFragment(msg)
-        else:
-            display = people.PersonFragment(person)
-        display.setFragmentParent(self.fragmentParent)
-        return display
+        #person = self._personFromAddress(msg, msg.sender)
+        #if person is None:
+        #    display = SenderPersonFragment(msg)
+        #else:
+        #    display = people.PersonFragment(person)
+        #display.setFragmentParent(self.fragmentParent)
+        #return display
+        return msg.sender
 
 class CompoundColumnView(EmailAddressColumnView):
     def __init__(self, *args, **kwargs):
@@ -529,6 +530,9 @@ class InboxScreen(athena.LiveFragment):
 
     def render_inboxTDB(self, ctx, data):
         return ctx.tag[self.inboxTDB]
+
+    def render_messageCount(self, ctx, data):
+        return self.inboxTDB.original.totalItems
 
     def render_addPersonFragment(self, ctx, data):
         # the person form is a fair amount of html,
