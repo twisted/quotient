@@ -9,34 +9,6 @@ if(typeof(Quotient.Mailbox) == "undefined") {
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 
-function quotient_intermingle(string, regex, transformation) {
-    var lpiece = null;
-    var mpiece = null;
-    var rpiece = null;
-    var piece  = null;
-    var match  = null;
-    var matches = null;
-
-    var pieces = [string];
-
-    while(true) {
-        piece = pieces[pieces.length-1];
-        match = regex.exec(piece);
-        if(match) {
-            matches++;
-            lpiece = piece.slice(0, match.index);
-            mpiece = match[0];
-            rpiece = piece.slice(match.index+mpiece.length, piece.length);
-            pieces.pop();
-            pieces = pieces.concat([lpiece, transformation(mpiece), rpiece]);
-        } else { break }
-    }
-    if(matches) {
-        return pieces;
-    }
-    return null;
-}
-
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function loaded(self) {
@@ -538,7 +510,6 @@ Quotient.Mailbox.Controller.methods(
 
                 if(!elem) { break };
                 if(elem.tagName) { i++; continue };
-
                 replacements = self.intermingle(
                                     elem.nodeValue, etype["pattern"], self.getTransformationForExtractType(k));
 

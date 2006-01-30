@@ -471,7 +471,7 @@ class InboxScreen(athena.LiveFragment):
         isPerson = person is not None
 
         data  = {u'sender': {u'is-person': isPerson},
-                 u'message': {u'extracts': {u'url': extract.URLExtract.regex.pattern},
+                 u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
                               u'read': self.currentMessage.read}}
 
         #for (ename, etype) in extract.extractTypes.iteritems():
