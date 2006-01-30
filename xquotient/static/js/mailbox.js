@@ -736,6 +736,12 @@ Quotient.Mailbox.Controller.methods(
             "onchange":self._makeHandler("setAttachment(self)")}));
     },
 
+    function twiddleMessageCount(self, howMuch) {
+        var mcNode = self.nodeByAttribute('class', 'message-count');
+        var currentMc = parseInt(mcNode.firstChild.nodeValue);
+        mcNode.firstChild.nodeValue = currentMc + howMuch;
+    },
+
 /* message actions - each of these asks the server to modify
    the current message somehow, and expects to receive the 
    content of the next message as a result, or a ValueError
@@ -750,13 +756,15 @@ Quotient.Mailbox.Controller.methods(
     function archiveThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
         self.callRemote('archiveCurrentMessage').addCallback(
-            function(data) { self.setMessageContent(data) });
+            function(data) { self.setMessageContent(data) }).addCallback(
+            function(ign) { self.twiddleMessageCount(-1) });
     },
 
     function deleteThis(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Deleting...");
         self.callRemote('deleteCurrentMessage').addCallback(
-            function(data) { self.setMessageContent(data) });
+            function(data) { self.setMessageContent(data) }).addCallback(
+            function(ign) { self.twiddleMessageCount(-1) });
     },
 
     function replyToThis(self) {
