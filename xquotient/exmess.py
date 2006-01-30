@@ -162,7 +162,7 @@ class MessageDetail(athena.LiveFragment):
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
-        self.organizer = original.store.findUnique(people.Organizer)
+        #self.organizer = original.store.findUnique(people.Organizer)
 
     def head(self):
         return None
@@ -179,7 +179,7 @@ class MessageDetail(athena.LiveFragment):
         return mtags
 
     def render_headerPanel(self, ctx, data):
-        p = self.organizer.personByEmailAddress(self.original.sender)
+        p = None#self.organizer.personByEmailAddress(self.original.sender)
         if p is None:
             personStan = SenderPersonFragment(self.original)
         else:
