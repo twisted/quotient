@@ -5,10 +5,12 @@
     Loading...
   </div>
   -->
+
   <div id="add-person-fragment" style="display: none; background-color: #FFFFFF">
     <nevow:invisible nevow:render="addPersonFragment" />
   </div>
 
+  <!--
   <div>
     <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
       <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
@@ -23,6 +25,7 @@
       <select class="select-3" size="5" style="width: 160px; position: relative; z-index: 5; opacity: .3" />
     </div>
   </div>
+  -->
 
   <div class="mailbox-container">
     <span id="throbber" style="visibility: hidden; position: absolute; top: 0; left: 0">
@@ -45,7 +48,8 @@
                   onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead()" />
                 <input nevow:pattern="show-read-off" type="checkbox"
                   onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead();" />
-            </span></span>
+              </span></span>
+            <!--
             <table>
               <tr>
                 <td>View by</td>
@@ -61,6 +65,7 @@
                 </td>
               </tr>
             </table>
+            -->
             <div id="mailbox-log" />
           </center>
         </td>
