@@ -531,10 +531,12 @@ Quotient.Mailbox.Controller.methods(
 
     function setMessageContent(self, data) {
         self.messageMetadata = data[0];
-        var extractDict = self.messageMetadata["message"]["extracts"];
-        for(var etypename in extractDict) {
-            extractDict[etypename]["pattern"] = new RegExp().compile(
-                                                        extractDict[etypename]["pattern"], "i");
+        if(self.messageMetadata) {
+            var extractDict = self.messageMetadata["message"]["extracts"];
+            for(var etypename in extractDict) {
+                extractDict[etypename]["pattern"] = new RegExp().compile(
+                                                            extractDict[etypename]["pattern"], "i");
+            }
         }
         self.loadMessageEnd = new Date();
         var md = document.getElementById("message-detail");
@@ -549,7 +551,9 @@ Quotient.Mailbox.Controller.methods(
         }
         self.hideThrobber();
         self.extractStart = new Date();
-        self.highlightExtracts();
+        if(self.messageMetadata) {
+            self.highlightExtracts();
+        }
         self.extractEnd = new Date();
         //self.reportTimes();
         initLightbox();

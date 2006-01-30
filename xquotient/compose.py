@@ -154,7 +154,7 @@ class ComposeFragment(liveform.LiveForm):
 
     iface = allowedMethods = dict(getPeople=True, invoke=True)
 
-    def __init__(self, original):
+    def __init__(self, original, toAddress='', subject='', messageBody=''):
         self.original = original
         super(ComposeFragment, self).__init__(
             callable=self._sendMail,
@@ -167,6 +167,10 @@ class ComposeFragment(liveform.LiveForm):
                         liveform.Parameter(name='messageBody',
                                            type=liveform.TEXTAREA_INPUT,
                                            coercer=unicode)])
+        self.toAddress = toAddress
+        self.subject = subject
+        self.messageBody = messageBody
+
         self.docFactory = None
 
 
@@ -178,8 +182,9 @@ class ComposeFragment(liveform.LiveForm):
 
 
     def render_compose(self, ctx, data):
-        to = ','.join(inevow.IRequest(ctx).args.get('recipient', ()))
-        return dictFillSlots(ctx.tag, dict(to=to, subject='', body=''))
+        return dictFillSlots(ctx.tag, dict(to=self.toAddress,
+                                           subject=self.subject,
+                                           body=self.messageBody))
 
 
     def head(self):

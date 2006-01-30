@@ -16,12 +16,12 @@ from xmantissa.fragmentutils import PatternDictionary
 from xmantissa.publicresource import getLoader
 
 from xquotient.exmess import Message
-from xquotient import mimepart, equotient, extract
+from xquotient import mimepart, equotient, extract, compose
 from xquotient.qpeople import EmailActions
 from xquotient.actions import SenderPersonFragment
 
 def quoteBody(m, maxwidth=78):
-    for part in m.walkMessage(preferred='text/plain'):
+    for part in m.walkMessage(prefer='text/plain'):
         if part.type is None or part.type == 'text/plain':
             break
     else:
@@ -326,13 +326,16 @@ class InboxScreen(athena.LiveFragment):
         return self.nextMessage(augmentIndex=-1)
 
     def replyToCurrentMessage(self):
-        assert False, 'dont do this right now'
-        composeDialog = self.composePatterns['compose-dialog']
-        composeDialog = _fillSlots(composeDialog(),
-                            dict(to=replyTo(self.currentMessage),
-                                 subject=reSubject(self.currentMessage),
-                                 body=quoteBody(self.currentMessage)))
-        return unicode(flatten(composeDialog), 'utf-8')
+        composer = self.original.store.findUnique(compose.Composer)
+        cf = compose.ComposeFragment(composer,
+                                     toAddress=replyTo(self.currentMessage),
+                                     subject=reSubject(self.currentMessage),
+                                     messageBody=quoteBody(self.currentMessage))
+
+        cf.setFragmentParent(self)
+        cf.docFactory = getLoader(cf.fragmentName)
+
+        return (None, unicode(flatten(cf), 'utf-8'))
 
     # other things
     def nextMessage(self, augmentIndex=0, markUnread=True):
