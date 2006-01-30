@@ -82,21 +82,21 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
 
-        avatar.findOrCreate(people.AddPerson).installOn(avatar)
+        #avatar.findOrCreate(people.AddPerson).installOn(avatar)
 
-        organizer = avatar.findOrCreate(people.Organizer)
-        organizer.installOn(avatar)
+        #organizer = avatar.findOrCreate(people.Organizer)
+        #organizer.installOn(avatar)
 
-        avatar.findOrCreate(qpeople.MessageLister).installOn(organizer)
-        avatar.findOrCreate(qpeople.ImageLister).installOn(organizer)
-        avatar.findOrCreate(qpeople.ExtractLister).installOn(organizer)
+        #avatar.findOrCreate(qpeople.MessageLister).installOn(organizer)
+        #avatar.findOrCreate(qpeople.ImageLister).installOn(organizer)
+        #avatar.findOrCreate(qpeople.ExtractLister).installOn(organizer)
 
         avatar.findOrCreate(inbox.Inbox).installOn(avatar)
         avatar.findOrCreate(inbox.Archive).installOn(avatar)
         avatar.findOrCreate(inbox.Trash).installOn(avatar)
 
-        avatar.findOrCreate(gallery.Gallery).installOn(avatar)
-        avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
+        #avatar.findOrCreate(gallery.Gallery).installOn(avatar)
+        #avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
 
         avatar.findOrCreate(compose.Composer).installOn(avatar)
 

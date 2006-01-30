@@ -158,7 +158,7 @@ class Part(item.Item):
 
         if self.parent is None:
             message.attachments = len(list(self.walkAttachments()))
-            extract.extract(message)
+            #extract.extract(message)
             indexer = store.findUnique(SyncIndexer, default=None)
             if indexer is not None:
                 indexer.indexMessage(message)
@@ -380,25 +380,25 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             self.message.senderDisplay = unicode(email.anyDisplayName())
             break
 
-        for (relation, address) in ((u'sender', self.message.sender),
-                                    (u'recipient', self.message.recipient)):
+        #for (relation, address) in ((u'sender', self.message.sender),
+        #                            (u'recipient', self.message.recipient)):
 
-            if address is not None and 0 < len(address):
-                exmess.Correspondent(store=self.store,
-                                     message=self.message,
-                                     relation=relation,
-                                     address=address)
+        #    if address is not None and 0 < len(address):
+        #        exmess.Correspondent(store=self.store,
+        #                             message=self.message,
+        #                             relation=relation,
+        #                             address=address)
 
-        try:
-            copied = self.part.getHeader(u'cc')
-        except equotient.NoSuchHeader:
-            pass
-        else:
-            for address in mimeutil.parseEmailAddresses(copied):
-                exmess.Correspondent(store=self.store,
-                                     message=self.message,
-                                     relation=u'copy',
-                                     address=unicode(address.email))
+        #try:
+        #    copied = self.part.getHeader(u'cc')
+        #except equotient.NoSuchHeader:
+        #    pass
+        #else:
+        #    for address in mimeutil.parseEmailAddresses(copied):
+        #        exmess.Correspondent(store=self.store,
+        #                             message=self.message,
+        #                             relation=u'copy',
+        #                             address=unicode(address.email))
 
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
