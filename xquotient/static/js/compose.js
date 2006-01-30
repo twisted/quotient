@@ -9,12 +9,13 @@ if(tinyMCE) {
 
 // import Quotient
 // import Quotient.Common
+// import Mantissa.LiveForm
 
 if(typeof(Quotient.Compose) == "undefined") {
     Quotient.Compose = {};
 }
 
-Quotient.Compose.Controller = Nevow.Athena.Widget.subclass('Quotient.Compose.Controller');
+Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
     function loaded(self) {
         //self.fitMessageBodyToPage();
@@ -201,4 +202,12 @@ Quotient.Compose.Controller.methods(
             {"type": "file",
              "style": "display: block",
              "onchange": self._makeHandler("setAttachment(this)")}));
+    },
+
+    function submitSuccess(self, result) {
+        alert('GREAT');
+    },
+
+    function submitFailure(self, err) {
+        alert('CRAP');
     });

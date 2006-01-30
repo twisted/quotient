@@ -67,7 +67,7 @@ class DeliveryFactoryMixin(object):
         return MessageDelivery(self.portal)
 
 
-class MailTransferAgent(item.Item, service.Service, DeliveryFactoryMixin, DeliveryAgentMixin):
+class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, DeliveryFactoryMixin, DeliveryAgentMixin):
     typeName = "mantissa_mta"
     schemaVersion = 1
 
@@ -113,11 +113,10 @@ class MailTransferAgent(item.Item, service.Service, DeliveryFactoryMixin, Delive
         self.securePort = None
 
     def installOn(self, other):
-        assert self.installedOn is None, "You cannot install a MailTransferAgent on more than one thing"
+        super(MailTransferAgent, self).installOn(other)
         other.powerUp(self, service.IService)
         other.powerUp(self, iquotient.IMIMEDelivery)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
-        self.installedOn = other
         self.setServiceParent(other)
 
     def privilegedStartService(self):

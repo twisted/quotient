@@ -1,15 +1,107 @@
+
+import datetime, rfc822
+
 from zope.interface import implements
+
 from twisted.python.components import registerAdapter
+from twisted.python import log, failure
+from twisted.mail import smtp, relaymanager
+from twisted.names import client
+from twisted.internet import error
 
-from nevow import athena, tags, inevow
+from nevow import tags, inevow, flat
 
-from axiom.item import Item, InstallableMixin
-from axiom import attributes
+from epsilon import extime
+
+from axiom import iaxiom, attributes, item, scheduler
 
 from xmantissa.fragmentutils import dictFillSlots
-from xmantissa import webnav, ixmantissa, people
+from xmantissa import webnav, ixmantissa, people, liveform
 
-class Composer(Item, InstallableMixin):
+from xquotient import iquotient, mail
+
+class _TransientError(Exception):
+    pass
+
+class _NeedsDelivery(item.Item):
+    composer = attributes.reference()
+    message = attributes.reference()
+    toAddress = attributes.text()
+    tries = attributes.integer(default=0)
+
+    running = attributes.inmemory()
+
+    # Retry for about five days, backing off to trying once every 6 hours gradually.
+    RETRANS_TIMES = ([60] * 5 +          #     5 minutes
+                     [60 * 5] * 5 +      #    25 minutes
+                     [60 * 30] * 3 +     #    90 minutes
+                     [60 * 60 * 2] * 2 + #   240 minutes
+                     [60 * 60 * 6] * 19) # + 114 hours   = 5 days
+
+
+    def activate(self):
+        self.running = False
+
+
+    def run(self):
+        sch = iaxiom.IScheduler(self.store)
+        if self.tries < len(self.RETRANS_TIMES):
+            # Set things up to try again, if this attempt fails
+            nextTry = datetime.timedelta(seconds=self.RETRANS_TIMES[self.tries])
+            sch.schedule(self, extime.Time() + nextTry)
+
+        if not self.running:
+            self.running = True
+            self.tries += 1
+
+            resolver = client.Resolver(resolv='/etc/resolv.conf')
+            mxc = relaymanager.MXCalculator(resolver)
+            d = mxc.getMX(self.toAddress.split('@', 1)[1])
+
+            def gotMX(mx):
+                resolver.protocol.transport.stopListening()
+                return mx
+            d.addCallback(gotMX)
+
+            def sendMail(mx):
+                host = str(mx.name)
+                return smtp.sendmail(
+                    host,
+                    self.composer.fromAddress,
+                    [self.toAddress],
+                    # XXX
+                    self.message.impl.source.open())
+            d.addCallback(sendMail)
+
+            def mailSent(result):
+                # Success!  Don't bother to try again.
+                sch.unscheduleAll(self)
+                self.composer.messageSent(self.toAddress, self.message)
+                self.deleteFromStore()
+            d.addCallback(mailSent)
+
+            def failureSending(err):
+                t = err.trap(smtp.SMTPDeliveryError, error.DNSLookupError)
+                if t is smtp.SMTPDeliveryError:
+                    code = err.value.code
+                    log = err.value.log
+                    if 500 <= code < 600 or self.tries >= len(self.RETRANS_TIMES):
+                        # Fatal
+                        self.composer.messageBounced(log, self.toAddress, self.message)
+                        # Don't bother to try again.
+                        sch.unscheduleAll(self)
+                elif t is error.DNSLookupError:
+                    # Lalala
+                    pass
+                else:
+                    assert False, "Cannot arrive at this branch."
+            d.addErrback(failureSending)
+
+            d.addErrback(log.err)
+
+
+
+class Composer(item.Item, item.InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_composer'
@@ -17,16 +109,42 @@ class Composer(Item, InstallableMixin):
 
     installedOn = attributes.reference()
 
+    fromAddress = 'exarkun@divmod.com'
+
     def installOn(self, other):
         super(Composer, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
+
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.6, children=
                     [webnav.Tab('Compose', self.storeID, 0.1)],
                 authoritative=False)]
 
-class ComposeFragment(athena.LiveFragment):
+
+    def sendMessage(self, toAddresses, msg):
+        for toAddress in toAddresses:
+            _NeedsDelivery(
+                store=self.store,
+                composer=self,
+                message=msg,
+                toAddress=toAddress).run()
+
+
+    def messageBounced(self, log, toAddress, msg):
+        print 'X' * 50
+        print 'OMFG IT BOUNCED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+        print 'X' * 50
+
+
+    def messageSent(self, toAddress, msg):
+        print 'Z' * 50
+        print 'DELIVERY PROBABLY!!!!!!!!!!!!!!!!!!'
+        print 'Z' * 50
+
+
+
+class ComposeFragment(liveform.LiveForm):
     implements(ixmantissa.INavigableFragment)
 
     fragmentName = 'compose'
@@ -34,7 +152,23 @@ class ComposeFragment(athena.LiveFragment):
     jsClass = 'Quotient.Compose.Controller'
     title = ''
 
-    iface = allowedMethods = dict(getPeople=True)
+    iface = allowedMethods = dict(getPeople=True, invoke=True)
+
+    def __init__(self, original):
+        self.original = original
+        super(ComposeFragment, self).__init__(
+            callable=self._sendMail,
+            parameters=[liveform.Parameter(name='toAddress',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=unicode),
+                        liveform.Parameter(name='subject',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=unicode),
+                        liveform.Parameter(name='messageBody',
+                                           type=liveform.TEXTAREA_INPUT,
+                                           coercer=unicode)])
+        self.docFactory = None
+
 
     def getPeople(self):
         peeps = []
@@ -42,9 +176,11 @@ class ComposeFragment(athena.LiveFragment):
             peeps.append((person.name, person.getEmailAddress()))
         return peeps
 
+
     def render_compose(self, ctx, data):
         to = ','.join(inevow.IRequest(ctx).args.get('recipient', ()))
         return dictFillSlots(ctx.tag, dict(to=to, subject='', body=''))
+
 
     def head(self):
         yield tags.script(type='text/javascript',
@@ -52,5 +188,50 @@ class ComposeFragment(athena.LiveFragment):
         yield tags.link(rel='stylesheet', type='text/css',
                         href='/Quotient/static/reader.css')
 
+
+    _mxCalc = None
+    def _sendMail(self, toAddress, subject, messageBody):
+
+        fromAddress = 'exarkun@divmod.com'
+
+
+        from email import Generator as G, Message as M, MIMEMessage as MM, MIMEMultipart as MMP, MIMEText as MT
+        import StringIO as S
+
+        s = S.StringIO()
+        m = MMP.MIMEMultipart(
+            'alternative',
+            None,
+            [MT.MIMEText(messageBody, 'plain'),
+             MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
+
+        m['From'] = fromAddress
+        m['To'] = toAddress
+        m['Subject'] = subject
+        m['Date'] = rfc822.formatdate()
+        m['Message-ID'] = smtp.messageid('divmod.xquotient')
+        G.Generator(s).flatten(m)
+        s.seek(0)
+
+        def createMessageAndQueueIt():
+            mr = iquotient.IMIMEDelivery(self.original.store).createMIMEReceiver()
+            for L in s:
+                mr.lineReceived(L.rstrip('\n'))
+            mr.messageDone()
+            msg = mr.message
+            self.original.sendMessage([toAddress], msg)
+        self.original.store.transact(createMessageAndQueueIt)
+
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
 
+
+class ComposeBenefactor(item.Item, item.InstallableMixin):
+    endowed = attributes.integer(default=0)
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
+        avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
+        avatar.findOrCreate(Composer).installOn(avatar)
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(Composer).deleteFromStore()

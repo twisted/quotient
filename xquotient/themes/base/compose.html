@@ -11,7 +11,8 @@
               <tr valign="top">
                 <td class="header-table-first-col">To</td>
                 <td class="header-table-last-col">
-                  <textarea 
+                  <textarea
+                    name="toAddress"
                     onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
                     oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
                     id="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
@@ -37,14 +38,16 @@
       </tr>
       <tr>
         <td>
-          <textarea id="message-body" cols="80" rows="10">
+          <textarea name="messageBody" id="message-body" cols="80" rows="10">
             Type message here
           </textarea>
         </td>
       </tr>
       <tr>
         <td align="right">
-          <input type="submit" value="Send" />
+          <button onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
+            Send
+          </button>
         </td>
       </tr>
     </table>

@@ -98,8 +98,6 @@ class QuotientBenefactor(Item):
         #avatar.findOrCreate(gallery.Gallery).installOn(avatar)
         #avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
 
-        avatar.findOrCreate(compose.Composer).installOn(avatar)
-
         avatar.findOrCreate(exmess.MessagePartView).installOn(avatar)
 
         avatar.findOrCreate(SyncIndexer)
