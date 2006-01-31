@@ -151,6 +151,14 @@ oTZw+Ovl1BvLcE+pK9VFxxY=
         self._messageTest(self.multipartMessage, self.assertMultipartMessageStructure)
 
 
+    typelessMessage = msg("""\
+To: you
+From: nobody
+
+haha
+""")
+
+
 class ParsingTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         deliveryDir = self.mktemp()
@@ -161,6 +169,7 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
         mr = mimepart.MIMEMessageReceiver(f)
         msg = mr.feedStringNow(source)
         assertMethod(msg)
+
 
 
 class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
@@ -183,3 +192,8 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
         partIDs = list(part.store.query(
                             mimestorage.Part, sort=mimestorage.Part.partID).getColumn('partID'))
         self.assertEquals(partIDs, range(len(partIDs)))
+
+    def testContentTypeNotNone(self):
+        self._messageTest(self.typelessMessage,
+                          lambda msg: self.assertEquals(msg.getContentType(),
+                                                        'text/plain'))

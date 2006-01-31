@@ -167,7 +167,7 @@ class Part(item.Item):
 
     # implementation of IMessageIterator
 
-    def getContentType(self, default=None):
+    def getContentType(self, default='text/plain'):
         try:
             value = self.getHeader(u'content-type')
         except equotient.NoSuchHeader:
@@ -247,7 +247,7 @@ class Part(item.Item):
         Return an iterator of Paragraph, Extract, and Embedded instances for
         this part of the message.
         """
-        ctype = self.getContentType(default='text/plain')
+        ctype = self.getContentType()
         if ctype.startswith('multipart'):
             args = (prefer,)
         else:
@@ -273,9 +273,9 @@ class Part(item.Item):
                 disposition = ''
 
             ctyp = part.getContentType()
-            if ctyp is not None and (not (ctyp.startswith('text')
-                or ctyp.startswith('multipart'))
-                    or disposition.startswith('attachment')):
+            if (not (ctyp.startswith('text')
+                     or ctyp.startswith('multipart'))
+                or disposition.startswith('attachment')):
 
                 fname = part.getParam('filename', header=u'content-disposition')
                 yield mimepart.AttachmentPart(self.message.storeID,
