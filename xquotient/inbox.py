@@ -51,11 +51,7 @@ def quoteBody(m, maxwidth=78):
     return '\n\n\n' + replyhead + (u'\n> '.join(newtext))
 
 def reSubject(m, pfx='Re: '):
-    try:
-        newsubject = m.impl.getHeader(u'subject')
-    except equotient.NoSuchHeader:
-        newsubject = ''
-
+    newsubject = m.subject
     if not newsubject.lower().startswith(pfx.lower()):
         newsubject = pfx + newsubject
     return newsubject
