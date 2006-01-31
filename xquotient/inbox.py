@@ -262,6 +262,7 @@ class InboxScreen(athena.LiveFragment):
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
 
+                nextUnread=True,
                 forwardCurrentMessage=True,
                 fetchFilteredCounts=True,
                 markCurrentMessageRead=True,
@@ -374,6 +375,29 @@ class InboxScreen(athena.LiveFragment):
             return self.getMessageContent(newOffset, markUnread=markUnread)
         else:
             raise ValueError('no next message')
+
+    def nextUnread(self):
+        next = self._findNextUnread()
+        assert next is not None
+
+        switchedPages = 0
+        itemOffset = None
+        while itemOffset is None:
+            for (i, d) in enumerate(self.inboxTDB.original.currentPage()):
+                if d['__item__'].storeID == next.storeID:
+                    itemOffset = i
+                    break
+            else:
+                assert self.inboxTDB.original.hasNextPage()
+                switchedPages += 1
+                self.inboxTDB.original.nextPage()
+
+        if 0 < switchedPages:
+            tdbhtml = self.inboxTDB.replaceTable()
+        else:
+            tdbhtml = None
+
+        return (tdbhtml, self.getMessageContent(itemOffset), itemOffset)
 
     def newMessage(self):
         pass
@@ -497,7 +521,8 @@ class InboxScreen(athena.LiveFragment):
 
         data  = {u'sender': {u'is-person': isPerson},
                  u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
-                              u'read': self.currentMessage.read}}
+                              u'read': self.currentMessage.read},
+                 u'next-unread': self._haveNextUnreadMessage()}
 
         #for (ename, etype) in extract.extractTypes.iteritems():
         #    edata[unicode(ename)] = {u'pattern': etype.regex.pattern}
@@ -591,8 +616,9 @@ class InboxScreen(athena.LiveFragment):
         return self._haveNextMessage() and self._findNextUnread() is not None
 
     def _findNextUnread(self, prev=False):
-        switch = prev ^ self.original.isAscending
-        sortColumn = self.original.currentSortColumn
+        # this is expensive, should probably cache the result
+        switch = prev ^ self.inboxTDB.original.isAscending
+        sortColumn = self.inboxTDB.original.currentSortColumn
         sortableColumn = sortColumn.sortAttribute()
 
         if switch:
@@ -606,7 +632,7 @@ class InboxScreen(athena.LiveFragment):
         offsetComparison = op(currentPivot, sortColumn.sortAttribute())
 
         comparison = attributes.AND(offsetComparison,
-                                    self.original.baseComparison,
+                                    self.inboxTDB.original.baseComparison,
                                     Message.read == False)
 
         q = self.original.store.query(Message, comparison,

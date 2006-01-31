@@ -278,6 +278,7 @@ Quotient.Mailbox.Controller.methods(
 
     function replaceTDB(self, data) {
         self.inboxTDB._setTableContent(data[0]);
+        self.inboxTDB._setPageState.apply(self.inboxTDB, data[1]);
     },
 
     function replaceSender(self, data) {
@@ -395,6 +396,24 @@ Quotient.Mailbox.Controller.methods(
         self.callRemote("newMessage").addCallback(
             function(data) { self.setMessageContent(data) }).addCallback(
                 function(ign) { self.fitMessageBodyToPage() });
+    },
+
+    function nextUnread(self) {
+        if(self.messageMetadata["next-unread"]) {
+            /* this thing returns [tdbhtml or null, msghtml, msgoffset] */
+            self.callRemote("nextUnread").addCallback(
+                function(data) {
+                    if(data[0]) {
+                        self.replaceTDB(data[0]);
+                        self.prepareForMessage(data[2]);
+                    } else {
+                        self.prepareForMessage(data[2]);
+                    }
+                    self.setMessageContent(data[1]);
+                });
+        } else {
+            alert("sorry, but there is not a next unread message.");
+        }
     },
 
     function fitMessageBodyToPage(self) {
