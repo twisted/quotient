@@ -254,11 +254,9 @@ class Part(item.Item):
             args = ()
 
         methodName = 'iterate_'+ctype.replace('/', '_')
-        method = getattr(self, methodName, None)
-        if method is None:
-            assert False, 'no method for content type: %r' % (ctype,)
-        else:
-            return method(*args)
+        method = getattr(self, methodName, self.iterateUnhandled)
+        return method(*args)
+
 
     def getAttachment(self, partID):
         for part in self.walkAttachments():
@@ -283,6 +281,16 @@ class Part(item.Item):
                                               disposition=disposition,
                                               filename=fname,
                                               part=part)
+    def iterateUnhandled(self, prefer=None):
+        yield mimepart.Part(
+            self.message.storeID, self.partID,
+            'text/plain',
+            children=[
+                mimepart.FixedParagraph.fromString(
+                    "ERROR: UNRENDERABLE TYPE - %r" %
+                    self.getContentType())],
+            part=self)
+
     def iterate_text_plain(self):
         content = self.getUnicodeBody()
 
