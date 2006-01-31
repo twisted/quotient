@@ -332,9 +332,11 @@ class Part(item.Item):
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, fObj):
+        partCounter = itertools.count().next
         super(MIMEMessageStorer, self).__init__(
             fObj,
-            lambda *a, **kw: Part(_partCounter=itertools.count().next,
+            lambda *a, **kw: Part(_partCounter=partCounter,
+                                  partID=partCounter(),
                                   *a,
                                   **kw))
         self.store = store

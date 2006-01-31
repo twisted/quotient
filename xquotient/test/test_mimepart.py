@@ -7,7 +7,7 @@ from twisted.python import filepath
 
 from axiom import store
 
-from xquotient import mail, mimepart
+from xquotient import mail, mimepart, mimestorage
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
@@ -164,11 +164,22 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
 
 
 class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
-    def _messageTest(self, source, assertMethod):
+    def setUpMailStuff(self):
         dbdir = self.mktemp()
         s = store.Store(dbdir)
         mp = mail.MailTransferAgent(store=s)
         mp.installOn(s)
-        mr = mp.createMIMEReceiver()
+        return mp.createMIMEReceiver()
+
+    def _messageTest(self, source, assertMethod):
+        mr = self.setUpMailStuff()
         msg = mr.feedStringNow(source)
         assertMethod(msg)
+
+    def testPartIDs(self):
+        mr = self.setUpMailStuff()
+        part = mr.feedStringNow(self.multipartMessage)
+        self.assertEquals(part.partID, 0)
+        partIDs = list(part.store.query(
+                            mimestorage.Part, sort=mimestorage.Part.partID).getColumn('partID'))
+        self.assertEquals(partIDs, range(len(partIDs)))
