@@ -8,7 +8,8 @@
     <nevow:slot name="content" />
   </nevow:invisible>
 
-  <iframe id="content-iframe" nevow:pattern="content-iframe" frameborder="0" width="100%" onload="resizeIFrame(this)">
+  <iframe id="content-iframe" nevow:pattern="content-iframe" frameborder="0" style="width: 100%"
+    onload="Quotient.Common.Util.resizeIFrame(this)">
     <nevow:attr name="src"><nevow:slot name="location" /></nevow:attr>
   </iframe>
 

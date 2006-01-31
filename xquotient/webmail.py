@@ -105,7 +105,9 @@ class HTMLPartRenderer(object):
                             original.part.store).linkTo(original.messageID)
 
     def rend(self, ctx, data):
+        translator = ixmantissa.IWebTranslator(self.original.part.store)
+        webid = translator.linkTo(self.original.part.storeID)
+
         return self.iframePattern.fillSlots('location', # argh
-                '/private/message-parts/%d/%d' % (self.original.messageID,
-                                                  self.original.identifier))
+                '/private/message-parts' + webid[len('/private'):])
 
