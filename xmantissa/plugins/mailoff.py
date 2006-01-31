@@ -5,7 +5,7 @@ from axiom import iaxiom, scheduler, userbase
 from xmantissa import website, offering, provisioning
 
 from xquotient.quotientapp import QuotientBenefactor
-from xquotient import mail, grabber, compose, publicpage
+from xquotient import mail, grabber, compose, popout, publicpage
 
 quotientBenefactorFactory = provisioning.BenefactorFactory(
     name = u'quotient',
@@ -22,6 +22,11 @@ composeBenefactorFactory = provisioning.BenefactorFactory(
     description = u'Allows message transmission',
     benefactorClass = compose.ComposeBenefactor)
 
+popAccessBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'POP Server',
+    description = u'Access to mail via POP3',
+    benefactorClass = popout.POP3Benefactor)
+
 plugin = offering.Offering(
     name = u'Quotient',
 
@@ -33,10 +38,12 @@ plugin = offering.Offering(
         (iaxiom.IScheduler, scheduler.Scheduler),
         (userbase.IRealm, userbase.LoginSystem),
         (None, website.WebSite),
+        (None, popout.POP3Listener),
         (None, mail.MailTransferAgent)),
 
     appPowerups = (publicpage.QuotientPublicPage,),
 
     benefactorFactories = [quotientBenefactorFactory,
                            grabberBenefactorFactory,
-                           composeBenefactorFactory])
+                           composeBenefactorFactory,
+                           popAccessBenefactorFactory])
