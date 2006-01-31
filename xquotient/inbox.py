@@ -35,20 +35,7 @@ def quoteBody(m, maxwidth=78):
         para = mimepart.FixedParagraph.fromString(payload)
     newtext = para.asRFC2646(maxwidth-2).split('\r\n')
 
-    if m.sender is not None:
-        origfrom = m.sender
-    else:
-        origfrom = "someone who chose not to be identified"
-
-    if m.sent is not None:
-        origdate = m.sent.asHumanly()
-    else:
-        origdate = "an indeterminate time in the past"
-
-    replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
-
-    newtext = [ '\n>'.join(newtext) ]
-    return '\n\n\n' + replyhead + (u'\n> '.join(newtext))
+    return [ '\n>'.join(newtext) ]
 
 def reSubject(m, pfx='Re: '):
     newsubject = m.subject
@@ -275,6 +262,7 @@ class InboxScreen(athena.LiveFragment):
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
 
+                forwardCurrentMessage=True,
                 fetchFilteredCounts=True,
                 markCurrentMessageRead=True,
                 attachPhoneToSender=True,
@@ -321,17 +309,54 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessage.archived = True
         return self.nextMessage(augmentIndex=-1)
 
-    def replyToCurrentMessage(self):
+    def _composeSomething(self, toAddress, subject, messageBody):
         composer = self.original.store.findUnique(compose.Composer)
         cf = compose.ComposeFragment(composer,
-                                     toAddress=replyTo(self.currentMessage),
-                                     subject=reSubject(self.currentMessage),
-                                     messageBody=quoteBody(self.currentMessage))
-
+                                     toAddress=toAddress,
+                                     subject=subject,
+                                     messageBody=messageBody)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
 
-        return (None, unicode(flatten(cf), 'utf-8'))
+        return unicode(flatten(cf), 'utf-8')
+
+    def replyToCurrentMessage(self):
+        curmsg = self.currentMessage
+
+        if curmsg.sender is not None:
+            origfrom = curmsg.sender
+        else:
+            origfrom = "someone who chose not to be identified"
+
+        if curmsg.sent is not None:
+            origdate = curmsg.sent.asHumanly()
+        else:
+            origdate = "an indeterminate time in the past"
+
+        replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
+
+        composeFrag = self._composeSomething(replyTo(curmsg),
+                                             reSubject(curmsg),
+                                             '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
+        return (None, composeFrag)
+
+    def forwardCurrentMessage(self):
+        curmsg = self.currentMessage
+
+        reply = ['\nBegin forwarded message:\n']
+        for hdr in u'From Date To Subject Reply-to'.split():
+            try:
+                val = curmsg.impl.getHeader(hdr)
+            except equotient.NoSuchHeader:
+                continue
+            reply.append('%s: %s' % (hdr, val))
+        reply.append('')
+        reply.extend(quoteBody(curmsg))
+
+        composeFrag = self._composeSomething(replyTo(curmsg),
+                                             reSubject(curmsg, 'Fwd: '),
+                                             '\n\n' + '\n> '.join(reply))
+        return (None, composeFrag)
 
     # other things
     def nextMessage(self, augmentIndex=0, markUnread=True):

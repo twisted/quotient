@@ -791,4 +791,13 @@ Quotient.Mailbox.Controller.methods(
             function(data) { self.setMessageContent(data) }).addCallback(
                 function(ign) { self.fitMessageBodyToPage() }).addErrback(
                     function(err) { self.mailboxFeedback(err) });
+    },
+    
+    function forwardThis(self) {
+        if(self.selectedRow)
+            self.setChildBGColors(self.selectedRow, "");
+        self.callRemote("forwardCurrentMessage").addCallback(
+            function(data) { self.setMessageContent(data) }).addCallback(
+                function(ign) { self.fitMessageBodyToPage() }).addErrback(
+                    function(err) { self.mailboxFeedback(err) });
     });
