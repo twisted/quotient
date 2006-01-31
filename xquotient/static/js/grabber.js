@@ -1,5 +1,7 @@
 // import Quotient
 // import Nevow.Athena
+// import Mantissa.LiveForm
+// import Mantissa.TDB
 
 Quotient.Grabber = {};
 
@@ -18,4 +20,19 @@ Quotient.Grabber.StatusWidget.method(
             self.node.removeChild(self.node.firstChild);
         }
         self.node.appendChild(document.createTextNode(newStatus));
+    });
+
+Quotient.Grabber.AddGrabberFormWidget = Mantissa.LiveForm.FormWidget.subclass(
+                                                    'Quotient.Grabber.AddGrabberFormWidget');
+
+Quotient.Grabber.AddGrabberFormWidget.method(
+    function submitSuccess(self, result) {
+        var tdbNode = Nevow.Athena.NodeByAttribute(self.widgetParent.node,
+                                                   'athena:class',
+                                                   'Mantissa.TDB.Controller');
+
+        var tdbController = Mantissa.TDB.Controller.get(tdbNode);
+
+        tdbController._setTableContent(result[0]);
+        tdbController._setPageState.apply(tdbController, result[1]);
     });

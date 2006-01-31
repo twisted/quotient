@@ -339,7 +339,7 @@ class GrabberConfigFragment(athena.LiveFragment):
 
     def render_addGrabberForm(self, ctx, data):
         f = liveform.LiveForm(
-            self.original.addGrabber,
+            self.addGrabber,
             [liveform.Parameter('username',
                                 liveform.TEXT_INPUT,
                                 unicode,
@@ -362,14 +362,18 @@ class GrabberConfigFragment(athena.LiveFragment):
                                 int,
                                 u'The port number on which the remote server runs.',
                                 '110')])
+        f.jsClass = u'Quotient.Grabber.AddGrabberFormWidget'
         f.setFragmentParent(self)
         return ctx.tag[f]
 
+    def addGrabber(self, **kwargs):
+        self.original.addGrabber(**kwargs)
+        return self.configuredGrabbersView.replaceTable()
 
     def render_POP3Grabbers(self, ctx, data):
-        f = ConfiguredGrabbersView(self.original.store)
-        f.setFragmentParent(self)
-        return f
+        self.configuredGrabbersView = ConfiguredGrabbersView(self.original.store)
+        self.configuredGrabbersView.setFragmentParent(self)
+        return self.configuredGrabbersView
 
 components.registerAdapter(GrabberConfigFragment, GrabberConfiguration, ixmantissa.INavigableFragment)
 
