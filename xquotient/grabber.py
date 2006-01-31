@@ -1,17 +1,19 @@
 # -*- test-case-name: xquotient.test.test_grabber -*-
 
+import time, datetime
+
 from zope.interface import implements
 
-from twisted.mail import pop3
+from twisted.mail import pop3, pop3client
 from twisted.internet import protocol, defer
 from twisted.python import log, components, failure
 from twisted.protocols import policies
 
 from nevow import loaders, tags, athena
 
-from epsilon import descriptor
+from epsilon import descriptor, extime
 
-from axiom import item, attributes
+from axiom import item, attributes, scheduler
 
 from xmantissa import ixmantissa, webnav, webapp, webtheme, liveform, tdb, tdbview
 
@@ -26,8 +28,17 @@ class Status(item.Item):
     Represents the latest status of a particular grabber.
     """
 
+    when = attributes.timestamp(doc="""
+    Time at which this status was set.
+    """)
+
     message = attributes.text(doc="""
     A short string describing the current state of the grabber.
+    """)
+
+    success = attributes.boolean(doc="""
+    Flag indicating whether this status indicates a successful action
+    or not.
     """)
 
     changeObservers = attributes.inmemory(doc="""
@@ -50,8 +61,10 @@ class Status(item.Item):
         return lambda: self.changeObservers.remove(observer)
 
 
-    def setStatus(self, message):
+    def setStatus(self, message, success=True):
+        self.when = extime.Time()
         self.message = message
+        self.success = success
         for L in self.changeObservers:
             try:
                 L(message)
@@ -71,7 +84,7 @@ class GrabberBenefactor(item.Item):
     """, default=0)
 
     def endow(self, ticket, avatar):
-        for cls in webapp.PrivateApplication, GrabberConfiguration:
+        for cls in scheduler.SubScheduler, webapp.PrivateApplication, GrabberConfiguration:
             avatar.findOrCreate(cls).installOn(avatar)
 
 
@@ -106,7 +119,8 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
 
 
     def addGrabber(self, username, password, domain, port):
-        POP3Grabber(
+        # DO IT
+        pg = POP3Grabber(
             store=self.store,
             username=username,
             password=password,
@@ -114,6 +128,9 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
             port=port,
             config=self,
             ssl=False)
+        # DO IT *NOW*
+        scheduler.IScheduler(self.store).schedule(pg, extime.Time())
+        # OR MAYBE A LITTLE LATER
 
 
 class POP3UID(item.Item):
@@ -182,6 +199,10 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
     any given time.
     """)
 
+    scheduled = attributes.timestamp(doc="""
+    When this grabber is next scheduled to run.
+    """)
+
     debug = attributes.boolean(doc="""
     Flag indicating whether to log traffic from this grabber or not.
     """, default=False)
@@ -198,12 +219,10 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
             self.status = Status(store=self.store, message=u'idle')
 
 
-    def run(self):
-        """
-        Retrieve some messages from the account associated with this
-        grabber.
-        """
-        assert not self.running, "Tried to grab concurrently with %r" % (self,)
+    def grab(self):
+        # Don't run concurrently, ever.
+        if self.running:
+            return
         self.running = True
 
         from twisted.internet import reactor
@@ -228,6 +247,23 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
         connect(self.domain, port, factory)
 
 
+    def run(self):
+        """
+        Retrieve some messages from the account associated with this
+        grabber.
+        """
+        try:
+            try:
+                self.grab()
+            except:
+                log.err()
+        finally:
+            # XXX This is not a good way for things to work.  Different, later.
+            delay = datetime.timedelta(seconds=300)
+            self.scheduled = extime.Time() + delay
+            return self.scheduled
+
+
     def shouldRetrieve(self, uid):
         return self.store.findUnique(
             POP3UID,
@@ -246,6 +282,15 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
 
 
 class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
+    _rate = 50
+    _delay = 2.0
+
+
+    def setCredentials(self, username, password):
+        self._username = username
+        self._password = password
+
+
     def _consumerFactory(self, msg):
         def consume(line):
             msg.lineReceived(line)
@@ -254,74 +299,168 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
     def serverGreeting(self, status):
         def ebGrab(err):
-            self.factory.grabber.status.setStatus(u"Error: %s" % (err.getErrorMessage(),))
+            log.err(err)
+            self.setStatus(u'Internal error: ' + unicode(err.getErrorMessage()))
             self.transport.loseConnection()
         return self._grab().addErrback(ebGrab)
 
+    def _relax(self):
+        # Leave off for a while.  This is ghetto.
+        d = defer.Deferred()
+        from twisted.internet import reactor
+        reactor.callLater(self._delay, d.callback, None)
+        return defer.waitForDeferred(d)
 
     def _grab(self):
-        g = self.factory.grabber
-        transact = g.store.transact
-
-        d = defer.waitForDeferred(self.login(g.username.encode('ascii'), g.password.encode('ascii')))
-        g.status.setStatus(u"Logging in...")
+        d = defer.waitForDeferred(self.login(self._username, self._password))
+        self.setStatus(u"Logging in...")
         yield d
-        loginResult = d.getResult()
+        try:
+            loginResult = d.getResult()
+        except:
+            f = failure.Failure()
+            if not f.check(pop3client.ServerErrorResponse):
+                log.err(f)
+            self.setStatus(u'Login failed: ' + unicode(f.getErrorMessage(), 'ascii'), False)
+            self.transport.loseConnection()
+            yield None                  # defgen error handling work-around.
+            return
 
         d = defer.waitForDeferred(self.listUID())
-        g.status.setStatus(u"Retrieving message list...")
+        self.setStatus(u"Retrieving message list...")
         yield d
-        uidList = d.getResult()
+        try:
+            uidList = d.getResult()
+        except:
+            f = failure.Failure()
+            log.err(f)
+            self.setStatus(unicode(f.getErrorMessage()), False)
+            self.transport.loseConnection()
+            return
 
         # XXX This is a bad loop.
         for idx, uid in enumerate(uidList):
-            if g.shouldRetrieve(uid):
-                rece = g.createMIMEReceiver()
+            if self.paused():
+                break
+
+            if self.shouldRetrieve(uid):
+                rece = self.createMIMEReceiver()
                 d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
-                g.status.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
+                self.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
                 yield d
                 try:
                     d.getResult()
-                    transact(rece.eomReceived)
                 except:
                     f = failure.Failure()
-                    log.msg("Error retrieving POP message")
-                    log.err(f)
-                    transact(g.markFailure, uid, f)
                     rece.connectionLost(f)
+                    self.markFailure(uid, f)
+                    if f.check(pop3client.LineTooLong):
+                        # reschedule, the connection has dropped
+                        self.transientFailure(f)
+                        break
+                    else:
+                        log.err(f)
                 else:
-                    transact(g.markSuccess, uid, rece.part)
+                    try:
+                        rece.eomReceived()
+                    except:
+                        # message could not be delivered.
+                        f = failure.Failure()
+                        log.err(f)
+                        self.markFailure(uid, f)
+                    else:
+                        self.markSuccess(uid, rece.part)
 
-        g.status.setStatus(u"Logging out...")
+            if (idx + 1) % self._rate == 0:
+                wfdlater = self._relax()
+                yield wfdlater
+                rslt = wfdlater.getResult()
+
+        self.setStatus(u"Logging out...")
         d = defer.waitForDeferred(self.quit())
         yield d
-        d.getResult()
-        g.status.setStatus(u"idle")
+        try:
+            d.getResult()
+        except:
+            f = failure.Failure()
+            log.err(f)
+            self.setStatus(unicode(f.getErrorMessage()), False)
+        else:
+            self.setStatus(u"idle")
         self.transport.loseConnection()
     _grab = defer.deferredGenerator(_grab)
 
 
     def connectionLost(self, reason):
-        # XXX change status here
-        self.factory.grabber.running = False
+        # XXX change status here - maybe?
+        self.stoppedRunning()
+
+
+
+class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
+    def _transact(self, *a, **kw):
+        return self.grabber.store.transact(*a, **kw)
+
+
+    def setStatus(self, msg, success=True):
+        self._transact(self.grabber.status.setStatus, msg, success)
+
+
+    def shouldRetrieve(self, uid):
+        return self._transact(self.grabber.shouldRetrieve, uid)
+
+
+    def createMIMEReceiver(self):
+        return self._transact(self.grabber.createMIMEReceiver)
+
+
+    def markSuccess(self, uid, part):
+        return self._transact(self.grabber.markSuccess, uid, part)
+
+
+    def markFailure(self, uid, reason):
+        return self._transact(self.grabber.markFailure, uid, reason)
+
+
+    def paused(self):
+        return self.grabber.paused
+
+
+    _transient = False
+    def transientFailure(self, f):
+        self._transient = True
+
+
+    def stoppedRunning(self):
+        self.grabber.running = False
+        if self._transient:
+            scheduler.IScheduler(self.grabber.store).reschedule(
+                self.grabber,
+                self.grabber.scheduled,
+                extime.Time())
 
 
 
 class POP3GrabberFactory(protocol.ClientFactory):
-    protocol = POP3GrabberProtocol
+    protocol = ControlledPOP3GrabberProtocol
 
     def __init__(self, grabber):
         self.grabber = grabber
 
 
     def clientConnectionFailed(self, connector, reason):
-        self.grabber.status.setStatus(u"Connection failed: " + (reason.getErrorMessage(),))
+        self.grabber.status.setStatus(u"Connection failed: " + reason.getErrorMessage())
         self.grabber.running = False
 
 
     def buildProtocol(self, addr):
         self.grabber.status.setStatus(u"Connection established...")
-        return protocol.ClientFactory.buildProtocol(self, addr)
+        p = protocol.ClientFactory.buildProtocol(self, addr)
+        p.setCredentials(
+            self.grabber.username.encode('ascii'),
+            self.grabber.password.encode('ascii'))
+        p.grabber = self.grabber
+        return p
 
 
 
@@ -446,20 +585,37 @@ class RunningColumnView(object):
 
 
 
-class GrabAction(tdbview.Action):
-    def __init__(self, actionID='grab',
-                 iconURL='/Quotient/static/images/action-grab.png',
-                 description='Retrieve Messages Now',
+class PauseAction(tdbview.Action):
+    def __init__(self, actionID='pause',
+                 iconURL='/Quotient/static/images/action-pause.png',
+                 description='Pause',
                  disabledIconURL=None):
-        super(GrabAction, self).__init__(actionID, iconURL, description, disabledIconURL)
+        super(PauseAction, self).__init__(actionID, iconURL, description, disabledIconURL)
 
 
     def performOn(self, item):
-        item.run()
+        item.paused = True
 
 
     def actionable(self, item):
-        return not item.running
+        return not item.paused
+
+
+
+class ResumeAction(tdbview.Action):
+    def __init__(self, actionID='resume',
+                 iconURL='/Quotient/static/images/action-resume.png',
+                 description='Resume',
+                 disabledIconURL=None):
+        super(ResumeAction, self).__init__(actionID, iconURL, description, disabledIconURL)
+
+
+    def performOn(self, item):
+        item.paused = False
+
+
+    def actionable(self, item):
+        return item.paused
 
 
 
@@ -479,7 +635,8 @@ class ConfiguredGrabbersView(tdbview.TabularDataView):
             StatusColumnView(self),
             RunningColumnView()]
         actions = [
-            GrabAction()]
+            PauseAction(),
+            ResumeAction()]
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
         super(ConfiguredGrabbersView, self).__init__(tdm, tdv, actions)
