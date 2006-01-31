@@ -366,8 +366,6 @@ Quotient.Mailbox.Controller.methods(
         if(self.selectedRow) {
             /* and it hadn't been read before */
             if(self.messageMetadata && !self.messageMetadata["message"]["read"]) {
-                /* mark it read */
-                self.callRemote('markCurrentMessageRead');
                 /* and make it look like it has been read */
                 try {
                     var node = Nevow.Athena.NodeByAttribute(self.selectedRow, 'class', 'unread-message');

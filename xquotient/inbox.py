@@ -548,8 +548,10 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessageOffset = idx
         self.currentMessageDetail = ixmantissa.INavigableFragment(message)
         self.currentMessageDetail.page = self.page
-        return (self._getMessageMetadata(),
-                unicode(flatten(self.currentMessageDetail), 'utf-8'))
+        messageMetadata = self._getMessageMetadata()
+        self.currentMessage.read = True
+
+        return (messageMetadata, unicode(flatten(self.currentMessageDetail), 'utf-8'))
 
     def _getBaseComparison(self):
         # the only mutually exclusive views are "show read" and archive/trash,
