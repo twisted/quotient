@@ -262,6 +262,8 @@ class InboxScreen(athena.LiveFragment):
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
 
+                nextPageAndMessage=True,
+                prevPageAndMessage=True,
                 nextUnread=True,
                 forwardCurrentMessage=True,
                 fetchFilteredCounts=True,
@@ -358,6 +360,15 @@ class InboxScreen(athena.LiveFragment):
                                              reSubject(curmsg, 'Fwd: '),
                                              '\n\n' + '\n> '.join(reply))
         return (None, composeFrag)
+
+    def nextPageAndMessage(self):
+        self.inboxTDB.original.nextPage()
+        return (self.inboxTDB.replaceTable(), self.getMessageContent(0))
+
+    def prevPageAndMessage(self):
+        self.inboxTDB.original.prevPage()
+        return (self.inboxTDB.replaceTable(),
+                len(self.inboxTDB.original.currentPage()) - 1)
 
     # other things
     def nextMessage(self, augmentIndex=0, markUnread=True):
@@ -522,7 +533,9 @@ class InboxScreen(athena.LiveFragment):
         data  = {u'sender': {u'is-person': isPerson},
                  u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
                               u'read': self.currentMessage.read},
-                 u'next-unread': self._haveNextUnreadMessage()}
+                 u'next-unread': self._haveNextUnreadMessage(),
+                 u'has-next-page': self.inboxTDB.original.hasNextPage(),
+                 u'has-prev-page': self.inboxTDB.original.hasPrevPage()}
 
         #for (ename, etype) in extract.extractTypes.iteritems():
         #    edata[unicode(ename)] = {u'pattern': etype.regex.pattern}

@@ -232,6 +232,44 @@ Quotient.Mailbox.Controller.methods(
                 MochiKit.DOM.createDOM("OPTION", {"value":self.allTags[i]}, self.allTags[i]));
     },
 
+    function nextOrPrevMessage(self, next) {
+        var offset = self.selectedRowOffset + (next ? 1 : -1);
+
+        var row = null;
+        
+        try {
+            row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
+        } catch(e) {}
+
+        /* if there is a next/prev message on this page */
+        if(row) {
+            /* select it, and get the message content */
+            self.prepareForMessage(offset);
+            self.callRemote("getMessageContent", offset).addCallback(
+                function(data) { self.setMessageContent(data) });
+        } else if(self.messageMetadata["has-" + (next ? "next" : "prev") + "-page"]) {
+            self.callRemote((next ? "next" : "prev") + "PageAndMessage").addCallback(
+                /* squish the round-trips by getting the tdb page and
+                   the next/prev message at the same time */
+                function(data) {
+                    self.replaceTDB(data[0]);
+                    self.prepareForMessage(0);
+                    self.setMessageContent(data[1]);
+                });
+        } else {
+            /* do something stupid */
+            alert("sorry, there is not a next/prev message");
+        }
+    },
+
+    function nextMessage(self) {
+        self.nextOrPrevMessage(true);
+    },
+
+    function prevMessage(self) {
+        self.nextOrPrevMessage(false);
+    },
+
     function viewChanged(self) {
         var vselect = document.getElementById("more-views-select");
         for(var i = 0; i < vselect.childNodes.length; i++) {
