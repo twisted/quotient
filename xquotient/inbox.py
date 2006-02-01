@@ -170,6 +170,31 @@ def archiveScreen(archiveItem):
 
 registerAdapter(archiveScreen, Archive, ixmantissa.INavigableFragment)
 
+class SentMail(Item, InstallableMixin):
+    implements(ixmantissa.INavigableElement)
+
+    typeName = 'quotient_sent_mail'
+    schemaVersion = 1
+
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(SentMail, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
+
+    def getTabs(self):
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('Sent Mail', self.storeID, 0.0)],
+                authoritative=False)]
+
+def sentMailScreen(sentMailItem):
+    inbox = sentMailItem.store.findUnique(Inbox)
+    inboxScreen = ixmantissa.INavigableFragment(inbox)
+    inboxScreen.inSentMailView = True
+    return inboxScreen
+
+registerAdapter(sentMailScreen, SentMail, ixmantissa.INavigableFragment)
+
 class Trash(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
@@ -247,6 +272,7 @@ class InboxScreen(athena.LiveFragment):
 
     inArchiveView = False
     inTrashView = False
+    inSentMailView = False
     viewingByTag = None
     viewingByPerson = None
     currentMessage = None
@@ -570,7 +596,8 @@ class InboxScreen(athena.LiveFragment):
         # the only mutually exclusive views are "show read" and archive/trash,
         # so you could look at all messages in trash, tagged with "boring"
         # sent by the Person with name "Joe" or whatever
-        comparison = Message.deleted == self.inTrashView
+        comparison = attributes.AND(Message.deleted == self.inTrashView,
+                                    Message.outgoing == self.inSentMailView)
         if not self.inArchiveView:
             comparison = attributes.AND(comparison, Message.archived == False)
 

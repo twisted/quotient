@@ -94,6 +94,7 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(inbox.Inbox).installOn(avatar)
         avatar.findOrCreate(inbox.Archive).installOn(avatar)
         avatar.findOrCreate(inbox.Trash).installOn(avatar)
+        avatar.findOrCreate(inbox.SentMail).installOn(avatar)
 
         #avatar.findOrCreate(gallery.Gallery).installOn(avatar)
         #avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
