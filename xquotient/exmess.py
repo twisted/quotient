@@ -204,15 +204,12 @@ class MessageDetail(athena.LiveFragment):
     def render_attachmentPanel(self, ctx, data):
         patterns = list()
         for attachment in self.attachmentParts:
-            if not attachment.type.startswith('image/'):
-                p = dictFillSlots(self.patterns['attachment'],
-                                            dict(filename=attachment.filename,
-                                                 icon=mimeTypeToIcon(attachment.type)))
+            p = dictFillSlots(self.patterns['attachment'],
+                                        dict(filename=attachment.filename,
+                                                icon=mimeTypeToIcon(attachment.type)))
 
-                location = self._partLink(attachment.part)
-                if attachment.filename is not None:
-                    location += '/' + attachment.filename
-                patterns.append(p.fillSlots('location', str(location)))
+            location = self._partLink(attachment.part) + '?withfilename=1'
+            patterns.append(p.fillSlots('location', str(location)))
 
         return ctx.tag[patterns]
 
