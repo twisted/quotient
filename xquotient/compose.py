@@ -13,7 +13,7 @@ from nevow import tags, inevow, flat
 
 from epsilon import extime
 
-from axiom import iaxiom, attributes, item, scheduler
+from axiom import iaxiom, attributes, item, scheduler, userbase
 
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform
@@ -109,7 +109,12 @@ class Composer(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
-    fromAddress = 'exarkun@divmod.com'
+    fromAddress = attributes.inmemory()
+
+    def activate(self):
+        for (localpart, domain) in userbase.getAccountNames(self.store):
+            self.fromAddress = localpart + '@' + domain
+            return
 
     def installOn(self, other):
         super(Composer, self).installOn(other)
