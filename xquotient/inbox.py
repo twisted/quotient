@@ -184,7 +184,7 @@ class SentMail(Item, InstallableMixin):
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.6, children=
-                    [webnav.Tab('Sent Mail', self.storeID, 0.0)],
+                    [webnav.Tab('Sent Mail', self.storeID, 0.15)],
                 authoritative=False)]
 
 def sentMailScreen(sentMailItem):

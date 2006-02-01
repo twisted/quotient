@@ -172,6 +172,12 @@ class ComposeFragment(liveform.LiveForm):
                                            coercer=unicode),
                         liveform.Parameter(name='messageBody',
                                            type=liveform.TEXTAREA_INPUT,
+                                           coercer=unicode),
+                        liveform.Parameter(name='cc',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=unicode),
+                        liveform.Parameter(name='bcc',
+                                           type=liveform.TEXT_INPUT,
                                            coercer=unicode)])
         self.toAddress = toAddress
         self.subject = subject
@@ -201,7 +207,7 @@ class ComposeFragment(liveform.LiveForm):
 
 
     _mxCalc = None
-    def _sendMail(self, toAddress, subject, messageBody):
+    def _sendMail(self, toAddress, subject, messageBody, cc, bcc):
 
         from email import Generator as G, Message as M, MIMEMessage as MM, MIMEMultipart as MMP, MIMEText as MT
         import StringIO as S
@@ -218,6 +224,10 @@ class ComposeFragment(liveform.LiveForm):
         m['Subject'] = subject
         m['Date'] = rfc822.formatdate()
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
+
+        m['Cc'] = cc
+        m['Bcc'] = bcc
+
         G.Generator(s).flatten(m)
         s.seek(0)
 

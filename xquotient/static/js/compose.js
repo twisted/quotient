@@ -28,6 +28,11 @@ Quotient.Compose.Controller.methods(
             });
     },
 
+    function toggleMoreOptions(self, node) {
+        var opts = Nevow.Athena.NodeByAttribute(node.parentNode.parentNode, "class", "options-container");
+        opts.style.display = (opts.style.display == "none") ? "" : "none";
+    },
+
     function fitMessageBodyToPage(self) {
         var e = document.getElementById("message-body");
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 55 + "px";

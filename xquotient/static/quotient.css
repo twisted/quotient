@@ -62,6 +62,10 @@ table.header-table {
     width: 100%;
 }
 
+.header-table-first-col {
+    white-space: nowrap;
+}
+
 .embedded-action-dialog {
     font-size: 1.4em;
     text-align: center;
