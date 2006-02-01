@@ -338,12 +338,13 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessage.archived = True
         return self.nextMessage(augmentIndex=-1)
 
-    def _composeSomething(self, toAddress, subject, messageBody):
+    def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)
         cf = compose.ComposeFragment(composer,
                                      toAddress=toAddress,
                                      subject=subject,
-                                     messageBody=messageBody)
+                                     messageBody=messageBody,
+                                     attachments=attachments)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
 
@@ -382,9 +383,10 @@ class InboxScreen(athena.LiveFragment):
         reply.append('')
         reply.extend(quoteBody(curmsg))
 
-        composeFrag = self._composeSomething(replyTo(curmsg),
+        composeFrag = self._composeSomething('',
                                              reSubject(curmsg, 'Fwd: '),
-                                             '\n\n' + '\n> '.join(reply))
+                                             '\n\n' + '\n> '.join(reply),
+                                             self.currentMessageDetail.attachmentParts)
         return (None, composeFrag)
 
     def nextPageAndMessage(self):

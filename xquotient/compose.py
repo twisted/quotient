@@ -160,7 +160,7 @@ class ComposeFragment(liveform.LiveForm):
 
     iface = allowedMethods = dict(getPeople=True, invoke=True)
 
-    def __init__(self, original, toAddress='', subject='', messageBody=''):
+    def __init__(self, original, toAddress='', subject='', messageBody='', attachments=()):
         self.original = original
         super(ComposeFragment, self).__init__(
             callable=self._sendMail,
@@ -182,6 +182,7 @@ class ComposeFragment(liveform.LiveForm):
         self.toAddress = toAddress
         self.subject = subject
         self.messageBody = messageBody
+        self.attachments = attachments
 
         self.docFactory = None
 
@@ -209,7 +210,7 @@ class ComposeFragment(liveform.LiveForm):
     _mxCalc = None
     def _sendMail(self, toAddress, subject, messageBody, cc, bcc):
 
-        from email import Generator as G, Message as M, MIMEMessage as MM, MIMEMultipart as MMP, MIMEText as MT
+        from email import Generator as G, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT
         import StringIO as S
 
         s = S.StringIO()
@@ -218,6 +219,15 @@ class ComposeFragment(liveform.LiveForm):
             None,
             [MT.MIMEText(messageBody, 'plain'),
              MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
+
+        if 0 < len(self.attachments):
+            attachmentParts = []
+            for a in self.attachments:
+                part = MB.MIMEBase(*a.type.split('/'))
+                part.set_payload(a.part.getBody(decode=True))
+                attachmentParts.append(part)
+
+            m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
         m['From'] = self.original.fromAddress
         m['To'] = toAddress
