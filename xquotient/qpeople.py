@@ -100,9 +100,9 @@ class MessageList(tdbview.TabularDataView):
                 person.store,
                 Message, (Message.sender,
                           Message.subject,
-                          Message.sent),
+                          Message.sentWhen),
                 baseComparison=comparison,
-                defaultSortColumn='sent',
+                defaultSortColumn='sentWhen',
                 defaultSortAscending=False,
                 itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
 
@@ -111,7 +111,7 @@ class MessageList(tdbview.TabularDataView):
 
         views = (self.personFragmentColumnView,
                  LinkToColumnView('subject'),
-                 StripTimeColumnView('sent'))
+                 StripTimeColumnView('sentWhen'))
 
         tdbview.TabularDataView.__init__(self, tdm, views)
         self.docFactory = getLoader(self.fragmentName)

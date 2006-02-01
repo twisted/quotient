@@ -218,9 +218,9 @@ class InboxMessageView(tdbview.TabularDataView):
 
         tdm = tdb.TabularDataModel(
                 original.store,
-                Message, [Message.sent],
+                Message, [Message.sentWhen],
                 baseComparison=baseComparison,
-                defaultSortColumn='sent',
+                defaultSortColumn='sentWhen',
                 defaultSortAscending=False,
                 itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
 
@@ -331,8 +331,8 @@ class InboxScreen(athena.LiveFragment):
         else:
             origfrom = "someone who chose not to be identified"
 
-        if curmsg.sent is not None:
-            origdate = curmsg.sent.asHumanly()
+        if curmsg.sentWhen is not None:
+            origdate = curmsg.sentWhen.asHumanly()
         else:
             origdate = "an indeterminate time in the past"
 

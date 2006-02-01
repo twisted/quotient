@@ -44,7 +44,7 @@ class QuotientSearchProvider(Item, InstallableMixin):
             yield search.SearchResult(description=msg.subject,
                                       url=translator.linkTo(msg.storeID),
                                       summary=document.text[:200],
-                                      timestamp=msg.sent,
+                                      timestamp=msg.sentWhen,
                                       score=0)
 
 class StaticShellContent(Item, InstallableMixin):

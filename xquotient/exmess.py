@@ -39,8 +39,9 @@ class Message(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
-    sent = attributes.timestamp()
-    received = attributes.timestamp()
+    sentWhen = attributes.timestamp()
+    receivedWhen = attributes.timestamp()
+
     sender = attributes.text()
     senderDisplay = attributes.text()
     recipient = attributes.text()
@@ -48,9 +49,12 @@ class Message(item.Item, item.InstallableMixin):
 
     attachments = attributes.integer(default=0)
 
+    # flags!
     read = attributes.boolean(default=False)
     archived = attributes.boolean(default=False)
     deleted = attributes.boolean(default=False)
+    outgoing = attributes.boolean(default=False)
+
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()

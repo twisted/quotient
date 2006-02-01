@@ -351,7 +351,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
 
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
-        self.message = exmess.Message(store=self.store, received=Time())
+        self.message = exmess.Message(store=self.store, receivedWhen=Time())
         self.message.installOn(self.store)
 
         try:
@@ -364,8 +364,8 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             except ValueError:
                 sent = None
         if sent is None:
-            sent = self.message.received
-        self.message.sent = sent
+            sent = self.message.receivedWhen
+        self.message.sentWhen = sent
 
         for (attr, headers) in [
             ('recipient', [u'to']),

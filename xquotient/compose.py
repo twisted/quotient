@@ -123,6 +123,7 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def sendMessage(self, toAddresses, msg):
+        msg.outgoing = True
         for toAddress in toAddresses:
             _NeedsDelivery(
                 store=self.store,
@@ -197,9 +198,6 @@ class ComposeFragment(liveform.LiveForm):
     _mxCalc = None
     def _sendMail(self, toAddress, subject, messageBody):
 
-        fromAddress = 'exarkun@divmod.com'
-
-
         from email import Generator as G, Message as M, MIMEMessage as MM, MIMEMultipart as MMP, MIMEText as MT
         import StringIO as S
 
@@ -210,7 +208,7 @@ class ComposeFragment(liveform.LiveForm):
             [MT.MIMEText(messageBody, 'plain'),
              MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
 
-        m['From'] = fromAddress
+        m['From'] = self.original.fromAddress
         m['To'] = toAddress
         m['Subject'] = subject
         m['Date'] = rfc822.formatdate()
