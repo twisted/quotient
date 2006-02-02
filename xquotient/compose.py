@@ -246,7 +246,12 @@ class ComposeFragment(liveform.LiveForm):
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
             msg = mr.message
-            self.original.sendMessage([toAddress, cc], msg)
+
+            addresses = [toAddress]
+            if cc:
+                addresses.append(cc)
+
+            self.original.sendMessage(addresses, msg)
         self.original.store.transact(createMessageAndQueueIt)
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
