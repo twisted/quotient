@@ -236,7 +236,6 @@ class ComposeFragment(liveform.LiveForm):
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
 
         m['Cc'] = cc
-        m['Bcc'] = bcc
 
         G.Generator(s).flatten(m)
         s.seek(0)
@@ -247,7 +246,7 @@ class ComposeFragment(liveform.LiveForm):
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
             msg = mr.message
-            self.original.sendMessage([toAddress], msg)
+            self.original.sendMessage([toAddress, cc], msg)
         self.original.store.transact(createMessageAndQueueIt)
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
