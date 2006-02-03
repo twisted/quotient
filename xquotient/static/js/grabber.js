@@ -5,6 +5,42 @@
 
 Quotient.Grabber = {};
 
+Quotient.Grabber.Controller = Nevow.Athena.Widget.subclass('Quotient.Grabber.Controller');
+Quotient.Grabber.Controller.methods(
+    function loaded(self) {
+        var lognode = self.nodeByAttribute("class", "grabber-log");
+        Divmod.logger.addObserver(function(err) {
+            if(err.debug && err.channel == "liveform") {
+                lognode.appendChild(document.createTextNode(err.message))
+            }
+        });
+    },
+
+    function loadEditForm(self, targetID) {
+        var D = self.callRemote("getEditGrabberForm", targetID);
+        D.addCallback(
+            function(html) {
+                var node = null;
+                try {
+                    node = self.nodeByAttribute("class", "edit-grabber-form");
+                } catch(e) {}
+
+                if(!node) {
+                    node = MochiKit.DOM.DIV({"class": "edit-grabber-form"}); 
+                    var cont = self.nodeByAttribute("class", "edit-grabber-form-container");
+                    cont.appendChild(node);
+                }
+                Divmod.Runtime.theRuntime.setNodeContent(node,
+                    '<div xmlns="http://www.w3.org/1999/xhtml">' + html + '</div>');
+            });
+    },
+    function hideEditForm(self) {
+        var form = self.nodeByAttribute("class", "edit-grabber-form");
+        while(form.childNodes) {
+            form.removeChild(form.firstChild);
+        }
+    });
+
 Quotient.Grabber.StatusWidget = Nevow.Athena.Widget.subclass('Grabber.StatusWidget');
 Quotient.Grabber.StatusWidget.method(
     function __init__(self, node) {

@@ -5,11 +5,12 @@ import time, datetime
 from zope.interface import implements
 
 from twisted.mail import pop3, pop3client
-from twisted.internet import protocol, defer
+from twisted.internet import protocol, defer, ssl
 from twisted.python import log, components, failure
 from twisted.protocols import policies
 
 from nevow import loaders, tags, athena
+from nevow.flat import flatten
 
 from epsilon import descriptor, extime
 
@@ -118,8 +119,13 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
         return [webnav.Tab('Grabbers', self.storeID, 0.3)]
 
 
-    def addGrabber(self, username, password, domain, port):
+    def addGrabber(self, username, password, domain, ssl):
         # DO IT
+        if ssl:
+            port = 995
+        else:
+            port = 110
+
         pg = POP3Grabber(
             store=self.store,
             username=username,
@@ -127,15 +133,16 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
             domain=domain,
             port=port,
             config=self,
-            ssl=False)
+            ssl=ssl)
         # DO IT *NOW*
         scheduler.IScheduler(self.store).schedule(pg, extime.Time())
         # OR MAYBE A LITTLE LATER
 
 
 class POP3UID(item.Item):
-    grabber = attributes.reference(doc="""
-    A reference to the grabber which retrieved this UID.
+    grabberID = attributes.text(doc="""
+    A string identifying the email-address/port parts of a
+    configured grabber
     """)
 
     value = attributes.bytes(doc="""
@@ -199,6 +206,11 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
     any given time.
     """)
 
+    protocol = attributes.inmemory(doc="""
+    While self.running=True this attribute will point to the
+    ControlledPOP3GrabberProtocol that is grabbing stuff
+    for me""")
+
     scheduled = attributes.timestamp(doc="""
     When this grabber is next scheduled to run.
     """)
@@ -215,6 +227,7 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
 
     def activate(self):
         self.running = False
+        self.protocol = None
         if self.status is None:
             self.status = Status(store=self.store, message=u'idle')
 
@@ -231,7 +244,7 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
         if self.ssl:
             if port is None:
                 port = 995
-            connect = reactor.connectSSL
+            connect = lambda h, p, f: reactor.connectSSL(h, p, f, ssl.ClientContextFactory())
         else:
             if port is None:
                 port = 110
@@ -263,21 +276,29 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
             self.scheduled = extime.Time() + delay
             return self.scheduled
 
+    def _grabberID(self):
+        if self.ssl and self.port == 995 or not self.ssl and self.port == 110:
+            port = 'default'
+        else:
+            port = self.port
+
+        return '%s@%s:%s' % (self.username, self.domain, port)
+    grabberID = property(_grabberID)
 
     def shouldRetrieve(self, uid):
         return self.store.findUnique(
             POP3UID,
-            attributes.AND(POP3UID.grabber == self,
+            attributes.AND(POP3UID.grabberID == self.grabberID,
                            POP3UID.value == uid),
             default=None) is None
 
 
     def markSuccess(self, uid, msg):
-        POP3UID(store=self.store, grabber=self, value=uid)
+        POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
 
 
     def markFailure(self, uid, err):
-        POP3UID(store=self.store, grabber=self, value=uid, failed=True)
+        POP3UID(store=self.store, grabberID=self.grabberID, value=uid, failed=True)
 
 
 
@@ -340,11 +361,15 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
         # XXX This is a bad loop.
         for idx, uid in enumerate(uidList):
+            if self.stopped:
+                return
             if self.paused():
                 break
 
             if self.shouldRetrieve(uid):
                 rece = self.createMIMEReceiver()
+                if rece is None:
+                    return # ONO
                 d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
                 self.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
                 yield d
@@ -395,6 +420,13 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         # XXX change status here - maybe?
         self.stoppedRunning()
 
+    stopped = False
+
+    def stop(self):
+        self.stopped = True
+
+
+
 
 
 class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
@@ -407,23 +439,28 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
 
 
     def shouldRetrieve(self, uid):
-        return self._transact(self.grabber.shouldRetrieve, uid)
+        if self.grabber is not None:
+            return self._transact(self.grabber.shouldRetrieve, uid)
 
 
     def createMIMEReceiver(self):
-        return self._transact(self.grabber.createMIMEReceiver)
+        if self.grabber is not None:
+            return self._transact(self.grabber.createMIMEReceiver)
 
 
     def markSuccess(self, uid, part):
-        return self._transact(self.grabber.markSuccess, uid, part)
+        if self.grabber is not None:
+            return self._transact(self.grabber.markSuccess, uid, part)
 
 
     def markFailure(self, uid, reason):
-        return self._transact(self.grabber.markFailure, uid, reason)
+        if self.grabber is not None:
+            return self._transact(self.grabber.markFailure, uid, reason)
 
 
     def paused(self):
-        return self.grabber.paused
+        if self.grabber is not None:
+            return self.grabber.paused
 
 
     _transient = False
@@ -432,6 +469,8 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
 
 
     def stoppedRunning(self):
+        if self.grabber is None:
+            return
         self.grabber.running = False
         if self._transient:
             scheduler.IScheduler(self.grabber.store).reschedule(
@@ -451,6 +490,7 @@ class POP3GrabberFactory(protocol.ClientFactory):
     def clientConnectionFailed(self, connector, reason):
         self.grabber.status.setStatus(u"Connection failed: " + reason.getErrorMessage())
         self.grabber.running = False
+        self.grabber.protocol = None
 
 
     def buildProtocol(self, addr):
@@ -460,6 +500,7 @@ class POP3GrabberFactory(protocol.ClientFactory):
             self.grabber.username.encode('ascii'),
             self.grabber.password.encode('ascii'))
         p.grabber = self.grabber
+        self.grabber.protocol = p
         return p
 
 
@@ -472,6 +513,8 @@ grabberTypes = {
 class GrabberConfigFragment(athena.LiveFragment):
     fragmentName = 'grabber-configuration'
     live = 'athena'
+    iface = allowedMethods = dict(getEditGrabberForm=True)
+    jsClass = u'Quotient.Grabber.Controller'
 
     def head(self):
         return ()
@@ -479,35 +522,84 @@ class GrabberConfigFragment(athena.LiveFragment):
     def render_addGrabberForm(self, ctx, data):
         f = liveform.LiveForm(
             self.addGrabber,
-            [liveform.Parameter('username',
-                                liveform.TEXT_INPUT,
-                                unicode,
-                                u'The username portion of the address from which to retrieve messages.'),
-             liveform.Parameter('password',
-                                liveform.PASSWORD_INPUT,
-                                unicode,
-                                u'The password for the remote account.'),
-             liveform.Parameter('domain',
+            [liveform.Parameter('domain',
                                 liveform.TEXT_INPUT,
                                 unicode,
                                 u'The domain which hosts the account.'),
+             liveform.Parameter('username',
+                                liveform.TEXT_INPUT,
+                                unicode,
+                                u'The username portion of the address from which to retrieve messages.'),
+             liveform.Parameter('password1',
+                                liveform.PASSWORD_INPUT,
+                                unicode,
+                                u'The password for the remote account.'),
+             liveform.Parameter('password2',
+                                liveform.PASSWORD_INPUT,
+                                unicode,
+                                u'Repeat password'),
 #              liveform.Parameter('protocol',
 #                                 liveform.Choice(grabberTypes.keys()),
 #                                 lambda value: grabberTypes[value],
 #                                 u'Super secret computer science stuff',
 #                                 'POP3'),
-             liveform.Parameter('port',
-                                liveform.TEXT_INPUT,
-                                int,
-                                u'The port number on which the remote server runs.',
-                                '110')])
+             liveform.Parameter('ssl',
+                                liveform.CHECKBOX_INPUT,
+                                bool,
+                                u'Use SSL to fetch messages')],
+             description='Add Grabber')
         f.jsClass = u'Quotient.Grabber.AddGrabberFormWidget'
         f.setFragmentParent(self)
         return ctx.tag[f]
 
-    def addGrabber(self, **kwargs):
-        self.original.addGrabber(**kwargs)
+    def getEditGrabberForm(self, targetID):
+        grabber = self.configuredGrabbersView.itemFromTargetID(targetID)
+
+        f = liveform.LiveForm(
+                lambda **kwargs: self.editGrabber(grabber, **kwargs),
+                (liveform.Parameter('password1',
+                                    liveform.PASSWORD_INPUT,
+                                    unicode,
+                                    u'New Password'),
+                liveform.Parameter('password2',
+                                   liveform.PASSWORD_INPUT,
+                                   unicode,
+                                   u'Repeat Password'),
+                liveform.Parameter('ssl',
+                                   liveform.CHECKBOX_INPUT,
+                                   bool,
+                                   'Use SSL',
+                                   default=grabber.ssl)),
+                description='Edit Grabber')
+
+        grabber.grab()
+        f.setFragmentParent(self)
+        return unicode(flatten(f), 'utf-8')
+
+    def editGrabber(self, grabber, password1, password2, ssl):
+        if password1 != password2:
+            raise ValueError("Passwords don't match")
+
+        if ssl != grabber.ssl:
+            if ssl:
+                port = 995
+            else:
+                port = 110
+            grabber.port = port
+            grabber.ssl = ssl
+
+        if password1 and password2:
+            grabber.password = password1
+
+        self.callRemote('hideEditForm')
+        return u'Well Done'
+
+    def addGrabber(self, domain, username, password1, password2, ssl):
+        if password1 != password2:
+            raise ValueError("Passwords don't match")
+        self.original.addGrabber(username, password1, domain, ssl)
         return self.configuredGrabbersView.replaceTable()
+
 
     def render_POP3Grabbers(self, ctx, data):
         self.configuredGrabbersView = ConfiguredGrabbersView(self.original.store)
@@ -546,7 +638,8 @@ class LiveStatusFragment(athena.LiveFragment):
 
 
 class StatusColumnView(object):
-    displayName = attributeID = 'status'
+    attributeID = 'status'
+    displayName = 'Status'
     typeName = typeHint = None
 
     def __init__(self, fragment):
@@ -569,7 +662,8 @@ class StatusColumnView(object):
 
 
 class RunningColumnView(object):
-    displayName = attributeID = 'running'
+    attributeID = 'running'
+    displayName = 'Running'
     typeName = typeHint = None
 
     def stanFromValue(self, idx, item, value):
@@ -584,6 +678,39 @@ class RunningColumnView(object):
         return None
 
 
+class DeleteAction(tdbview.Action):
+    def __init__(self, actionID='delete',
+                 iconURL='/Mantissa/images/delete.png',
+                 description='Delete',
+                 disabledIconURL=None):
+        super(DeleteAction, self).__init__(actionID, iconURL, description, disabledIconURL)
+
+    def performOn(self, grabber):
+        scheduler.IScheduler(grabber.store).unscheduleAll(grabber)
+        if grabber.running:
+            grabber.protocol.stop()
+            grabber.protocol.grabber = None
+        grabber.deleteFromStore()
+
+    def actionable(self, item):
+        return True
+
+class EditAction(tdbview.Action):
+    def __init__(self, actionID='edit',
+                 iconURL=None,
+                 description='Edit',
+                 disabledIconURL=None):
+        super(EditAction, self).__init__(actionID, iconURL, description, disabledIconURL)
+
+    def performOn(self, item):
+        raise NotImplementedError()
+
+    def actionable(self, item):
+        return True
+
+    def toLinkStan(self, idx, item):
+        handler = 'Nevow.Athena.Widget.get(this).widgetParent.loadEditForm(%r)' % (idx,)
+        return tags.a(href='#', onclick=handler + ';return false')['Edit']
 
 class PauseAction(tdbview.Action):
     def __init__(self, actionID='pause',
@@ -636,7 +763,9 @@ class ConfiguredGrabbersView(tdbview.TabularDataView):
             RunningColumnView()]
         actions = [
             PauseAction(),
-            ResumeAction()]
+            ResumeAction(),
+            DeleteAction(),
+            EditAction()]
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
-        super(ConfiguredGrabbersView, self).__init__(tdm, tdv, actions)
+        super(ConfiguredGrabbersView, self).__init__(tdm, tdv, actions, itemsCalled='Grabbers')
