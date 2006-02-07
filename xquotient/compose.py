@@ -1,4 +1,3 @@
-
 import datetime, rfc822
 
 from zope.interface import implements
@@ -149,6 +148,69 @@ class Composer(item.Item, item.InstallableMixin):
         print 'Z' * 50
 
 
+class File(item.Item):
+    typeName = 'quotient_file'
+    schemaVersion = 1
+
+    type = attributes.text(allowNone=False)
+    body = attributes.path(allowNone=False)
+    name = attributes.text(allowNone=False)
+
+    cabinet = attributes.reference(allowNone=False)
+
+class FileCabinet(item.Item):
+
+    implements(inevow.IResource)
+
+    typeName = 'quotient_file_cabinet'
+    schemaVersion = 1
+
+    name = attributes.text()
+    filesCount = attributes.integer(default=0)
+
+    def renderHTTP(self, ctx):
+        req = inevow.IRequest(ctx)
+        if req.method == 'GET':
+            req.setHeader("content/type", "text/html")
+            return '''
+            <html>
+            <head>
+            <script type="text/javascript">
+            function reportProgressToParent() {
+                document.getElementsByTagName("form")[0].style.display = "none";
+                /* do something magical */
+            }
+            </script>
+            </head>
+            <body>
+            <form enctype="multipart/form-data" method="POST" onsubmit="reportProgressToParent(); return true;">
+            <input name="uploaddata" type="file" />
+            <input type="submit" name="upload" value="Upload" />
+            </form></body></html>
+            '''
+        if req.method == 'POST':
+            uploadedFileArg = req.fields['uploaddata']
+            def txn():
+                self.filesCount += 1
+                outf = self.store.newFile('cabinet-'+str(self.storeID),
+                                          str(self.filesCount))
+                outf.write(uploadedFileArg.file.read())
+                outf.close()
+
+                File(store=self.store,
+                     body=outf.finalpath,
+                     name=unicode(uploadedFileArg.filename),
+                     type=unicode(uploadedFileArg.type),
+                     cabinet=self)
+
+            self.store.transact(txn)
+            req.setHeader("content/type", "text/plain")
+            return 'OK '+str(self.filesCount)
+
+    def locateChild(self, ctx, segments):
+        return self, ()
+
+
 
 class ComposeFragment(liveform.LiveForm):
     implements(ixmantissa.INavigableFragment)
@@ -199,6 +261,11 @@ class ComposeFragment(liveform.LiveForm):
                                            subject=self.subject,
                                            body=self.messageBody))
 
+
+    def render_fileCabinet(self, ctx, data):
+        cabinet = self.original.store.findOrCreate(FileCabinet)
+        return inevow.IQ(self.docFactory).onePattern('cabinet-iframe').fillSlots(
+                    'src', ixmantissa.IWebTranslator(cabinet.store).linkTo(cabinet.storeID))
 
     def head(self):
         yield tags.script(type='text/javascript',

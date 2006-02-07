@@ -8,6 +8,7 @@ from axiom import attributes
 from xmantissa import website, webapp, ixmantissa, people, prefs, search
 
 from xquotient import inbox, exmess, mail, gallery, compose, qpeople
+from xquotient.grabber import GrabberConfiguration
 from xquotient.indexinghelp import SyncIndexer
 
 class QuotientSearchProvider(Item, InstallableMixin):
@@ -141,17 +142,18 @@ class _ShowReadPreference(prefs.MultipleChoicePreference):
 class QuotientPreferenceCollection(Item, InstallableMixin):
     implements(ixmantissa.IPreferenceCollection)
 
-    schemaVersion = 1
     typeName = 'quotient_preference_collection'
+    schemaVersion = 1
 
-    name = 'Email Preferences'
+    installedOn = attributes.reference()
 
     preferredMimeType = attributes.text(default=u'text/plain')
     preferredMessageDisplay = attributes.text(default=u'split')
     showRead = attributes.boolean(default=True)
 
-    installedOn = attributes.reference()
     _cachedPrefs = attributes.inmemory()
+
+    applicationName = 'Mail'
 
     def installOn(self, other):
         super(QuotientPreferenceCollection, self).installOn(other)
@@ -176,3 +178,8 @@ class QuotientPreferenceCollection(Item, InstallableMixin):
         setattr(pref, 'value', value)
         setattr(self, pref.key, value)
 
+    def getSections(self):
+        gconf = self.store.findUnique(GrabberConfiguration, default=None)
+        if gconf is None:
+            return None
+        return [gconf]

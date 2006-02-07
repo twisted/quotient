@@ -1,7 +1,10 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
   nevow:render="liveFragment">
-
   <nevow:invisible nevow:render="compose">
+    <iframe nevow:pattern="cabinet-iframe">
+      <nevow:attr name="src"><nevow:slot name="src" /></nevow:attr>
+    </iframe>
+
     <span id="address-completions" style="display: none; position: absolute" />
     <table>
       <tr>
@@ -26,10 +29,11 @@
               <tr>
                 <td class="header-table-first-col">Attachments</td>
                 <td class="header-table-last-col"
-                  ><input type="file" id="file-upload-1" style="display: none;" />
+                  ><!--<input type="file" id="file-upload-1" style="display: none;" />
                   <a href="#"
                     onclick="Quotient.Compose.Controller.get(this).addAttachment(this); return false"
-                    >attach a file</a>
+                    >attach a file</a>-->
+                  <nevow:invisible nevow:render="fileCabinet" />
                 </td>
               </tr>
               <tr>
