@@ -99,6 +99,7 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
     Manages the creation, operation, and destruction of grabbers
     (items which retrieve information from remote sources).
     """
+    implements(ixmantissa.INavigableElement)
 
     paused = attributes.boolean(doc="""
     Flag indicating whether grabbers created by this Item will be
@@ -108,6 +109,15 @@ class GrabberConfiguration(item.Item, item.InstallableMixin):
     installedOn = attributes.reference(doc="""
     A reference to the avatar which has been powered up by this item.
     """)
+
+    def installOn(self, other):
+        super(GrabberConfiguration, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
+
+
+    def getTabs(self):
+        return [webnav.Tab('Grabbers', self.storeID, 0.3)]
+
 
     def addGrabber(self, username, password, domain, ssl):
         # DO IT
