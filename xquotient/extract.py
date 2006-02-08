@@ -9,7 +9,7 @@ from epsilon.extime import Time
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 
-from xquotient import iquotient
+from xquotient import iquotient, mail
 from xquotient.gallery import Image, makeThumbnail
 from xquotient.exmess import Message
 
@@ -177,8 +177,16 @@ extractTypes = {'url': URLExtract,
                 'phone number': PhoneNumberExtract,
                 'email address': EmailAddressExtract}
 
-def extract(message):
-    extractImages(message)
 
-    for et in extractTypes.itervalues():
-        et.extract(message)
+class ExtractPowerup(Item, InstallableMixin):
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(ExtractPowerup, self).installOn(other)
+        self.store.findUnique(mail.MessageSource).addReliableListener(self)
+
+    def processItem(self, message):
+        extractImages(message)
+
+        for et in extractTypes.itervalues():
+            et.extract(message)

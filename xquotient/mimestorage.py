@@ -1,15 +1,14 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
 import itertools
+import quopri, binascii
 
 from epsilon.extime import Time
 
 from axiom import item, attributes
 
-from xquotient import mimepart, equotient, mimeutil, exmess, extract, iquotient
-from xquotient.indexinghelp import SyncIndexer
+from xquotient import mimepart, equotient, mimeutil, exmess
 
-import quopri, binascii
 
 class Header(item.Item):
     typeName = 'quotient_mime_header'
@@ -158,10 +157,6 @@ class Part(item.Item):
 
         if self.parent is None:
             message.attachments = len(list(self.walkAttachments()))
-            #extract.extract(message)
-            indexer = store.findUnique(SyncIndexer, default=None)
-            if indexer is not None:
-                indexer.indexMessage(message)
 
         del self._headers, self._children
 

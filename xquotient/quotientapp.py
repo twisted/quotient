@@ -3,11 +3,11 @@ from zope.interface import implements
 from nevow import tags
 
 from axiom.item import Item, InstallableMixin
-from axiom import attributes
+from axiom import attributes, scheduler
 
 from xmantissa import website, webapp, ixmantissa, people, prefs, search
 
-from xquotient import inbox, exmess, mail, gallery, compose, qpeople
+from xquotient import inbox, exmess, mail, gallery, compose, qpeople, extract
 from xquotient.grabber import GrabberConfiguration
 from xquotient.indexinghelp import SyncIndexer
 
@@ -78,6 +78,7 @@ class QuotientBenefactor(Item):
         other.powerUp(self, ixmantissa.IBenefactor)
 
     def endow(self, ticket, avatar):
+        avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
         avatar.findOrCreate(website.WebSite).installOn(avatar)
         avatar.findOrCreate(webapp.PrivateApplication).installOn(avatar)
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
@@ -97,14 +98,54 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(inbox.Trash).installOn(avatar)
         avatar.findOrCreate(inbox.SentMail).installOn(avatar)
 
-        #avatar.findOrCreate(gallery.Gallery).installOn(avatar)
-        #avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
-
         avatar.findOrCreate(exmess.MessagePartView).installOn(avatar)
 
-        avatar.findOrCreate(SyncIndexer)
-        avatar.findOrCreate(QuotientSearchProvider).installOn(avatar)
         avatar.findOrCreate(StaticShellContent).installOn(avatar)
+
+
+
+class ExtractBenefactor(Item):
+    implements(ixmantissa.IBenefactor)
+
+    endowed = attributes.integer(default=0)
+
+
+    def installOn(self, other):
+        other.powerUp(self, ixmantissa.IBenefactor)
+
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(extract.ExtractPowerup).installOn(avatar)
+        avatar.findOrCreate(gallery.Gallery).installOn(avatar)
+        avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
+
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(extract.ExtractPowerup).deleteFromStore()
+        avatar.findUnique(gallery.Gallery).deleteFromStore()
+        avatar.findUnique(gallery.ThumbnailDisplayer).deleteFromStore()
+
+
+
+class IndexingBenefactor(Item):
+    implements(ixmantissa.IBenefactor)
+
+    endowed = attributes.integer(default=0)
+
+    def installOn(self, other):
+        other.powerUp(self, ixmantissa.IBenefactor)
+
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(SyncIndexer).installOn(avatar)
+        avatar.findOrCreate(QuotientSearchProvider).installOn(avatar)
+
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(SyncIndexer).deleteFromStore()
+        avatar.findUnique(QuotientSearchProvider).deleteFromStore()
+
+
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
     def __init__(self, value, collection):

@@ -4,13 +4,25 @@ from axiom import iaxiom, scheduler, userbase
 
 from xmantissa import website, offering, provisioning
 
-from xquotient.quotientapp import QuotientBenefactor
+from xquotient.quotientapp import QuotientBenefactor, ExtractBenefactor, IndexingBenefactor
 from xquotient import mail, grabber, compose, popout, publicpage
 
 quotientBenefactorFactory = provisioning.BenefactorFactory(
     name = u'quotient',
-    description = u'Incoming SMTP, Gallery, Address Book, Thumbnailer, Fulltext Indexer, Extracts',
+    description = u'Incoming SMTP, Address Book',
     benefactorClass = QuotientBenefactor)
+
+extractBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Extracts',
+    description = u'Data-driven feature discovery, extraction, and presentation',
+    benefactorClass = ExtractBenefactor,
+    dependencies = [quotientBenefactorFactory])
+
+indexingBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Indexing',
+    description = u'Full-text email (and other stuff) indexing',
+    benefactorClass = IndexingBenefactor,
+    dependencies = [quotientBenefactorFactory])
 
 grabberBenefactorFactory = provisioning.BenefactorFactory(
     name = u'Grabbers',
@@ -44,6 +56,8 @@ plugin = offering.Offering(
     appPowerups = (publicpage.QuotientPublicPage,),
 
     benefactorFactories = [quotientBenefactorFactory,
+                           extractBenefactorFactory,
+                           indexingBenefactorFactory,
                            grabberBenefactorFactory,
                            composeBenefactorFactory,
                            popAccessBenefactorFactory])

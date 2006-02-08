@@ -76,7 +76,6 @@ class POP3Up(item.Item, item.InstallableMixin):
                             localPop3Deleted=False,
                             localPop3UID = os.urandom(16).encode('hex'),
                             message=message)
-            print 'COMPUTING MESSAGE LIST', len(oldMessages), len(newMessages)
             self.messageList = list(self.store.query(MessageInfo))
             self.deletions = []
         return self.messageList
@@ -169,7 +168,7 @@ class POP3Benefactor(item.Item):
 
 
 
-class POP3Listener(item.Item, service.Service):
+class POP3Listener(item.Item, item.InstallableMixin, service.Service):
 
     typeName = "quotient_pop3listener"
     schemaVersion = 1
@@ -212,9 +211,9 @@ class POP3Listener(item.Item, service.Service):
         self.securePort = None
 
     def installOn(self, other):
-        assert self.installedOn is None, "You cannot install a POP3Listener on more than one thing"
+        super(POP3Listener, self).installOn(other)
         other.powerUp(self, service.IService)
-        self.installedOn = other
+        self.setServiceParent(other)
 
     def privilegedStartService(self):
         realm = portal.IRealm(self.installedOn, None)

@@ -1,6 +1,4 @@
 
-import itertools
-
 try:
     from OpenSSL import SSL
 except ImportError:
@@ -11,15 +9,19 @@ from zope.interface import implements
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.protocols import policies
-from twisted.python import components, log
+from twisted.python import log
 from twisted.cred import portal, checkers
 from twisted.mail import smtp
 
+from epsilon import extime
+
 from vertex import sslverify
 
-from axiom import store, item, attributes, userbase
+from axiom import item, attributes, userbase, scheduler, batch
 
 from xquotient import iquotient, exmess, mimestorage
+
+MessageSource = batch.processor(exmess.Message)
 
 class MailConfigurationError(RuntimeError):
     """You specified some invalid configuration.
@@ -117,6 +119,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, Deliv
         other.powerUp(self, service.IService)
         other.powerUp(self, iquotient.IMIMEDelivery)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
+        scheduler.IScheduler(self.store).schedule(self.store.findOrCreate(MessageSource), extime.Time())
         self.setServiceParent(other)
 
     def privilegedStartService(self):
