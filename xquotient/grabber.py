@@ -505,6 +505,7 @@ class GrabberConfigFragment(athena.LiveFragment):
     live = 'athena'
     iface = allowedMethods = dict(getEditGrabberForm=True)
     jsClass = u'Quotient.Grabber.Controller'
+    title = 'External Accounts'
 
     def head(self):
         return ()
