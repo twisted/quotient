@@ -53,7 +53,7 @@ function getPageScroll(){
 		yScroll = document.body.scrollTop;
 	}
 
-	arrayPageScroll = new Array('',yScroll)
+	var arrayPageScroll = new Array('',yScroll)
 	return arrayPageScroll;
 }
 
@@ -93,6 +93,8 @@ function getPageSize(){
 	}
 
 	// for small pages with total height less then height of the viewport
+        var pageHeight;
+
 	if(yScroll < windowHeight){
 		pageHeight = windowHeight;
 	} else {
@@ -100,6 +102,8 @@ function getPageSize(){
 	}
 
 	// for small pages with total width less then width of the viewport
+        var pageWidth;
+
 	if(xScroll < windowWidth){
 		pageWidth = windowWidth;
 	} else {
@@ -107,7 +111,7 @@ function getPageSize(){
 	}
 
 
-	arrayPageSize = new Array(pageWidth,pageHeight,windowWidth,windowHeight)
+	var arrayPageSize = new Array(pageWidth,pageHeight,windowWidth,windowHeight)
 	return arrayPageSize;
 }
 
