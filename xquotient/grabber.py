@@ -256,10 +256,11 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
         grabber.
         """
         try:
-            try:
-                self.grab()
-            except:
-                log.err()
+            if not self.paused:
+                try:
+                    self.grab()
+                except:
+                    log.err()
         finally:
             # XXX This is not a good way for things to work.  Different, later.
             delay = datetime.timedelta(seconds=300)
