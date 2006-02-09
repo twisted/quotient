@@ -5,7 +5,7 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.python import filepath
 
-from axiom import store
+from axiom import store, scheduler
 
 from xquotient import mail, mimepart, mimestorage
 
@@ -176,6 +176,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
     def setUpMailStuff(self):
         dbdir = self.mktemp()
         s = store.Store(dbdir)
+        scheduler.Scheduler(store=s).installOn(s)
         mp = mail.MailTransferAgent(store=s)
         mp.installOn(s)
         return mp.createMIMEReceiver()

@@ -5,7 +5,7 @@ from twisted.mail import smtp
 
 from vertex.scripts import certcreate
 
-from axiom import store, userbase
+from axiom import store, userbase, scheduler
 
 from xquotient import mail, mimestorage
 
@@ -13,6 +13,7 @@ class MailTests(unittest.TestCase):
     def setUp(self):
         self.dbdir = self.mktemp()
         self.store = store.Store(self.dbdir)
+        scheduler.Scheduler(store=self.store).installOn(self.store)
         self.login = userbase.LoginSystem(store=self.store)
         self.login.installOn(self.store)
 
@@ -57,6 +58,7 @@ class MailTests(unittest.TestCase):
         self.failUnless(smtp.IMessageDelivery.providedBy(delivery))
 
     def testValidateTo(self):
+        scheduler.Scheduler(store=self.store).installOn(self.store)
         mta = mail.MailTransferAgent(store=self.store)
         mta.installOn(self.store)
         factory = smtp.IMessageDeliveryFactory(self.store)
@@ -64,6 +66,7 @@ class MailTests(unittest.TestCase):
 
         account = self.login.addAccount('testuser', 'example.com', None)
         subStore = account.avatars.open()
+        scheduler.Scheduler(store=subStore).installOn(subStore)
         mail.MailTransferAgent(store=subStore).installOn(subStore)
 
         d = delivery.validateTo(
