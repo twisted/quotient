@@ -44,10 +44,6 @@ def extractImages(message):
 
 class SimpleExtractMixin(object):
 
-    def installOn(self, other):
-        super(SimpleExtractMixin, self).installOn(other)
-        other.powerUp(self, iquotient.IExtract)
-
     # a lot of class methods. though it is less weird this way i think
 
     def findExisting(cls, message, extractedText):
@@ -65,6 +61,11 @@ class SimpleExtractMixin(object):
     worthStoring = staticmethod(worthStoring)
 
     def extract(cls, message):
+        def updateExtract(e, **kw):
+            for (k, v) in kw.iteritems():
+                if getattr(e, k) != v:
+                    setattr(e, k, v)
+
         for part in message.impl.getTypedParts('text/plain'):
             for match in cls.regex.finditer(part.getUnicodeBody()):
                 (start, end) = match.span()
@@ -73,15 +74,15 @@ class SimpleExtractMixin(object):
                 if cls.worthStoring(message, extractedText):
                     existing = cls.findExisting(message, extractedText)
                     if existing is not None:
-                        existing.installedOn.powerDown(existing, iquotient.IExtract)
-                        existing.deleteFromStore()
+                        f = lambda **k: updateExtract(existing, **k)
+                    else:
+                        f = lambda **k: cls(store=message.store, **k)
 
-                    cls(message=message,
-                        timestamp=Time(),
-                        text=extractedText,
-                        start=start,
-                        end=end,
-                        store=message.store).installOn(part)
+                    f(message=message,
+                      timestamp=Time(),
+                      text=extractedText,
+                      start=start,
+                      end=end)
 
     extract = classmethod(extract)
 
@@ -94,7 +95,6 @@ class SimpleExtractMixin(object):
                 text[end:end+chars])
 
 class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
-    implements(iquotient.IExtract)
 
     typeName = 'quotient_url_extract'
     schemaVersion = 1
@@ -119,7 +119,6 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
 
 
 class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
-    implements(iquotient.IExtract)
 
     typeName = 'quotient_phone_number_extract'
     schemaVersion = 1
@@ -137,15 +136,14 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
     ignored = attributes.boolean(default=False)
 
     regex = re.compile(ur'%(area)s%(body)s%(extn)s' % dict(area=r'(?:(?:\(?\d{3}\)?[-.\s]?|\d{3}[-.\s]))?',
-                                                         body=r'\d{3}[-.\s]\d{4}',
-                                                         extn=r'(?:\s?(?:ext\.?|\#)\s?\d+)?'),
+                                                           body=r'\d{3}[-.\s]\d{4}',
+                                                           extn=r'(?:\s?(?:ext\.?|\#)\s?\d+)?'),
                        re.UNICODE | re.IGNORECASE)
 
     def asStan(self):
         return tags.b[self.text]
 
 class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
-    implements(iquotient.IExtract)
 
     typeName = 'quotient_email_address_extract'
     schemaVersion = 1
