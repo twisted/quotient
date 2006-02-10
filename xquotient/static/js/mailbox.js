@@ -802,7 +802,6 @@ Quotient.Mailbox.Controller.methods(
             self.counterElements = {};
         }
         if(!(className in self.counterElements)) {
-            alert("FOO");
             self.counterElements[className] = self.nodeByAttribute('class', className);
         }
         var node = self.counterElements[className];
