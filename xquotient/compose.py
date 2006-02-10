@@ -3,10 +3,10 @@ import datetime, rfc822
 from zope.interface import implements
 
 from twisted.python.components import registerAdapter
-from twisted.python import log, failure
+from twisted.python import log
 from twisted.mail import smtp, relaymanager
 from twisted.names import client
-from twisted.internet import error
+from twisted.internet import error, defer, reactor
 
 from nevow import tags, inevow, flat
 
@@ -15,12 +15,21 @@ from epsilon import extime
 from axiom import iaxiom, attributes, item, scheduler, userbase
 
 from xmantissa.fragmentutils import dictFillSlots
-from xmantissa import webnav, ixmantissa, people, liveform
+from xmantissa import webnav, ixmantissa, people, liveform, prefs
 
 from xquotient import iquotient, mail
 
+def _esmtpSendmail(username, password, smtphost, from_addr, to_addrs, msg):
+    d = defer.Deferred()
+    f = smtp.ESMTPSenderFactory(username, password, from_addr, to_addrs, msg, d, requireTransportSecurity=False)
+    reactor.connectTCP(smtphost, 25, f)
+    return d
+
+
 class _TransientError(Exception):
     pass
+
+
 
 class _NeedsDelivery(item.Item):
     composer = attributes.reference()
@@ -42,6 +51,44 @@ class _NeedsDelivery(item.Item):
         self.running = False
 
 
+    def getMailExchange(self, recipientDomain):
+        resolver = client.Resolver(resolv='/etc/resolv.conf')
+        mxc = relaymanager.MXCalculator(resolver)
+        d = mxc.getMX(recipientDomain)
+
+        def gotMX(mx):
+            resolver.protocol.transport.stopListening()
+            return mx
+        d.addCallback(gotMX)
+        return d
+
+
+    def sendmail(self):
+        # XXX
+        # Why aren't these self.compose.foo?  They probably should be.
+        prefCollection = self.store.findUnique(ComposePreferenceCollection)
+        if prefCollection.preferredSmarthost is not None:
+            return _esmtpSendmail(
+                prefCollection.smarthostUsername,
+                prefCollection.smarthostPassword,
+                prefCollection.preferredSmarthost,
+                self.composer.fromAddress,
+                [self.toAddress],
+                self.message.impl.source.open())
+        else:
+            d = self.getMailExchange(self.toAddress.split('@', 1)[1])
+            def sendMail(mx):
+                host = str(mx.name)
+                return smtp.sendmail(
+                    host,
+                    self.composer.fromAddress,
+                    [self.toAddress],
+                    # XXX
+                    self.message.impl.source.open())
+            d.addCallback(sendMail)
+            return d
+
+
     def run(self):
         sch = iaxiom.IScheduler(self.store)
         if self.tries < len(self.RETRANS_TIMES):
@@ -53,24 +100,7 @@ class _NeedsDelivery(item.Item):
             self.running = True
             self.tries += 1
 
-            resolver = client.Resolver(resolv='/etc/resolv.conf')
-            mxc = relaymanager.MXCalculator(resolver)
-            d = mxc.getMX(self.toAddress.split('@', 1)[1])
-
-            def gotMX(mx):
-                resolver.protocol.transport.stopListening()
-                return mx
-            d.addCallback(gotMX)
-
-            def sendMail(mx):
-                host = str(mx.name)
-                return smtp.sendmail(
-                    host,
-                    self.composer.fromAddress,
-                    [self.toAddress],
-                    # XXX
-                    self.message.impl.source.open())
-            d.addCallback(sendMail)
+            d = self.sendmail()
 
             def mailSent(result):
                 # Success!  Don't bother to try again.
@@ -324,13 +354,159 @@ class ComposeFragment(liveform.LiveForm):
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
 
 
+
 class ComposeBenefactor(item.Item, item.InstallableMixin):
     endowed = attributes.integer(default=0)
 
     def endow(self, ticket, avatar):
         avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
+        avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
         avatar.findOrCreate(Composer).installOn(avatar)
+
 
     def revoke(self, ticket, avatar):
         avatar.findUnique(Composer).deleteFromStore()
+
+
+
+class _SmarthostPreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-host', value,
+            'Smart Host', collection,
+            'Hostname of an SMTP server to which all outgoing mail will be sent.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class _SmarthostUsernamePreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-username', value,
+            'Smarthost Username', collection,
+            'Username to use to log in to the smarthost.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class _SmarthostPasswordPreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-password', value,
+            'Smarthost password', collection,
+            'Password to use to log in to the smarthost.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class ComposePreferenceCollection(item.Item, item.InstallableMixin):
+    implements(ixmantissa.IPreferenceCollection)
+
+    installedOn = attributes.reference()
+
+    preferredSmarthost = attributes.text(doc="""
+    Hostname to which all outgoing mail will be delivered.
+    """)
+    smarthostUsername = attributes.text(doc="""
+    Username with which to authenticate to the smart host.
+    """)
+    smarthostPassword = attributes.text(doc="""
+    Password with which to authenticate to the smart host.
+    """)
+
+    _cachedPrefs = attributes.inmemory()
+
+    applicationName = 'Compose'
+
+    def installOn(self, other):
+        super(ComposePreferenceCollection, self).installOn(other)
+        other.powerUp(self, ixmantissa.IPreferenceCollection)
+
+
+    def getPreferences(self):
+        try:
+            return self._cachedPrefs
+        except AttributeError:
+            self._cachedPrefs = {
+                'smarthost-host': _SmarthostPreference(self.preferredSmarthost, self),
+                'smarthost-username': _SmarthostUsernamePreference(self.smarthostUsername, self),
+                'smarthost-password': _SmarthostPasswordPreference(self.smarthostPassword, self)
+                }
+            return self._cachedPrefs
+
+
+    def setPreferenceValue(self, pref, value):
+        if pref.key == 'smarthost-host':
+            self.preferredSmarthost = value
+        elif pref.key == 'smarthost-username':
+            self.smarthostUsername = value
+        elif pref.key == 'smarthost-password':
+            self.smarthostPassword = value
+        else:
+            assert False, "Bogus preference input: %r %r" % (pref, value)
+        setattr(pref, 'value', value)
+
+
+    def getSections(self):
+        return None
