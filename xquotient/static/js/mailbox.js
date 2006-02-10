@@ -798,7 +798,14 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _twiddleCount(self, className, howMuch) {
-        var node = self.nodeByAttribute('class', className);
+        if(!self.counterElements) {
+            self.counterElements = {};
+        }
+        if(!(className in self.counterElements)) {
+            alert("FOO");
+            self.counterElements[className] = self.nodeByAttribute('class', className);
+        }
+        var node = self.counterElements[className];
         node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) + howMuch;
     },
 
