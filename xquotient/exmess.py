@@ -1,4 +1,5 @@
 from os import path
+import pytz
 
 from zope.interface import implements
 from twisted.python.components import registerAdapter
@@ -190,11 +191,19 @@ class MessageDetail(athena.LiveFragment):
         #    personStan = people.PersonFragment(p, self.original.sender)
         #personStan.page = self.page
 
+        prefs = ixmantissa.IPreferenceAggregator(self.original.store)
+        tzinfo = pytz.timezone(prefs.getPreferenceValue('timezone'))
+        if self.original.sentWhen is None:
+            sentWhen = 'Unknown'
+        else:
+            sentWhen = self.original.sentWhen.asHumanly(tzinfo)
+
         return dictFillSlots(ctx.tag,
                 dict(sender=self.original.sender,
                      recipient=self.original.recipient,
                      subject=self.original.subject,
-                     tags=self.tagsAsStan()))
+                     tags=self.tagsAsStan(),
+                     sent=sentWhen))
 
     def _childLink(self, webItem, item):
         return '/' + webItem.prefixURL + self.translator.linkTo(item.storeID)[len('/private'):]
