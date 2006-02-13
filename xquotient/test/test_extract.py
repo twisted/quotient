@@ -42,5 +42,17 @@ class ExtractTestCase(TestCase):
 
             self.assertIdentical(theExtract, theSameExtract)
             checkExtract(theSameExtract)
+
+            extract.EmailAddressExtract.regex = re.compile('complicated')
+            part = SimplePart(store=s, myText=u'life is complicated')
+            mesg2 = exmess.Message(store=s, impl=part)
+
+            extract.EmailAddressExtract.extract(mesg2)
+            (theOldExtract, theNewExtract) = list(s.query(extract.EmailAddressExtract,
+                                                          sort=extract.EmailAddressExtract.timestamp.asc))
+            checkExtract(theOldExtract)
+            self.assertEqual(theNewExtract.text, 'complicated')
+            self.assertEqual('life is complicated'[theNewExtract.start:theNewExtract.end], 'complicated')
+            self.assertIdentical(theNewExtract.message, mesg2)
         finally:
             extract.EmailAddressExtract.regex = origRegex
