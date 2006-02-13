@@ -267,6 +267,7 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
             self.scheduled = extime.Time() + delay
             return self.scheduled
 
+
     def _grabberID(self):
         if self.ssl and self.port == 995 or not self.ssl and self.port == 110:
             port = 'default'
@@ -276,12 +277,17 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
         return '%s@%s:%s' % (self.username, self.domain, port)
     grabberID = property(_grabberID)
 
-    def shouldRetrieve(self, uid):
-        return self.store.findUnique(
+
+    def shouldRetrieve(self, uidList):
+        d = {}
+        for (idx, uid) in uidList:
+            d[uid] = (idx, uid)
+        for uid in self.store.query(
             POP3UID,
             attributes.AND(POP3UID.grabberID == self.grabberID,
-                           POP3UID.value == uid),
-            default=None) is None
+                           POP3UID.value.oneOf(d.keys()))).getColumn('value'):
+            del d[uid]
+        return d.values()
 
 
     def markSuccess(self, uid, msg):
@@ -316,12 +322,6 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             self.transport.loseConnection()
         return self._grab().addErrback(ebGrab)
 
-    def _relax(self):
-        # Leave off for a while.  This is ghetto.
-        d = defer.Deferred()
-        from twisted.internet import reactor
-        reactor.callLater(self._delay, d.callback, None)
-        return defer.waitForDeferred(d)
 
     def _grab(self):
         d = defer.waitForDeferred(self.login(self._username, self._password))
@@ -338,11 +338,35 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             yield None                  # defgen error handling work-around.
             return
 
-        d = defer.waitForDeferred(self.listUID())
+
+        N = 100
+
+        # Up to N (index, uid) pairs which have been received but not
+        # checked against shouldRetrieve
+        uidWorkingSet = []
+
+        # All the (index, uid) pairs which should be retrieved
+        uidList = []
+
+        # Consumer for listUID - adds to the working set and processes
+        # a batch if appropriate.
+        def consumeUIDLine(ent):
+            uidWorkingSet.append(ent)
+            if len(uidWorkingSet) >= N:
+                processBatch()
+
+        def processBatch():
+            L = self.shouldRetrieve(uidWorkingSet)
+            L.sort()
+            uidList.extend(L)
+            del uidWorkingSet[:]
+
+
+        d = defer.waitForDeferred(self.listUID(consumeUIDLine))
         self.setStatus(u"Retrieving message list...")
         yield d
         try:
-            uidList = d.getResult()
+            d.getResult()
         except:
             f = failure.Failure()
             log.err(f)
@@ -350,47 +374,45 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             self.transport.loseConnection()
             return
 
+        # Clean up any stragglers.
+        if uidWorkingSet:
+            processBatch()
+
         # XXX This is a bad loop.
-        for idx, uid in enumerate(uidList):
+        for idx, uid in uidList:
             if self.stopped:
                 return
             if self.paused():
                 break
 
-            if self.shouldRetrieve(uid):
-                rece = self.createMIMEReceiver()
-                if rece is None:
-                    return # ONO
-                d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
-                self.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
-                yield d
-                try:
-                    d.getResult()
-                except:
-                    f = failure.Failure()
-                    rece.connectionLost(f)
-                    self.markFailure(uid, f)
-                    if f.check(pop3client.LineTooLong):
-                        # reschedule, the connection has dropped
-                        self.transientFailure(f)
-                        break
-                    else:
-                        log.err(f)
+            rece = self.createMIMEReceiver()
+            if rece is None:
+                return # ONO
+            d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
+            self.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
+            yield d
+            try:
+                d.getResult()
+            except:
+                f = failure.Failure()
+                rece.connectionLost(f)
+                self.markFailure(uid, f)
+                if f.check(pop3client.LineTooLong):
+                    # reschedule, the connection has dropped
+                    self.transientFailure(f)
+                    break
                 else:
-                    try:
-                        rece.eomReceived()
-                    except:
-                        # message could not be delivered.
-                        f = failure.Failure()
-                        log.err(f)
-                        self.markFailure(uid, f)
-                    else:
-                        self.markSuccess(uid, rece.part)
-
-            if (idx + 1) % self._rate == 0:
-                wfdlater = self._relax()
-                yield wfdlater
-                rslt = wfdlater.getResult()
+                    log.err(f)
+            else:
+                try:
+                    rece.eomReceived()
+                except:
+                    # message could not be delivered.
+                    f = failure.Failure()
+                    log.err(f)
+                    self.markFailure(uid, f)
+                else:
+                    self.markSuccess(uid, rece.part)
 
         self.setStatus(u"Logging out...")
         d = defer.waitForDeferred(self.quit())
@@ -429,9 +451,9 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
         self._transact(self.grabber.status.setStatus, msg, success)
 
 
-    def shouldRetrieve(self, uid):
+    def shouldRetrieve(self, uidList):
         if self.grabber is not None:
-            return self._transact(self.grabber.shouldRetrieve, uid)
+            return self._transact(self.grabber.shouldRetrieve, uidList)
 
 
     def createMIMEReceiver(self):

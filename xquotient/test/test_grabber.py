@@ -21,8 +21,8 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
         self.events.append(('status', msg, success))
 
 
-    def shouldRetrieve(self, uid):
-        self.events.append(('retrieve', uid))
+    def shouldRetrieve(self, uidList):
+        self.events.append(('retrieve', uidList))
         return True
 
 
