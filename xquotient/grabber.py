@@ -675,23 +675,6 @@ class StatusColumnView(object):
 
 
 
-class RunningColumnView(object):
-    attributeID = 'running'
-    displayName = 'Running'
-    typeName = typeHint = None
-
-    def stanFromValue(self, idx, item, value):
-        return item.running and 'yes' or 'no'
-
-
-    def getWidth(self):
-        return ''
-
-
-    def onclick(self, idx, item, value):
-        return None
-
-
 class DeleteAction(tdbview.Action):
     def __init__(self, actionID='delete',
                  iconURL='/Mantissa/images/delete.png',
@@ -773,8 +756,7 @@ class ConfiguredGrabbersView(tdbview.TabularDataView):
             tdbview.ColumnViewBase('username'),
             tdbview.ColumnViewBase('domain'),
             tdbview.ColumnViewBase('paused'),
-            StatusColumnView(self),
-            RunningColumnView()]
+            StatusColumnView(self)]
         actions = [
             PauseAction(),
             ResumeAction(),
