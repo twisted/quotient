@@ -8,7 +8,7 @@ from twisted.mail import smtp, relaymanager
 from twisted.names import client
 from twisted.internet import error, defer, reactor
 
-from nevow import tags, inevow, flat
+from nevow import tags, inevow, flat, rend
 
 from epsilon import extime
 
@@ -16,6 +16,7 @@ from axiom import iaxiom, attributes, item, scheduler, userbase
 
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform, prefs
+from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, mail
 
@@ -189,58 +190,41 @@ class File(item.Item):
     cabinet = attributes.reference(allowNone=False)
 
 class FileCabinet(item.Item):
-
-    implements(inevow.IResource)
-
     typeName = 'quotient_file_cabinet'
     schemaVersion = 1
 
     name = attributes.text()
     filesCount = attributes.integer(default=0)
 
+class FileCabinetPage(rend.Page):
+    def __init__(self, original):
+        rend.Page.__init__(self, original, docFactory=getLoader('file-upload'))
+
     def renderHTTP(self, ctx):
         req = inevow.IRequest(ctx)
-        if req.method == 'GET':
-            req.setHeader("content/type", "text/html")
-            return '''
-            <html>
-            <head>
-            <script type="text/javascript">
-            function reportProgressToParent() {
-                document.getElementsByTagName("form")[0].style.display = "none";
-                /* do something magical */
-            }
-            </script>
-            </head>
-            <body>
-            <form enctype="multipart/form-data" method="POST" onsubmit="reportProgressToParent(); return true;">
-            <input name="uploaddata" type="file" />
-            <input type="submit" name="upload" value="Upload" />
-            </form></body></html>
-            '''
         if req.method == 'POST':
             uploadedFileArg = req.fields['uploaddata']
             def txn():
-                self.filesCount += 1
-                outf = self.store.newFile('cabinet-'+str(self.storeID),
-                                          str(self.filesCount))
+                self.original.filesCount += 1
+
+                outf = self.original.store.newFile(
+                                'cabinet-'+str(self.original.storeID),
+                                str(self.original.filesCount))
+
                 outf.write(uploadedFileArg.file.read())
                 outf.close()
 
-                File(store=self.store,
+                File(store=self.original.store,
                      body=outf.finalpath,
                      name=unicode(uploadedFileArg.filename),
                      type=unicode(uploadedFileArg.type),
-                     cabinet=self)
+                     cabinet=self.original)
 
-            self.store.transact(txn)
-            req.setHeader("content/type", "text/plain")
-            return 'OK '+str(self.filesCount)
+            self.original.store.transact(txn)
 
-    def locateChild(self, ctx, segments):
-        return self, ()
+        return rend.Page.renderHTTP(self, ctx)
 
-
+registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
 
 class ComposeFragment(liveform.LiveForm):
     implements(ixmantissa.INavigableFragment)
@@ -275,9 +259,16 @@ class ComposeFragment(liveform.LiveForm):
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments
+        self.fileAttachments = []
 
         self.docFactory = None
 
+    def invoke(self, formPostEmulator):
+        coerced = self._coerced(formPostEmulator)
+        # we want to allow the javascript to submit an
+        # list of filenames of arbitrary length with the form
+        coerced['files'] = formPostEmulator.get('files', ())
+        self.callable(**coerced)
 
     def getPeople(self):
         peeps = []
@@ -305,7 +296,8 @@ class ComposeFragment(liveform.LiveForm):
 
 
     _mxCalc = None
-    def _sendMail(self, toAddress, subject, messageBody, cc, bcc):
+    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files):
+        print files
 
         from email import Generator as G, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT
         import StringIO as S
@@ -317,12 +309,23 @@ class ComposeFragment(liveform.LiveForm):
             [MT.MIMEText(messageBody, 'plain'),
              MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
 
-        if 0 < len(self.attachments):
+        if self.attachments or files:
             attachmentParts = []
             for a in self.attachments:
                 part = MB.MIMEBase(*a.type.split('/'))
                 part.set_payload(a.part.getBody(decode=True))
+                fname = a.part.getParam('filename', header=u'content-disposition')
+                if fname is not None:
+                    part.add_header('content-disposition', 'attachment', filename=fname)
                 attachmentParts.append(part)
+
+            for fname in files:
+                a = self.original.store.findFirst(File, File.name == fname)
+                part = MB.MIMEBase(*a.type.split('/'))
+                part.set_payload(a.body.getContent())
+                part.add_header('content-disposition', 'attachment', filename=a.name)
+                attachmentParts.append(part)
+                a.deleteFromStore()
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 

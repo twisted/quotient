@@ -1,0 +1,38 @@
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="/Mantissa/mantissa.css" />
+    <script type="text/javascript" src="/Quotient/static/js/compose.js" />
+    <script type="text/javascript">
+      var current_filename = null;
+
+      function reportProgressToParent(form) {
+          if(!current_filename) {
+             return false;
+          }
+
+          document.getElementsByTagName("body")[0].style.opacity = .8;
+          window.parent.Quotient.Compose.Controller.get(
+              window.parent.Nevow.Athena.NodeByAttribute(
+                  window.parent.document.documentElement,
+                  'athena:class',
+                  'Quotient.Compose.Controller')).uploadedFile(current_filename);
+          return true;
+      }
+
+      function setFilename(name) {
+          // once submit is clicked, .value is the empty string
+          current_filename = name;
+      }
+    </script>
+  </head>
+  <body>
+    <form enctype="multipart/form-data" method="POST" onsubmit="return reportProgressToParent(this);">
+      <table>
+        <tr>
+          <td><input name="uploaddata" type="file" onchange="setFilename(this.value);"/></td>
+          <td><input type="submit" name="upload" value="Upload" /></td>
+        </tr>
+      </table>
+    </form>
+  </body>
+</html>

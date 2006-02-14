@@ -28,8 +28,41 @@ Quotient.Compose.Controller.methods(
             });
     },
 
+    function uploadedFile(self, fname) {
+        function relpath(s) {
+            var c = (-1 < s.lastIndexOf('/')) ? '/' : '\\';
+            return s.substring(s.lastIndexOf(c)+1, s.length);
+        }
+        var flist = self.nodeByAttribute('class', 'file-list');
+        flist.appendChild(MochiKit.DOM.LI(null, [fname,
+            MochiKit.DOM.A({"style": "padding-left: 4px",
+                            "href": "#",
+                            "onclick": function() {
+                                self.removeFile(this);
+                                return false
+                            }},
+                            "remove")]));
+        self.nodeByAttribute('class', 'uploaded-files').appendChild(
+            MochiKit.DOM.INPUT({"type": "text",
+                                "name": "files",
+                                "value": relpath(fname)}, fname));
+    },
+
+    function removeFile(self, node) {
+        var fname = node.previousSibling.nodeValue;
+        node.parentNode.parentNode.removeChild(node.parentNode);
+        var uploaded = self.nodeByAttribute('class', 'uploaded-files');
+        for(var i = 0; i < uploaded.childNodes.length; i++) {
+            if(uploaded.childNodes[i].firstChild.nodeValue == fname) {
+                uploaded.removeChild(uploaded.childNodes[i]);
+                break;
+            }
+        }
+    },
+
     function toggleMoreOptions(self, node) {
-        var opts = Nevow.Athena.NodeByAttribute(node.parentNode.parentNode, "class", "options-container");
+        var opts = Nevow.Athena.NodeByAttribute(
+                            node.parentNode.parentNode, "class", "options-container");
         opts.style.display = (opts.style.display == "none") ? "" : "none";
     },
 
