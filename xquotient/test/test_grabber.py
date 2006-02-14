@@ -23,7 +23,7 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
 
     def shouldRetrieve(self, uidList):
         self.events.append(('retrieve', uidList))
-        return True
+        return list(uidList)
 
 
     def createMIMEReceiver(self):
