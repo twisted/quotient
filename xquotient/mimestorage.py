@@ -73,7 +73,7 @@ class Part(item.Item):
                 "Don't add headers to in-database messages - they aren't mutable [yet?]")
         if not hasattr(self, '_headers'):
             self._headers = []
-        self._headers.append(Header(name=name.lower().decode('ascii'),
+        self._headers.append(Header(name=name.decode('ascii', 'ignore').lower(),
                                     value=value,
                                     part=self,
                                     message=self.message,

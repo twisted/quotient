@@ -18,6 +18,7 @@ From: alice@example.com
 To: bob@example.com
 Subject: a test message
 Date: Tue, 11 Oct 2005 14:25:12 GMT
+Junk\xa0Header: value
 
 Hello Bob,
   How are you?
@@ -35,12 +36,14 @@ Hello Bob,
             [mimepart.Header(u"from", "alice@example.com"),
              mimepart.Header(u"to", "bob@example.com"),
              mimepart.Header(u"subject", "a test message"),
-             mimepart.Header(u"date", 'Tue, 11 Oct 2005 14:25:12 GMT')])
+             mimepart.Header(u"date", "Tue, 11 Oct 2005 14:25:12 GMT"),
+             mimepart.Header(u"junkheader", "value")])
 
         self.assertEquals(msg.getHeader(u"from"), "alice@example.com")
         self.assertEquals(msg.getHeader(u"to"), "bob@example.com")
         self.assertEquals(msg.getHeader(u"subject"), "a test message")
         self.assertEquals(msg.getHeader(u"date"), 'Tue, 11 Oct 2005 14:25:12 GMT')
+        self.assertEquals(msg.getHeader(u"junkheader"), "value")
 
     def testTrivialMessage(self):
         self._messageTest(self.trivialMessage, self.assertTrivialMessageStructure)

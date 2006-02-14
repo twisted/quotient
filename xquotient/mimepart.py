@@ -528,7 +528,7 @@ class MIMEPart(object):
         self.headers = []
 
     def addHeader(self, name, value):
-        self.headers.append(Header(name.lower(), value)) # XXX decode value
+        self.headers.append(Header(name.decode('ascii', 'ignore').lower(), value)) # XXX decode value
 
     def getAllHeaders(self):
         return iter(self.headers)

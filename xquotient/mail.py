@@ -52,14 +52,49 @@ class MessageDelivery(object):
         d.addCallbacks(cbLogin, ebLogin)
         return d
 
+
+class SafeMIMEParserWrapper(object):
+    """
+    Simpler wrapper around a real MIME parser which captures errors
+    from lineReceived and saves them until messageDone().
+    """
+
+    failure = None
+
+    def __init__(self, receiver):
+        self.receiver = receiver
+
+
+    def lineReceived(self, line):
+        if self.failure is None:
+            try:
+                return self.receiver.lineReceived(line)
+            except:
+                self.failure = failure.Failure()
+
+
+    def messageDone(self):
+        if self.failure is not None:
+            self.failure.raiseException()
+        else:
+            return self.receiver.messageDone()
+
+
+    def __getattr__(self, name):
+        # Let people get at feedStringNow and that junk, if they want.
+        # We won't help them out if they try.
+        return getattr(self.receiver, name)
+
+
+
 class DeliveryAgentMixin(object):
     implements(iquotient.IMIMEDelivery)
 
     def createMIMEReceiver(self):
         fObj = self.installedOn.newFile('messages', str(self.messageCount))
         self.messageCount += 1
-        return mimestorage.MIMEMessageStorer(
-            self.installedOn, fObj)
+        return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
+            self.installedOn, fObj))
 
 
 class DeliveryFactoryMixin(object):
