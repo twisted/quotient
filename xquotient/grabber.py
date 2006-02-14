@@ -389,7 +389,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             if rece is None:
                 return # ONO
             d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
-            self.setStatus(u"Downloading %d of %d" % (idx, len(uidList)))
+            self.setStatus(u"Downloading %d of %d" % (idx, uidList[-1][0]))
             yield d
             try:
                 d.getResult()
