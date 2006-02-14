@@ -1,23 +1,5 @@
-.viewtab {
-    margin-right: 4px;
-    padding: 4px 4px 0px 4px;
-    border: solid 1px #B0B0B0;
-    border-bottom: none;
-    background-color: #F1F1F1;
-    cursor: pointer;
-}
-
-.active-viewtab {
-    margin-right: 4px;
-    padding: 4px 4px 0px 4px;
-    border: solid 1px #B0B0B0;
-    border-bottom: none;
-    background-color: #FFFFFF;
-    font-weight: bold;
-}
-
 table.tdb > tbody > tr > td { cursor: pointer; }
-.embedded-action { float: right; display: block; }
+
 #overlay {
     background-image: url(/Quotient/static/images/overlay.png);
 }
@@ -183,36 +165,3 @@ img.thumbnail { border: none; }
     padding-left: 4px;
 }
 
-.hide-show-link {
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-#message-control-panel {
-    margin-left: 1%;
-    border: solid 1px #DADADA;
-}
-
-.slight-link {
-    font-size: .9em;
-    font-style: italic;
-}
-
-table.quotient-dialog-table {
-    margin: 12px;
-    background-color: #FFFFFF;
-    border-spacing: 0;
-    border: solid 1px #B0B0B0;
-}
-
-table.quotient-dialog-table > thead {
-    background-color: #DADADA;
-    font-style: italic;
-}
-
-table.quotient-dialog-table > thead > tr > td {
-    border-bottom: solid 1px #B0B0B0;
-    padding: 2px;
-}
-
-table.quotient-dialog-table > tbody > tr > td { padding: 4px; }
