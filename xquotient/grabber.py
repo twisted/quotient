@@ -240,7 +240,7 @@ class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
                 port = 110
             connect = reactor.connectTCP
 
-        factory = POP3GrabberFactory(self)
+        factory = POP3GrabberFactory(self, self.ssl)
         if self.debug:
             factory = policies.TrafficLoggingFactory(
                 factory,
@@ -496,8 +496,9 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
 class POP3GrabberFactory(protocol.ClientFactory):
     protocol = ControlledPOP3GrabberProtocol
 
-    def __init__(self, grabber):
+    def __init__(self, grabber, ssl):
         self.grabber = grabber
+        self.ssl = ssl
 
 
     def clientConnectionFailed(self, connector, reason):
@@ -509,6 +510,8 @@ class POP3GrabberFactory(protocol.ClientFactory):
     def buildProtocol(self, addr):
         self.grabber.status.setStatus(u"Connection established...")
         p = protocol.ClientFactory.buildProtocol(self, addr)
+        if self.ssl:
+            p.allowInsecureLogin = True
         p.setCredentials(
             self.grabber.username.encode('ascii'),
             self.grabber.password.encode('ascii'))
