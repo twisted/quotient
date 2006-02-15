@@ -5,6 +5,8 @@ from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.python import filepath
 
+from epsilon import extime
+
 from axiom import store, scheduler
 
 from xquotient import mail, mimepart, mimestorage
@@ -154,14 +156,6 @@ oTZw+Ovl1BvLcE+pK9VFxxY=
         self._messageTest(self.multipartMessage, self.assertMultipartMessageStructure)
 
 
-    typelessMessage = msg("""\
-To: you
-From: nobody
-
-haha
-""")
-
-
 class ParsingTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         deliveryDir = self.mktemp()
@@ -197,7 +191,29 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
                             mimestorage.Part, sort=mimestorage.Part.partID).getColumn('partID'))
         self.assertEquals(partIDs, range(len(partIDs)))
 
+
+    typelessMessage = msg("""\
+To: you
+From: nobody
+
+haha
+""")
+
     def testContentTypeNotNone(self):
         self._messageTest(self.typelessMessage,
-                          lambda msg: self.assertEquals(msg.getContentType(),
-                                                        'text/plain'))
+                          lambda part: self.assertEquals(part.getContentType(),
+                                                         'text/plain'))
+
+    datelessMessage = msg("""\
+Received: Wed, 15 Feb 2006 03:58:50 GMT
+
+Some body
+""")
+
+    def testSentWhen(self):
+        def assertSentWhen(part):
+            self.assertEquals(
+                part.message.sentWhen,
+                extime.Time.fromRFC2822("Wed, 15 Feb 2006 03:58:50 GMT"))
+
+        self._messageTest(self.datelessMessage, assertSentWhen)

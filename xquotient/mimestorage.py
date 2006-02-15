@@ -1,7 +1,7 @@
 # -*- test-case-name: xquotient.test.test_mimepart -*-
 
 import itertools
-import quopri, binascii
+import quopri, binascii, rfc822
 
 from epsilon.extime import Time
 
@@ -358,6 +358,22 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                 sent = Time.fromRFC2822(sent)
             except ValueError:
                 sent = None
+
+        if sent is None:
+            for received in list(self.part.getHeaders(u'received'))[::-1]:
+                lines = received.value.splitlines()
+                if lines:
+                    lastLine = lines[-1]
+                    parts = lastLine.split('; ')
+                    if parts:
+                        date = parts[-1]
+                        try:
+                            sent = Time.fromStructTime(rfc822.parsedate(date))
+                        except ValueError:
+                            pass
+                        else:
+                            break
+
         if sent is None:
             sent = self.message.receivedWhen
         self.message.sentWhen = sent
