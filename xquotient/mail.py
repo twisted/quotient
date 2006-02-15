@@ -9,7 +9,7 @@ from zope.interface import implements
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.protocols import policies
-from twisted.python import log
+from twisted.python import log, failure
 from twisted.cred import portal, checkers
 from twisted.mail import smtp
 
