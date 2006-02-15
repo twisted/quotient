@@ -168,9 +168,34 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def messageBounced(self, log, toAddress, msg):
-        print 'X' * 50
-        print 'OMFG IT BOUNCED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-        print 'X' * 50
+        from email import Parser as P, Generator as G, Message as M, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT, MIMEMessage as MM
+        import StringIO as S
+
+        bounceText = 'Your message bounced.'
+
+        s = S.StringIO()
+        original = P.Parser().parse(msg.impl.source.open())
+
+        m = MMP.MIMEMultipart(
+            'mixed',
+            None,
+            [MT.MIMEText(bounceText, 'plain'),
+             MT.MIMEText(log, 'plain'),
+             MM.MIMEMessage(original)])
+
+        m['Subject'] = 'Unable to deliver message'
+        m['From'] = '<>'
+        m['To'] = ''
+
+        G.Generator(s).flatten(m)
+        s.seek(0)
+
+        def createMessage():
+            mr = iquotient.IMIMEDelivery(self.store).createMIMEReceiver()
+            for L in s:
+                mr.lineReceived(L.rstrip('\n'))
+            mr.messageDone()
+        self.store.transact(createMessage)
 
 
     def messageSent(self, toAddress, msg):
@@ -335,7 +360,8 @@ class ComposeFragment(liveform.LiveForm):
         m['Date'] = rfc822.formatdate()
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
 
-        m['Cc'] = cc
+        if cc:
+            m['Cc'] = cc
 
         G.Generator(s).flatten(m)
         s.seek(0)
