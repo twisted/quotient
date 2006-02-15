@@ -362,17 +362,19 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             sent = self.message.receivedWhen
         self.message.sentWhen = sent
 
-        for (attr, headers) in [
-            ('recipient', [u'to']),
-            ('subject', [u'subject'])]:
-            for h in headers:
-                try:
-                    v = self.part.getHeader(h)
-                except equotient.NoSuchHeader:
-                    continue
-                else:
-                    setattr(self.message, attr, mimeutil.headerToUnicode(v))
-                    break
+        try:
+            to = self.part.getHeader(u'to')
+        except equotient.NoSuchHeader:
+            pass
+        else:
+            self.message.recipient = mimeutil.headerToUnicode(to)
+
+        try:
+            subject = self.part.getHeader(u'subject')
+        except equotient.NoSuchHeader:
+            self.message.subject = u'(no subject)'
+        else:
+            self.message.subject = mimeutil.headerToUnicode(subject)
 
         for header in (u'from', u'sender', u'reply-to'):
             try:
