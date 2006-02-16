@@ -1,10 +1,12 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+<div
+  xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  xmlns:athena="http://divmod.org/ns/athena/0.7"
   nevow:render="liveFragment">
   <!--
   <div id="loading-dialog" style="font-size: 2.4em;">
     Loading...
   </div>
-  
+
   <div id="add-person-fragment" style="display: none; background-color: #FFFFFF">
     <nevow:invisible nevow:render="addPersonFragment" />
   </div>
@@ -24,7 +26,9 @@
     </div>
   </div>
   -->
-
+  <select nevow:pattern="accountChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseAccount(this);">
+    <option nevow:pattern="accountChoice"><nevow:attr name="value"><nevow:slot name="accountName" /></nevow:attr><nevow:slot name="accountName" /></option>
+  </select>
   <div class="mailbox-container">
     <span id="throbber" style="visibility: hidden; position: absolute; top: 0; left: 0">
       <img style="padding: 4px;" src="/Quotient/static/images/circle-throbber.gif" />
@@ -42,6 +46,7 @@
           <center id="view-options">
             <a href="#" onclick="Quotient.Mailbox.Controller.get(this).prevPage(); return false">page up</a>
             | <a href="#" onclick="Quotient.Mailbox.Controller.get(this).nextPage();return false">page down</a>
+            | <nevow:invisible nevow:render="accountChooser" />
             <!--<span id="show-read-outer-container">
               show read:
               <span id="show-read-container" nevow:render="showRead">

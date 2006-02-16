@@ -42,7 +42,10 @@ class MessageDelivery(object):
     def validateTo(self, user):
         def cbLogin((iface, avatar, logout)):
             logout() # XXX???
-            return avatar.createMIMEReceiver
+            def createMIMEReceiver():
+                return avatar.createMIMEReceiver(
+                    u"smtp://%s@%s" % (user.dest.local, user.dest.domain))
+            return createMIMEReceiver
         def ebLogin(err):
             log.msg("Failed validateTo")
             log.err(err)
@@ -90,11 +93,11 @@ class SafeMIMEParserWrapper(object):
 class DeliveryAgentMixin(object):
     implements(iquotient.IMIMEDelivery)
 
-    def createMIMEReceiver(self):
+    def createMIMEReceiver(self, source):
         fObj = self.installedOn.newFile('messages', str(self.messageCount))
         self.messageCount += 1
         return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
-            self.installedOn, fObj))
+            self.installedOn, fObj, source))
 
 
 class DeliveryFactoryMixin(object):

@@ -176,7 +176,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
         scheduler.Scheduler(store=s).installOn(s)
         mp = mail.MailTransferAgent(store=s)
         mp.installOn(s)
-        return mp.createMIMEReceiver()
+        return mp.createMIMEReceiver(u"test://" + dbdir)
 
     def _messageTest(self, source, assertMethod):
         mr = self.setUpMailStuff()

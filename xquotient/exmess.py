@@ -40,6 +40,11 @@ class Message(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
+    source = attributes.text(doc="""
+    A short string describing the means by which this Message came to exist.
+    For example, u'mailto:alice@example.com' or u'pop3://bob@example.net'.
+    """)
+
     sentWhen = attributes.timestamp()
     receivedWhen = attributes.timestamp()
 

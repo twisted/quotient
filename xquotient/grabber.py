@@ -324,6 +324,8 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
 
     def _grab(self):
+        source = self.getSource()
+
         d = defer.waitForDeferred(self.login(self._username, self._password))
         self.setStatus(u"Logging in...")
         yield d
@@ -385,7 +387,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             if self.paused():
                 break
 
-            rece = self.createMIMEReceiver()
+            rece = self.createMIMEReceiver(source)
             if rece is None:
                 return # ONO
             d = defer.waitForDeferred(self.retrieve(idx, self._consumerFactory(rece)))
@@ -447,6 +449,10 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
         return self.grabber.store.transact(*a, **kw)
 
 
+    def getSource(self):
+        return u'pop3://' + self.grabber.grabberID
+
+
     def setStatus(self, msg, success=True):
         self._transact(self.grabber.status.setStatus, msg, success)
 
@@ -456,9 +462,9 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
             return self._transact(self.grabber.shouldRetrieve, uidList)
 
 
-    def createMIMEReceiver(self):
+    def createMIMEReceiver(self, source):
         if self.grabber is not None:
-            return self._transact(self.grabber.createMIMEReceiver)
+            return self._transact(self.grabber.createMIMEReceiver, source)
 
 
     def markSuccess(self, uid, part):

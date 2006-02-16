@@ -17,6 +17,12 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
         grabber.POP3GrabberProtocol.connectionMade(self)
         self.events = []
 
+
+    def getSource(self):
+        self.events.append(('source',))
+        return u"test-pop3"
+
+
     def setStatus(self, msg, success=True):
         self.events.append(('status', msg, success))
 
@@ -26,9 +32,9 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
         return list(uidList)
 
 
-    def createMIMEReceiver(self):
+    def createMIMEReceiver(self, source):
         s = StringIO.StringIO()
-        self.events.append(('receiver', s))
+        self.events.append(('receiver', source, s))
         return mimepart.MIMEMessageReceiver(s)
 
 
@@ -122,7 +128,3 @@ class POP3GrabberTestCase(unittest.TestCase):
         self.assertEquals(
             [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
             'stopped')
-
-
-
-

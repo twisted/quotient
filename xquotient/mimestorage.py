@@ -333,8 +333,10 @@ class Part(item.Item):
             for child in part.walkMessage(prefer):
                 yield child
 
+
+
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
-    def __init__(self, store, fObj):
+    def __init__(self, store, fObj, source):
         partCounter = itertools.count().next
         super(MIMEMessageStorer, self).__init__(
             fObj,
@@ -343,6 +345,8 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                                   *a,
                                   **kw))
         self.store = store
+        self.source = source
+
 
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
@@ -368,10 +372,13 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                     if parts:
                         date = parts[-1]
                         try:
-                            sent = Time.fromStructTime(rfc822.parsedate(date))
+                            when = rfc822.parsedate(date)
+                            if when is None:
+                                continue
                         except ValueError:
                             pass
                         else:
+                            sent = Time.fromStructTime(when)
                             break
 
         if sent is None:
@@ -402,6 +409,8 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             self.message.sender = unicode(email.email)
             self.message.senderDisplay = unicode(email.anyDisplayName())
             break
+
+        self.message.source = self.source
 
         #for (relation, address) in ((u'sender', self.message.sender),
         #                            (u'recipient', self.message.recipient)):

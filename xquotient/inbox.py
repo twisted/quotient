@@ -275,6 +275,7 @@ class InboxScreen(athena.LiveFragment):
     inSentMailView = False
     viewingByTag = None
     viewingByPerson = None
+    viewingByAccount = None
     currentMessage = None
 
     translator = None
@@ -287,6 +288,7 @@ class InboxScreen(athena.LiveFragment):
                 viewByTag=True,      viewByAllTags=True,     markCurrentMessageUnread=True,
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
+                viewByAccount=True,
 
                 nextPageAndMessage=True,
                 prevPageAndMessage=True,
@@ -462,6 +464,10 @@ class InboxScreen(athena.LiveFragment):
         self.viewingByPerson = None
         self._changeComparisonReplaceTable()
 
+    def viewByAccount(self, account):
+        self.viewingByAccount = account
+        self._changeComparisonReplaceTable()
+
     def toggleShowRead(self):
         self.showRead = not self.showRead
         self._changeComparisonReplaceTable()
@@ -616,6 +622,11 @@ class InboxScreen(athena.LiveFragment):
                  people.Person.name == self.viewingByPerson,
                  comparison)
 
+        if self.viewingByAccount is not None:
+            comparison = attributes.AND(
+                Message.source == self.viewingByAccount,
+                comparison)
+
         if not self.showRead and not (self.inArchiveView or self.inTrashView):
             comparison = attributes.AND(comparison,
                                         Message.read == False)
@@ -623,6 +634,19 @@ class InboxScreen(athena.LiveFragment):
 
     def render_inboxTDB(self, ctx, data):
         return ctx.tag[self.inboxTDB]
+
+    def _accountNames(self):
+        return self.original.store.query(Message).getColumn("source").distinct()
+
+    def render_accountChooser(self, ctx, data):
+        select = inevow.IQ(self.docFactory).onePattern('accountChooser')
+        option = inevow.IQ(select).patternGenerator('accountChoice')
+        for acc in [None] + list(self._accountNames()):
+            opt = option().fillSlots('accountName', acc or 'All')
+            if acc == self.viewingByAccount:
+                opt(selected="selected")
+            select[opt]
+        return select
 
     def render_messageCount(self, ctx, data):
         return self.inboxTDB.original.totalItems

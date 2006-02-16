@@ -314,6 +314,13 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
+    function chooseAccount(self, select) {
+        var value = select.value;
+        if (value == 'All') {
+            value = null;
+        }
+        self.callRemote("viewByAccount", value);
+    },
 
     function replaceTDB(self, data) {
         self.inboxTDB._setTableContent(data[0]);
