@@ -13,12 +13,20 @@ Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function loaded(self) {
-        var tdbContainer = self.nodeByAttribute("class", "inbox-tdb-container");
-        var tdbNode = Nevow.Athena.NodeByAttribute(tdbContainer,
-                                                   "athena:class",
-                                                   "Mantissa.TDB.Controller");
+        /* temporarily disable any inbox behaviour, at the moment the
+           inbox is just a scrolled table, so we don't need a lot of 
+           this tdb hacking cleverness (it also won't work).  eventually
+           we'll want to re-enable a lot of this functionality, like view by tag
+           and such, but some of it will move into the message detail
+           fragment/jsclass
+        */
+        var scrollContainer = self.nodeByAttribute("class", "scrolltable-container");
+        var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
+                                                      "athena:class",
+                                                      "Mantissa.ScrollTable.ScrollingWidget");
 
-        self.inboxTDB = Mantissa.TDB.Controller.get(tdbNode);
+        self.scrollWidget = Mantissa.ScrollTable.ScrollingWidget.get(scrollNode);
+        return;
 
         self.allTags   = new Array();
         self.selectedRow = null;
@@ -319,7 +327,11 @@ Quotient.Mailbox.Controller.methods(
         if (value == 'All') {
             value = null;
         }
-        self.callRemote("viewByAccount", value);
+        self.callRemote("viewByAccount", value).addCallback(
+            function(rowCount) {
+                self.scrollWidget.setViewportHeight(rowCount);
+                self.scrollWidget.emptyAndRefill();
+            });
     },
 
     function replaceTDB(self, data) {

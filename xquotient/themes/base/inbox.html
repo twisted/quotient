@@ -1,83 +1,20 @@
-<div
-  xmlns:nevow="http://nevow.com/ns/nevow/0.1"
-  xmlns:athena="http://divmod.org/ns/athena/0.7"
-  nevow:render="liveFragment">
-  <!--
-  <div id="loading-dialog" style="font-size: 2.4em;">
-    Loading...
-  </div>
-
-  <div id="add-person-fragment" style="display: none; background-color: #FFFFFF">
-    <nevow:invisible nevow:render="addPersonFragment" />
-  </div>
-
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment">
   <div>
-    <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
-      <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
-      Views</div>
-    <div class="pane-body" style="display: none;">
-      <select onchange="Quotient.Mailbox.Controller.get(this).changedView(this)" class="select-1" size="5" style="width: 160px">
-        <option>Mail</option>
-        <option>People</option>
-        <option>Tags</option>
-      </select>
-      <select class="select-2" size="5" style="width: 160px; opacity: .3; position: relative; z-index: 3" />
-      <select class="select-3" size="5" style="width: 160px; position: relative; z-index: 5; opacity: .3" />
-    </div>
-  </div>
-  -->
-  <select nevow:pattern="accountChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseAccount(this);">
-    <option nevow:pattern="accountChoice"><nevow:attr name="value"><nevow:slot name="accountName" /></nevow:attr><nevow:slot name="accountName" /></option>
-  </select>
-  <div class="mailbox-container">
-    <span id="throbber" style="visibility: hidden; position: absolute; top: 0; left: 0">
-      <img style="padding: 4px;" src="/Quotient/static/images/circle-throbber.gif" />
-    </span>
-    <div id="time-report-box" />
     <span class="message-count"
       ><nevow:invisible nevow:render="messageCount" /></span> messages.
     <span class="unread-message-count"
       ><nevow:invisible nevow:render="unreadMessageCount" /></span> unread messages.
-    <table style="width: 100%; border-spacing: 0px;">
-      <tr valign="top">
-        <td class="inbox-tdb-container">
-          <nevow:invisible nevow:render="inboxTDB" />
+  </div>
 
-          <center id="view-options">
-            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).prevPage(); return false">page up</a>
-            | <a href="#" onclick="Quotient.Mailbox.Controller.get(this).nextPage();return false">page down</a>
-            | <nevow:invisible nevow:render="accountChooser" />
-            <!--<span id="show-read-outer-container">
-              show read:
-              <span id="show-read-container" nevow:render="showRead">
-                <input nevow:pattern="show-read-on" type="checkbox" checked="true"
-                  onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead()" />
-                <input nevow:pattern="show-read-off" type="checkbox"
-                  onclick="Quotient.Mailbox.Controller.get(this).toggleShowRead();" />
-              </span></span>
-            <table>
-              <tr>
-                <td>View by</td>
-                <td>
-                  <select id="more-views-select" onchange="Quotient.Mailbox.Controller.get(this).viewChanged()"
-                    ><option value="tag">tag</option><option value="person">person</option></select>
-                </td>
-                <td>
-                  <select style="width: 200px; overflow: hidden" id="tag-select"
-                    onchange="Quotient.Mailbox.Controller.get(this).viewByTagChanged(this)"/>
-                  <select style="display: none; width: 200px; overflow: hidden;" id="person-select"
-                    onchange="Quotient.Mailbox.Controller.get(this).viewByPersonChanged(this)"/>
-                </td>
-              </tr>
-            </table>
-            -->
-            <div id="mailbox-log" />
-          </center>
-        </td>
-        <td style="width: 100%">
-          <div id="message-detail" />
-        </td>
-      </tr>
-    </table>
+  <select nevow:pattern="accountChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseAccount(this);">
+    <option nevow:pattern="accountChoice"><nevow:attr name="value"><nevow:slot name="accountName" /></nevow:attr><nevow:slot name="accountName" /></option>
+  </select>
+
+  <div class="scrolltable-container">
+    <nevow:invisible nevow:render="scroller" />
+  </div>
+
+  <div>
+    <nevow:invisible nevow:render="accountChooser" />
   </div>
 </div>

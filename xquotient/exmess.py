@@ -211,7 +211,7 @@ class MessageDetail(athena.LiveFragment):
                      sent=sentWhen))
 
     def _childLink(self, webItem, item):
-        return '/' + webItem.prefixURL + self.translator.linkTo(item.storeID)[len('/private'):]
+        return '/' + webItem.prefixURL + '/' + self.translator.toWebID(item)
 
     def _partLink(self, part):
         return self._childLink(MessagePartView, part)

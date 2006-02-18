@@ -125,8 +125,6 @@ class GalleryScreen(athena.LiveFragment):
         imageClasses = itertools.cycle(('gallery-image', 'gallery-image-alt'))
         placedImages = 0
 
-        linkTo = lambda item: self.translator.linkTo(item.storeID)[len('/private'):]
-
         if 0 < len(self.items):
             for (i, image) in enumerate(self.items):
                 if 0 < i and i % self.itemsPerRow == 0:
@@ -137,8 +135,8 @@ class GalleryScreen(athena.LiveFragment):
                     imageClass = imageClasses.next()
                     lastMessageID = message.storeID
 
-                imageURL = '/private/message-parts' + linkTo(image.part) + '?withfilename=1'
-                thumbURL = '/private/thumbnails' + linkTo(image)
+                imageURL = '/private/message-parts' + self.translator.toWebID(image.part) + '?withfilename=1'
+                thumbURL = '/private/thumbnails' + self.translator.toWebID(image)
 
                 person = self.organizer.personByEmailAddress(message.sender)
                 if person is None:

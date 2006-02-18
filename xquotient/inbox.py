@@ -14,6 +14,7 @@ from axiom.slotmachine import hyper as super
 from xmantissa import ixmantissa, tdb, tdbview, webnav, people
 from xmantissa.fragmentutils import PatternDictionary
 from xmantissa.publicresource import getLoader
+from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message
 from xquotient import mimepart, equotient, extract, compose
@@ -443,10 +444,9 @@ class InboxScreen(athena.LiveFragment):
     def newMessage(self):
         pass
 
-    def _changeComparisonReplaceTable(self):
-        self.inboxTDB.original.baseComparison = self._getBaseComparison()
-        self.inboxTDB.original.firstPage()
-        return self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
+    def _changeComparison(self):
+        self.scrollingFragment.baseConstraint = self._getBaseComparison()
+        return self.scrollingFragment.requestCurrentSize()
 
     def viewByTag(self, tag):
         self.viewingByTag = tag
@@ -466,7 +466,7 @@ class InboxScreen(athena.LiveFragment):
 
     def viewByAccount(self, account):
         self.viewingByAccount = account
-        self._changeComparisonReplaceTable()
+        return self._changeComparison()
 
     def toggleShowRead(self):
         self.showRead = not self.showRead
@@ -647,6 +647,16 @@ class InboxScreen(athena.LiveFragment):
                 opt(selected="selected")
             select[opt]
         return select
+
+    def render_scroller(self, ctx, data):
+        f = ScrollingFragment(self.original.store,
+                              Message,
+                              self._getBaseComparison(),
+                              [u'sender', u'subject', u'sentWhen'])
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        self.scrollingFragment = f
+        return f
 
     def render_messageCount(self, ctx, data):
         return self.inboxTDB.original.totalItems

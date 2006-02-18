@@ -33,11 +33,10 @@ class EmailActions(Item, InstallableMixin):
         if self.translator is None:
             self.translator = ixmantissa.IWebTranslator(self.store)
 
-        def linkTo(typeClass):
-            return self.translator.linkTo(self.store.findUnique(typeClass).storeID)
-
-        sendMailLink = tags.a(href='%s?recipient=%s' % (linkTo(compose.Composer),
-                                                        urllib.quote(self.installedOn.getEmailAddress())))
+        sendMailLink = tags.a(href='%s?recipient=%s' % (
+                self.translator.linkTo(
+                    self.store.findUnique(compose.Composer).storeID),
+                urllib.quote(self.installedOn.getEmailAddress())))
         return sendMailLink['Send an email!']
 
 class LinkToColumnView(tdbview.ColumnViewBase):
