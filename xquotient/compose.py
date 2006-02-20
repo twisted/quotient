@@ -191,7 +191,10 @@ class Composer(item.Item, item.InstallableMixin):
         s.seek(0)
 
         def createMessage():
-            mr = iquotient.IMIMEDelivery(self.store).createMIMEReceiver()
+            # this doesn't seem to get called (yet?)
+            mr = iquotient.IMIMEDelivery(
+                    self.store).createMIMEReceiver(
+                                'sent://' + self.fromAddress)
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
@@ -367,7 +370,9 @@ class ComposeFragment(liveform.LiveForm):
         s.seek(0)
 
         def createMessageAndQueueIt():
-            mr = iquotient.IMIMEDelivery(self.original.store).createMIMEReceiver()
+            mr = iquotient.IMIMEDelivery(
+                        self.original.store).createMIMEReceiver(
+                                'sent://' + self.original.fromAddress)
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
