@@ -1,5 +1,3 @@
-import operator
-
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
@@ -238,6 +236,31 @@ class Inbox(Item, InstallableMixin):
         super(Inbox, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
 
+    def findNextUnread(self, scrollingFragment, currentMessage, perPage=None):
+        # is there an unread item after the current msg in the current row set?
+        seen = False
+        for msg in scrollingFragment.currentRowSet:
+            if seen:
+                if not msg.read:
+                    return msg
+            elif msg.storeID == currentMessage.storeID:
+                seen = True
+
+        nextUnread = None
+        (rangeBegin, rangeEnd) = scrollingFragment.currentRowRange
+        if perPage is None:
+            perPage = 10
+
+        while True:
+            i = 0
+            for msg in scrollingFragment.performQuery(rangeBegin, rangeBegin+perPage):
+                if not msg.read:
+                    return msg
+                i += 1
+            if i == 0:
+                break
+            rangeBegin += perPage
+
 class InboxMessageView(tdbview.TabularDataView):
     def __init__(self, original, baseComparison=None):
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
@@ -289,11 +312,10 @@ class InboxScreen(athena.LiveFragment):
                 viewByTag=True,      viewByAllTags=True,     markCurrentMessageUnread=True,
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
-                viewByAccount=True,
+                viewByAccount=True,  loadMessageFromID=True, nextUnread=True,
 
                 nextPageAndMessage=True,
                 prevPageAndMessage=True,
-                nextUnread=True,
                 forwardCurrentMessage=True,
                 fetchFilteredCounts=True,
                 markCurrentMessageRead=True,
@@ -308,6 +330,7 @@ class InboxScreen(athena.LiveFragment):
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
         self.organizer = original.store.findOrCreate(people.Organizer)
         self.showRead = self.prefs.getPreferenceValue('showRead')
+        self.translator = ixmantissa.IWebTranslator(original.store)
 
     def _getInboxTDB(self):
         if self._inboxTDB is None:
@@ -417,32 +440,6 @@ class InboxScreen(athena.LiveFragment):
             return self.getMessageContent(newOffset, markUnread=markUnread)
         else:
             raise ValueError('no next message')
-
-    def nextUnread(self):
-        next = self._findNextUnread()
-        assert next is not None
-
-        switchedPages = 0
-        itemOffset = None
-        while itemOffset is None:
-            for (i, d) in enumerate(self.inboxTDB.original.currentPage()):
-                if d['__item__'].storeID == next.storeID:
-                    itemOffset = i
-                    break
-            else:
-                assert self.inboxTDB.original.hasNextPage()
-                switchedPages += 1
-                self.inboxTDB.original.nextPage()
-
-        if 0 < switchedPages:
-            tdbhtml = self.inboxTDB.replaceTable()
-        else:
-            tdbhtml = None
-
-        return (tdbhtml, self.getMessageContent(itemOffset), itemOffset)
-
-    def newMessage(self):
-        pass
 
     def _changeComparison(self):
         self.scrollingFragment.baseConstraint = self._getBaseComparison()
@@ -567,7 +564,6 @@ class InboxScreen(athena.LiveFragment):
         data  = {u'sender': {u'is-person': isPerson},
                  u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
                               u'read': self.currentMessage.read},
-                 u'next-unread': self._haveNextUnreadMessage(),
                  u'has-next-page': self.inboxTDB.original.hasNextPage(),
                  u'has-prev-page': self.inboxTDB.original.hasPrevPage()}
 
@@ -584,6 +580,27 @@ class InboxScreen(athena.LiveFragment):
         #        edata[ename][ex.text] = v
 
         return data
+
+    def nextUnread(self):
+        next = self._findNextUnread()
+        if next is not None:
+            return (self.scrollingFragment.currentRowRange,
+                    self.scrollingFragment.constructRows(
+                            self.scrollingFragment.currentRowSet),
+                    unicode(self.translator.toWebID(next)),
+                    self._loadMessage(next))
+
+    def loadMessageFromID(self, webID):
+        return self._loadMessage(self.translator.fromWebID(webID))
+
+    def _loadMessage(self, item):
+        self.currentMessage = item
+        self.currentMessageDetail = ixmantissa.INavigableFragment(item)
+        self.currentMessageDetail.page = self.page
+        item.read = True
+
+        return (self._getMessageMetadata(),
+                unicode(flatten(self.currentMessageDetail), 'utf-8'))
 
     def getMessageContent(self, idx, markUnread=True):
         # i load and display the message at offset 'idx' in the current
@@ -652,7 +669,8 @@ class InboxScreen(athena.LiveFragment):
         f = ScrollingFragment(self.original.store,
                               Message,
                               self._getBaseComparison(),
-                              [u'sender', u'subject', u'sentWhen'])
+                              [u'sender', u'subject', u'sentWhen', u'read'])
+        f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         self.scrollingFragment = f
@@ -691,38 +709,26 @@ class InboxScreen(athena.LiveFragment):
                         and not self.inboxTDB.original.hasNextPage())
 
     def _haveNextUnreadMessage(self):
-        return self._haveNextMessage() and self._findNextUnread() is not None
+        return self._findNextUnread() is not None
 
-    def _findNextUnread(self, prev=False):
-        # this is expensive, should probably cache the result
-        switch = prev ^ self.inboxTDB.original.isAscending
-        sortColumn = self.inboxTDB.original.currentSortColumn
-        sortableColumn = sortColumn.sortAttribute()
-
-        if switch:
-            op = operator.lt
-            sortableColumn = sortableColumn.ascending
-        else:
-            op = operator.gt
-            sortableColumn = sortableColumn.descending
-
-        currentPivot = sortColumn.extractValue(None, self.currentMessage)
-        offsetComparison = op(currentPivot, sortColumn.sortAttribute())
-
-        comparison = attributes.AND(offsetComparison,
-                                    self.inboxTDB.original.baseComparison,
-                                    Message.read == False)
-
-        q = self.original.store.query(Message, comparison,
-                                      limit=1, sort=sortableColumn)
-        try:
-            return iter(q).next()
-        except StopIteration:
-            return None
+    def _findNextUnread(self):
+        return self.original.findNextUnread(self.scrollingFragment, self.currentMessage)
 
     def head(self):
-        return tags.link(rel='stylesheet', type='text/css',
-                         href='/Quotient/static/reader.css')
+        yield tags.link(rel='stylesheet', type='text/css',
+                        href='/Quotient/static/reader.css')
+        yield tags.script(type='text/javascript')['''
+            var djConfig = {
+                baseRelativePath: "/Quotient/static/js/dojo/"
+            }
+        ''']
+        yield tags.script(type='text/javascript', src='/Quotient/static/js/dojo/dojo.js')
+        yield tags.script(type='text/javascript')['''
+            dojo.require("dojo.widget.SplitPane");
+            dojo.require("dojo.widget.ContentPane");
+            dojo.require("dojo.widget.ScrolledTableContentPane");
+            dojo.require("dojo.widget.ChildSizingContentPane");
+        ''']
 
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)

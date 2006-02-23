@@ -3,6 +3,7 @@
 // import Quotient.Compose
 // import Mantissa.People
 // import LightBox
+// import Mantissa.ScrollTable
 
 if(typeof(Quotient.Mailbox) == "undefined") {
     Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
@@ -18,22 +19,72 @@ Quotient.Mailbox.MessageDetail.methods(
         });
     });
 
+Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();
+Quotient.Mailbox.ScrollingWidget.methods(
+    function _selectRow(self, rowOffset, row) {
+        if(self._selectedRow) {
+            self._selectedRow.style.backgroundColor = '#FFFFFF';
+        }
+        row.style.backgroundColor = '#CACACA';
+        self._selectedRow = row;
+        self._selectedRowOffset = rowOffset;
+    },
+
+    function makeRowElement(self, rowOffset, rowData, cells) {
+        return MochiKit.DOM.A(
+            {"class": "scroll-row",
+             "href": "#",
+             "style": rowData["read"] ? "" : "font-weight: bold",
+             "onclick": function() {
+                self._selectRow(rowOffset, this);
+                self.widgetParent.loadMessageFromID(rowData["__id__"]);
+                return false;
+            }},
+            cells);
+    },
+
+    function skipColumn(self, name) {
+        return name == "read";
+    },
+    
+    function cbRowsFetched(self) {
+        if(self._pendingRowSelection) {
+            self._pendingRowSelection();
+            self._pendingRowSelection = null;
+        }
+    });
+
+
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function loaded(self) {
         /* temporarily disable any inbox behaviour, at the moment the
-            inbox is just a scrolled table, so we don't need a lot of 
-            this tdb hacking cleverness (it also won't work).  eventually
-            we'll want to re-enable a lot of this functionality, like view by tag
-            and such, but some of it will move into the message detail
-            fragment/jsclass
+           inbox is just a scrolled table, so we don't need a lot of 
+           this tdb hacking cleverness (it also won't work).  eventually
+           we'll want to re-enable a lot of this functionality, like view by tag
+           and such, but some of it will move into the message detail
+           fragment/jsclass
         */
         var scrollContainer = self.nodeByAttribute("class", "scrolltable-container");
         var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
-                                                        "athena:class",
-                                                        "Mantissa.ScrollTable.ScrollingWidget");
+                                                      "athena:class",
+                                                      "Quotient.Mailbox.ScrollingWidget");
+        self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
+        self.messageDetailNode = self.nodeByAttribute("class", "message-detail");
+        var topControls = self.nodeByAttribute("class", "top-controls");
+        var splitPane = self.nodeByAttribute("class", "dojoHtmlSplitPane");
+        var splitPaneWidget = dojo.widget.byType("SplitPane")[0];
 
-        self.scrollWidget = Mantissa.ScrollTable.ScrollingWidget.get(scrollNode);
+        function setSplitPaneSize() {
+            var totalHeight = document.documentElement.clientHeight;
+            var remainingSpace = totalHeight - Quotient.Common.Util.findPosY(splitPane);
+            splitPane.style.height = remainingSpace + 'px';
+            for(var i = 0; i < splitPaneWidget.children.length; i++) {
+                splitPaneWidget.children[i].onResized();
+            }
+        }
+        setSplitPaneSize();
+        window.onresize = setSplitPaneSize;
         return;
 
         self.allTags   = new Array();
@@ -48,7 +99,63 @@ Quotient.Mailbox.Controller.methods(
 
     },
 
-    /*
+    function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {
+        /* ideally we want to disable these actions if they aren't going
+           to behave as advertised - as it stands they'll just do nothing
+           if there isn't a next/prev row.
+           
+           elementFactory is a function that returns the row that should be
+           highlighted.  it is a function because the row element might or
+           might not exist when we called (e.g. if we have to request more
+           rows to fufill the request) */
+        
+        if(offset < 0) { return }
+        if(typeof requestMoreRowsIfNeeded === 'undefined') {
+            requestMoreRowsIfNeeded = true;
+        }
+
+        var sw = self.scrollWidget;
+        if(sw._rows.length < offset+1) {
+            if(requestMoreRowsIfNeeded) {
+                /* free up some space */
+                sw._scrollViewport.scrollTop += sw._rowHeight * 3;
+                sw.scrolled();
+                /* the scroll widget's cbRowsFetched
+                   method will call this function when
+                   it gets rows */
+                sw._pendingRowSelection = function() {
+                    /* call ourselves, passing additional argument
+                       indicating that we shouldn't go through this
+                       rigmarole a second time if there still aren't enough rows */
+                    self._selectAndFetchRow(offset, elementFactory, false);
+                }
+            }
+            return;
+        }
+
+        sw._selectRow(offset, elementFactory());
+        var data = sw._rows[offset][0];
+        self.callRemote("loadMessageFromID", data["__id__"]).addCallback(
+            function(stuff) { self.setMessageContent(stuff) });
+    },
+
+    function nextMessage(self) {
+        var sw = self.scrollWidget;
+        self._selectAndFetchRow(++sw._selectedRowOffset,
+                                function() {
+                                    return sw._selectedRow.nextSibling
+                                });
+    },
+
+    function prevMessage(self) {
+        var sw = self.scrollWidget;
+        self._selectAndFetchRow(--sw._selectedRowOffset,
+                                function() {
+                                    return sw._selectedRow.previousSibling
+                                });
+    },
+
+/*
     function checkTDBSize(self) {
         var row = document.getElementById("tdb-item-1");
         if(!row) {
@@ -77,7 +184,13 @@ Quotient.Mailbox.Controller.methods(
                 MochiKit.DOM.hideElement("loading-dialog");
                 document.getElementById("mailbox-meat").style.visibility = 'visible' });
     },
-    */
+*/
+
+    function loadMessageFromID(self, id) {
+        self.callRemote("loadMessageFromID", id).addCallback(
+                        function(data) { self.setMessageContent(data) }
+                            ).addErrback(alert);
+    },
 
     function mailboxFeedback(self, msg) {
         document.getElementById("mailbox-log").appendChild(
@@ -155,7 +268,7 @@ Quotient.Mailbox.Controller.methods(
             self.emptyThirdSelect(container);
             self.fetchCountsForThirdSelect(self.lookBusy(container, 3)) };
     },
-
+    
 
     function fetchCountsForThirdSelect(self, thirdSelect) {
         while(0 < thirdSelect.childNodes.length) {
@@ -164,7 +277,7 @@ Quotient.Mailbox.Controller.methods(
 
         var parent = thirdSelect.parentNode.parentNode.parentNode;
         var filters = [self._getFilter(parent, 'select-1'),
-                        self._getFilter(parent, 'select-2')];
+                       self._getFilter(parent, 'select-2')];
 
         self.callRemote('fetchFilteredCounts', filters).addCallback(
             function(labels) {
@@ -189,7 +302,7 @@ Quotient.Mailbox.Controller.methods(
         }
         return options[select.selectedIndex].firstChild.nodeValue;
     },
-
+    
     function populateSelectWithLabels(self, labels, select) {
         
         var nodeArgs = null;
@@ -205,11 +318,11 @@ Quotient.Mailbox.Controller.methods(
         }
         select.style.opacity = '1';
     },
-
+    
     function filterMessages(self, parent) {
         var filters = [self._getFilter(parent, 'select-1'),
-                        self._getFilter(parent, 'select-2'),
-                        self._getFilter(parent, 'select-3')];
+                       self._getFilter(parent, 'select-2'),
+                       self._getFilter(parent, 'select-3')];
 
         if(!filters[2]) {
             filters[2] = filters[1];
@@ -267,7 +380,7 @@ Quotient.Mailbox.Controller.methods(
         } else if(self.messageMetadata["has-" + (next ? "next" : "prev") + "-page"]) {
             self.callRemote((next ? "next" : "prev") + "PageAndMessage").addCallback(
                 /* squish the round-trips by getting the tdb page and
-                    the next/prev message at the same time */
+                   the next/prev message at the same time */
                 function(data) {
                     self.replaceTDB(data[0]);
                     self.prepareForMessage(0);
@@ -277,14 +390,6 @@ Quotient.Mailbox.Controller.methods(
             /* do something stupid */
             alert("sorry, there is not a next/prev message");
         }
-    },
-
-    function nextMessage(self) {
-        self.nextOrPrevMessage(true);
-    },
-
-    function prevMessage(self) {
-        self.nextOrPrevMessage(false);
     },
 
     function viewChanged(self) {
@@ -389,7 +494,6 @@ Quotient.Mailbox.Controller.methods(
         md.style.opacity = '.3';
         md.style.backgroundColor = '#CACACA';
 
-        self.everythingStart = self.loadMessageStart = new Date();
         self.showThrobber();
         self.prepareForMessage(index);
         self.callRemote("getMessageContent", index).addCallback(
@@ -404,15 +508,24 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function applyToChildren(self, f, parent) {
-        MochiKit.Base.map(function(e) { if(e.tagName) { f(e) }}, parent.childNodes);
+        MochiKit.Base.map(
+            function(e) {
+                if(e.tagName) { f(e) }
+            }, parent.childNodes);
     },
 
     function setChildBGColors(self, parent, color) {
-        self.applyToChildren(function(e) { e.style.backgroundColor = color }, parent);
+        self.applyToChildren(
+            function(e) {
+                e.style.backgroundColor = color
+            }, parent);
     },
 
     function setChildBorders(self, parent, style) {
-        self.applyToChildren(function(e) { e.style.border = style }, parent);
+        self.applyToChildren(
+            function(e) {
+                e.style.border = style
+            }, parent);
     },
 
     function showThrobber(self) {
@@ -463,21 +576,30 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function nextUnread(self) {
-        if(self.messageMetadata["next-unread"]) {
-            /* this thing returns [tdbhtml or null, msghtml, msgoffset] */
-            self.callRemote("nextUnread").addCallback(
-                function(data) {
-                    if(data[0]) {
-                        self.replaceTDB(data[0]);
-                        self.prepareForMessage(data[2]);
-                    } else {
-                        self.prepareForMessage(data[2]);
+        self.callRemote("nextUnread").addCallback(
+            function(stuff) {
+                if(!stuff) { return; }
+                var rowRange = stuff[0];
+                var rows = stuff[1];
+                var webID = stuff[2];
+                var messageData = stuff[3];
+
+                var sw = self.scrollWidget;
+                sw.createRows(rowRange[0], rows);
+                for(var i = 0; i < sw._rows.length; i++) {
+                   if(sw._rows[i] && sw._rows[i][0]["__id__"] == webID) {
+                        var rowElement = sw._rows[i][1];
+                        break;
                     }
-                    self.setMessageContent(data[1]);
-                });
-        } else {
-            alert("sorry, but there is not a next unread message.");
-        }
+                }
+                sw._selectRow(i, rowElement);
+                self.setMessageContent(messageData);
+                var newPos = sw._rowHeight * i;
+                if(sw._scrollViewport.scrollTop < newPos) {
+                    sw._scrollViewport.scrollTop = newPos;
+                    sw.scrolled();
+                }
+            });
     },
 
     function fitMessageBodyToPage(self) {
@@ -621,24 +743,16 @@ Quotient.Mailbox.Controller.methods(
                                                             extractDict[etypename]["pattern"], "i");
             }
         }
-        self.loadMessageEnd = new Date();
-        var md = document.getElementById("message-detail");
-        md.style.opacity = '';
-        md.style.backgroundColor = '';
-        self.replaceMessageDOMStart = new Date();
-        md.innerHTML = data[1];
-        self.replaceMessageDOMEnd = new Date();
+        self.messageDetailNode.style.opacity = '';
+        self.messageDetailNode.style.backgroundColor = '';
+        self.messageDetailNode.innerHTML = data[1];
         var iframe = document.getElementById("content-iframe");
         if(iframe) {
             Quotient.Common.Util.resizeIFrame(iframe);
         }
-        self.hideThrobber();
-        self.extractStart = new Date();
         if(self.messageMetadata) {
             self.highlightExtracts();
         }
-        self.extractEnd = new Date();
-        //self.reportTimes();
         initLightbox();
     },
 
@@ -759,8 +873,10 @@ Quotient.Mailbox.Controller.methods(
 
         var tag  = form.tag.value;
         var tags = tag.match(/,/) ? tag.split(/,/) : [tag];
-        tags = MochiKit.Base.filter(function(s) { return 0 < s.length },
-                                    MochiKit.Base.map(Quotient.Common.Util.normalizeTag, tags));
+        tags = MochiKit.Base.filter(
+                    function(s) {
+                        return 0 < s.length
+                    }, MochiKit.Base.map(Quotient.Common.Util.normalizeTag, tags));
 
         var newTags = 0;
         var i = 0;
