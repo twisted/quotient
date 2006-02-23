@@ -395,7 +395,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         try:
             subject = self.part.getHeader(u'subject')
         except equotient.NoSuchHeader:
-            self.message.subject = u'(no subject)'
+            self.message.subject = u'<No Subject>'
         else:
             self.message.subject = mimeutil.headerToUnicode(subject)
 
