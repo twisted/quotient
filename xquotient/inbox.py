@@ -394,7 +394,7 @@ class InboxScreen(athena.LiveFragment):
         composeFrag = self._composeSomething(replyTo(curmsg),
                                              reSubject(curmsg),
                                              '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
-        return (None, composeFrag)
+        return composeFrag
 
     def forwardCurrentMessage(self):
         curmsg = self.currentMessage
@@ -413,7 +413,7 @@ class InboxScreen(athena.LiveFragment):
                                              reSubject(curmsg, 'Fwd: '),
                                              '\n\n' + '\n> '.join(reply),
                                              self.currentMessageDetail.attachmentParts)
-        return (None, composeFrag)
+        return composeFrag
 
     def nextPageAndMessage(self):
         self.inboxTDB.original.nextPage()

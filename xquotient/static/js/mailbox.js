@@ -70,6 +70,7 @@ Quotient.Mailbox.Controller.methods(
         var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
                                                       "athena:class",
                                                       "Quotient.Mailbox.ScrollingWidget");
+
         self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
         self.messageDetailNode = self.nodeByAttribute("class", "message-detail");
         var topControls = self.nodeByAttribute("class", "top-controls");
@@ -157,12 +158,25 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function archive(self) {
-        self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
+        self.scrollWidget.replaceWith
         self.callRemote('archiveCurrentMessage').addCallback(
             function(ign) { self.twiddleMessageCount(-1) }).addCallback(
             function(data) { self.setMessageContent(data) });
     },
 
+    function replyToThis(self) {
+        self.callRemote("replyToCurrentMessage").addCallback(
+            function(data) {
+                self.setMessageContent(data)
+            });
+    },
+
+    function forwardThis(self) {
+        self.callRemote("forwardCurrentMessage").addCallback(
+            function(data) {
+                self.setMessageContent(data)
+            });
+    },
 
     function loadMessageFromID(self, id) {
         self.callRemote("loadMessageFromID", id).addCallback(
@@ -400,5 +414,5 @@ Quotient.Mailbox.Controller.methods(
 
     function twiddleUnreadMessageCount(self, howMuch) {
         self._twiddleCount('unread-message-count', howMuch);
-    },
+    }
     });
