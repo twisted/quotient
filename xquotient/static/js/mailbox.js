@@ -5,16 +5,16 @@
 // import LightBox
 
 if(typeof(Quotient.Mailbox) == "undefined") {
-Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
+    Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
 }
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 Quotient.Mailbox.MessageDetail.methods(
-function messageSource(self) {
-    self.callRemote("getMessageSource").addCallback(
-        function(source) {
-            MochiKit.DOM.replaceChildNodes("message-body",
-                MochiKit.DOM.PRE(null, source));
+    function messageSource(self) {
+        self.callRemote("getMessageSource").addCallback(
+            function(source) {
+                MochiKit.DOM.replaceChildNodes("message-body",
+                    MochiKit.DOM.PRE(null, source));
         });
     });
 
