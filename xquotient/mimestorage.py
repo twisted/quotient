@@ -409,6 +409,8 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             self.message.sender = unicode(email.email)
             self.message.senderDisplay = unicode(email.anyDisplayName())
             break
+        else:
+            self.message.sender = self.message.senderDisplay = u'<No Sender>'
 
         self.message.source = self.source
 
