@@ -14,7 +14,8 @@ Quotient.Mailbox.MessageDetail.methods(
     function messageSource(self) {
         self.callRemote("getMessageSource").addCallback(
             function(source) {
-                MochiKit.DOM.replaceChildNodes("message-body",
+                MochiKit.DOM.replaceChildNodes(
+                    self.nodeByAttribute("class", "message-body"),
                     MochiKit.DOM.PRE(null, source));
         });
     });
@@ -155,7 +156,7 @@ Quotient.Mailbox.Controller.methods(
                                 });
     },
 
-    function archiveThis(self) {
+    function archive(self) {
         self.replaceWithDialog(self.selectedRowOffset, "Archiving...");
         self.callRemote('archiveCurrentMessage').addCallback(
             function(ign) { self.twiddleMessageCount(-1) }).addCallback(
@@ -318,7 +319,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function highlightExtracts(self) {
-        var body = document.getElementById("message-body");
+        var body = self.nodeByAttribute("class", "message-body");
         var replacements = null;
         var replacement = null;
 

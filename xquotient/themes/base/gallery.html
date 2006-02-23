@@ -1,7 +1,7 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="margin-top: 12px;"
   nevow:render="liveFragment">
 
-  <div id="images" nevow:render="images" />
+  <div class="images" nevow:render="images" />
 
   <span style="font-size: 1.3em" nevow:pattern="no-images">
     No Images
@@ -35,5 +35,5 @@
   <div nevow:pattern="row-separator" style="clear: both">&#160;</div>
   <a nevow:pattern="prev-page" href="#" onclick="Quotient.Gallery.Controller.get(this).prevPage(); return false">prev page</a>
   <a nevow:pattern="next-page" href="#" onclick="Quotient.Gallery.Controller.get(this).nextPage(); return false">next page</a>
-  <div id="pagination-links" style="clear: both" nevow:render="paginationLinks" />
+  <div class="pagination-links" style="clear: both" nevow:render="paginationLinks" />
 </div>

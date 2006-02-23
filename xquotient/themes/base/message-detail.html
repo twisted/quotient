@@ -19,7 +19,7 @@
     <tbody>
       <tr>
         <td class="header-table-first-col">From</td>
-        <td class="header-table-last-col" id="message-detail-sender"><nevow:slot name="sender" /></td>
+        <td class="header-table-last-col"><nevow:slot name="sender" /></td>
       </tr>
       <tr>
         <td class="header-table-first-col">To</td>
@@ -62,7 +62,7 @@
   </table>
   <p />
   <div nevow:render="attachmentPanel" style="float: right" />
-  <div id="message-body" style="font-family: monospace; width: 80%; font-size: 1.3em;" nevow:render="messageBody">
+  <div class="message-body" style="font-family: monospace; width: 80%; font-size: 1.3em;" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
   <nevow:invisible nevow:render="imagePanel" />

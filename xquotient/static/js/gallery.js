@@ -9,18 +9,24 @@ if(typeof(Quotient.Gallery) == "undefined") {
 Quotient.Gallery.Controller = Nevow.Athena.Widget.subclass("Quotient.Gallery.Controller");
 
 Quotient.Gallery.Controller.methods(
+    function __init__(self, node) {
+        Quotient.Gallery.Controller.upcall(self, "__init__", node);
+        self.images = self.nodeByAttribute("class", "images");
+        self.paginationLinks = self.nodeByAttribute("class", "pagination-links");
+    },
+
     function setGalleryState(self, data) {
-        document.getElementById("images").innerHTML = data[0];
-        document.getElementById("pagination-links").innerHTML = data[1];
+        self.images.innerHTML = data[0];
+        self.paginationLinks.innerHTML = data[1];
         initLightbox();
     },
 
     function prevPage(self) {
-        self.callRemote('prevPage').addCallback(
+        self.callRemote("prevPage").addCallback(
             function(gs) { self.setGalleryState(gs) });
     },
 
     function nextPage(self) {
-        self.callRemote('nextPage').addCallback(
+        self.callRemote("nextPage").addCallback(
             function(gs) { self.setGalleryState(gs) });
     });

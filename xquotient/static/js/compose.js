@@ -20,7 +20,8 @@ Quotient.Compose.Controller.methods(
     function loaded(self) {
         //self.fitMessageBodyToPage();
         self.allPeople = new Array();
-
+    
+        self.completions = self.nodeByAttribute("class", "address-completions");
         self.callRemote("getPeople").addCallback(
             function(people) {
                 self.allPeople = self.allPeople.concat(people);
@@ -67,12 +68,12 @@ Quotient.Compose.Controller.methods(
     },
 
     function fitMessageBodyToPage(self) {
-        var e = document.getElementById("message-body");
+        var e = self.nodeByAttribute("class", "message-body");
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 55 + "px";
     },
 
     function stuffPeopleInDropdown(self) {
-        var select = document.getElementById("person-select");
+        var select = self.nodeByAttribute("class", "person-select");
         MochiKit.DOM.replaceChildNodes(select);
         select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
 
@@ -83,13 +84,12 @@ Quotient.Compose.Controller.methods(
 
     function addrAutocompleteKeyDown(self, event) {
         var TAB = 9;
-        var completions = document.getElementById("address-completions");
 
-        if(completions.style.display == "none")
+        if(self.completions.style.display == "none")
             return true;
 
         if(event.keyCode == event.DOM_VK_ENTER || event.keyCode == TAB) {
-            if(0 < completions.childNodes.length) {
+            if(0 < self.completions.childNodes.length) {
                 self.appendAddrCompletionToList(self.selectedAddrCompletion());
             }
             return self.dontBubbleEvent(event);
@@ -111,52 +111,46 @@ Quotient.Compose.Controller.methods(
     },
 
     function shiftAddrCompletionHighlightDown(self) {
-        var completions = document.getElementById("address-completions");
         var selectedOffset = self.selectedAddrCompletion();
-        if(selectedOffset == completions.childNodes.length-1)
+        if(selectedOffset == self.completions.childNodes.length-1)
             return;
-        var currentCompletion = completions.childNodes[selectedOffset];
+        var currentCompletion = self.completions.childNodes[selectedOffset];
         currentCompletion.className = "";
         currentCompletion.nextSibling.className = "selected-address-completion";
     },
 
     function highlightFirstAddrCompletion(self) {
-        var completions = document.getElementById("address-completions");
-        completions.firstChild.className = "selected-address-completion";
+        self.completions.firstChild.className = "selected-address-completion";
     },
 
     function shiftAddrCompletionHighlightUp(self) {
-        var completions = document.getElementById("address-completions");
         var selectedOffset = self.selectedAddrCompletion();
         if(selectedOffset == 0)
             return;
-        var currentCompletion = completions.childNodes[selectedOffset];
+        var currentCompletion = self.completions.childNodes[selectedOffset];
         currentCompletion.className = "";
         currentCompletion.previousSibling.className = "selected-address-completion";
     },
 
     function selectedAddrCompletion(self) {
-        var completions = document.getElementById("address-completions");
-        for(var i = 0; i < completions.childNodes.length; i++)
-            if(completions.childNodes[i].className == "selected-address-completion")
+        for(var i = 0; i < self.completions.childNodes.length; i++)
+            if(self.completions.childNodes[i].className == "selected-address-completion")
                 return i;
         return null;
     },
 
     function emptyAndHideAddressCompletions(self) {
         with(MochiKit.DOM) {
-            var completions = getElement("address-completions");
-            replaceChildNodes(completions);
-            hideElement(completions);
+            replaceChildNodes(self.completions);
+            hideElement(self.completions);
         }
     },
 
     function appendAddrCompletionToList(self, offset) {
-        var input = document.getElementById("compose-to-address");
+        var input = self.nodeByAttribute("compose-to-address");
         var addrs = input.value.split(/,/);
         var lastAddr = Quotient.Common.Util.stripLeadingTrailingWS(addrs[addrs.length - 1]);
-        var completions = document.getElementById("address-completions");
-        var word = completions.childNodes[offset].firstChild.nodeValue;
+        var word = self.completions.childNodes[offset].firstChild.nodeValue;
         // truncate the value of the text box so it includes all addresses up to
         // but not including the last one
         input.value = input.value.slice(0, input.value.length - lastAddr.length);
@@ -175,9 +169,8 @@ Quotient.Compose.Controller.methods(
         if(addresses.length == 0)
             return;
 
-        var completionContainer = document.getElementById("address-completions");
         var lastAddress = Quotient.Common.Util.stripLeadingTrailingWS(addresses[addresses.length - 1]);
-        MochiKit.DOM.replaceChildNodes(completionContainer);
+        MochiKit.DOM.replaceChildNodes(self.completions);
 
         if(lastAddress.length == 0)
             return;
@@ -196,17 +189,17 @@ Quotient.Compose.Controller.methods(
 
         var attrs = null;
 
-        for(i = 0; i < completions.length; i++) {
+        for(i = 0; i < self.completions.length; i++) {
             attrs = {"href":"#", "onclick":handler+";return false", "style":"display: block"}
-            completionContainer.appendChild(
-                MochiKit.DOM.A(attrs, self.reconstituteAddress(completions[i])));
+            self.completions.appendChild(
+                MochiKit.DOM.A(attrs, self.reconstituteAddress(self.completions[i])));
         }
 
-        if(0 < completions.length) {
-            var input = document.getElementById("compose-to-address");
-            MochiKit.DOM.setDisplayForElement("", completionContainer);
-            completionContainer.style.top  = Quotient.Common.Util.findPosY(input) + input.clientHeight + "px";
-            completionContainer.style.left = Quotient.Common.Util.findPosX(input) + "px";
+        if(0 < self.completions.length) {
+            var input = self.nodeByAttribute("class", "compose-to-address");
+            MochiKit.DOM.setDisplayForElement("", self.completions);
+            self.completions.style.top  = Quotient.Common.Util.findPosY(input) + input.clientHeight + "px";
+            self.completions.style.left = Quotient.Common.Util.findPosX(input) + "px";
             self.highlightFirstAddrCompletion();
         }
     },

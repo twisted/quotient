@@ -5,7 +5,7 @@
       <nevow:attr name="src"><nevow:slot name="src" /></nevow:attr>
     </iframe>
 
-    <span id="address-completions" style="display: none; position: absolute" />
+    <span class="address-completions" style="display: none; position: absolute" />
     <table>
       <tr>
         <td>
@@ -18,7 +18,7 @@
                     name="toAddress"
                     onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
                     oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
-                    id="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
+                    class="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
               </tr>
               <tr>
                 <td class="header-table-first-col">Subject</td>
@@ -62,7 +62,7 @@
       </tr>
       <tr>
         <td>
-          <textarea name="messageBody" id="message-body" cols="80" rows="10"
+          <textarea name="messageBody" class="message-body" cols="80" rows="10"
             ><nevow:slot name="body" /></textarea>
         </td>
       </tr>
