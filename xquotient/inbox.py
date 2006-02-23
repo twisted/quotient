@@ -362,7 +362,6 @@ class InboxScreen(athena.LiveFragment):
 
     def archiveCurrentMessage(self):
         self.currentMessage.archived = True
-        return self.nextMessage(augmentIndex=-1)
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)

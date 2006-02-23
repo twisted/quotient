@@ -47,6 +47,14 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function skipColumn(self, name) {
         return name == "read";
     },
+
+    function removeCurrentRow(self) {
+        self._selectedRow.parentNode.removeChild(self._selectedRow);
+        self._rows = self._rows.slice(
+                        0, self._selectedRowOffset).concat(
+                            self._rows.slice(self._selectedRowOffset+1, self._rows.length));
+    },
+        
     
     function cbRowsFetched(self) {
         if(self._pendingRowSelection) {
@@ -157,11 +165,14 @@ Quotient.Mailbox.Controller.methods(
                                 });
     },
 
-    function archive(self) {
-        self.scrollWidget.replaceWith
-        self.callRemote('archiveCurrentMessage').addCallback(
-            function(ign) { self.twiddleMessageCount(-1) }).addCallback(
-            function(data) { self.setMessageContent(data) });
+    function archiveThis(self) {
+        var sw = self.scrollWidget;
+        sw.removeCurrentRow();
+        self.callRemote("archiveCurrentMessage");
+        self._selectAndFetchRow(sw._selectedRowOffset,
+                                function() {
+                                    return sw._selectedRow.nextSibling;
+                                });
     },
 
     function replyToThis(self) {
@@ -414,5 +425,4 @@ Quotient.Mailbox.Controller.methods(
 
     function twiddleUnreadMessageCount(self, howMuch) {
         self._twiddleCount('unread-message-count', howMuch);
-    }
     });
