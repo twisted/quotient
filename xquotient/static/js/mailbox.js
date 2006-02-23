@@ -5,475 +5,483 @@
 // import LightBox
 
 if(typeof(Quotient.Mailbox) == "undefined") {
-    Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
+Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
 }
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
+Quotient.Mailbox.MessageDetail.methods(
+function messageSource(self) {
+    self.callRemote("getMessageSource").addCallback(
+        function(source) {
+            MochiKit.DOM.replaceChildNodes("message-body",
+                MochiKit.DOM.PRE(null, source));
+        });
+    });
 
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function loaded(self) {
-        /* temporarily disable any inbox behaviour, at the moment the
-           inbox is just a scrolled table, so we don't need a lot of 
-           this tdb hacking cleverness (it also won't work).  eventually
-           we'll want to re-enable a lot of this functionality, like view by tag
-           and such, but some of it will move into the message detail
-           fragment/jsclass
-        */
-        var scrollContainer = self.nodeByAttribute("class", "scrolltable-container");
-        var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
-                                                      "athena:class",
-                                                      "Mantissa.ScrollTable.ScrollingWidget");
+function loaded(self) {
+    /* temporarily disable any inbox behaviour, at the moment the
+        inbox is just a scrolled table, so we don't need a lot of 
+        this tdb hacking cleverness (it also won't work).  eventually
+        we'll want to re-enable a lot of this functionality, like view by tag
+        and such, but some of it will move into the message detail
+        fragment/jsclass
+    */
+    var scrollContainer = self.nodeByAttribute("class", "scrolltable-container");
+    var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
+                                                    "athena:class",
+                                                    "Mantissa.ScrollTable.ScrollingWidget");
 
-        self.scrollWidget = Mantissa.ScrollTable.ScrollingWidget.get(scrollNode);
-        return;
+    self.scrollWidget = Mantissa.ScrollTable.ScrollingWidget.get(scrollNode);
+    return;
 
-        self.allTags   = new Array();
-        self.selectedRow = null;
-        self.selectedRowOffset = null;
+    self.allTags   = new Array();
+    self.selectedRow = null;
+    self.selectedRowOffset = null;
 
-        self.callRemote("getTags").addCallback(
-            function(tags) {
-                self.allTags = self.allTags.concat(tags).sort();
-                self.stuffTagsInDropdown();
-            });
+    self.callRemote("getTags").addCallback(
+        function(tags) {
+            self.allTags = self.allTags.concat(tags).sort();
+            self.stuffTagsInDropdown();
+        });
 
-    },
+},
 
 /*
-    function checkTDBSize(self) {
-        var row = document.getElementById("tdb-item-1");
-        if(!row) {
-            return setTimeout(function() { self.checkTDBSize() }, 100);
-        }
+function checkTDBSize(self) {
+    var row = document.getElementById("tdb-item-1");
+    if(!row) {
+        return setTimeout(function() { self.checkTDBSize() }, 100);
+    }
 
-        self.loadMessageStart = null;
-        self.loadMessageEnd = null;
-        self.replaceMessageDOMStart = null;
-        self.replaceMessageDOMEnd = null;
-        self.extractStart = null;
-        self.extractEnd = null;
-        self.everythingStart = null;
-        self.everythingEnd = null;
+    self.loadMessageStart = null;
+    self.loadMessageEnd = null;
+    self.replaceMessageDOMStart = null;
+    self.replaceMessageDOMEnd = null;
+    self.extractStart = null;
+    self.extractEnd = null;
+    self.everythingStart = null;
+    self.everythingEnd = null;
 
-        var tdb = Nevow.Athena.NodeByAttribute(
-            document.getElementById("tdb-container"), "athena:class", "Mantissa.TDB.Controller"
-        );
-        var tdbEnd = quotient_findPosY(tdb) + tdb.clientHeight;
-        var viewOpts = document.getElementById("view-options");
-        tdbEnd += viewOpts.clientHeight;
-        // + 15 because of padding and whatever
-        var moreRows = Math.floor((document.documentElement.clientHeight - tdbEnd) / (row.clientHeight + 15)) - 1;
-        self.callRemote('incrementItemsPerPage', moreRows).addCallback(
-            function() {
-                MochiKit.DOM.hideElement("loading-dialog");
-                document.getElementById("mailbox-meat").style.visibility = 'visible' });
-    },
+    var tdb = Nevow.Athena.NodeByAttribute(
+        document.getElementById("tdb-container"), "athena:class", "Mantissa.TDB.Controller"
+    );
+    var tdbEnd = quotient_findPosY(tdb) + tdb.clientHeight;
+    var viewOpts = document.getElementById("view-options");
+    tdbEnd += viewOpts.clientHeight;
+    // + 15 because of padding and whatever
+    var moreRows = Math.floor((document.documentElement.clientHeight - tdbEnd) / (row.clientHeight + 15)) - 1;
+    self.callRemote('incrementItemsPerPage', moreRows).addCallback(
+        function() {
+            MochiKit.DOM.hideElement("loading-dialog");
+            document.getElementById("mailbox-meat").style.visibility = 'visible' });
+},
 */
 
-    function mailboxFeedback(self, msg) {
-        document.getElementById("mailbox-log").appendChild(
-            MochiKit.DOM.DIV(null, msg));
-    },
+function mailboxFeedback(self, msg) {
+    document.getElementById("mailbox-log").appendChild(
+        MochiKit.DOM.DIV(null, msg));
+},
 
-    function changedView(self, select) {
-        self.emptySecondAndThirdSelects(select.parentNode.parentNode);
-        var options = select.getElementsByTagName("option");
-        var newView = options[select.selectedIndex].firstChild.nodeValue;
+function changedView(self, select) {
+    self.emptySecondAndThirdSelects(select.parentNode.parentNode);
+    var options = select.getElementsByTagName("option");
+    var newView = options[select.selectedIndex].firstChild.nodeValue;
 
-        if(newView == "Tags") {
-            self.filterByTag(select);
-        } else if(newView == "People") {
-            self.filterByPerson(select);
-        } else if(newView == "Mail") {
-            self.filterMail(select);
-        }
-    },
+    if(newView == "Tags") {
+        self.filterByTag(select);
+    } else if(newView == "People") {
+        self.filterByPerson(select);
+    } else if(newView == "Mail") {
+        self.filterMail(select);
+    }
+},
 
-    function filterMail(self, firstSelect) {
-        var container = firstSelect.parentNode.parentNode.parentNode;
-        self.callRemote("fetchFilteredCounts", ["Mail", null]).addCallback(
-            function(counts) {
-                var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2'); 
-                self.populateSelectWithLabels(counts, secondSelect);
+function filterMail(self, firstSelect) {
+    var container = firstSelect.parentNode.parentNode.parentNode;
+    self.callRemote("fetchFilteredCounts", ["Mail", null]).addCallback(
+        function(counts) {
+            var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2'); 
+            self.populateSelectWithLabels(counts, secondSelect);
 
-                secondSelect.onchange = function() {
-                    self.filterMessages(container);
-                }
-            });
-    },
+            secondSelect.onchange = function() {
+                self.filterMessages(container);
+            }
+        });
+},
 
 
-    function filterByTag(self, firstSelect) {
-        self.populateSecondSelect(firstSelect.parentNode.parentNode, self.allTags);
-    },
+function filterByTag(self, firstSelect) {
+    self.populateSecondSelect(firstSelect.parentNode.parentNode, self.allTags);
+},
 
-    function filterByPerson(self, firstSelect) {
-        var select = self.lookBusy(firstSelect.parentNode.parentNode, 2);
-        self.callRemote("getPeople").addCallback(
-            function(people) {
-                self.populateSecondSelect(firstSelect.parentNode.parentNode, people);
-                select.style.opacity = '1';
-            }).addErrback(alert);
-    },
+function filterByPerson(self, firstSelect) {
+    var select = self.lookBusy(firstSelect.parentNode.parentNode, 2);
+    self.callRemote("getPeople").addCallback(
+        function(people) {
+            self.populateSecondSelect(firstSelect.parentNode.parentNode, people);
+            select.style.opacity = '1';
+        }).addErrback(alert);
+},
 
-    function emptySecondAndThirdSelects(self, container) {
-        var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
+function emptySecondAndThirdSelects(self, container) {
+    var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
 
-        while(0 < secondSelect.childNodes.length) {
-            secondSelect.removeChild(secondSelect.firstChild);
-        }
+    while(0 < secondSelect.childNodes.length) {
+        secondSelect.removeChild(secondSelect.firstChild);
+    }
 
+    self.emptyThirdSelect(container);
+},
+
+function emptyThirdSelect(self, container) {
+    var thirdSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-3');
+
+    while(0 < thirdSelect.childNodes.length) {
+        thirdSelect.removeChild(thirdSelect.firstChild);
+    }
+},
+
+function populateSecondSelect(self, container, list) {
+    var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
+
+    for(var i = 0; i < list.length; i++) {
+        secondSelect.appendChild(
+            MochiKit.DOM.OPTION(null, list[i]));
+    }
+    secondSelect.style.opacity = '1';
+    secondSelect.onchange = function() { 
         self.emptyThirdSelect(container);
-    },
+        self.fetchCountsForThirdSelect(self.lookBusy(container, 3)) };
+},
 
-    function emptyThirdSelect(self, container) {
-        var thirdSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-3');
 
-        while(0 < thirdSelect.childNodes.length) {
-            thirdSelect.removeChild(thirdSelect.firstChild);
-        }
-    },
+function fetchCountsForThirdSelect(self, thirdSelect) {
+    while(0 < thirdSelect.childNodes.length) {
+        thirdSelect.removeChild(thirdSelect.firstChild);
+    }
 
-    function populateSecondSelect(self, container, list) {
-        var secondSelect = Nevow.Athena.NodeByAttribute(container, 'class', 'select-2');
+    var parent = thirdSelect.parentNode.parentNode.parentNode;
+    var filters = [self._getFilter(parent, 'select-1'),
+                    self._getFilter(parent, 'select-2')];
 
-        for(var i = 0; i < list.length; i++) {
-            secondSelect.appendChild(
-                MochiKit.DOM.OPTION(null, list[i]));
-        }
-        secondSelect.style.opacity = '1';
-        secondSelect.onchange = function() { 
-            self.emptyThirdSelect(container);
-            self.fetchCountsForThirdSelect(self.lookBusy(container, 3)) };
-    },
+    self.callRemote('fetchFilteredCounts', filters).addCallback(
+        function(labels) {
+            self.populateSelectWithLabels(labels, thirdSelect);
+            thirdSelect.onchange = function() { 
+                self.filterMessages(thirdSelect.parentNode.parentNode)
+            };
+        });
+},
+
+function lookBusy(self, containingNode, listOffset) {
+    var select = Nevow.Athena.NodeByAttribute(containingNode, 'class', 'select-' + listOffset);
+    select.style.opacity = '.3';
+    return select;
+},
+
+function _getFilter(self, parent, className) {
+    var select = Nevow.Athena.NodeByAttribute(parent, 'class', className);
+    var options = select.getElementsByTagName('option');
+    if(options.length == 0) {
+        return null;
+    }
+    return options[select.selectedIndex].firstChild.nodeValue;
+},
+
+function populateSelectWithLabels(self, labels, select) {
     
-
-    function fetchCountsForThirdSelect(self, thirdSelect) {
-        while(0 < thirdSelect.childNodes.length) {
-            thirdSelect.removeChild(thirdSelect.firstChild);
+    var nodeArgs = null;
+    for(var i = 0; i < labels.length; i++) {
+        if(labels[i][1] == 0) {
+            nodeArgs = {"disabled": true};
+        } else {
+            nodeArgs = null;
         }
+        select.appendChild(
+                MochiKit.DOM.OPTION(nodeArgs,
+                    labels[i][0] + " (" + labels[i][1] + ")"));
+    }
+    select.style.opacity = '1';
+},
 
-        var parent = thirdSelect.parentNode.parentNode.parentNode;
-        var filters = [self._getFilter(parent, 'select-1'),
-                       self._getFilter(parent, 'select-2')];
+function filterMessages(self, parent) {
+    var filters = [self._getFilter(parent, 'select-1'),
+                    self._getFilter(parent, 'select-2'),
+                    self._getFilter(parent, 'select-3')];
 
-        self.callRemote('fetchFilteredCounts', filters).addCallback(
-            function(labels) {
-                self.populateSelectWithLabels(labels, thirdSelect);
-                thirdSelect.onchange = function() { 
-                    self.filterMessages(thirdSelect.parentNode.parentNode)
-                };
-            });
-    },
+    if(!filters[2]) {
+        filters[2] = filters[1];
+        filters[1] = null;
+    }
 
-    function lookBusy(self, containingNode, listOffset) {
-        var select = Nevow.Athena.NodeByAttribute(containingNode, 'class', 'select-' + listOffset);
-        select.style.opacity = '.3';
-        return select;
-    },
+    filters[2] = filters[2].substr(0, filters[2].match(/\(/).index - 1);
 
-    function _getFilter(self, parent, className) {
-        var select = Nevow.Athena.NodeByAttribute(parent, 'class', className);
-        var options = select.getElementsByTagName('option');
-        if(options.length == 0) {
-            return null;
-        }
-        return options[select.selectedIndex].firstChild.nodeValue;
-    },
+    self.callRemote('filterMessages', filters).addCallback(
+        function(data) { self.replaceTDB(data) });
+
+},
+
+function replaceWithDialog(self, index, dialog) {
+    var row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
+    self.setChildBGColors(row, "");
+    var cell = row.getElementsByTagName("td")[0];
+    MochiKit.DOM.replaceChildNodes(cell,
+        MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
+},
+
+function nextPage(self) {
+    self.inboxTDB.nextPage();
+},
+
+function prevPage(self) {
+    self.inboxTDB.prevPage();
+},
+
+function stuffTagsInDropdown(self) {
+    var select = document.getElementById("tag-select");
+    MochiKit.DOM.replaceChildNodes(select);
+    select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
+
+    for(i = 0; i < self.allTags.length; i++)
+        select.appendChild(
+            MochiKit.DOM.createDOM("OPTION", {"value":self.allTags[i]}, self.allTags[i]));
+},
+
+function nextOrPrevMessage(self, next) {
+    var offset = self.selectedRowOffset + (next ? 1 : -1);
+
+    var row = null;
     
-    function populateSelectWithLabels(self, labels, select) {
-        
-        var nodeArgs = null;
-        for(var i = 0; i < labels.length; i++) {
-            if(labels[i][1] == 0) {
-                nodeArgs = {"disabled": true};
-            } else {
-                nodeArgs = null;
-            }
-            select.appendChild(
-                    MochiKit.DOM.OPTION(nodeArgs,
-                        labels[i][0] + " (" + labels[i][1] + ")"));
-        }
-        select.style.opacity = '1';
-    },
-    
-    function filterMessages(self, parent) {
-        var filters = [self._getFilter(parent, 'select-1'),
-                       self._getFilter(parent, 'select-2'),
-                       self._getFilter(parent, 'select-3')];
+    try {
+        row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
+    } catch(e) {}
 
-        if(!filters[2]) {
-            filters[2] = filters[1];
-            filters[1] = null;
-        }
-
-        filters[2] = filters[2].substr(0, filters[2].match(/\(/).index - 1);
-
-        self.callRemote('filterMessages', filters).addCallback(
-            function(data) { self.replaceTDB(data) });
-
-    },
-
-    function replaceWithDialog(self, index, dialog) {
-        var row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + index);
-        self.setChildBGColors(row, "");
-        var cell = row.getElementsByTagName("td")[0];
-        MochiKit.DOM.replaceChildNodes(cell,
-            MochiKit.DOM.DIV({"class":"embedded-action-dialog"}, dialog));
-    },
-
-    function nextPage(self) {
-        self.inboxTDB.nextPage();
-    },
-
-    function prevPage(self) {
-        self.inboxTDB.prevPage();
-    },
-
-    function stuffTagsInDropdown(self) {
-        var select = document.getElementById("tag-select");
-        MochiKit.DOM.replaceChildNodes(select);
-        select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
-
-        for(i = 0; i < self.allTags.length; i++)
-            select.appendChild(
-                MochiKit.DOM.createDOM("OPTION", {"value":self.allTags[i]}, self.allTags[i]));
-    },
-
-    function nextOrPrevMessage(self, next) {
-        var offset = self.selectedRowOffset + (next ? 1 : -1);
-
-        var row = null;
-        
-        try {
-            row = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
-        } catch(e) {}
-
-        /* if there is a next/prev message on this page */
-        if(row) {
-            /* select it, and get the message content */
-            self.prepareForMessage(offset);
-            self.callRemote("getMessageContent", offset).addCallback(
-                function(data) { self.setMessageContent(data) });
-        } else if(self.messageMetadata["has-" + (next ? "next" : "prev") + "-page"]) {
-            self.callRemote((next ? "next" : "prev") + "PageAndMessage").addCallback(
-                /* squish the round-trips by getting the tdb page and
-                   the next/prev message at the same time */
-                function(data) {
-                    self.replaceTDB(data[0]);
-                    self.prepareForMessage(0);
-                    self.setMessageContent(data[1]);
-                });
-        } else {
-            /* do something stupid */
-            alert("sorry, there is not a next/prev message");
-        }
-    },
-
-    function nextMessage(self) {
-        self.nextOrPrevMessage(true);
-    },
-
-    function prevMessage(self) {
-        self.nextOrPrevMessage(false);
-    },
-
-    function viewChanged(self) {
-        var vselect = document.getElementById("more-views-select");
-        for(var i = 0; i < vselect.childNodes.length; i++) {
-            var subvselect = document.getElementById(vselect.childNodes[i].value + "-select");
-            subvselect.style.display = (i == vselect.selectedIndex) ?  "" : "none";
-        }
-    },
-
-    function viewByTagChanged(self, select) {
-        var options = 0; var selectedValue = null;
-        for(var i = 0; i < select.childNodes.length; i++) {
-            if(options == select.selectedIndex) {
-                selectedValue = select.childNodes[i].value;
-                break;
-            }
-            if(select.childNodes[i].tagName)
-                options++;
-        }
-        if(selectedValue == select.firstChild.value) {
-            self.callRemote("viewByAllTags");
-        } else {
-            self.callRemote("viewByTag", selectedValue);
-        }
-    },
-
-    function viewByPersonChanged(self, select) {
-        var options = 0; var selectedValue = null;
-        for(var i = 0; i < select.childNodes.length; i++) {
-            if(options == select.selectedIndex) {
-                selectedValue = select.childNodes[i].value;
-                break;
-            }
-            if(select.childNodes[i].tagName)
-                options++;
-        }
-        if(selectedValue == select.firstChild.value) {
-            self.callRemote("viewByAllPeople");
-        } else {
-            self.callRemote("viewByPerson", selectedValue).addErrback(
-                function(err) { self.mailboxFeedback(err) });
-        }
-    },
-
-    function chooseAccount(self, select) {
-        var value = select.value;
-        if (value == 'All') {
-            value = null;
-        }
-        self.callRemote("viewByAccount", value).addCallback(
-            function(rowCount) {
-                self.scrollWidget.setViewportHeight(rowCount);
-                self.scrollWidget.emptyAndRefill();
-            });
-    },
-
-    function replaceTDB(self, data) {
-        self.inboxTDB._setTableContent(data[0]);
-        self.inboxTDB._setPageState.apply(self.inboxTDB, data[1]);
-    },
-
-    function replaceSender(self, data) {
-        document.getElementById("message-detail-sender").innerHTML = data;
-    },
-
-    function toggleShowRead(self) {
-        self.callRemote("toggleShowRead").addCallback(
-            function(linkHTML) { self.setShowReadLinks(linkHTML) });
-    },
-
-    function _changeView(self, viewName) {
-        self.callRemote(viewname).addCallback(
-            function(linkHTML) { self.setViewLinks(linkHTML) }).addCallback(
-                function(ign) { self.hideShowReadLinks() });
-    },
-
-    function trashView(self) { self._changeView("trashView") },
-
-    function archiveView(self) { self._changeView("archiveView") },
-
-    function inboxView(self) { self._changeView("inboxView") },
-
-    function setViewLinks(self, html) {
-        document.getElementById("view-container").innerHTML = html;
-    },
-
-    function showShowReadLinks(self) {
-        MochiKit.DOM.setDisplayForElement("", "show-read-outer-container");
-    },
-
-    function hideShowReadLinks(self) {
-        MochiKit.DOM.hideElement("show-read-outer-container");
-    },
-
-    function setShowReadLinks(self, html) {
-        document.getElementById("show-read-container").innerHTML = html;
-    },
-
-    function loadMessage(self, index) {
-        var md = document.getElementById("message-detail");
-        md.style.opacity = '.3';
-        md.style.backgroundColor = '#CACACA';
-
-        self.everythingStart = self.loadMessageStart = new Date();
-        self.showThrobber();
-        self.prepareForMessage(index);
-        self.callRemote("getMessageContent", index).addCallback(
+    /* if there is a next/prev message on this page */
+    if(row) {
+        /* select it, and get the message content */
+        self.prepareForMessage(offset);
+        self.callRemote("getMessageContent", offset).addCallback(
             function(data) { self.setMessageContent(data) });
-    },
+    } else if(self.messageMetadata["has-" + (next ? "next" : "prev") + "-page"]) {
+        self.callRemote((next ? "next" : "prev") + "PageAndMessage").addCallback(
+            /* squish the round-trips by getting the tdb page and
+                the next/prev message at the same time */
+            function(data) {
+                self.replaceTDB(data[0]);
+                self.prepareForMessage(0);
+                self.setMessageContent(data[1]);
+            });
+    } else {
+        /* do something stupid */
+        alert("sorry, there is not a next/prev message");
+    }
+},
 
-    function maybeLoadMessage(self, event, index) {
-        if(event.target.tagName == "A" || event.target.tagName == "IMG") {
-            return;
+function nextMessage(self) {
+    self.nextOrPrevMessage(true);
+},
+
+function prevMessage(self) {
+    self.nextOrPrevMessage(false);
+},
+
+function viewChanged(self) {
+    var vselect = document.getElementById("more-views-select");
+    for(var i = 0; i < vselect.childNodes.length; i++) {
+        var subvselect = document.getElementById(vselect.childNodes[i].value + "-select");
+        subvselect.style.display = (i == vselect.selectedIndex) ?  "" : "none";
+    }
+},
+
+function viewByTagChanged(self, select) {
+    var options = 0; var selectedValue = null;
+    for(var i = 0; i < select.childNodes.length; i++) {
+        if(options == select.selectedIndex) {
+            selectedValue = select.childNodes[i].value;
+            break;
         }
-        self.loadMessage(index);
-    },
+        if(select.childNodes[i].tagName)
+            options++;
+    }
+    if(selectedValue == select.firstChild.value) {
+        self.callRemote("viewByAllTags");
+    } else {
+        self.callRemote("viewByTag", selectedValue);
+    }
+},
 
-    function applyToChildren(self, f, parent) {
-        MochiKit.Base.map(function(e) { if(e.tagName) { f(e) }}, parent.childNodes);
-    },
-
-    function setChildBGColors(self, parent, color) {
-        self.applyToChildren(function(e) { e.style.backgroundColor = color }, parent);
-    },
-
-    function setChildBorders(self, parent, style) {
-        self.applyToChildren(function(e) { e.style.border = style }, parent);
-    },
-
-    function showThrobber(self) {
-        document.getElementById("throbber").style.visibility = "visible";
-    },
-
-    function hideThrobber(self) {
-        document.getElementById("throbber").style.visibility = "hidden";
-    },
-
-    function reselectMessage(self) {
-        self.prepareForMessage(self.selectedRowOffset);
-    },
-
-    function prepareForMessage(self, offset) {
-        /* if we are selecting a message, and there was a message selected before self */
-        if(self.selectedRow) {
-            /* and it hadn't been read before */
-            if(self.messageMetadata && !self.messageMetadata["message"]["read"]) {
-                /* and make it look like it has been read */
-                try {
-                    var node = Nevow.Athena.NodeByAttribute(self.selectedRow, 'class', 'unread-message');
-                    if(node) {
-                        node.className = 'read-message';
-                    }
-                    self.twiddleUnreadMessageCount(-1);
-                } catch(e) {}
-            }
+function viewByPersonChanged(self, select) {
+    var options = 0; var selectedValue = null;
+    for(var i = 0; i < select.childNodes.length; i++) {
+        if(options == select.selectedIndex) {
+            selectedValue = select.childNodes[i].value;
+            break;
         }
+        if(select.childNodes[i].tagName)
+            options++;
+    }
+    if(selectedValue == select.firstChild.value) {
+        self.callRemote("viewByAllPeople");
+    } else {
+        self.callRemote("viewByPerson", selectedValue).addErrback(
+            function(err) { self.mailboxFeedback(err) });
+    }
+},
 
-        self.selectedRowOffset = offset;
-        var newlySelectedRow = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
+function chooseAccount(self, select) {
+    var value = select.value;
+    if (value == 'All') {
+        value = null;
+    }
+    self.callRemote("viewByAccount", value).addCallback(
+        function(rowCount) {
+            self.scrollWidget.setViewportHeight(rowCount);
+            self.scrollWidget.emptyAndRefill();
+        });
+},
 
-        if(self.selectedRow != null && self.selectedRow != newlySelectedRow)
-            self.setChildBGColors(self.selectedRow, "");
+function replaceTDB(self, data) {
+    self.inboxTDB._setTableContent(data[0]);
+    self.inboxTDB._setPageState.apply(self.inboxTDB, data[1]);
+},
 
-        self.setChildBGColors(newlySelectedRow, Quotient.Mailbox.selectedMessageColor);
-        self.setChildBorders(newlySelectedRow, "");
-        self.selectedRow = newlySelectedRow;
-    },
+function replaceSender(self, data) {
+    document.getElementById("message-detail-sender").innerHTML = data;
+},
 
-    function newMessage(self) {
-        if(self.selectedRow)
-            self.setChildBGColors(self.selectedRow, "");
-        self.callRemote("newMessage").addCallback(
-            function(data) { self.setMessageContent(data) }).addCallback(
-                function(ign) { self.fitMessageBodyToPage() });
-    },
+function toggleShowRead(self) {
+    self.callRemote("toggleShowRead").addCallback(
+        function(linkHTML) { self.setShowReadLinks(linkHTML) });
+},
 
-    function nextUnread(self) {
-        if(self.messageMetadata["next-unread"]) {
-            /* this thing returns [tdbhtml or null, msghtml, msgoffset] */
-            self.callRemote("nextUnread").addCallback(
-                function(data) {
-                    if(data[0]) {
-                        self.replaceTDB(data[0]);
-                        self.prepareForMessage(data[2]);
-                    } else {
-                        self.prepareForMessage(data[2]);
-                    }
-                    self.setMessageContent(data[1]);
-                });
-        } else {
-            alert("sorry, but there is not a next unread message.");
+function _changeView(self, viewName) {
+    self.callRemote(viewname).addCallback(
+        function(linkHTML) { self.setViewLinks(linkHTML) }).addCallback(
+            function(ign) { self.hideShowReadLinks() });
+},
+
+function trashView(self) { self._changeView("trashView") },
+
+function archiveView(self) { self._changeView("archiveView") },
+
+function inboxView(self) { self._changeView("inboxView") },
+
+function setViewLinks(self, html) {
+    document.getElementById("view-container").innerHTML = html;
+},
+
+function showShowReadLinks(self) {
+    MochiKit.DOM.setDisplayForElement("", "show-read-outer-container");
+},
+
+function hideShowReadLinks(self) {
+    MochiKit.DOM.hideElement("show-read-outer-container");
+},
+
+function setShowReadLinks(self, html) {
+    document.getElementById("show-read-container").innerHTML = html;
+},
+
+function loadMessage(self, index) {
+    var md = document.getElementById("message-detail");
+    md.style.opacity = '.3';
+    md.style.backgroundColor = '#CACACA';
+
+    self.everythingStart = self.loadMessageStart = new Date();
+    self.showThrobber();
+    self.prepareForMessage(index);
+    self.callRemote("getMessageContent", index).addCallback(
+        function(data) { self.setMessageContent(data) });
+},
+
+function maybeLoadMessage(self, event, index) {
+    if(event.target.tagName == "A" || event.target.tagName == "IMG") {
+        return;
+    }
+    self.loadMessage(index);
+},
+
+function applyToChildren(self, f, parent) {
+    MochiKit.Base.map(function(e) { if(e.tagName) { f(e) }}, parent.childNodes);
+},
+
+function setChildBGColors(self, parent, color) {
+    self.applyToChildren(function(e) { e.style.backgroundColor = color }, parent);
+},
+
+function setChildBorders(self, parent, style) {
+    self.applyToChildren(function(e) { e.style.border = style }, parent);
+},
+
+function showThrobber(self) {
+    document.getElementById("throbber").style.visibility = "visible";
+},
+
+function hideThrobber(self) {
+    document.getElementById("throbber").style.visibility = "hidden";
+},
+
+function reselectMessage(self) {
+    self.prepareForMessage(self.selectedRowOffset);
+},
+
+function prepareForMessage(self, offset) {
+    /* if we are selecting a message, and there was a message selected before self */
+    if(self.selectedRow) {
+        /* and it hadn't been read before */
+        if(self.messageMetadata && !self.messageMetadata["message"]["read"]) {
+            /* and make it look like it has been read */
+            try {
+                var node = Nevow.Athena.NodeByAttribute(self.selectedRow, 'class', 'unread-message');
+                if(node) {
+                    node.className = 'read-message';
+                }
+                self.twiddleUnreadMessageCount(-1);
+            } catch(e) {}
         }
-    },
+    }
 
-    function fitMessageBodyToPage(self) {
-        var e = document.getElementById("message-body");
+    self.selectedRowOffset = offset;
+    var newlySelectedRow = self.inboxTDB.nodeByAttribute('class', 'tdb-row-' + offset);
+
+    if(self.selectedRow != null && self.selectedRow != newlySelectedRow)
+        self.setChildBGColors(self.selectedRow, "");
+
+    self.setChildBGColors(newlySelectedRow, Quotient.Mailbox.selectedMessageColor);
+    self.setChildBorders(newlySelectedRow, "");
+    self.selectedRow = newlySelectedRow;
+},
+
+function newMessage(self) {
+    if(self.selectedRow)
+        self.setChildBGColors(self.selectedRow, "");
+    self.callRemote("newMessage").addCallback(
+        function(data) { self.setMessageContent(data) }).addCallback(
+            function(ign) { self.fitMessageBodyToPage() });
+},
+
+function nextUnread(self) {
+    if(self.messageMetadata["next-unread"]) {
+        /* this thing returns [tdbhtml or null, msghtml, msgoffset] */
+        self.callRemote("nextUnread").addCallback(
+            function(data) {
+                if(data[0]) {
+                    self.replaceTDB(data[0]);
+                    self.prepareForMessage(data[2]);
+                } else {
+                    self.prepareForMessage(data[2]);
+                }
+                self.setMessageContent(data[1]);
+            });
+    } else {
+        alert("sorry, but there is not a next unread message.");
+    }
+},
+
+function fitMessageBodyToPage(self) {
+    var e = document.getElementById("message-body");
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 35 + "px";
     },
 

@@ -1,4 +1,4 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding-left: 12px;">
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding-left: 12px;" nevow:render="liveFragment">
 
   <div class="actions-container">
     <!--<a href="#" onclick="Quotient.Mailbox.Controller.get(this).markThisUnread(); return false"
@@ -16,7 +16,9 @@
     <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(); return false"
       >delete</a> |
     <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(); return false"
-      >archive</a> <!--|
+      >archive</a> |
+    <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">message source</a>
+    <!--|
     <a href="#" oncick="Quotient.Mailbox.Controller.get(this).replyToAllThis(); return false"
       >reply all</a> |
     <a href="#" onclick="Quotient.Mailbox.Controller.get(this).redirectThis(); return false"

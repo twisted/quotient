@@ -163,6 +163,8 @@ class MessageDetail(athena.LiveFragment):
     live = 'athena'
     jsClass = 'Quotient.Mailbox.MessageDetail'
 
+    iface = allowedMethods = dict(getMessageSource=True)
+
     _partsByID = None
 
     def __init__(self, original):
@@ -265,6 +267,15 @@ class MessageDetail(athena.LiveFragment):
                 paragraphs.append(renderable)
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
+
+    def getMessageSource(self):
+        source = self.original.impl.source.getContent()
+        charset = self.original.impl.getParam('charset', default='utf-8')
+
+        try:
+            return unicode(source, charset, 'replace')
+        except LookupError:
+            return unicode(source, 'utf-8', 'replace')
 
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)
