@@ -1,5 +1,10 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
+  <tr nevow:pattern="cc">
+    <td class="header-table-first-col">CC</td>
+    <td class="header-table-last-col"><nevow:slot name="cc" /></td>
+  </tr>
+
   <nevow:invisible nevow:render="paragraph">
     <div class="text-paragraph" nevow:pattern="paragraph">
       <nevow:attr name="class"><nevow:slot name="quote-class" /></nevow:attr>

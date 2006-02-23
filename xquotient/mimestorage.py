@@ -388,7 +388,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         try:
             to = self.part.getHeader(u'to')
         except equotient.NoSuchHeader:
-            pass
+            self.message.recipient = u'<No Recipient>'
         else:
             self.message.recipient = mimeutil.headerToUnicode(to)
 

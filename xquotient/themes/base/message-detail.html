@@ -1,4 +1,5 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1" style="padding-left: 12px;">
+
   <div class="actions-container">
     <!--<a href="#" onclick="Quotient.Mailbox.Controller.get(this).markThisUnread(); return false"
       >mark unread</a> |-->
@@ -37,6 +38,7 @@
         <td class="header-table-first-col">To</td>
         <td class="header-table-last-col"><nevow:slot name="recipient" /></td>
       </tr>
+      <nevow:slot name="cc" />
       <tr>
         <td class="header-table-first-col">Subject</td>
         <td class="header-table-last-col"><nevow:slot name="subject" /></td>

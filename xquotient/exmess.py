@@ -14,7 +14,7 @@ from xmantissa import ixmantissa, website, people
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, equotient
+from xquotient import gallery, equotient, mimeutil
 from xquotient.actions import SenderPersonFragment
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -203,9 +203,19 @@ class MessageDetail(athena.LiveFragment):
         else:
             sentWhen = self.original.sentWhen.asHumanly(tzinfo)
 
+        try:
+            cc = self.original.impl.getHeader(u'cc')
+        except equotient.NoSuchHeader:
+            cc = ''
+        else:
+            cc = self.patterns['cc'].fillSlots(
+                                'cc', ', '.join(e.anyDisplayName()
+                                                    for e in mimeutil.parseEmailAddresses(cc)))
+
         return dictFillSlots(ctx.tag,
                 dict(sender=self.original.sender,
                      recipient=self.original.recipient,
+                     cc=cc,
                      subject=self.original.subject,
                      tags=self.tagsAsStan(),
                      sent=sentWhen))
