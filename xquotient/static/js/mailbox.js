@@ -26,6 +26,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
         if(self._selectedRow) {
             self._selectedRow.style.backgroundColor = '#FFFFFF';
         }
+        if(!row) {
+            row = self._rows[rowOffset][1];
+        }
+
         row.style.backgroundColor = '#CACACA';
         self._selectedRow = row;
         self._selectedRowOffset = rowOffset;
@@ -171,7 +175,7 @@ Quotient.Mailbox.Controller.methods(
         self.callRemote("archiveCurrentMessage");
         self._selectAndFetchRow(sw._selectedRowOffset,
                                 function() {
-                                    return sw._selectedRow.nextSibling;
+                                    return null;
                                 });
     },
 
