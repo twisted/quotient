@@ -54,6 +54,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
     function removeCurrentRow(self) {
         self._selectedRow.parentNode.removeChild(self._selectedRow);
+        self.adjustViewportHeight(-1);
         var top;
         for(var i = self._selectedRowOffset; i < self._rows.length && self._rows[i]; i++) {
             top = parseInt(self._rows[i][1].style.top);
