@@ -160,23 +160,25 @@ Quotient.Mailbox.Controller.methods(
             function(stuff) { self.setMessageContent(stuff) });
     },
 
-    function nextMessage(self) {
+    function nextMessage(self, n) {
         var sw = self.scrollWidget;
         self._selectAndFetchRow(++sw._selectedRowOffset,
                                 function() {
                                     return sw._selectedRow.nextSibling
                                 });
+        n.blur();
     },
 
-    function prevMessage(self) {
+    function prevMessage(self, n) {
         var sw = self.scrollWidget;
         self._selectAndFetchRow(--sw._selectedRowOffset,
                                 function() {
                                     return sw._selectedRow.previousSibling
                                 });
+        n.blur();
     },
 
-    function archiveThis(self) {
+    function archiveThis(self, n) {
         var sw = self.scrollWidget;
         sw.removeCurrentRow();
         self.callRemote("archiveCurrentMessage");
@@ -184,20 +186,23 @@ Quotient.Mailbox.Controller.methods(
                                 function() {
                                     return null;
                                 });
+        n.blur();
     },
 
-    function replyToThis(self) {
+    function replyToThis(self, n) {
         self.callRemote("replyToCurrentMessage").addCallback(
             function(data) {
                 self.setMessageContent(data)
             });
+        n.blur();
     },
 
-    function forwardThis(self) {
+    function forwardThis(self, n) {
         self.callRemote("forwardCurrentMessage").addCallback(
             function(data) {
                 self.setMessageContent(data)
             });
+        n.blur();
     },
 
     function loadMessageFromID(self, id) {
