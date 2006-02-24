@@ -192,7 +192,7 @@ Quotient.Mailbox.Controller.methods(
     function replyToThis(self, n) {
         self.callRemote("replyToCurrentMessage").addCallback(
             function(data) {
-                self.setMessageContent(data)
+                self.setMessageContent([null, data])
             });
         n.blur();
     },
@@ -200,7 +200,7 @@ Quotient.Mailbox.Controller.methods(
     function forwardThis(self, n) {
         self.callRemote("forwardCurrentMessage").addCallback(
             function(data) {
-                self.setMessageContent(data)
+                self.setMessageContent([null, data])
             });
         n.blur();
     },
