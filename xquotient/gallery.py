@@ -135,8 +135,8 @@ class GalleryScreen(athena.LiveFragment):
                     imageClass = imageClasses.next()
                     lastMessageID = message.storeID
 
-                imageURL = '/private/message-parts' + self.translator.toWebID(image.part) + '?withfilename=1'
-                thumbURL = '/private/thumbnails' + self.translator.toWebID(image)
+                imageURL = '/private/message-parts/' + self.translator.toWebID(image.part) + '?withfilename=1'
+                thumbURL = '/private/thumbnails/' + self.translator.toWebID(image)
 
                 person = self.organizer.personByEmailAddress(message.sender)
                 if person is None:
