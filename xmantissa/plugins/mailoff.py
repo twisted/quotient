@@ -5,6 +5,7 @@ from axiom import iaxiom, scheduler, userbase
 from xmantissa import website, offering, provisioning
 
 from xquotient.quotientapp import QuotientBenefactor, ExtractBenefactor, IndexingBenefactor
+from xquotient.quotienttheme import QuotientTheme
 from xquotient import mail, grabber, compose, popout, publicpage
 
 quotientBenefactorFactory = provisioning.BenefactorFactory(
@@ -60,4 +61,6 @@ plugin = offering.Offering(
                            indexingBenefactorFactory,
                            grabberBenefactorFactory,
                            composeBenefactorFactory,
-                           popAccessBenefactorFactory])
+                           popAccessBenefactorFactory],
+
+    themes = [QuotientTheme('base', 0)])
