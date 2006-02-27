@@ -12,6 +12,7 @@ quotient = athena.JSPackage({
     u'Quotient.Compose': jsdir.child('compose.js').path,
     u'Quotient.Gallery': jsdir.child('gallery.js').path,
     u'Quotient.Grabber': jsdir.child('grabber.js').path,
+    u'Quotient.Filter': jsdir.child('filter.js').path,
 
     u'LightBox': jsdir.child('lightbox.js').path,
 

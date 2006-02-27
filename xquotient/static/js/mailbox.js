@@ -230,16 +230,24 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    function chooseAccount(self, select) {
+    function _chooseViewParameter(self, viewFunction, select) {
         var value = select.value;
         if (value == 'All') {
             value = null;
         }
-        self.callRemote("viewByAccount", value).addCallback(
+        self.callRemote("viewByTag", value).addCallback(
             function(rowCount) {
                 self.scrollWidget.setViewportHeight(rowCount);
                 self.scrollWidget.emptyAndRefill();
             });
+    },
+
+    function chooseTag(self, select) {
+        return self._chooseViewParameter('viewByTag', select);
+    },
+
+    function chooseAccount(self, select) {
+        return self._chooseViewParameter('viewByAccount', select);
     },
 
     function nextUnread(self) {

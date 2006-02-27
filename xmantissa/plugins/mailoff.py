@@ -6,7 +6,7 @@ from xmantissa import website, offering, provisioning
 
 from xquotient.quotientapp import QuotientBenefactor, ExtractBenefactor, IndexingBenefactor
 from xquotient.quotienttheme import QuotientTheme
-from xquotient import mail, grabber, compose, popout, publicpage
+from xquotient import mail, grabber, compose, popout, publicpage, filter
 
 quotientBenefactorFactory = provisioning.BenefactorFactory(
     name = u'quotient',
@@ -40,6 +40,12 @@ popAccessBenefactorFactory = provisioning.BenefactorFactory(
     description = u'Access to mail via POP3',
     benefactorClass = popout.POP3Benefactor)
 
+ruleBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Filtering',
+    description = u'Pre-configured and user-customizable filtering of messages based on headers and such.',
+    benefactorClass = filter.FilterBenefactor,
+    dependencies = [quotientBenefactorFactory])
+
 plugin = offering.Offering(
     name = u'Quotient',
 
@@ -61,6 +67,6 @@ plugin = offering.Offering(
                            indexingBenefactorFactory,
                            grabberBenefactorFactory,
                            composeBenefactorFactory,
-                           popAccessBenefactorFactory],
-
+                           popAccessBenefactorFactory,
+                           ruleBenefactorFactory],
     themes = [QuotientTheme('base', 0)])

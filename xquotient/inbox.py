@@ -309,7 +309,7 @@ class InboxScreen(athena.LiveFragment):
                 toggleShowRead=True, newMessage=True,        addTags=True,
                 archiveMessage=True, deleteMessage=True,     getPeople=True,
                 archiveView=True,    trashView=True,         inboxView=True,
-                viewByTag=True,      viewByAllTags=True,     markCurrentMessageUnread=True,
+                viewByTag=True,      markCurrentMessageUnread=True,
                 viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
                 getTags=True,        getMessageContent=True, filterMessages=True,
                 viewByAccount=True,  loadMessageFromID=True, nextUnread=True,
@@ -446,19 +446,15 @@ class InboxScreen(athena.LiveFragment):
 
     def viewByTag(self, tag):
         self.viewingByTag = tag
-        self._changeComparisonReplaceTable()
+        return self._changeComparison()
 
     def viewByPerson(self, person):
         self.viewingByPerson = person
-        self._changeComparisonReplaceTable()
-
-    def viewByAllTags(self):
-        self.viewingByTag = None
-        self._changeComparisonReplaceTable()
+        return self._changeComparison()
 
     def viewByAllPeople(self):
         self.viewingByPerson = None
-        self._changeComparisonReplaceTable()
+        return self._changeComparison()
 
     def viewByAccount(self, account):
         self.viewingByAccount = account
@@ -650,6 +646,16 @@ class InboxScreen(athena.LiveFragment):
 
     def render_inboxTDB(self, ctx, data):
         return ctx.tag[self.inboxTDB]
+
+    def render_tagChooser(self, ctx, data):
+        select = inevow.IQ(self.docFactory).onePattern('tagChooser')
+        option = inevow.IQ(select).patternGenerator('tagChoice')
+        for tag in [None] + self.getTags():
+            opt = option().fillSlots('tagName', tag or 'All')
+            if tag == self.viewingByTag:
+                opt(selected="selected")
+            select[opt]
+        return select
 
     def _accountNames(self):
         return self.original.store.query(Message).getColumn("source").distinct()

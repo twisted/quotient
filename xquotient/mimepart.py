@@ -2,14 +2,14 @@
 # Copyright 2005 Divmod, Inc.  See LICENSE file for details
 
 import re, rfc822, time, textwrap
-
-from zope.interface import implements
+from email.Header import decode_header
 
 from cStringIO import StringIO
 
+from zope.interface import implements
+
 from twisted.internet import defer
 from twisted.python.components import registerAdapter
-
 from twisted.mail import smtp
 
 from nevow import inevow
@@ -339,6 +339,9 @@ class Header(object):
         self.name = name
         self.value = value
 
+    def __repr__(self):
+        return '<Header %s: %r>' % (self.name, self.value)
+
     def __cmp__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
@@ -347,6 +350,11 @@ class Header(object):
         return cmp(self.value, other.value)
 
 class HeaderBodyParser(object):
+
+    _normalizeHeaders = {
+        'references': None,
+        }
+
     def __init__(self, part, parent):
         self.parent = parent
         self.parsingHeaders = 1
@@ -380,7 +388,28 @@ class HeaderBodyParser(object):
 
     def finishHeader(self):
         if self.prevheader is not None:
-            self.part.addHeader(self.prevheader, self.prevvalue)
+            prevheader = self.prevheader.lower()
+
+            decodedValueList = []
+            try:
+                parts = decode_header(self.prevvalue)
+                for maybeUncoded in parts:
+                    if isinstance(maybeUncoded, unicode):
+                        decodedValueList.append(maybeUncoded)
+                    else:
+                        uncoded, encoding = maybeUncoded
+                        decodedValueList.append(uncoded.decode(encoding or 'ascii', 'replace'))
+            except ValueError:
+                decodedValue = self.prevvalue.decode('ascii', 'replace')
+            else:
+                decodedValue = u''.join(decodedValueList)
+
+            if prevheader in self._normalizeHeaders:
+                values = decodedValue.split(self._normalizeHeaders[prevheader])
+                for v in values:
+                    self.part.addHeader(prevheader, v)
+            else:
+                self.part.addHeader(self.prevheader, decodedValue)
         self.prevheader = self.prevvalue = None
 
     def parseHeaders(self, line, linebegin, lineend, hdrValueDelim=re.compile(":[ \t]")):
@@ -455,7 +484,7 @@ class MIMEMessageParser(HeaderBodyParser):
                         key, val = ps
                         key = key.strip().lower()
                         if key.lower() == 'boundary':
-                            return '--' + unquote(val.strip())
+                            return '--' + unquote(val.strip().encode('ascii'))
             return None
 
     def parse_body(self, line, b, e):
@@ -528,7 +557,7 @@ class MIMEPart(object):
         self.headers = []
 
     def addHeader(self, name, value):
-        self.headers.append(Header(name.decode('ascii', 'ignore').lower(), value)) # XXX decode value
+        self.headers.append(Header(name.decode('ascii', 'ignore').lower(), value))
 
     def getAllHeaders(self):
         return iter(self.headers)
@@ -670,7 +699,7 @@ class MIMEMessageReceiver(object):
 
         self._detectLoop()
 
-        self.part.addHeader('x-divmod-processed', rfc822.formatdate(localNow))
+        self.part.addHeader('x-divmod-processed', unicode(rfc822.formatdate(localNow)))
         self.file.close()
         self.done = True
 

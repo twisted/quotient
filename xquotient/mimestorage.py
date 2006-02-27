@@ -24,12 +24,14 @@ class Header(item.Item):
     name = attributes.text(
         "The name of this header.  What it is called.",
         allowNone=False)
-    value = attributes.bytes(
-        "The encoded value of this header.",
+    value = attributes.text(
+        "The decoded value of this header.",
         allowNone=False)
     index = attributes.integer(
         "The position of this header within a part.",
         allowNone=False)
+
+
 
 class Part(item.Item):
     typeName = 'quotient_mime_part'
@@ -73,6 +75,7 @@ class Part(item.Item):
                 "Don't add headers to in-database messages - they aren't mutable [yet?]")
         if not hasattr(self, '_headers'):
             self._headers = []
+
         self._headers.append(Header(name=name.decode('ascii', 'ignore').lower(),
                                     value=value,
                                     part=self,
@@ -168,7 +171,7 @@ class Part(item.Item):
         except equotient.NoSuchHeader:
             return default
 
-        ctype = value.split(';', 1)[0].lower().strip()
+        ctype = value.split(';', 1)[0].lower().strip().encode('ascii')
         if ctype.count('/') != 1:
             return default
         return ctype
@@ -390,14 +393,14 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         except equotient.NoSuchHeader:
             self.message.recipient = u'<No Recipient>'
         else:
-            self.message.recipient = mimeutil.headerToUnicode(to)
+            self.message.recipient = to
 
         try:
             subject = self.part.getHeader(u'subject')
         except equotient.NoSuchHeader:
             self.message.subject = u'<No Subject>'
         else:
-            self.message.subject = mimeutil.headerToUnicode(subject)
+            self.message.subject = subject
 
         for header in (u'from', u'sender', u'reply-to'):
             try:
@@ -405,7 +408,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             except equotient.NoSuchHeader:
                 continue
 
-            email = mimeutil.EmailAddress(v)
+            email = mimeutil.EmailAddress(v, mimeEncoded=False)
             self.message.sender = unicode(email.email)
             self.message.senderDisplay = unicode(email.anyDisplayName())
             break

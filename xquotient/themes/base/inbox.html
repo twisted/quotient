@@ -2,7 +2,9 @@
   <select nevow:pattern="accountChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseAccount(this);">
     <option nevow:pattern="accountChoice"><nevow:attr name="value"><nevow:slot name="accountName" /></nevow:attr><nevow:slot name="accountName" /></option>
   </select>
-
+  <select nevow:pattern="tagChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseTag(this);">
+    <option nevow:pattern="tagChoice"><nevow:attr name="value"><nevow:slot name="tagName" /></nevow:attr><nevow:slot name="tagName" /></option>
+  </select>
   <table class="top-controls" style="width: 100%">
     <tr valign="bottom">
       <td>
@@ -10,6 +12,9 @@
           ><nevow:invisible nevow:render="messageCount" /></span> messages.
         <span class="unread-message-count"
           ><nevow:invisible nevow:render="unreadMessageCount" /></span> unread messages.
+      </td>
+      <td align="right">
+        View By Tag: <nevow:invisible nevow:render="tagChooser" />
       </td>
       <td align="right">
         View By Account: <nevow:invisible nevow:render="accountChooser" />

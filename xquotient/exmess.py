@@ -132,7 +132,7 @@ class PartDisplayer(rend.Page):
         if 'withfilename' in request.args:
             try:
                 request.setHeader('content-disposition',
-                                    self.part.getHeader(u'content-disposition'))
+                                    self.part.getHeader(u'content-disposition').encode('ascii'))
             except equotient.NoSuchHeader:
                 pass
 
