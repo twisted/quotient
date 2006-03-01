@@ -1,8 +1,11 @@
+from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
 from nevow import tags, inevow, athena
 from nevow.flat import flatten
+
+from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -314,6 +317,7 @@ class InboxScreen(athena.LiveFragment):
                 getTags=True,        getMessageContent=True, filterMessages=True,
                 viewByAccount=True,  loadMessageFromID=True, nextUnread=True,
 
+                deferCurrentMessage=True,
                 nextPageAndMessage=True,
                 prevPageAndMessage=True,
                 forwardCurrentMessage=True,
@@ -362,6 +366,13 @@ class InboxScreen(athena.LiveFragment):
 
     def archiveCurrentMessage(self):
         self.currentMessage.archived = True
+
+    def deferCurrentMessage(self, days, hours, minutes):
+        print days, hours, minutes
+        self.currentMessage.receivedWhen = Time() + timedelta(days=days,
+                                                              hours=hours,
+                                                              minutes=minutes)
+        self.currentMessage.read = False
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)
@@ -617,7 +628,8 @@ class InboxScreen(athena.LiveFragment):
         # so you could look at all messages in trash, tagged with "boring"
         # sent by the Person with name "Joe" or whatever
         comparison = attributes.AND(Message.deleted == self.inTrashView,
-                                    Message.outgoing == self.inSentMailView)
+                                    Message.outgoing == self.inSentMailView,
+                                    Message.receivedWhen < Time())
         if not self.inArchiveView:
             comparison = attributes.AND(comparison, Message.archived == False)
 
@@ -674,7 +686,9 @@ class InboxScreen(athena.LiveFragment):
         f = ScrollingFragment(self.original.store,
                               Message,
                               self._getBaseComparison(),
-                              [u'sender', u'subject', u'sentWhen', u'read'])
+                              [u'sender', u'subject', u'receivedWhen', u'read'],
+                              defaultSortColumn=Message.receivedWhen)
+        f.resort('receivedWhen')
         f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)

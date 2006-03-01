@@ -4,6 +4,11 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     background-image: url(/Quotient/static/images/overlay.png);
 }
 
+#add-person-fragment {
+    background-color: #FFFFFF;
+    position: absolute;
+}
+
 * html #overlay{
     background-color: #000;
     back\ground-color: transparent;

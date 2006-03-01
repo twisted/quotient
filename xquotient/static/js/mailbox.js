@@ -66,7 +66,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                             self._rows.slice(self._selectedRowOffset+1, self._rows.length));
     },
         
-    
+   
     function cbRowsFetched(self) {
         if(self._pendingRowSelection) {
             self._pendingRowSelection();
@@ -187,6 +187,26 @@ Quotient.Mailbox.Controller.methods(
                                     return null;
                                 });
         n.blur();
+    },
+
+    function showDeferForm(self) {
+        self.deferForm = self.nodeByAttribute("class", "defer-form");
+        self.deferForm.style.display = "";
+    },
+
+    function deferThis(self) {
+        var sw = self.scrollWidget;
+        sw.removeCurrentRow();
+        self._selectAndFetchRow(sw._selectedRowOffset,
+                                function() {
+                                    return null;
+                                });
+
+        var days = parseInt(self.deferForm.days.value);
+        var hours = parseInt(self.deferForm.hours.value);
+        var minutes = parseInt(self.deferForm.minutes.value);
+        self.deferForm.style.display = "none";
+        self.callRemote("deferCurrentMessage", days, hours, minutes);
     },
 
     function replyToThis(self, n) {
@@ -412,6 +432,9 @@ Quotient.Mailbox.Controller.methods(
                 extractDict[etypename]["pattern"] = new RegExp().compile(
                                                             extractDict[etypename]["pattern"], "i");
             }
+        }
+        if(self.scrollWidget._selectedRow) {
+            self.scrollWidget._selectedRow.style.fontWeight = "";
         }
         self.messageDetailNode.style.opacity = '';
         self.messageDetailNode.style.backgroundColor = '';
