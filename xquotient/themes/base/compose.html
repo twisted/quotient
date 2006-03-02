@@ -4,9 +4,28 @@
     <iframe nevow:pattern="cabinet-iframe" style="border: 0px; height: 60px; width: 100%; overflow: visible">
       <nevow:attr name="src"><nevow:slot name="src" /></nevow:attr>
     </iframe>
-
+    <input type="checkbox" name="draft" style="display: none" />
     <span class="address-completions" style="display: none; position: absolute" />
     <table>
+      <tr>
+        <td>
+          <table>
+            <tr valign="bottom">
+              <td width="100%">
+                <div class="draft-notification" style="height: 2em"/>
+              </td>
+              <td align="right" style="white-space: nowrap">
+                <button onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false">
+                  Save Draft
+                </button>
+                <button onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
+                  Send
+                </button>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
       <tr>
         <td>
           <table class="header-table" cellspacing="0">
@@ -26,33 +45,51 @@
                   <input type="text" name="subject" style="width: 98%"
                     ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input></td>
               </tr>
-              <tr>
-                <td class="header-table-first-col">Attachments</td>
-                <td class="header-table-last-col" style="white-space: nowrap"
-                  ><!--<input type="file" id="file-upload-1" style="display: none;" />
+              <tr valign="top">
+                <td class="header-table-first-col">
                   <a href="#"
-                    onclick="Quotient.Compose.Controller.get(this).addAttachment(this); return false"
-                    >attach a file</a>-->
-                  <div class="upload-file-container">
-                    <nevow:invisible nevow:render="fileCabinet" />
+                    onclick="Quotient.Compose.Controller.get(this).toggleAttachments(this); return false">
+                    Attachments</a>
+                </td>
+                <td class="header-table-last-col" style="white-space: nowrap"
+                  ><div class="attach-container" style="display: none">
+                    <div class="upload-file-container">
+                      <nevow:invisible nevow:render="fileCabinet" />
+                    </div>
+                    <span class="upload-notification" style="visibility: hidden">Uploading...</span>
+                    <ul class="file-list">
+                      <nevow:slot name="attachments" />
+                    </ul>
+                    <li nevow:pattern="attachment"
+                      ><nevow:slot name="name" /> <a href="#"
+                        onclick="Quotient.Compose.Controller.get(this).removeFile(this); return false">remove</a>
+                      <span class="attachment-id" style="display: none"><nevow:slot name="id" /></span>
+                    </li>
+                    <div class="uploaded-files" style="display: none" />
                   </div>
-                  <ul class="file-list" />
-                  <div class="uploaded-files" style="display: none" />
                 </td>
               </tr>
               <tr valign="top">
-                <td class="header-table-first-col"
+                <td class="header-table-first-col" align="center"
                   ><a href="#"
                     onclick="Quotient.Compose.Controller.get(this).toggleMoreOptions(this); return false"
-                    >More Options</a></td>
+                    >Add CC</a></td>
                 <td class="header-table-last-col">
                   <table class="options-container" style="display: none; width: 100%">
                     <tr>
-                      <td>CC:</td><td style="width: 100%"><input type="text" name="cc" style="width: 80%" /></td>
+                      <td>CC:</td>
+                      <td style="width: 100%">
+                        <input type="text" name="cc" style="width: 80%">
+                          <nevow:attr name="value"><nevow:slot name="cc" /></nevow:attr>
+                        </input>
+                        <input style="display: none" type="text" name="bcc" />
+                      </td>
                     </tr>
+                    <!--
                     <tr>
                       <td>BCC:</td><td style="width: 100%"><input type="text" name="bcc" style="width: 80%" /></td>
                     </tr>
+                    -->
                   </table>
                 </td>
               </tr>
@@ -68,6 +105,9 @@
       </tr>
       <tr>
         <td align="right">
+          <button onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false">
+            Save Draft
+          </button>
           <button onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
             Send
           </button>

@@ -34,11 +34,9 @@ def mimeTypeToIcon(mtype,
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
 
-class Message(item.Item, item.InstallableMixin):
+class Message(item.Item):
     typeName = 'quotient_message'
     schemaVersion = 1
-
-    installedOn = attributes.reference()
 
     source = attributes.text(doc="""
     A short string describing the means by which this Message came to exist.
@@ -60,6 +58,7 @@ class Message(item.Item, item.InstallableMixin):
     archived = attributes.boolean(default=False)
     deleted = attributes.boolean(default=False)
     outgoing = attributes.boolean(default=False)
+    draft = attributes.boolean(default=False)
 
     impl = attributes.reference()
 

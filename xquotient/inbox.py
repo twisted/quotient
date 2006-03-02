@@ -629,7 +629,8 @@ class InboxScreen(athena.LiveFragment):
         # sent by the Person with name "Joe" or whatever
         comparison = attributes.AND(Message.deleted == self.inTrashView,
                                     Message.outgoing == self.inSentMailView,
-                                    Message.receivedWhen < Time())
+                                    Message.receivedWhen < Time(),
+                                    Message.draft == False)
         if not self.inArchiveView:
             comparison = attributes.AND(comparison, Message.archived == False)
 

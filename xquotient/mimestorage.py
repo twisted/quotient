@@ -337,7 +337,6 @@ class Part(item.Item):
                 yield child
 
 
-
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, fObj, source):
         partCounter = itertools.count().next
@@ -354,7 +353,6 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
         self.message = exmess.Message(store=self.store, receivedWhen=Time())
-        self.message.installOn(self.store)
 
         try:
             sent = self.part.getHeader(u'date')

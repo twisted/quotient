@@ -1,15 +1,7 @@
-/*
-if(tinyMCE) {
-    tinyMCE.init({
-        mode: "exact",
-        elements: "message-body",
-        theme: "simple"});
-}
-*/
-
 // import Quotient
 // import Quotient.Common
 // import Mantissa.LiveForm
+// import Fadomatic
 
 if(typeof(Quotient.Compose) == "undefined") {
     Quotient.Compose = {};
@@ -17,25 +9,75 @@ if(typeof(Quotient.Compose) == "undefined") {
 
 Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
-    function loaded(self) {
+    function loaded(self) {     
         //self.fitMessageBodyToPage();
         self.allPeople = new Array();
-    
+        self.draftNotification = self.nodeByAttribute("class", "draft-notification"); 
         self.completions = self.nodeByAttribute("class", "address-completions");
         self.callRemote("getPeople").addCallback(
             function(people) {
                 self.allPeople = self.allPeople.concat(people);
                 self.stuffPeopleInDropdown();
             });
+
+        self.attachContainer = self.nodeByAttribute("class", "attach-container");
+        self.optsContainer = self.nodeByAttribute("class", "options-container");
+        self.autoSaveInterval = 30000; /* 30 seconds */
+
+        setTimeout(function() {
+            self.saveDraft(false);
+        }, self.autoSaveInterval);
+        self.makeFileInputs();
     },
 
-    function uploadedFile(self, fname) {
-        function relpath(s) {
-            var c = (-1 < s.lastIndexOf('/')) ? '/' : '\\';
-            return s.substring(s.lastIndexOf(c)+1, s.length);
+    function saveDraft(self, userInitiated) {
+        var e = self.nodeByAttribute("name", "draft");
+        e.checked = true;
+        self.submit().addCallback(
+            function(ign) {
+                var time = (new Date()).toTimeString();
+                var msg = MochiKit.DOM.DIV({"class": "draft-timestamp"},
+                                        "Draft saved at " + time.substr(0, time.indexOf(' ')));
+
+                MochiKit.DOM.replaceChildNodes(self.draftNotification, msg);
+                new Fadomatic(msg, 2).fadeOut();
+                setTimeout(function() {
+                    MochiKit.DOM.replaceChildNodes(self.draftNotification);
+                }, 1700);
+                if(!userInitiated) {
+                    setTimeout(function() {
+                        self.saveDraft(false)
+                    }, self.autoSaveInterval);
+                }
+                return ign;
+            });
+        e.checked = false;
+    },
+
+    function makeFileInputs(self) {
+        var fl = self.nodeByAttribute("class", "file-list");
+        var uploaded = self.nodeByAttribute("class", "uploaded-files");
+        var lis = fl.getElementsByTagName("li");
+        var span;
+        for(var i = 0; i < lis.length; i++) {
+            span = lis[i].getElementsByTagName("span")[0];
+            uploaded.appendChild(
+                MochiKit.DOM.INPUT({"type": "text",
+                                    "name": "files",
+                                    "value": span.firstChild.nodeValue},
+                                   lis[i].firstChild.nodeValue));
         }
-        var flist = self.nodeByAttribute('class', 'file-list');
-        flist.appendChild(MochiKit.DOM.LI(null, [fname,
+    },
+    
+    function uploading(self) {
+        self.nodeByAttribute("class", "upload-notification").style.visibility = "";
+    },
+
+    function gotFileData(self, d) {
+        self.nodeByAttribute("class", "upload-notification").style.visibility = "hidden";
+
+        var flist = self.nodeByAttribute("class", "file-list");
+        flist.appendChild(MochiKit.DOM.LI(null, [d["name"],
             MochiKit.DOM.A({"style": "padding-left: 4px",
                             "href": "#",
                             "onclick": function() {
@@ -43,10 +85,10 @@ Quotient.Compose.Controller.methods(
                                 return false
                             }},
                             "remove")]));
-        self.nodeByAttribute('class', 'uploaded-files').appendChild(
+        self.nodeByAttribute("class", "uploaded-files").appendChild(
             MochiKit.DOM.INPUT({"type": "text",
                                 "name": "files",
-                                "value": relpath(fname)}, fname));
+                                "value": d["id"]}, d["name"]));
     },
 
     function removeFile(self, node) {
@@ -61,9 +103,13 @@ Quotient.Compose.Controller.methods(
         }
     },
 
+    function toggleAttachments(self, node) {
+        var attach = self.attachContainer;
+        attach.style.display = (attach.style.display == "none") ? "" : "none";
+    },
+
     function toggleMoreOptions(self, node) {
-        var opts = Nevow.Athena.NodeByAttribute(
-                            node.parentNode.parentNode, "class", "options-container");
+        var opts = self.optsContainer;
         opts.style.display = (opts.style.display == "none") ? "" : "none";
     },
 
@@ -235,10 +281,9 @@ Quotient.Compose.Controller.methods(
              "onchange": self._makeHandler("setAttachment(this)")}));
     },
 
-    function submitSuccess(self, result) {
-        alert('GREAT');
-    },
+    function submitSuccess(self, result) {},
 
     function submitFailure(self, err) {
+        alert(err);
         alert('CRAP');
     });

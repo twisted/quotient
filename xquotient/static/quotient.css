@@ -9,6 +9,14 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     position: absolute;
 }
 
+.draft-timestamp {
+    background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
+    text-shadow: 2px 2px 1px #2A7DB3;
+    color: #FFFFFF;
+    padding: 4px 2px 0px 2px;
+    font-weight: bold;
+}
+
 * html #overlay{
     background-color: #000;
     back\ground-color: transparent;

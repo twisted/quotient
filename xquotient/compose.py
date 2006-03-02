@@ -8,17 +8,19 @@ from twisted.mail import smtp, relaymanager
 from twisted.names import client
 from twisted.internet import error, defer, reactor
 
-from nevow import tags, inevow, flat, rend
+from nevow import tags, inevow, flat, rend, json
 
 from epsilon import extime
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
 
 from xmantissa.fragmentutils import dictFillSlots
-from xmantissa import webnav, ixmantissa, people, liveform, prefs
+from xmantissa import webnav, ixmantissa, people, liveform, prefs, tdb, tdbview
 from xmantissa.webtheme import getLoader
 
-from xquotient import iquotient, mail
+from xquotient import iquotient, mail, equotient
+from xquotient.exmess import Message
+from xquotient.mimestorage import Header, Part
 
 def _esmtpSendmail(username, password, smtphost, from_addr, to_addrs, msg):
     d = defer.Deferred()
@@ -168,7 +170,7 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def messageBounced(self, log, toAddress, msg):
-        from email import Parser as P, Generator as G, Message as M, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT, MIMEMessage as MM
+        from email import Parser as P, Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEMessage as MM
         import StringIO as S
 
         bounceText = 'Your message bounced.'
@@ -215,6 +217,7 @@ class File(item.Item):
     body = attributes.path(allowNone=False)
     name = attributes.text(allowNone=False)
 
+    message = attributes.reference()
     cabinet = attributes.reference(allowNone=False)
 
 class FileCabinet(item.Item):
@@ -225,6 +228,8 @@ class FileCabinet(item.Item):
     filesCount = attributes.integer(default=0)
 
 class FileCabinetPage(rend.Page):
+    lastFile = None
+
     def __init__(self, original):
         rend.Page.__init__(self, original, docFactory=getLoader('file-upload'))
 
@@ -242,15 +247,21 @@ class FileCabinetPage(rend.Page):
                 outf.write(uploadedFileArg.file.read())
                 outf.close()
 
-                File(store=self.original.store,
-                     body=outf.finalpath,
-                     name=unicode(uploadedFileArg.filename),
-                     type=unicode(uploadedFileArg.type),
-                     cabinet=self.original)
+                self.lastFile = File(store=self.original.store,
+                                     body=outf.finalpath,
+                                     name=unicode(uploadedFileArg.filename),
+                                     type=unicode(uploadedFileArg.type),
+                                     cabinet=self.original)
 
             self.original.store.transact(txn)
 
         return rend.Page.renderHTTP(self, ctx)
+
+    def render_lastFileData(self, ctx, data):
+        if self.lastFile is None:
+            return ''
+        return json.serialize({u'id': self.lastFile.storeID,
+                               u'name': self.lastFile.name})
 
 registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
 
@@ -264,10 +275,12 @@ class ComposeFragment(liveform.LiveForm):
 
     iface = allowedMethods = dict(getPeople=True, invoke=True)
 
+    _savedDraft = None
+
     def __init__(self, original, toAddress='', subject='', messageBody='', attachments=()):
         self.original = original
         super(ComposeFragment, self).__init__(
-            callable=self._sendMail,
+            callable=self._sendOrSave,
             parameters=[liveform.Parameter(name='toAddress',
                                            type=liveform.TEXT_INPUT,
                                            coercer=unicode),
@@ -282,7 +295,10 @@ class ComposeFragment(liveform.LiveForm):
                                            coercer=unicode),
                         liveform.Parameter(name='bcc',
                                            type=liveform.TEXT_INPUT,
-                                           coercer=unicode)])
+                                           coercer=unicode),
+                        liveform.Parameter(name='draft',
+                                           type=liveform.CHECKBOX_INPUT,
+                                           coercer=bool)])
         self.toAddress = toAddress
         self.subject = subject
         self.messageBody = messageBody
@@ -304,12 +320,43 @@ class ComposeFragment(liveform.LiveForm):
             peeps.append((person.name, person.getEmailAddress()))
         return peeps
 
-
     def render_compose(self, ctx, data):
-        return dictFillSlots(ctx.tag, dict(to=self.toAddress,
-                                           subject=self.subject,
-                                           body=self.messageBody))
+        req = inevow.IRequest(ctx)
+        draftWebID = req.args.get('draft', [None])[0]
 
+        if draftWebID is not None:
+            draft = ixmantissa.IWebTranslator(self.original.store).fromWebID(draftWebID)
+            # i think this will suffice until we have a rich text compose
+            (alt,) = list(draft.message.impl.getTypedParts('multipart/alternative'))
+            (txt,) = list(alt.getTypedParts('text/plain'))
+            try:
+                cc = draft.message.impl.getHeader(u'cc')
+            except equotient.NoSuchHeader:
+                cc = ''
+
+            attachments = []
+            attachmentPattern = inevow.IQ(self.docFactory).patternGenerator('attachment')
+            for f in draft.store.query(File, File.message == draft.message):
+                attachments.append(attachmentPattern.fillSlots(
+                                    'id', f.storeID).fillSlots(
+                                    'name', f.name))
+
+            slotData = dict(to=draft.message.recipient,
+                            subject=draft.message.subject,
+                            body=txt.getBody(decode=True),
+                            cc=cc,
+                            attachments=attachments)
+
+            # make subsequent edits overwrite the draft we're editing
+            self._savedDraft = draft
+        else:
+            slotData = dict(to=self.toAddress,
+                            subject=self.subject,
+                            body=self.messageBody,
+                            cc='',
+                            attachments='')
+
+        return dictFillSlots(ctx.tag, slotData)
 
     def render_fileCabinet(self, ctx, data):
         cabinet = self.original.store.findOrCreate(FileCabinet)
@@ -322,11 +369,7 @@ class ComposeFragment(liveform.LiveForm):
         yield tags.link(rel='stylesheet', type='text/css',
                         href='/Quotient/static/reader.css')
 
-
-    _mxCalc = None
-    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files):
-        print files
-
+    def createMessage(self, toAddress, subject, messageBody, cc, bcc, files):
         from email import Generator as G, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT
         import StringIO as S
 
@@ -337,6 +380,7 @@ class ComposeFragment(liveform.LiveForm):
             [MT.MIMEText(messageBody, 'plain'),
              MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
 
+        fileItems = []
         if self.attachments or files:
             attachmentParts = []
             for a in self.attachments:
@@ -347,13 +391,13 @@ class ComposeFragment(liveform.LiveForm):
                     part.add_header('content-disposition', 'attachment', filename=fname)
                 attachmentParts.append(part)
 
-            for fname in files:
-                a = self.original.store.findFirst(File, File.name == fname)
+            for storeID in files:
+                a = self.original.store.getItemByID(long(storeID))
+                fileItems.append(a)
                 part = MB.MIMEBase(*a.type.split('/'))
                 part.set_payload(a.body.getContent())
                 part.add_header('content-disposition', 'attachment', filename=a.name)
                 attachmentParts.append(part)
-                a.deleteFromStore()
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
@@ -376,14 +420,59 @@ class ComposeFragment(liveform.LiveForm):
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
-            msg = mr.message
+            return mr.message
 
-            addresses = [toAddress]
-            if cc:
-                addresses.append(cc)
+        msg = self.original.store.transact(createMessageAndQueueIt)
+        # there is probably a better way than this, but there
+        # isn't a way to associate the same file item with multiple
+        # messages anyway, so there isn't a need to reflect that here
+        for fileItem in fileItems:
+            fileItem.message = msg
+        return msg
 
-            self.original.sendMessage(addresses, msg)
-        self.original.store.transact(createMessageAndQueueIt)
+    _mxCalc = None
+    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files):
+        # overwrite the previous draft of this message with another draft
+        self._saveDraft(toAddress, subject, messageBody, cc, bcc, files)
+
+        addresses = [toAddress]
+        if cc:
+            addresses.append(cc)
+
+        # except we are going to send this draft
+        self.original.sendMessage(addresses, self._savedDraft.message)
+        # and then make it not a draft anymore
+        self._savedDraft.message.draft = False
+
+        # once the user has sent a message, we'll consider all subsequent
+        # drafts in the lifetime of this fragment as being drafts of a 
+        # different message
+        self._savedDraft.deleteFromStore()
+        self._savedDraft = None
+
+    def _saveDraft(self, toAddress, subject, messageBody, cc, bcc, files):
+        msg = self.createMessage(toAddress, subject, messageBody, cc, bcc, files)
+        msg.draft = True
+
+        if self._savedDraft is not None:
+            oldmsg = self._savedDraft.message
+            for p in oldmsg.store.query(Part, Part.message == oldmsg):
+                p.deleteFromStore()
+            for h in oldmsg.store.query(Header, Header.message == oldmsg):
+                h.deleteFromStore()
+            oldmsg.deleteFromStore()
+            self._savedDraft.message = msg
+        else:
+            self._savedDraft = Draft(store=self.original.store, message=msg)
+
+
+    def _sendOrSave(self, toAddress, subject, messageBody, cc, bcc, files, draft):
+        if draft:
+            f = self._saveDraft
+        else:
+            f = self._sendMail
+        return f(toAddress, subject, messageBody, cc, bcc, files)
+
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
 
@@ -397,10 +486,12 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
         avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
         avatar.findOrCreate(Composer).installOn(avatar)
+        avatar.findOrCreate(Drafts).installOn(avatar)
 
 
     def revoke(self, ticket, avatar):
         avatar.findUnique(Composer).deleteFromStore()
+        avatar.findUnique(Drafts).deleteFromStore()
 
 
 
@@ -544,3 +635,76 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin):
 
     def getSections(self):
         return None
+
+class Draft(item.Item):
+    """
+    i only exist so my storeID can be exposed, instead of exposing
+    the storeID of the underlying Message (which gets overwritten
+    with each draft save).  this stops draft-editing URLs from being
+    invalidated every 30 seconds
+    """
+
+    typeName = 'quotient_draft'
+    schemaVersion = 1
+
+    message = attributes.reference(allowNone=False)
+
+class Drafts(item.Item, item.InstallableMixin):
+    implements(ixmantissa.INavigableElement)
+
+    typeName = 'quotient_drafts'
+    schemaVersion = 1
+
+    installedOn = attributes.reference()
+
+    def getTabs(self):
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('Drafts', self.storeID, 0.0)],
+                authoritative=False)]
+
+    def installOn(self, other):
+        super(Drafts, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
+
+class DraftColumnView(tdbview.ColumnViewBase):
+    translator = None
+
+    def __init__(self, name, displayName=None, default=None):
+        super(DraftColumnView, self).__init__(name, displayName=displayName)
+        self.default = default
+
+    def stanFromValue(self, idx, item, value):
+        if self.translator is None:
+            self.translator = ixmantissa.IWebTranslator(item.store)
+            self.composerURL = self.translator.linkTo(
+                                  item.store.findUnique(Composer).storeID)
+        if isinstance(value, extime.Time):
+            value = value.asHumanly()
+        else:
+            if not value:
+                value = self.default
+
+        draft = item.store.findUnique(Draft, Draft.message == item)
+        return tags.a(href=self.composerURL+'?draft='+self.translator.toWebID(draft))[value]
+
+class DraftsScreen(tdbview.TabularDataView):
+    def __init__(self, original):
+        prefs = ixmantissa.IPreferenceAggregator(original.store)
+        tdm = tdb.TabularDataModel(
+                    original.store,
+                    Message, (Message.sentWhen,
+                              Message.subject,
+                              Message.recipient),
+                    baseComparison=Message.draft == True,
+                    defaultSortColumn='sentWhen',
+                    defaultSortAscending=False,
+                    itemsPerPage=prefs.getPreferenceValue('itemsPerPage'))
+
+        views = (DraftColumnView('sentWhen'),
+                 DraftColumnView('subject', default='No Subject'),
+                 DraftColumnView('recipient', 'Recipients', 'No Recipients'))
+
+        tdbview.TabularDataView.__init__(self, tdm, views)
+        self.docFactory = getLoader(self.fragmentName)
+
+registerAdapter(DraftsScreen, Drafts, ixmantissa.INavigableFragment)
