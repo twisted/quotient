@@ -24,29 +24,35 @@ class QuotientSearchProvider(Item, InstallableMixin):
         super(QuotientSearchProvider, self).installOn(other)
         other.powerUp(self, ixmantissa.ISearchProvider)
 
+
     def activate(self):
         self._indexer = None
+
 
     def _getIndexer(self):
         if self._indexer is None:
             self._indexer = self.store.findUnique(SyncIndexer)
         return self._indexer
-
     indexer = property(_getIndexer)
 
+
     def count(self, term):
-        return len(self.indexer.search(term))
+        return self.indexer.search(term).addCallback(len)
+
 
     def search(self, term, count, offset):
         translator = ixmantissa.IWebTranslator(self.store)
-        for (i, document) in enumerate(self.indexer.search(term, count, offset)):
-            msg = self.store.getItemByID(long(document['@uri']))
+        def searchCompleted(results):
+            for (i, document) in enumerate(results):
+                msg = self.store.getItemByID(long(document['@uri']))
+                yield search.SearchResult(description=msg.subject,
+                                          url=translator.linkTo(msg.storeID),
+                                          summary=document.text[:200],
+                                          timestamp=msg.sentWhen,
+                                          score=0)
+        return self.indexer.search(term, count, offset).addCallback(searchCompleted)
 
-            yield search.SearchResult(description=msg.subject,
-                                      url=translator.linkTo(msg.storeID),
-                                      summary=document.text[:200],
-                                      timestamp=msg.sentWhen,
-                                      score=0)
+
 
 class StaticShellContent(Item, InstallableMixin):
     implements(ixmantissa.IStaticShellContent)
