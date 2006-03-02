@@ -1,4 +1,6 @@
 
+import datetime
+
 try:
     from OpenSSL import SSL
 except ImportError:
@@ -90,14 +92,24 @@ class SafeMIMEParserWrapper(object):
 
 
 
-class DeliveryAgentMixin(object):
+class DeliveryAgent(item.Item, item.InstallableMixin):
     implements(iquotient.IMIMEDelivery)
 
+    installedOn = attributes.reference()
+    messageCount = attributes.integer(default=0)
+
+    def installOn(self, other):
+        super(DeliveryAgent, self).installOn(other)
+        other.powerUp(self, iquotient.IMIMEDelivery)
+
+
     def createMIMEReceiver(self, source):
-        fObj = self.installedOn.newFile('messages', str(self.messageCount))
+        today = datetime.date.today()
+        fObj = self.installedOn.newFile('messages', str(today.year), str(today.month), str(today.day), str(self.messageCount))
         self.messageCount += 1
         return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
             self.installedOn, fObj, source))
+
 
 
 class DeliveryFactoryMixin(object):
@@ -107,7 +119,8 @@ class DeliveryFactoryMixin(object):
         return MessageDelivery(self.portal)
 
 
-class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, DeliveryFactoryMixin, DeliveryAgentMixin):
+
+class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, DeliveryFactoryMixin):
     typeName = "mantissa_mta"
     schemaVersion = 1
 
@@ -155,7 +168,6 @@ class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, Deliv
     def installOn(self, other):
         super(MailTransferAgent, self).installOn(other)
         other.powerUp(self, service.IService)
-        other.powerUp(self, iquotient.IMIMEDelivery)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
         scheduler.IScheduler(self.store).schedule(self.store.findOrCreate(MessageSource), extime.Time())
         self.setServiceParent(other)

@@ -2,8 +2,6 @@
 
 import time, datetime
 
-from zope.interface import implements
-
 from twisted.mail import pop3, pop3client
 from twisted.internet import protocol, defer, ssl
 from twisted.python import log, components, failure
@@ -16,7 +14,7 @@ from epsilon import descriptor, extime
 
 from axiom import item, attributes, scheduler
 
-from xmantissa import ixmantissa, webnav, webapp, webtheme, liveform, tdb, tdbview
+from xmantissa import ixmantissa, webapp, webtheme, liveform, tdb, tdbview
 
 from xquotient import mail
 
@@ -85,7 +83,8 @@ class GrabberBenefactor(item.Item):
     """, default=0)
 
     def endow(self, ticket, avatar):
-        for cls in scheduler.SubScheduler, webapp.PrivateApplication, GrabberConfiguration:
+        for cls in (scheduler.SubScheduler, webapp.PrivateApplication,
+                    mail.DeliveryAgent, GrabberConfiguration):
             avatar.findOrCreate(cls).installOn(avatar)
 
 
@@ -146,7 +145,7 @@ class POP3UID(item.Item):
 
 
 
-class POP3Grabber(item.Item, mail.DeliveryAgentMixin):
+class POP3Grabber(item.Item):
     """
     Item for retrieving email messages from a remote POP server.
     """
@@ -464,7 +463,10 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
 
     def createMIMEReceiver(self, source):
         if self.grabber is not None:
-            return self._transact(self.grabber.createMIMEReceiver, source)
+            def createIt():
+                agent = self.grabber.store.findUnique(mail.DeliveryAgent)
+                return agent.createMIMEReceiver(source)
+            return self._transact(createIt)
 
 
     def markSuccess(self, uid, part):

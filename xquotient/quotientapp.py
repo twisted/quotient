@@ -81,6 +81,7 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
         avatar.findOrCreate(website.WebSite).installOn(avatar)
         avatar.findOrCreate(webapp.PrivateApplication).installOn(avatar)
+        avatar.findOrCreate(mail.DeliveryAgent).installOn(avatar)
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
 
