@@ -67,7 +67,7 @@ class MailTests(unittest.TestCase):
         account = self.login.addAccount('testuser', 'example.com', None)
         subStore = account.avatars.open()
         scheduler.Scheduler(store=subStore).installOn(subStore)
-        mail.MailTransferAgent(store=subStore).installOn(subStore)
+        mail.DeliveryAgent(store=subStore).installOn(subStore)
 
         d = delivery.validateTo(
             smtp.User(smtp.Address('testuser@example.com'),
