@@ -21,6 +21,11 @@ Quotient.Mailbox.MessageDetail.methods(
 
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();
 Quotient.Mailbox.ScrollingWidget.methods(
+    function __init__(self, node) {
+        self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
+        Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
+    },
+
     function _selectRow(self, rowOffset, row) {
         if(self._selectedRow) {
             self._selectedRow.style.backgroundColor = '#FFFFFF';
