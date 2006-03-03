@@ -1,3 +1,4 @@
+# -*- test-case-name: xquotient.test.test_inbox -*-
 from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
