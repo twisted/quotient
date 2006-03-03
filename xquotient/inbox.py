@@ -688,7 +688,7 @@ class InboxScreen(athena.LiveFragment):
         f = ScrollingFragment(self.original.store,
                               Message,
                               self._getBaseComparison(),
-                              [u'senderDisplay', u'subject', u'receivedWhen', u'read'],
+                              [u'senderDisplay', u'subject', u'receivedWhen', u'read', u'sentWhen'],
                               defaultSortColumn=Message.receivedWhen)
         f.resort('receivedWhen')
         f.jsClass = 'Quotient.Mailbox.ScrollingWidget'

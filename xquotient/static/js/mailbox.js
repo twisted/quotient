@@ -52,8 +52,40 @@ Quotient.Mailbox.ScrollingWidget.methods(
             cells);
     },
 
+    function makeCellElement(self, colName, rowData) {
+        if(colName == "receivedWhen") {
+            colName = "sentWhen";
+        }
+        return MochiKit.DOM.DIV({"class": "scroll-cell"},
+                                self.massageColumnValue(
+                                     colName, self.columnTypes[colName], rowData[colName]));
+    },
+
+    function formatDate(self, d) {
+        function to12Hour(HH, MM) {
+            var meridian;
+            if(HH == 0) {
+                HH += 12;
+                meridian = "AM";
+            } else if(0 < HH && HH < 12) {
+                meridian = "AM";
+            } else if(HH == 12) {
+                meridian = "PM";
+            } else {
+                HH -= 12;
+                meridian = "PM";
+            }
+            return HH + ":" + MM + " " + meridian;
+        }
+        function pad(n) {
+            return (n < 10) ? "0" + n : n;
+        }
+        var value = [pad(d.getDate()), pad(d.getMonth() + 1), d.getFullYear()].join("/");
+        return value + " " + to12Hour(d.getHours(), d.getMinutes());
+    },
+
     function skipColumn(self, name) {
-        return name == "read";
+        return name == "read" || name == "sentWhen";
     },
 
     function removeCurrentRow(self) {
