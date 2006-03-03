@@ -306,6 +306,7 @@ class ComposeFragment(liveform.LiveForm):
         self.fileAttachments = []
 
         self.docFactory = None
+        self.translator = ixmantissa.IWebTranslator(original.store)
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
@@ -320,12 +321,16 @@ class ComposeFragment(liveform.LiveForm):
             peeps.append((person.name, person.getEmailAddress()))
         return peeps
 
+    def render_inboxLink(self, ctx, data):
+        from xquotient.inbox import Inbox
+        return self.translator.linkTo(self.original.store.findUnique(Inbox).storeID)
+
     def render_compose(self, ctx, data):
         req = inevow.IRequest(ctx)
         draftWebID = req.args.get('draft', [None])[0]
 
         if draftWebID is not None:
-            draft = ixmantissa.IWebTranslator(self.original.store).fromWebID(draftWebID)
+            draft = self.translator.fromWebID(draftWebID)
             # i think this will suffice until we have a rich text compose
             (alt,) = list(draft.message.impl.getTypedParts('multipart/alternative'))
             (txt,) = list(alt.getTypedParts('text/plain'))

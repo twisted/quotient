@@ -23,6 +23,7 @@ Quotient.Compose.Controller.methods(
         self.attachContainer = self.nodeByAttribute("class", "attach-container");
         self.optsContainer = self.nodeByAttribute("class", "options-container");
         self.autoSaveInterval = 30000; /* 30 seconds */
+        self.inboxURL = self.nodeByAttribute("class", "inbox-link").href;
 
         setTimeout(function() {
             self.saveDraft(false);
@@ -52,6 +53,17 @@ Quotient.Compose.Controller.methods(
                 return ign;
             });
         e.checked = false;
+    },
+
+    function submit(self) {
+        var savingADraft = self.nodeByAttribute("name", "draft").checked;
+        var D = Quotient.Compose.Controller.upcall(self, "submit");
+        if(savingADraft) {
+            return D;
+        }
+        return D.addCallback(function(ign) {
+            document.location = self.inboxURL;
+        });
     },
 
     function makeFileInputs(self) {
