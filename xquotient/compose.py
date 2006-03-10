@@ -369,10 +369,7 @@ class ComposeFragment(liveform.LiveForm):
                     'src', ixmantissa.IWebTranslator(cabinet.store).linkTo(cabinet.storeID))
 
     def head(self):
-        yield tags.script(type='text/javascript',
-                          src='/Quotient/static/js/tiny_mce/tiny_mce.js')
-        yield tags.link(rel='stylesheet', type='text/css',
-                        href='/Quotient/static/reader.css')
+        return None
 
     def createMessage(self, toAddress, subject, messageBody, cc, bcc, files):
         from email import Generator as G, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT

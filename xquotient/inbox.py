@@ -736,8 +736,6 @@ class InboxScreen(athena.LiveFragment):
         return self.original.findNextUnread(self.scrollingFragment, self.currentMessage)
 
     def head(self):
-        yield tags.link(rel='stylesheet', type='text/css',
-                        href='/Quotient/static/reader.css')
         yield tags.script(type='text/javascript')['''
             var djConfig = {
                 baseRelativePath: "/Quotient/static/js/dojo/"
