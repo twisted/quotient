@@ -105,7 +105,13 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
 
     def createMIMEReceiver(self, source):
         today = datetime.date.today()
-        fObj = self.installedOn.newFile('messages', str(today.year), str(today.month), str(today.day), str(self.messageCount))
+        fObj = self.installedOn.newFile(
+            'messages',
+            str(today.year),
+            str(today.month),
+            str(today.day),
+            str(self.messageCount % 100),
+            str(self.messageCount))
         self.messageCount += 1
         return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
             self.installedOn, fObj, source))
