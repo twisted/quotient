@@ -4,7 +4,11 @@ from axiom import iaxiom, scheduler, userbase
 
 from xmantissa import website, offering, provisioning
 
-from xquotient.quotientapp import QuotientBenefactor, ExtractBenefactor, IndexingBenefactor
+from xquotient.quotientapp import (QuotientBenefactor,
+                                   ExtractBenefactor,
+                                   IndexingBenefactor,
+                                   QuotientPeopleBenefactor)
+
 from xquotient.quotienttheme import QuotientTheme
 from xquotient import mail, grabber, compose, popout, publicpage, filter
 
@@ -46,6 +50,11 @@ ruleBenefactorFactory = provisioning.BenefactorFactory(
     benefactorClass = filter.FilterBenefactor,
     dependencies = [quotientBenefactorFactory])
 
+quotientPeopleBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Quotient People Plugins',
+    description = u'Per-person Image/Extract/Picture lists',
+    benefactorClass = QuotientPeopleBenefactor)
+
 plugin = offering.Offering(
     name = u'Quotient',
 
@@ -68,5 +77,6 @@ plugin = offering.Offering(
                            grabberBenefactorFactory,
                            composeBenefactorFactory,
                            popAccessBenefactorFactory,
-                           ruleBenefactorFactory],
+                           ruleBenefactorFactory,
+                           quotientPeopleBenefactorFactory],
     themes = [QuotientTheme('base', 0)])

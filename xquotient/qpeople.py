@@ -1,4 +1,3 @@
-import urllib
 from zope.interface import implements
 
 from nevow import tags, rend, athena
@@ -10,34 +9,8 @@ from xmantissa import tdb, tdbview, ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, extract, compose
+from xquotient import gallery, extract
 from xquotient.exmess import Message
-
-class EmailActions(Item, InstallableMixin):
-    implements(ixmantissa.IPersonAction)
-
-    typeName = 'quotient_email_actions'
-    schemaVersion = 1
-
-    installedOn = attributes.reference()
-    translator = attributes.inmemory()
-
-    def installOn(self, other):
-        super(EmailActions, self).installOn(other)
-        other.powerUp(self, ixmantissa.IPersonAction)
-
-    def activate(self):
-        self.translator = None
-
-    def toLinkStan(self):
-        if self.translator is None:
-            self.translator = ixmantissa.IWebTranslator(self.store)
-
-        sendMailLink = tags.a(href='%s?recipient=%s' % (
-                self.translator.linkTo(
-                    self.store.findUnique(compose.Composer).storeID),
-                urllib.quote(self.installedOn.getEmailAddress())))
-        return sendMailLink['Send an email!']
 
 class LinkToColumnView(tdbview.ColumnViewBase):
     translator = None
@@ -110,7 +83,7 @@ class MessageList(tdbview.TabularDataView):
 
         views = (self.personFragmentColumnView,
                  LinkToColumnView('subject'),
-                 StripTimeColumnView('sentWhen'))
+                 StripTimeColumnView('sentWhen', displayName='Date'))
 
         tdbview.TabularDataView.__init__(self, tdm, views)
         self.docFactory = getLoader(self.fragmentName)

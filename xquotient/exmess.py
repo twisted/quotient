@@ -173,7 +173,7 @@ class MessageDetail(athena.LiveFragment):
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
-        #self.organizer = original.store.findUnique(people.Organizer)
+        self.organizer = original.store.findUnique(people.Organizer)
 
     def head(self):
         return None
@@ -190,15 +190,16 @@ class MessageDetail(athena.LiveFragment):
         return mtags
 
     def render_headerPanel(self, ctx, data):
-        #self.organizer.personByEmailAddress(self.original.sender)
-        #if p is None:
-        #    personStan = SenderPersonFragment(self.original)
-        #else:
-        #    personStan = people.PersonFragment(p, self.original.sender)
-        #personStan.page = self.page
+        p = self.organizer.personByEmailAddress(self.original.sender)
+        if p is None:
+            personStan = SenderPersonFragment(self.original)
+        else:
+            personStan = people.PersonFragment(p, self.original.sender)
+        personStan.page = self.page
 
         prefs = ixmantissa.IPreferenceAggregator(self.original.store)
         tzinfo = pytz.timezone(prefs.getPreferenceValue('timezone'))
+
         if self.original.sentWhen is None:
             sentWhen = 'Unknown'
         else:
@@ -214,7 +215,7 @@ class MessageDetail(athena.LiveFragment):
                                                     for e in mimeutil.parseEmailAddresses(cc)))
 
         return dictFillSlots(ctx.tag,
-                dict(sender=self.original.sender,
+                dict(sender=personStan,
                      recipient=self.original.recipient,
                      cc=cc,
                      subject=self.original.subject,

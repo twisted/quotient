@@ -7,6 +7,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 #add-person-fragment {
     background-color: #FFFFFF;
     position: absolute;
+    z-index: 99;
 }
 
 .draft-timestamp {
@@ -126,7 +127,7 @@ table.header-table > tbody > tr > td {
 
 img.thumbnail { border: none; }
 
-#address-completions {
+.address-completions {
     border: solid 1px #000000;
     background-color: #FFFFFF;
     padding: 2px;

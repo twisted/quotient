@@ -318,7 +318,15 @@ class ComposeFragment(liveform.LiveForm):
     def getPeople(self):
         peeps = []
         for person in self.original.store.query(people.Person):
-            peeps.append((person.name, person.getEmailAddress()))
+            email = person.getEmailAddress()
+            if email is None:
+                email = u''
+            if person.name is None:
+                name = u''
+            else:
+                name = person.name
+            if name or email:
+                peeps.append((name, email))
         return peeps
 
     def render_inboxLink(self, ctx, data):

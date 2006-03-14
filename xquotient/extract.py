@@ -1,7 +1,5 @@
 import re
 
-from zope.interface import implements
-
 from nevow import tags
 
 from epsilon.extime import Time
@@ -9,7 +7,7 @@ from epsilon.extime import Time
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 
-from xquotient import iquotient, mail
+from xquotient import mail
 from xquotient.gallery import Image, makeThumbnail
 from xquotient.exmess import Message
 
@@ -79,6 +77,7 @@ class SimpleExtractMixin(object):
                         f = lambda **k: cls(store=message.store, **k)
 
                     f(message=message,
+                      part=part,
                       timestamp=Time(),
                       text=extractedText,
                       start=start,
@@ -87,7 +86,7 @@ class SimpleExtractMixin(object):
     extract = classmethod(extract)
 
     def inContext(self, chars=30):
-        text = self.installedOn.getUnicodeBody()
+        text = self.part.getUnicodeBody()
         (start, end) = (self.start, self.end)
 
         return (text[start-chars:start],
@@ -104,9 +103,8 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
     text = attributes.text()
 
     message = attributes.reference()
+    part = attributes.reference()
     timestamp = attributes.timestamp()
-
-    installedOn = attributes.reference()
 
     actedUpon = attributes.boolean(default=False)
     ignored = attributes.boolean(default=False)
@@ -128,9 +126,8 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
     text = attributes.text()
 
     message = attributes.reference()
+    part = attributes.reference()
     timestamp = attributes.timestamp()
-
-    installedOn = attributes.reference()
 
     actedUpon = attributes.boolean(default=False)
     ignored = attributes.boolean(default=False)
@@ -153,9 +150,8 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
     text = attributes.text()
 
     message = attributes.reference()
+    part = attributes.reference()
     timestamp = attributes.timestamp()
-
-    installedOn = attributes.reference()
 
     actedUpon = attributes.boolean(default=False)
     ignored = attributes.boolean(default=False)

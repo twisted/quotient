@@ -9,7 +9,7 @@ if(typeof(Quotient.Compose) == "undefined") {
 
 Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
-    function loaded(self) {     
+    function loaded(self) { 
         //self.fitMessageBodyToPage();
         self.allPeople = new Array();
         self.draftNotification = self.nodeByAttribute("class", "draft-notification"); 
@@ -17,8 +17,7 @@ Quotient.Compose.Controller.methods(
         self.callRemote("getPeople").addCallback(
             function(people) {
                 self.allPeople = self.allPeople.concat(people);
-                self.stuffPeopleInDropdown();
-            });
+            }).addErrback(alert);
 
         self.attachContainer = self.nodeByAttribute("class", "attach-container");
         self.optsContainer = self.nodeByAttribute("class", "options-container");
@@ -130,16 +129,6 @@ Quotient.Compose.Controller.methods(
         e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 55 + "px";
     },
 
-    function stuffPeopleInDropdown(self) {
-        var select = self.nodeByAttribute("class", "person-select");
-        MochiKit.DOM.replaceChildNodes(select);
-        select.appendChild(MochiKit.DOM.createDOM("OPTION", {"value":"--all--"}, "--all--"));
-
-        for(i = 0; i < self.allPeople.length; i++)
-            select.appendChild(
-                MochiKit.DOM.createDOM("OPTION", {"value":self.allPeople[i]}, self.allPeople[i]));
-    },
-
     function addrAutocompleteKeyDown(self, event) {
         var TAB = 9;
 
@@ -205,7 +194,7 @@ Quotient.Compose.Controller.methods(
     },
 
     function appendAddrCompletionToList(self, offset) {
-        var input = self.nodeByAttribute("compose-to-address");
+        var input = self.nodeByAttribute("class", "compose-to-address");
         var addrs = input.value.split(/,/);
         var lastAddr = Quotient.Common.Util.stripLeadingTrailingWS(addrs[addrs.length - 1]);
         var word = self.completions.childNodes[offset].firstChild.nodeValue;
@@ -242,18 +231,21 @@ Quotient.Compose.Controller.methods(
             MochiKit.Base.partial(nameOrAddressStartswith, lastAddress),
             self.allPeople);
 
-        var handler = "Quotient.Compose.Controller.get(this)";
-        handler += ".appendAddrCompletionToList(this.firstChild.nodeValue)";
 
         var attrs = null;
 
-        for(i = 0; i < self.completions.length; i++) {
-            attrs = {"href":"#", "onclick":handler+";return false", "style":"display: block"}
+        for(i = 0; i < completions.length; i++) {
+            attrs = {"href": "#",
+                     "onclick": function() {
+                        self.appendAddrCompletionToList(this.firstChild.nodeValue);
+                        return false;
+                     },
+                     "style": "display: block"};
             self.completions.appendChild(
-                MochiKit.DOM.A(attrs, self.reconstituteAddress(self.completions[i])));
+                MochiKit.DOM.A(attrs, self.reconstituteAddress(completions[i])));
         }
 
-        if(0 < self.completions.length) {
+        if(0 < completions.length) {
             var input = self.nodeByAttribute("class", "compose-to-address");
             MochiKit.DOM.setDisplayForElement("", self.completions);
             self.completions.style.top  = Quotient.Common.Util.findPosY(input) + input.clientHeight + "px";

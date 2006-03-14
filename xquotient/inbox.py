@@ -20,7 +20,6 @@ from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message
 from xquotient import mimepart, equotient, extract, compose
-from xquotient.qpeople import EmailActions
 from xquotient.actions import SenderPersonFragment
 
 def quoteBody(m, maxwidth=78):
@@ -130,7 +129,6 @@ class AddPersonFragment(people.AddPersonFragment):
 
     def makePerson(self, nickname):
         person = super(AddPersonFragment, self).makePerson(nickname)
-        EmailActions(store=self.original.store).installOn(person)
         self.lastPerson = person
         return person
 
@@ -142,7 +140,6 @@ class AddPersonFragment(people.AddPersonFragment):
         # and jumping through flaming hoops
         assert self.lastPerson is not None
         personFrag = people.PersonFragment(self.lastPerson)
-        personFrag.setFragmentParent(self)
         return unicode(flatten(personFrag), 'utf-8')
 
 # we want to allow linking to the archive/trash views from outside of the
@@ -333,7 +330,7 @@ class InboxScreen(athena.LiveFragment):
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
-        self.organizer = original.store.findOrCreate(people.Organizer)
+        self.organizer = original.store.findUnique(people.Organizer, default=None)
         self.showRead = self.prefs.getPreferenceValue('showRead')
         self.translator = ixmantissa.IWebTranslator(original.store)
 
@@ -565,10 +562,12 @@ class InboxScreen(athena.LiveFragment):
         # at some point send extract type names and regular expressions
         # when the page loads
 
-        person = self.organizer.personByEmailAddress(self.currentMessage.sender)
-        isPerson = person is not None
+        if self.organizer is not None:
+            person = self.organizer.personByEmailAddress(self.currentMessage.sender)
+        else:
+            person = None
 
-        data  = {u'sender': {u'is-person': isPerson},
+        data  = {u'sender': {u'is-person': person is not None},
                  u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
                               u'read': self.currentMessage.read},
                  u'has-next-page': self.inboxTDB.original.hasNextPage(),

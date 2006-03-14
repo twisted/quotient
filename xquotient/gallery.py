@@ -108,7 +108,7 @@ class GalleryScreen(athena.LiveFragment):
 
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
-        self.organizer = original.store.findOrCreate(people.Organizer)
+        self.organizer = original.store.findUnique(people.Organizer)
         self.translator = ixmantissa.IWebTranslator(original.store)
 
         self.tdm = tdb.TabularDataModel(original.store, Image, (Image.message,),
