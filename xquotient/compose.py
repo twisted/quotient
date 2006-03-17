@@ -1,4 +1,4 @@
-import datetime, rfc822
+import datetime
 
 from zope.interface import implements
 
@@ -380,15 +380,21 @@ class ComposeFragment(liveform.LiveForm):
         return None
 
     def createMessage(self, toAddress, subject, messageBody, cc, bcc, files):
-        from email import Generator as G, MIMEBase as MB, MIMEMultipart as MMP, MIMEText as MT
+        from email import (Generator as G, MIMEBase as MB,
+                           MIMEMultipart as MMP, MIMEText as MT,
+                           Header as MH, Charset as MC, Utils as EU)
         import StringIO as S
+
+        MC.add_charset('utf-8', None, MC.QP, 'utf-8')
+
+        encode = lambda s: MH.Header(s).encode()
 
         s = S.StringIO()
         m = MMP.MIMEMultipart(
             'alternative',
             None,
-            [MT.MIMEText(messageBody, 'plain'),
-             MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html')])
+            [MT.MIMEText(messageBody, 'plain', 'utf-8'),
+             MT.MIMEText(flat.flatten(tags.html[tags.body[messageBody]]), 'html', 'utf-8')])
 
         fileItems = []
         if self.attachments or files:
@@ -411,14 +417,14 @@ class ComposeFragment(liveform.LiveForm):
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
-        m['From'] = self.original.fromAddress
-        m['To'] = toAddress
-        m['Subject'] = subject
-        m['Date'] = rfc822.formatdate()
+        m['From'] = encode(self.original.fromAddress)
+        m['To'] = encode(toAddress)
+        m['Subject'] = encode(subject)
+        m['Date'] = EU.formatdate()
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
 
         if cc:
-            m['Cc'] = cc
+            m['Cc'] = encode(cc)
 
         G.Generator(s).flatten(m)
         s.seek(0)

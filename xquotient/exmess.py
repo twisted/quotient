@@ -199,11 +199,7 @@ class MessageDetail(athena.LiveFragment):
 
         prefs = ixmantissa.IPreferenceAggregator(self.original.store)
         tzinfo = pytz.timezone(prefs.getPreferenceValue('timezone'))
-
-        if self.original.sentWhen is None:
-            sentWhen = 'Unknown'
-        else:
-            sentWhen = self.original.sentWhen.asHumanly(tzinfo)
+        sentWhen = self.original.sentWhen.asHumanly(tzinfo)
 
         try:
             cc = self.original.impl.getHeader(u'cc')

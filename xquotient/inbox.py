@@ -9,18 +9,18 @@ from nevow.flat import flatten
 from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin
+from axiom.tags import Tag
 from axiom import attributes
-from axiom.tags import Catalog, Tag
-from axiom.slotmachine import hyper as super
 
-from xmantissa import ixmantissa, tdb, tdbview, webnav, people
-from xmantissa.fragmentutils import PatternDictionary
+from xmantissa import ixmantissa, webnav, people
+from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message
-from xquotient import mimepart, equotient, extract, compose
-from xquotient.actions import SenderPersonFragment
+from xquotient import mimepart, equotient, compose
+
+#_entityReference = re.compile('&([a-z]+);', re.I)
 
 def quoteBody(m, maxwidth=78):
     for part in m.walkMessage(prefer='text/plain'):
@@ -52,75 +52,6 @@ def replyTo(m):
         recipient = m.sender
     return recipient
 
-class EmailAddressColumnView(tdbview.ColumnViewBase):
-    # there is a lot of optimization here, and it's ugly.  but at 
-    # 20 items per page, if the user is sorting on the sender address,
-    # there would be a bunch of redundant queries
-
-    _translator = None
-    _personActions = None
-
-    def __init__(self, *args, **kwargs):
-        tdbview.ColumnViewBase.__init__(self, *args, **kwargs)
-
-        self._cachedPeople = dict()
-        self._cachedNotPeople = list()
-        self._cachedNames = dict()
-
-    def _personFromAddress(self, message, address):
-        # return a people.Person instance if there is one already
-        # existing that corresponds to 'address', otherwise None
-        person = self._cachedPeople.get(address)
-        if person is None and address not in self._cachedNotPeople:
-            # at some point differentiate between people belonging to
-            # different organizers, or something
-            organizer = message.store.findOrCreate(people.Organizer)
-            person = organizer.personByEmailAddress(address)
-
-            if person is None:
-                self._cachedNotPeople.append(address)
-            else:
-                self._cachedPeople[address] = person
-        return person
-
-    def personAdded(self, person):
-        self._cachedPeople[person.name] = person
-        if person.name in self._cachedNotPeople:
-            self._cachedNotPeople.remove(person.name)
-
-    def stanFromValue(self, idx, msg, value):
-        #person = self._personFromAddress(msg, msg.sender)
-        #if person is None:
-        #    display = SenderPersonFragment(msg)
-        #else:
-        #    display = people.PersonFragment(person)
-        #display.setFragmentParent(self.fragmentParent)
-        #return display
-        return msg.sender
-
-class CompoundColumnView(EmailAddressColumnView):
-    def __init__(self, *args, **kwargs):
-        EmailAddressColumnView.__init__(self, *args, **kwargs)
-        self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
-
-    def stanFromValue(self, idx, item, value):
-        # FIXME - this & EmailAddressColumnView.stanFromValue should use
-        # template patterns
-        senderStan = EmailAddressColumnView.stanFromValue(self, idx, item, value)
-
-        subjectStan = item.subject
-
-        if 0 < item.attachments:
-            # put a paperclip icon here
-            subjectStan = ('(%d) - ' % (item.attachments,), subjectStan)
-
-        className = ('unread-message', 'read-message')[item.read]
-        subjectStan = tags.div(style='overflow: hidden')[subjectStan]
-        return tags.div(**{'class': className})[(senderStan, subjectStan)]
-
-    def onclick(self, idx, item, value):
-        return 'Nevow.Athena.Widget.get(this).widgetParent.maybeLoadMessage(event, %r)' % (idx,)
-
 class AddPersonFragment(people.AddPersonFragment):
     jsClass = 'Quotient.Common.AddPerson'
 
@@ -141,9 +72,6 @@ class AddPersonFragment(people.AddPersonFragment):
         assert self.lastPerson is not None
         personFrag = people.PersonFragment(self.lastPerson)
         return unicode(flatten(personFrag), 'utf-8')
-
-# we want to allow linking to the archive/trash views from outside of the
-# inbox page, so we'll make some items with strange adaptors
 
 class Archive(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
@@ -237,56 +165,6 @@ class Inbox(Item, InstallableMixin):
         super(Inbox, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
 
-    def findNextUnread(self, scrollingFragment, currentMessage, perPage=None):
-        # is there an unread item after the current msg in the current row set?
-        seen = False
-        for msg in scrollingFragment.currentRowSet:
-            if seen:
-                if not msg.read:
-                    return msg
-            elif msg.storeID == currentMessage.storeID:
-                seen = True
-
-        nextUnread = None
-        (rangeBegin, rangeEnd) = scrollingFragment.currentRowRange
-        if perPage is None:
-            perPage = 10
-
-        while True:
-            i = 0
-            for msg in scrollingFragment.performQuery(rangeBegin, rangeBegin+perPage):
-                if not msg.read:
-                    return msg
-                i += 1
-            if i == 0:
-                break
-            rangeBegin += perPage
-
-class InboxMessageView(tdbview.TabularDataView):
-    def __init__(self, original, baseComparison=None):
-        self.prefs = ixmantissa.IPreferenceAggregator(original.store)
-
-        tdm = tdb.TabularDataModel(
-                original.store,
-                Message, [Message.sentWhen],
-                baseComparison=baseComparison,
-                defaultSortColumn='sentWhen',
-                defaultSortAscending=False,
-                itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
-
-        self.emailAddressColumnView = CompoundColumnView('sender',
-                                                typeHint='quotient-reader-column')
-
-        views = [self.emailAddressColumnView]
-        self.messageDetailPatterns = PatternDictionary(
-                                            getLoader('message-detail-patterns'))
-        tdbview.TabularDataView.__init__(self, tdm, views, width='340px')
-
-def _fillSlots(tag, slotmap):
-    for (k, v) in slotmap.iteritems():
-        tag = tag.fillSlots(k, v)
-    return tag
-
 class InboxScreen(athena.LiveFragment):
     implements(ixmantissa.INavigableFragment)
 
@@ -298,367 +176,93 @@ class InboxScreen(athena.LiveFragment):
     inArchiveView = False
     inTrashView = False
     inSentMailView = False
-    viewingByTag = None
-    viewingByPerson = None
-    viewingByAccount = None
     currentMessage = None
 
+    viewingByTag = None
+    viewingByAccount = None
+
     translator = None
-    _inboxTDB = None
 
-    iface = allowedMethods = dict(
-                toggleShowRead=True, newMessage=True,        addTags=True,
-                archiveMessage=True, deleteMessage=True,     getPeople=True,
-                archiveView=True,    trashView=True,         inboxView=True,
-                viewByTag=True,      markCurrentMessageUnread=True,
-                viewByPerson=True,   viewByAllPeople=True,   nextMessage=True,
-                getTags=True,        getMessageContent=True, filterMessages=True,
-                viewByAccount=True,  loadMessageFromID=True, nextUnread=True,
+    iface = allowedMethods = dict(deleteCurrentMessage=True,
+                                  archiveCurrentMessage=True,
+                                  deferCurrentMessage=True,
+                                  replyToCurrentMessage=True,
+                                  forwardCurrentMessage=True,
+                                  getMessageCount=True,
 
-                deferCurrentMessage=True,
-                nextPageAndMessage=True,
-                prevPageAndMessage=True,
-                forwardCurrentMessage=True,
-                fetchFilteredCounts=True,
-                markCurrentMessageRead=True,
-                attachPhoneToSender=True,
-                incrementItemsPerPage=True,
-                archiveCurrentMessage=True,
-                deleteCurrentMessage=True,
-                replyToCurrentMessage=True)
+                                  fastForward=True,
+
+                                  viewByTag=True,
+                                  viewByPerson=True)
 
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
-        self.organizer = original.store.findUnique(people.Organizer, default=None)
         self.showRead = self.prefs.getPreferenceValue('showRead')
         self.translator = ixmantissa.IWebTranslator(original.store)
 
-    def _getInboxTDB(self):
-        if self._inboxTDB is None:
-            inboxTDB = InboxMessageView(
-                    self.original, self._getBaseComparison())
-            inboxTDB.docFactory = getLoader(inboxTDB.fragmentName)
-            inboxTDB.setFragmentParent(self)
-            inboxTDB.emailAddressColumnView.fragmentParent = self
-            self._inboxTDB = inboxTDB
-        return self._inboxTDB
-    inboxTDB = property(_getInboxTDB)
+        self._resetCurrentMessage()
 
-    def incrementItemsPerPage(self, n):
-        self.inboxTDB.original.itemsPerPage += int(n)
-        self.inboxTDB.original.firstPage()
-        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
-
-    # current message actions
-    def markCurrentMessageUnread(self):
-        self.currentMessage.read = False
-        return self.nextMessage(markUnread=False)
-
-    def markCurrentMessageRead(self):
-        self.currentMessage.read = True
-
-    def deleteCurrentMessage(self):
-        self.currentMessage.deleted = True
-        return self.nextMessage(augmentIndex=-1)
-
-    def archiveCurrentMessage(self):
-        self.currentMessage.archived = True
-
-    def deferCurrentMessage(self, days, hours, minutes):
-        print days, hours, minutes
-        self.currentMessage.receivedWhen = Time() + timedelta(days=days,
-                                                              hours=hours,
-                                                              minutes=minutes)
-        self.currentMessage.read = False
-
-    def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
-        composer = self.original.store.findUnique(compose.Composer)
-        cf = compose.ComposeFragment(composer,
-                                     toAddress=toAddress,
-                                     subject=subject,
-                                     messageBody=messageBody,
-                                     attachments=attachments)
-        cf.setFragmentParent(self)
-        cf.docFactory = getLoader(cf.fragmentName)
-
-        return unicode(flatten(cf), 'utf-8')
-
-    def replyToCurrentMessage(self):
-        curmsg = self.currentMessage
-
-        if curmsg.sender is not None:
-            origfrom = curmsg.sender
+    def _resetCurrentMessage(self):
+        self.currentMessage = self._getNextMessage()
+        if self.currentMessage is not None:
+            self.currentMessage.read = True
+            self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
         else:
-            origfrom = "someone who chose not to be identified"
+            self.nextMessage = None
 
-        if curmsg.sentWhen is not None:
-            origdate = curmsg.sentWhen.asHumanly()
-        else:
-            origdate = "an indeterminate time in the past"
+    def _getNextMessage(self, after=None, before=None):
+        comparison = self._getBaseComparison()
+        sort = Message.receivedWhen.desc
+        if after is not None:
+            comparison = attributes.AND(comparison, Message.receivedWhen < after)
+        if before is not None:
+            comparison = attributes.AND(comparison, before < Message.receivedWhen)
+            sort = Message.receivedWhen.asc
 
-        replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
+        return self.original.store.findFirst(Message,
+                                             comparison,
+                                             default=None,
+                                             sort=sort)
 
-        composeFrag = self._composeSomething(replyTo(curmsg),
-                                             reSubject(curmsg),
-                                             '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
-        return composeFrag
+    def _currentAsFragment(self):
+        if self.currentMessage is None:
+            return ''
+        f = ixmantissa.INavigableFragment(self.currentMessage)
+        f.setFragmentParent(self)
+        self.currentMessageDetail = f
+        return f
 
-    def forwardCurrentMessage(self):
-        curmsg = self.currentMessage
+    def render_messageDetail(self, ctx, data):
+        return self._currentAsFragment()
 
-        reply = ['\nBegin forwarded message:\n']
-        for hdr in u'From Date To Subject Reply-to'.split():
-            try:
-                val = curmsg.impl.getHeader(hdr)
-            except equotient.NoSuchHeader:
-                continue
-            reply.append('%s: %s' % (hdr, val))
-        reply.append('')
-        reply.extend(quoteBody(curmsg))
+    def render_addPersonFragment(self, ctx, data):
+        # the person form is a fair amount of html,
+        # so we'll only include it once
 
-        composeFrag = self._composeSomething('',
-                                             reSubject(curmsg, 'Fwd: '),
-                                             '\n\n' + '\n> '.join(reply),
-                                             self.currentMessageDetail.attachmentParts)
-        return composeFrag
+        self.addPersonFragment = AddPersonFragment(self.original)
+        self.addPersonFragment.setFragmentParent(self)
+        self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
+        return self.addPersonFragment
 
-    def nextPageAndMessage(self):
-        self.inboxTDB.original.nextPage()
-        return (self.inboxTDB.replaceTable(), self.getMessageContent(0))
-
-    def prevPageAndMessage(self):
-        self.inboxTDB.original.prevPage()
-        return (self.inboxTDB.replaceTable(),
-                len(self.inboxTDB.original.currentPage()) - 1)
-
-    # other things
-    def nextMessage(self, augmentIndex=0, markUnread=True):
-        if self._haveNextMessage():
-            newOffset = self.currentMessageOffset + 1
-            if self.prefs.getPreferenceValue('itemsPerPage') < newOffset:
-                newOffset = 0
-                self.inboxTDB.original.nextPage()
-            else:
-                newOffset += augmentIndex
-
-            self.callRemote(
-                    'replaceTDB', self.inboxTDB.replaceTable()).addCallback(
-                        lambda ign: self.callRemote('prepareForMessage', newOffset))
-            return self.getMessageContent(newOffset, markUnread=markUnread)
-        else:
-            raise ValueError('no next message')
-
-    def _changeComparison(self):
-        self.scrollingFragment.baseConstraint = self._getBaseComparison()
-        return self.scrollingFragment.requestCurrentSize()
-
-    def viewByTag(self, tag):
-        self.viewingByTag = tag
-        return self._changeComparison()
-
-    def viewByPerson(self, person):
-        self.viewingByPerson = person
-        return self._changeComparison()
-
-    def viewByAllPeople(self):
-        self.viewingByPerson = None
-        return self._changeComparison()
-
-    def viewByAccount(self, account):
-        self.viewingByAccount = account
-        return self._changeComparison()
-
-    def toggleShowRead(self):
-        self.showRead = not self.showRead
-        self._changeComparisonReplaceTable()
-        return unicode(flatten(self._getShowReadPattern()), 'utf-8')
-
-    def archiveMessage(self, index):
-        msg = self.inboxTDB.itemFromTargetID(int(index))
-        msg.archived = True
-        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
-
-    def deleteMessage(self, index):
-        msg = self.inboxTDB.itemFromTargetID(int(index))
-        msg.deleted = True
-        self.callRemote('replaceTDB', self.inboxTDB.replaceTable())
+    def render_scroller(self, ctx, data):
+        f = ScrollingFragment(self.original.store,
+                              Message,
+                              self._getBaseComparison(),
+                              [u'senderDisplay', u'subject', u'receivedWhen', u'read', u'sentWhen'],
+                              defaultSortColumn=Message.receivedWhen)
+        f.resort('receivedWhen')
+        f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        self.scrollingFragment = f
+        return f
 
     def getTags(self):
-        return list(
-            self.original.store.query(Tag).getColumn('name').distinct())
-
-    def getPeople(self):
-        return list(
-            self.original.store.query(people.Person).getColumn('name'))
-
-    def addTags(self, tags):
-        catalog = self.original.store.findOrCreate(Catalog)
-        for tag in tags:
-            catalog.tag(self.currentMessage, unicode(tag))
-        return unicode(flatten(self.currentMessageDetail.tagsAsStan()), 'utf-8')
-
-    filterNamesAndClauses =  ((u'All Messages',  ()),
-                              (u'New Messages',  (Message.read == False,
-                                                  Message.archived == False,
-                                                  Message.deleted == False)),
-                              (u'Sent Messages', (Message.deleted == False,)), # fix this
-                              (u'Trash',         (Message.deleted == True,)))
-
-    def filterMessages(self, (filterType, filterValue, messageFilterType)):
-        (typeClass, comparison) = self._queryForFilterType(
-                                         filterType,
-                                         filterValue,
-                                         dict(self.filterNamesAndClauses)[messageFilterType])
-
-        self.inboxTDB.original.baseComparison = comparison
-        self.inboxTDB.original.firstPage()
-        return self.inboxTDB.replaceTable()
-
-    def _queryForFilterType(self, filterType, filterValue, clauses):
-        if filterType == 'Tags':
-            return (Tag, attributes.AND(Tag.object == Message.storeID,
-                                        Tag.name == filterValue,
-                                        *clauses))
-        if filterType == 'People':
-            return (Message, attributes.AND(Message.sender == people.EmailAddress.address,
-                                            people.EmailAddress.person == people.Person.storeID,
-                                            people.Person.name == filterValue,
-                                            *clauses))
-        if filterType == 'Mail':
-            if 0 < len(clauses):
-                return (Message, attributes.AND(*clauses))
-            return (Message, None)
-
-    def fetchFilteredCounts(self, (filterType, filterValue)):
-        labels = list()
-
-        for (name, clauses) in self.filterNamesAndClauses:
-            count = self.original.store.count(
-                            *self._queryForFilterType(filterType, filterValue, clauses))
-            labels.append((name, count))
-
-        return labels
-
-    def attachPhoneToSender(self, number):
-        person = self.organizer.personByEmailAddress(self.currentMessage.sender)
-
-        people.PhoneNumber(store=person.store,
-                           person=person,
-                           number=number)
-
-
-        print 'trying to find an extract with text = %r' % (number,)
-        ex = person.store.findUnique(extract.PhoneNumberExtract,
-                            attributes.AND(extract.PhoneNumberExtract.message == self.currentMessage,
-                                           extract.PhoneNumberExtract.text == number))
-        ex.actedUpon = True
-
-    def _getMessageMetadata(self):
-        # FIXME this and some other functions need to be commuted
-        # to exmess.MessageDetail so the standalone message detail
-        # it not entirely broken
-
-        # at some point send extract type names and regular expressions
-        # when the page loads
-
-        if self.organizer is not None:
-            person = self.organizer.personByEmailAddress(self.currentMessage.sender)
-        else:
-            person = None
-
-        data  = {u'sender': {u'is-person': person is not None},
-                 u'message': {u'extracts': {u'url': {u'pattern': extract.URLExtract.regex.pattern}},
-                              u'read': self.currentMessage.read},
-                 u'has-next-page': self.inboxTDB.original.hasNextPage(),
-                 u'has-prev-page': self.inboxTDB.original.hasPrevPage()}
-
-        #for (ename, etype) in extract.extractTypes.iteritems():
-        #    edata[unicode(ename)] = {u'pattern': etype.regex.pattern}
-        #    for ex in self.original.store.query(etype, etype.message==self.currentMessage):
-        #        if ex.actedUpon:
-        #            v = u'acted-upon'
-        #        elif ex.ignored:
-        #            v = u'ignored'
-        #        else:
-        #            v = u'unused'
-        #
-        #        edata[ename][ex.text] = v
-
-        return data
-
-    def nextUnread(self):
-        next = self._findNextUnread()
-        if next is not None:
-            return (self.scrollingFragment.currentRowRange,
-                    self.scrollingFragment.constructRows(
-                            self.scrollingFragment.currentRowSet),
-                    unicode(self.translator.toWebID(next)),
-                    self._loadMessage(next))
-
-    def loadMessageFromID(self, webID):
-        return self._loadMessage(self.translator.fromWebID(webID))
-
-    def _loadMessage(self, item):
-        self.currentMessage = item
-        self.currentMessageDetail = ixmantissa.INavigableFragment(item)
-        self.currentMessageDetail.page = self.page
-        item.read = True
-
-        return (self._getMessageMetadata(),
-                unicode(flatten(self.currentMessageDetail), 'utf-8'))
-
-    def getMessageContent(self, idx, markUnread=True):
-        # i load and display the message at offset 'idx' in the current
-        # result set of the underlying tdb model
-
-        message = self.inboxTDB.itemFromTargetID(idx)
-
-        self.currentMessage = message
-        self.currentMessageOffset = idx
-        self.currentMessageDetail = ixmantissa.INavigableFragment(message)
-        self.currentMessageDetail.page = self.page
-        messageMetadata = self._getMessageMetadata()
-        self.currentMessage.read = True
-
-        return (messageMetadata, unicode(flatten(self.currentMessageDetail), 'utf-8'))
-
-    def _getBaseComparison(self):
-        # the only mutually exclusive views are "show read" and archive/trash,
-        # so you could look at all messages in trash, tagged with "boring"
-        # sent by the Person with name "Joe" or whatever
-        comparison = attributes.AND(Message.deleted == self.inTrashView,
-                                    Message.outgoing == self.inSentMailView,
-                                    Message.receivedWhen < Time(),
-                                    Message.draft == False)
-        if not self.inArchiveView:
-            comparison = attributes.AND(comparison, Message.archived == False)
-
-        if self.viewingByTag is not None:
-            comparison = attributes.AND(
-                Tag.object == Message.storeID,
-                Tag.name == self.viewingByTag,
-                comparison)
-
-        if self.viewingByPerson is not None:
-            comparison = attributes.AND(
-                 Message.sender == people.EmailAddress.address,
-                 people.EmailAddress.person == people.Person.storeID,
-                 people.Person.name == self.viewingByPerson,
-                 comparison)
-
-        if self.viewingByAccount is not None:
-            comparison = attributes.AND(
-                Message.source == self.viewingByAccount,
-                comparison)
-
-        if not self.showRead and not (self.inArchiveView or self.inTrashView):
-            comparison = attributes.AND(comparison,
-                                        Message.read == False)
-        return comparison
-
-    def render_inboxTDB(self, ctx, data):
-        return ctx.tag[self.inboxTDB]
+        tags = self.original.store.query(Tag,
+                            attributes.AND(Tag.object == Message.storeID,
+                                           self._getBaseComparison()))
+        return list(tags.getColumn('name').distinct())
 
     def render_tagChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('tagChooser')
@@ -683,71 +287,171 @@ class InboxScreen(athena.LiveFragment):
             select[opt]
         return select
 
-    def render_scroller(self, ctx, data):
-        f = ScrollingFragment(self.original.store,
-                              Message,
-                              self._getBaseComparison(),
-                              [u'senderDisplay', u'subject', u'receivedWhen', u'read', u'sentWhen'],
-                              defaultSortColumn=Message.receivedWhen)
-        f.resort('receivedWhen')
-        f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
-        f.setFragmentParent(self)
-        f.docFactory = getLoader(f.fragmentName)
-        self.scrollingFragment = f
-        return f
+    def _nextMessagePreview(self):
+        if self.currentMessage is None:
+            return u'No more messages'
+        onePattern = inevow.IQ(self.docFactory).onePattern
+        if self.nextMessage is None:
+            return onePattern('last-message')
+        m = self.nextMessage
+        return dictFillSlots(onePattern('next-message'),
+                             dict(sender=m.senderDisplay,
+                                  subject=m.subject,
+                                  date=m.sentWhen.asHumanly()))
 
-    def render_messageCount(self, ctx, data):
-        return self.inboxTDB.original.totalItems
-
-    def render_unreadMessageCount(self, ctx, data):
-        return self.original.store.count(Message,
-                    attributes.AND(Message.read == False,
-                                   self._getBaseComparison()))
-
-    def render_addPersonFragment(self, ctx, data):
-        # the person form is a fair amount of html,
-        # so we'll only include it once
-
-        self.addPersonFragment = AddPersonFragment(self.original)
-        self.addPersonFragment.setFragmentParent(self)
-        self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
-        return self.addPersonFragment
-
-    def _getShowReadPattern(self):
-        pname = ['show-read-off', 'show-read-on'][self.showRead]
-        return inevow.IQ(self.docFactory).onePattern(pname)
-
-    def render_showRead(self, ctx, data):
-        return ctx.tag[self._getShowReadPattern()]
-
-    def _havePrevMessage(self):
-        return not (self.currentMessageOffset - 1 < 0
-                        and not self.original.hasPrevPage())
-
-    def _haveNextMessage(self):
-        return not (self.prefs.getPreferenceValue('itemsPerPage') < self.currentMessageOffset + 1
-                        and not self.inboxTDB.original.hasNextPage())
-
-    def _haveNextUnreadMessage(self):
-        return self._findNextUnread() is not None
-
-    def _findNextUnread(self):
-        return self.original.findNextUnread(self.scrollingFragment, self.currentMessage)
+    def render_nextMessagePreview(self, ctx, data):
+        return self._nextMessagePreview()
 
     def head(self):
-        yield tags.script(type='text/javascript')['''
-            var djConfig = {
-                baseRelativePath: "/Quotient/static/js/dojo/"
-            }
-        ''']
-        yield tags.script(type='text/javascript', src='/Quotient/static/js/dojo/dojo.js')
-        yield tags.script(type='text/javascript')['''
-            dojo.require("dojo.widget.SplitPane");
-            dojo.require("dojo.widget.ContentPane");
-            dojo.require("dojo.widget.ScrolledTableContentPane");
-            dojo.require("dojo.widget.ChildSizingContentPane");
-        ''']
+        return tags.link(rel='stylesheet', type='text/css',
+                         href='/Quotient/static/reader.css')
 
+    # remote methods
+
+    def fastForward(self, webID):
+        self.currentMessage = self.translator.fromWebID(webID)
+        self.currentMessage.read = True
+        self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
+        return self._current()
+
+    def _resetScrollQuery(self):
+        self.scrollingFragment.baseConstraint = self._getBaseComparison()
+
+    def viewByTag(self, tag):
+        self.viewingByTag = tag
+        self._resetCurrentMessage()
+        self._resetScrollQuery()
+        return (self.getMessageCount(), self._current())
+
+    def viewByAccount(self, account):
+        self.viewingByAccount = account
+        self._resetCurrentMessage()
+        self._resetScrollQuery()
+        return (self.getMessageCount(), self._current())
+
+    def getMessageCount(self):
+        return self.original.store.count(Message, self._getBaseComparison())
+
+    def _squish(self, thing):
+        # replacing &nbsp with &#160 in webmail.SpacePreservingStringRenderer
+        # fixed all issues with calling setNodeContent on flattened message
+        # details for all messages in the test pool.  but there might be
+        # other things that will break also.
+
+        #for eref in set(_entityReference.findall(text)):
+        #    entity = getattr(entities, eref, None)
+        #    if entity is not None:
+        #        text = text.replace('&' + eref + ';', '&#' + entity.num + ';')
+        return unicode(flatten(thing), 'utf-8')
+
+    def _current(self):
+        return (self._squish(self._nextMessagePreview()),
+                self._squish(self._currentAsFragment()))
+
+    def _moveToNextMessage(self):
+        previousMessage = self.currentMessage
+        self.currentMessage = self.nextMessage
+
+        if self.currentMessage is not None:
+            self.currentMessage.read = True
+            self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
+        else:
+            self.currentMessage = self._getNextMessage(before=previousMessage.receivedWhen)
+            self.nextMessage = None
+
+    def deleteCurrentMessage(self):
+        self.currentMessage.deleted = True
+        self._moveToNextMessage()
+        return self._current()
+
+    def archiveCurrentMessage(self):
+        self.currentMessage.archived = True
+        self._moveToNextMessage()
+        return self._current()
+
+    def deferCurrentMessage(self, days, hours, minutes):
+        self.currentMessage.receivedWhen = Time() + timedelta(days=days,
+                                                              hours=hours,
+                                                              minutes=minutes)
+        self.currentMessage.read = False
+        self._moveToNextMessage()
+        return self._current()
+
+    def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
+        composer = self.original.store.findUnique(compose.Composer)
+        cf = compose.ComposeFragment(composer,
+                                     toAddress=toAddress,
+                                     subject=subject,
+                                     messageBody=messageBody,
+                                     attachments=attachments)
+        cf.setFragmentParent(self)
+        cf.docFactory = getLoader(cf.fragmentName)
+
+        return (None, unicode(flatten(cf), 'utf-8'))
+
+    def replyToCurrentMessage(self):
+        curmsg = self.currentMessage
+
+        if curmsg.sender is not None:
+            origfrom = curmsg.sender
+        else:
+            origfrom = "someone who chose not to be identified"
+
+        if curmsg.sentWhen is not None:
+            origdate = curmsg.sentWhen.asHumanly()
+        else:
+            origdate = "an indeterminate time in the past"
+
+        replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
+
+        return self._composeSomething(replyTo(curmsg),
+                                      reSubject(curmsg),
+                                      '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
+
+    def forwardCurrentMessage(self):
+        curmsg = self.currentMessage
+
+        reply = ['\nBegin forwarded message:\n']
+        for hdr in u'From Date To Subject Reply-to'.split():
+            try:
+                val = curmsg.impl.getHeader(hdr)
+            except equotient.NoSuchHeader:
+                continue
+            reply.append('%s: %s' % (hdr, val))
+        reply.append('')
+        reply.extend(quoteBody(curmsg))
+
+        return self._composeSomething('',
+                                      reSubject(curmsg, 'Fwd: '),
+                                      '\n\n' + '\n> '.join(reply),
+                                      self.currentMessageDetail.attachmentParts)
+
+    def _getBaseComparison(self):
+        # the only mutually exclusive views are "show read" and archive/trash,
+        # so you could look at all messages in trash, tagged with "boring"
+        # sent by the Person with name "Joe" or whatever
+        comparison = attributes.AND(Message.deleted == self.inTrashView,
+                                    Message.outgoing == self.inSentMailView,
+                                    Message.receivedWhen < Time(),
+                                    Message.draft == False)
+        if not self.inArchiveView:
+            comparison = attributes.AND(comparison, Message.archived == False)
+
+        if self.viewingByTag is not None:
+            comparison = attributes.AND(
+                Tag.object == Message.storeID,
+                Tag.name == self.viewingByTag,
+                comparison)
+
+        if self.viewingByAccount is not None:
+            comparison = attributes.AND(
+                Message.source == self.viewingByAccount,
+                comparison)
+
+        if not self.showRead and not (self.inArchiveView or self.inTrashView):
+            comparison = attributes.AND(comparison,
+                                        Message.read == False)
+        return comparison
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
 

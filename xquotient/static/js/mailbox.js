@@ -24,6 +24,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function __init__(self, node) {
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
+        self._scrollViewport.style.height = '100px'
     },
 
     function _selectRow(self, rowOffset, row) {
@@ -46,7 +47,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "style": rowData["read"] ? "" : "font-weight: bold",
              "onclick": function() {
                 self._selectRow(rowOffset, this);
-                self.widgetParent.loadMessageFromID(rowData["__id__"]);
+                self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
             }},
             cells);
@@ -81,7 +82,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             return (n < 10) ? "0" + n : n;
         }
         var value = [pad(d.getDate()), pad(d.getMonth() + 1), d.getFullYear()].join("/");
-        return value + " " + to12Hour(d.getHours(), d.getMinutes());
+        return value + " " + to12Hour(d.getHours(), pad(d.getMinutes()));
     },
 
     function skipColumn(self, name) {
@@ -96,10 +97,12 @@ Quotient.Mailbox.ScrollingWidget.methods(
             top = parseInt(self._rows[i][1].style.top);
             self._rows[i][1].style.top = (top - self._rowHeight) + "px";
         }
-            
         self._rows = self._rows.slice(
                         0, self._selectedRowOffset).concat(
                             self._rows.slice(self._selectedRowOffset+1, self._rows.length));
+        if(self._selectedRowOffset == 0) {
+            self.scrolled();
+        }
     },
         
    
@@ -113,47 +116,61 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function loaded(self) {
-        /* temporarily disable any inbox behaviour, at the moment the
-           inbox is just a scrolled table, so we don't need a lot of 
-           this tdb hacking cleverness (it also won't work).  eventually
-           we'll want to re-enable a lot of this functionality, like view by tag
-           and such, but some of it will move into the message detail
-           fragment/jsclass
-        */
-        var scrollContainer = self.nodeByAttribute("class", "scrolltable-container");
-        var scrollNode = Nevow.Athena.NodeByAttribute(scrollContainer,
-                                                      "athena:class",
-                                                      "Quotient.Mailbox.ScrollingWidget");
-
-        self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
-        self.messageDetailNode = self.nodeByAttribute("class", "message-detail");
-        var topControls = self.nodeByAttribute("class", "top-controls");
-        var splitPane = self.nodeByAttribute("class", "dojoHtmlSplitPane");
-        var splitPaneWidget = dojo.widget.byType("SplitPane")[0];
-
-        function setSplitPaneSize() {
-            var totalHeight = document.documentElement.clientHeight;
-            var remainingSpace = totalHeight - Quotient.Common.Util.findPosY(splitPane);
-            splitPane.style.height = remainingSpace + 'px';
-            for(var i = 0; i < splitPaneWidget.children.length; i++) {
-                splitPaneWidget.children[i].onResized();
+    function __init__(self, node) {
+        Quotient.Mailbox.Controller.upcall(self, "__init__", node);
+        self.inboxContainer = self.firstNodeByAttribute("class", "inbox-container");
+        var firstWithClass = function(cls, n) {
+            if(!n) {
+                n = self.inboxContainer;
             }
+            return Nevow.Athena.FirstNodeByAttribute(n, "class", cls);
         }
-        setSplitPaneSize();
-        window.onresize = setSplitPaneSize;
-        return;
 
-        self.allTags   = new Array();
-        self.selectedRow = null;
-        self.selectedRowOffset = null;
+        self.messageDetail = firstWithClass("message-detail");
+        self.nextMessagePreview = firstWithClass("next-message-preview");
 
-        self.callRemote("getTags").addCallback(
-            function(tags) {
-                self.allTags = self.allTags.concat(tags).sort();
-                self.stuffTagsInDropdown();
+        var progressMeter = firstWithClass("progress-meter");
+        self.progressBar  = firstWithClass("progress-bar", progressMeter);
+
+        self.messageActions = firstWithClass("message-actions");
+
+        self.highlightExtracts();
+
+        var scrollNode = self.firstNodeByAttribute("athena:class", "Quotient.Mailbox.ScrollingWidget");
+        self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
+        self._selectAndFetchRow(0, function() { return null });
+
+        self.callRemote("getMessageCount").addCallback(
+            function(count) { self.setMessageCount(count) });
+    },
+
+    function fastForward(self, toMessageID) {
+        self.callRemote("fastForward", toMessageID).addCallback(
+            function(messageData) {
+                self.setMessageContent(messageData, true);
             });
+    },
 
+    function _chooseViewParameter(self, viewFunction, select) {
+        var value = select.value;
+        if (value == 'All') {
+            value = null;
+        }
+        self.callRemote(viewFunction, value).addCallback(
+            function(messageData) {
+                self.setMessageCount(messageData[0]);
+                self.setMessageContent(messageData[1], true);
+                self.scrollWidget.setViewportHeight(messageData[0]);
+                self.scrollWidget.emptyAndRefill();
+            });
+    },
+
+    function chooseTag(self, select) {
+        return self._chooseViewParameter('viewByTag', select);
+    },
+
+    function chooseAccount(self, select) {
+        return self._chooseViewParameter('viewByAccount', select);
     },
 
     function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {
@@ -191,38 +208,62 @@ Quotient.Mailbox.Controller.methods(
         }
 
         sw._selectRow(offset, elementFactory());
-        var data = sw._rows[offset][0];
-        self.callRemote("loadMessageFromID", data["__id__"]).addCallback(
-            function(stuff) { self.setMessageContent(stuff) });
     },
 
-    function nextMessage(self, n) {
-        var sw = self.scrollWidget;
-        self._selectAndFetchRow(++sw._selectedRowOffset,
-                                function() {
-                                    return sw._selectedRow.nextSibling
-                                });
-        n.blur();
-    },
+    function touch(self, action, isProgress) {
+        var remoteArgs = [action + "CurrentMessage"];
+        for(var i = 3; i < arguments.length; i++) {
+            remoteArgs.push(arguments[i]);
+        }
 
-    function prevMessage(self, n) {
-        var sw = self.scrollWidget;
-        self._selectAndFetchRow(--sw._selectedRowOffset,
-                                function() {
-                                    return sw._selectedRow.previousSibling
-                                });
-        n.blur();
-    },
+        self.scrollWidget.removeCurrentRow();
 
-    function archiveThis(self, n) {
-        var sw = self.scrollWidget;
-        sw.removeCurrentRow();
-        self.callRemote("archiveCurrentMessage");
-        self._selectAndFetchRow(sw._selectedRowOffset,
+        var select = self.scrollWidget._selectedRowOffset;
+        if(select == self.scrollWidget._rows.length) {
+            select--;
+        }
+
+        self._selectAndFetchRow(select,
                                 function() {
                                     return null;
                                 });
-        n.blur();
+
+        self.messageDetail.style.opacity = .2;
+        self.callRemote.apply(self, remoteArgs).addCallback(
+            function(nextMessage) {
+                self.messageDetail.style.opacity = 1;
+                self.setMessageContent(nextMessage, true);
+                if(isProgress) {
+                    self.progressBar.style.borderRight = "solid 1px #000000";
+                    self.remainingMessages--;
+                    self.setProgressWidth();
+                }
+            });
+    },
+
+    function setMessageCount(self, count) {
+        self.remainingMessages = count;
+        self.totalMessages = count;
+        self.setProgressWidth();
+    },
+
+    function setProgressWidth(self) {
+        if(self.remainingMessages == 0) {
+            self.messageActions.style.visibility = "hidden";
+            self.progressBar.style.visibility = "hidden";
+        } else {
+            self.progressBar.style.visibility = "";
+            self.messageActions.style.visibility = "";
+            self.progressBar.style.width = Math.ceil((self.remainingMessages / self.totalMessages) * 100) + "%";
+        }
+    },
+
+    function archiveThis(self, n) {
+        self.touch("archive", true);
+    },
+
+    function deleteThis(self, n) {
+        self.touch("delete", true);
     },
 
     function showDeferForm(self) {
@@ -231,117 +272,25 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function deferThis(self) {
-        var sw = self.scrollWidget;
-        sw.removeCurrentRow();
-        self._selectAndFetchRow(sw._selectedRowOffset,
-                                function() {
-                                    return null;
-                                });
-
         var days = parseInt(self.deferForm.days.value);
         var hours = parseInt(self.deferForm.hours.value);
         var minutes = parseInt(self.deferForm.minutes.value);
         self.deferForm.style.display = "none";
-        self.callRemote("deferCurrentMessage", days, hours, minutes);
+        self.touch("defer", true, days, hours, minutes);
     },
 
     function replyToThis(self, n) {
-        self.callRemote("replyToCurrentMessage").addCallback(
-            function(data) {
-                self.setMessageContent([null, data])
-            });
-        n.blur();
+        self.touch("replyTo", false);
     },
 
     function forwardThis(self, n) {
-        self.callRemote("forwardCurrentMessage").addCallback(
-            function(data) {
-                self.setMessageContent([null, data])
-            });
-        n.blur();
-    },
-
-    function loadMessageFromID(self, id) {
-        self.callRemote("loadMessageFromID", id).addCallback(
-                        function(data) { self.setMessageContent(data) }
-                            ).addErrback(alert);
-    },
-
-    function mailboxFeedback(self, msg) {
-        document.getElementById("mailbox-log").appendChild(
-            MochiKit.DOM.DIV(null, msg));
-    },
-
-    function changedView(self, select) {
-        self.emptySecondAndThirdSelects(select.parentNode.parentNode);
-        var options = select.getElementsByTagName("option");
-        var newView = options[select.selectedIndex].firstChild.nodeValue;
-
-        if(newView == "Tags") {
-            self.filterByTag(select);
-        } else if(newView == "People") {
-            self.filterByPerson(select);
-        } else if(newView == "Mail") {
-            self.filterMail(select);
-        }
-    },
-
-    function _chooseViewParameter(self, viewFunction, select) {
-        var value = select.value;
-        if (value == 'All') {
-            value = null;
-        }
-        self.callRemote("viewByTag", value).addCallback(
-            function(rowCount) {
-                self.scrollWidget.setViewportHeight(rowCount);
-                self.scrollWidget.emptyAndRefill();
-            });
-    },
-
-    function chooseTag(self, select) {
-        return self._chooseViewParameter('viewByTag', select);
-    },
-
-    function chooseAccount(self, select) {
-        return self._chooseViewParameter('viewByAccount', select);
-    },
-
-    function nextUnread(self) {
-        self.callRemote("nextUnread").addCallback(
-            function(stuff) {
-                if(!stuff) { return; }
-                var rowRange = stuff[0];
-                var rows = stuff[1];
-                var webID = stuff[2];
-                var messageData = stuff[3];
-
-                var sw = self.scrollWidget;
-                sw.createRows(rowRange[0], rows);
-                for(var i = 0; i < sw._rows.length; i++) {
-                   if(sw._rows[i] && sw._rows[i][0]["__id__"] == webID) {
-                        var rowElement = sw._rows[i][1];
-                        break;
-                    }
-                }
-                sw._selectRow(i, rowElement);
-                self.setMessageContent(messageData);
-                var newPos = sw._rowHeight * i;
-                if(sw._scrollViewport.scrollTop < newPos) {
-                    sw._scrollViewport.scrollTop = newPos;
-                    sw.scrolled();
-                }
-            });
+        self.touch("forward", false);
     },
 
     function intermingle(self, string, regex, transformation) {
-        var lpiece = null;
-        var mpiece = null;
-        var rpiece = null;
-        var piece  = null;
-        var match  = null;
-        var matches = null;
-
+        var lpiece, mpiece, rpiece, piece, match;
         var pieces = [string];
+        var matches = 0;
 
         while(true) {
             piece = pieces[pieces.length-1];
@@ -361,16 +310,6 @@ Quotient.Mailbox.Controller.methods(
         return null;
     },
 
-    function attachPhoneToSender(self, number, node) {
-        function swapImages(ign) {
-            var newimg = MochiKit.DOM.IMG({"src": "/Quotient/static/images/attach-data-disabled.png"});
-            node.parentNode.insertBefore(newimg, node);
-            node.parentNode.removeChild(node);
-            self._setExtractState("phone number", number, "acted-upon");
-        }
-        self.callRemote('attachPhoneToSender', number).addCallback(swapImages);
-    },
-
     function transformURL(self, s) {
         var target = s
         if(Quotient.Common.Util.startswith('www', s)) {
@@ -379,133 +318,61 @@ Quotient.Mailbox.Controller.methods(
         return MochiKit.DOM.A({"href":target}, s);
     },
 
-    function _setExtractState(self, etype, extract, state) {
-        self.messageMetadata["message"]["extracts"][type][extract] = state;
-    },
-
-    function _lookupExtractState(self, etype, extract) {
-        return self.messageMetadata["message"]["extracts"][etype][extract];
-    },
-
-    function transformPhoneNumber(self, s) {
-        var enabled = self.messageMetadata["sender"]["is-person"] &&
-                            self._lookupExtractState("phone number", s) == "unused";
-        var icon = null;
-
-        if(enabled) {
-            var handler = "Quotient.Mailbox.Controller.get(this).attachPhoneToSender";
-            handler += "('" + s + "', this); return false";
-            var link = MochiKit.DOM.A({"href": "#","onclick": handler},
-                            MochiKit.DOM.IMG({"src": "/Quotient/static/images/attach-data.png",
-                                            "border": "0"}));
-            icon = link;
-        } else {
-            icon = MochiKit.DOM.IMG(
-                        {"src": "/Quotient/static/images/attach-data-disabled.png"});
-        }
-
-        return MochiKit.DOM.SPAN({}, [s, icon]);
-    },
-
-    function transformEmailAddress(self, s) {
-        return MochiKit.DOM.A({"href":"mailto:" + s}, s);
-    },
-
-    function getTransformationForExtractType(self, etype) {
-        var f = null;
-
-        if(etype == "url") {
-            return function(URL) { return self.transformURL(URL) };
-        } else if(etype == "phone number") {
-            return function(phone) { return self.transformPhoneNumber(phone) };
-        } else if(etype == "email address") {
-            return function(addr) { return self.transformEmailAddress(addr) };
-        }
-    },
-
     function highlightExtracts(self) {
-        var body = self.nodeByAttribute("class", "message-body");
-        var replacements = null;
-        var replacement = null;
+        try {
+            var messageBody = self.firstNodeByAttribute("class", "message-body");
+        } catch(e) { return }
+        var replacements, replacement, replacementLen, j, elem;
+        var i = 0;
+        var regex = /(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]/;
 
-        var j = null;
-        var i = null;
-        var elem = null;
-        var regex = null;
-        var etypes = self.messageMetadata["message"]["extracts"];
-        for(var k in etypes) {
-            etype = etypes[k];
-            i = 0;
+        while(true) {
+            elem = messageBody.childNodes[i];
 
-            while(true) {
-                elem = body.childNodes[i];
-
-                if(!elem) { break };
-                if(elem.tagName) { i++; continue };
-                replacements = self.intermingle(
-                                    elem.nodeValue, etype["pattern"], self.getTransformationForExtractType(k));
-
-                if(!replacements) { i++; continue };
-
-                for(j = 0; j < replacements.length; j++) {
-                    replacement = replacements[j];
-                    if(!replacement.tagName) {
-                        replacement = document.createTextNode(replacement);
-                    }
-                    body.insertBefore(replacement, elem);
-                }
-                body.removeChild(elem);
-                i += j;
+            if(!elem) {
+                break
             }
+
+            if(elem.tagName) {
+                i++;
+                continue
+            }
+
+            replacements = self.intermingle(
+                                elem.nodeValue, regex, self.transformURL);
+
+            if(!replacements) {
+                i++;
+                continue
+            }
+
+            replacementLen = replacements.length;
+            for(j = 0; j < replacementLen; j++) {
+                replacement = replacements[j];
+                if(!replacement.tagName) {
+                    replacement = document.createTextNode(replacement);
+                }
+                messageBody.insertBefore(replacement, elem);
+            }
+            messageBody.removeChild(elem);
+            i += j;
         }
     },
 
-    function setMessageContent(self, data) {
-        self.messageMetadata = data[0];
-        if(self.messageMetadata) {
-            var extractDict = self.messageMetadata["message"]["extracts"];
-            for(var etypename in extractDict) {
-                extractDict[etypename]["pattern"] = new RegExp().compile(
-                                                            extractDict[etypename]["pattern"], "i");
-            }
+    function setMessageContent(self, data, msg) {
+        /* data = [html for next msg preview, html for curmsg] */
+        var n;
+        if(msg) {
+            n = self.messageDetail;
+        } else {
+            n = self.inboxContainer;
         }
-        if(self.scrollWidget._selectedRow) {
-            self.scrollWidget._selectedRow.style.fontWeight = "";
-        }
-        self.messageDetailNode.style.opacity = '';
-        self.messageDetailNode.style.backgroundColor = '';
-        self.messageDetailNode.innerHTML = data[1];
-        var iframe = document.getElementById("content-iframe");
-        if(iframe) {
-            Quotient.Common.Util.resizeIFrame(iframe);
-        }
-        if(self.messageMetadata) {
+        Divmod.Runtime.theRuntime.setNodeContent(
+            n, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[1] + '</div>');
+        if(data[0] != null) {
+            /* so this is a message, not a compose fragment */
+            Divmod.Runtime.theRuntime.setNodeContent(
+                self.nextMessagePreview, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[0] + '</div>');
             self.highlightExtracts();
         }
-        initLightbox();
-    },
-
-
-    function _twiddleCount(self, className, howMuch) {
-        if(!self.counterElements) {
-            self.counterElements = {};
-        }
-        if(!(className in self.counterElements)) {
-            self.counterElements[className] = self.nodeByAttribute('class', className);
-        }
-        var node = self.counterElements[className];
-        node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) + howMuch;
-    },
-
-    function twiddleMessageCount(self, howMuch) {
-        self._twiddleCount('message-count', howMuch);
-        /* we'll make the assumption that you cannot act on
-           messages that are not loaded into message detail */
-        if(!self.messageMetadata["message"]["read"]) {
-            self.twiddleUnreadMessageCount(howMuch);
-        }
-    },
-
-    function twiddleUnreadMessageCount(self, howMuch) {
-        self._twiddleCount('unread-message-count', howMuch);
     });

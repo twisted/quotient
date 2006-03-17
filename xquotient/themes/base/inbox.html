@@ -5,10 +5,17 @@
   <select nevow:pattern="tagChooser" onchange="Quotient.Mailbox.Controller.get(this).chooseTag(this);">
     <option nevow:pattern="tagChoice"><nevow:attr name="value"><nevow:slot name="tagName" /></nevow:attr><nevow:slot name="tagName" /></option>
   </select>
+
+  <div align="right" style="padding-bottom: 4px">
+    View By Tag: <nevow:invisible nevow:render="tagChooser" /> |
+    View By Account: <nevow:invisible nevow:render="accountChooser" />
+  </div>
+
   <div style="display: none; background-color: #FFFFFF" id="add-person-fragment">
     <nevow:invisible nevow:render="addPersonFragment" />
   </div>
 
+  <!--
   <table class="top-controls" style="width: 100%">
     <tr valign="bottom">
       <td>
@@ -32,53 +39,62 @@
           >next</a> |
         <a href="#" onclick="Quotient.Mailbox.Controller.get(this).nextUnread(this); return false"
           >next unread</a> |
-        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
-          >reply</a> |
-        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
-          >forward</a> |
-        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false"
-          >delete</a> |
-        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
-          >archive</a> |
-        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).showDeferForm(this); return false"
-          >defer</a>
-        <form style="display: none" class="defer-form"
-          onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
-          <table>
-            <tr>
-              <td>Days:</td><td><input type="text" name="days" value="0" /></td>
-            </tr>
-            <tr>
-              <td>Hours:</td><td><input type="text" name="hours" value="1" /></td>
-            </tr>
-            <tr>
-              <td>Minutes:</td><td><input type="text" name="minutes" value="0" /></td>
-            </tr>
-            <tr>
-              <td colspan="2" align="right">
-                <input type="submit" value="Defer" />
-              </td>
-            </tr>
-          </table>
-        </form>
-      </td>
-    </tr>
-  </table>
+        -->
+        <div class="inbox-container" style="padding-left: 8px">
+          <div style="padding-bottom: 4px">
+            <nevow:invisible nevow:render="scroller" />
+          </div>
 
-  <div dojoType="SplitPane"
-    orientation="vertical"
-    sizerWidth="6"
-    activeSizing="0"
-    style="width: 100%; height: 10px">
-    <div dojoType="ScrolledTableContentPane" sizeShare="40"
-      ><div class="scrolltable-container"
-        ><nevow:invisible nevow:render="scroller" />
-      </div>
-    </div>
-    <div dojoType="ChildSizingContentPane" sizeShare="60"
-      ><div style="overflow: auto; padding: 4px; border: solid 1px black">
-        <div class="message-detail"/>
-      </div>
+          <div class="next-message-preview">
+            <nevow:invisible nevow:render="nextMessagePreview" />
+          </div>
+          <div nevow:pattern="last-message" class="last-message">
+            This is the last message
+          </div>
+          <div nevow:pattern="next-message" class="next-message">
+            <b>Next</b>: <nevow:slot name="sender" /> - <i><nevow:slot name="subject" /></i>
+          </div>
+          <div class="progress-meter">
+            <div class="progress-bar" />
+          </div>
+          <div class="message-actions" style="visibility: hidden">
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
+              >Archive</a> |
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false"
+              >Delete</a> |
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).showDeferForm(this); return false"
+              >Defer</a> |
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
+              >Forward</a> |
+            <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
+              >Reply</a>
+          </div>
+          <form style="display: none" class="defer-form"
+            onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
+            <table>
+              <tr>
+                <td>Days:</td><td><input type="text" name="days" value="0" /></td>
+              </tr>
+              <tr>
+                <td>Hours:</td><td><input type="text" name="hours" value="1" /></td>
+              </tr>
+              <tr>
+                <td>Minutes:</td><td><input type="text" name="minutes" value="0" /></td>
+              </tr>
+              <tr>
+                <td colspan="2" align="right">
+                  <input type="submit" value="Defer" />
+                </td>
+              </tr>
+            </table>
+          </form>
+          <!--
+        </td>
+      </tr>
+    </table>
+    -->
+    <div class="message-detail">
+      <nevow:invisible nevow:render="messageDetail" />
     </div>
   </div>
 </div>

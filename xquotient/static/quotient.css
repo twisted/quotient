@@ -4,6 +4,24 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     background-image: url(/Quotient/static/images/overlay.png);
 }
 
+.progress-bar {
+    height: 4px;
+    background-color: #DADADA;
+}
+
+.progress-meter {
+    background-color: #FFFFFF;
+    margin-bottom: 4px;
+    border: solid 1px #000000;
+}
+
+.next-message-preview {
+    border: solid 1px #000000;
+    padding: 4px;
+    background-color: #DADADA;
+    margin-bottom: 2px;
+}
+
 #add-person-fragment {
     background-color: #FFFFFF;
     position: absolute;
@@ -56,7 +74,12 @@ a.collapse-arrow {
 #overlay img { border: none; }
 
 .unread-message {
+    display: block;
     font-weight: bold;
+}
+
+.read-message {
+    display: block;
 }
 
 #add-person-fragment {

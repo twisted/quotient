@@ -19,10 +19,10 @@ class SpacePreservingStringRenderer(object):
     def cruftifyMultipleSpaces(text):
         """Replace multiple spaces with &nbsp; such that they are rendered as we want."""
         if text.startswith(' '):
-            yield tags.xml('&nbsp;')
+            yield tags.xml('&#160;')
             text = text[1:]
         chunks = text.split('  ')
-        for i in SpacePreservingStringRenderer.intersperse(tags.xml(' &nbsp;'), chunks):
+        for i in SpacePreservingStringRenderer.intersperse(tags.xml(' &#160;'), chunks):
             yield i
 
     cruftifyMultipleSpaces = staticmethod(cruftifyMultipleSpaces)
