@@ -4,6 +4,51 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     background-image: url(/Quotient/static/images/overlay.png);
 }
 
+.list-option {
+    border: solid 1px #FFFFFF;
+    margin-top: 1px;
+    margin-bottom: 1px;
+    font-size: .8em;
+}
+
+.list-option, .selected-list-option {
+    overflow: hidden;
+}
+
+.list-option:hover {
+    border: solid 1px #000000;
+    cursor: pointer;
+    background-color: #DADADA;
+}
+
+.view-pane-container {
+    width: 200px;
+}
+
+.selected-list-option {
+    border: solid 1px #000000;
+    background-color: #FFFF00;
+    margin-top: 1px;
+    margin-bottom: 1px;
+    font-size: .8em;
+}
+
+.q-scroll-row, .q-scroll-row-alt {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    font-size: .8em;
+    width: 100%;
+}
+
+.q-scroll-row:visited, .q-scroll-row-alt:visited, .q-scroll-row:link, .q-scroll-row-alt:link {
+    color: #000000;
+}
+
+.q-scroll-row-alt {
+    background-color: #DADADA;
+}
+
 .progress-bar {
     height: 4px;
     background-color: #DADADA;
@@ -17,9 +62,16 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 
 .next-message-preview {
     border: solid 1px #000000;
-    padding: 4px;
+    padding: 2px;
+    margin-left: 4px;
     background-color: #DADADA;
     margin-bottom: 2px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.progress-meter, .message-actions {
+    margin-left: 4px;
 }
 
 #add-person-fragment {
@@ -52,6 +104,7 @@ a.collapse-arrow {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
     padding: 2px;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .pane-body {
@@ -88,9 +141,15 @@ a.collapse-arrow {
     border: solid 1px #000000;
 }
 
+.view-selectors {
+    margin-bottom: 4px;
+}
+
 /* the header table */
 
 table.header-table {
+    margin-left: 4px;
+    margin-right: 4px;
     border: solid 1px #CACACA;
     border-top: none;
     width: 100%;
@@ -114,7 +173,7 @@ table.header-table {
 table.header-table > tbody > tr > td {
     border-right: solid 1px #CACACA;
     border-top: solid 1px #CACACA;
-    padding: 5px;
+    padding: 1px;
 }
 
 /* gallery stuff */
@@ -190,15 +249,15 @@ img.thumbnail { border: none; }
     padding: 2px;
 }
 
-#split-message-detail {
+.message-detail {
     overflow: auto;
-    margin-left: 1%; 
-    padding: 0;
-    padding-top: 4px;
-    height: 200px;
+    height: 100%;
+    border-bottom: solid 1px #000000;
 }
 
-#message-detail {
-    padding-left: 4px;
+.message-body {
+    margin-left: 4px;
+    font-family: monospace;
+    font-size: 1.3em;
+    padding-top: 2px;
 }
-

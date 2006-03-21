@@ -180,6 +180,7 @@ class InboxScreen(athena.LiveFragment):
 
     viewingByTag = None
     viewingByAccount = None
+    viewingByPerson = None
 
     translator = None
 
@@ -193,6 +194,8 @@ class InboxScreen(athena.LiveFragment):
                                   fastForward=True,
 
                                   viewByTag=True,
+                                  viewByAccount=True,
+                                  viewByMailType=True,
                                   viewByPerson=True)
 
     def __init__(self, original):
@@ -264,13 +267,66 @@ class InboxScreen(athena.LiveFragment):
                                            self._getBaseComparison()))
         return list(tags.getColumn('name').distinct())
 
+    def render_viewPane(self, ctx, data):
+        attrs = ctx.tag.attributes
+        return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
+                             {'name': attrs['name'],
+                              'renderer': tags.directive(attrs['renderer'])})
+
+    def render_personChooser(self, ctx, data):
+        select = inevow.IQ(self.docFactory).onePattern('personChooser')
+        option = inevow.IQ(select).patternGenerator('personChoice')
+        selectedOption = inevow.IQ(select).patternGenerator('selectedPersonChoice')
+
+        for person in [None] + list(self.original.store.query(people.Person)):
+            if person == self.viewingByPerson:
+                p = selectedOption
+            else:
+                p = option
+            if person:
+                name = person.getDisplayName()
+                key = self.translator.toWebID(person)
+            else:
+                name = 'All'
+                key = None
+
+            opt = p().fillSlots(
+                    'personName', name).fillSlots(
+                    'personKey', key)
+
+            select[opt]
+        return select
+
+    def render_mailViewChooser(self, ctx, data):
+        select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')
+        option = inevow.IQ(select).patternGenerator('mailViewChoice')
+        selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
+
+        views = [((not (self.inArchiveView or
+                        self.inTrashView or
+                        self.inSentMailView)), 'Inbox'),
+                 (self.inArchiveView, 'All'),
+                 (self.inTrashView, 'Trash'),
+                 (self.inSentMailView, 'Sent')]
+
+        for (truth, view) in views:
+            if truth:
+                p = selectedOption
+            else:
+                p = option
+            select[p().fillSlots('mailViewName', view)]
+        return select
+
     def render_tagChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('tagChooser')
         option = inevow.IQ(select).patternGenerator('tagChoice')
+        selectedOption = inevow.IQ(select).patternGenerator('selectedTagChoice')
         for tag in [None] + self.getTags():
-            opt = option().fillSlots('tagName', tag or 'All')
             if tag == self.viewingByTag:
-                opt(selected="selected")
+                p = selectedOption
+            else:
+                p = option
+            opt = p().fillSlots('tagName', tag or 'All')
             select[opt]
         return select
 
@@ -280,10 +336,13 @@ class InboxScreen(athena.LiveFragment):
     def render_accountChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('accountChooser')
         option = inevow.IQ(select).patternGenerator('accountChoice')
+        selectedOption = inevow.IQ(select).patternGenerator('selectedAccountChoice')
         for acc in [None] + list(self._accountNames()):
-            opt = option().fillSlots('accountName', acc or 'All')
             if acc == self.viewingByAccount:
-                opt(selected="selected")
+                p = selectedOption
+            else:
+                p = option
+            opt = p().fillSlots('accountName', acc or 'All')
             select[opt]
         return select
 
@@ -317,6 +376,16 @@ class InboxScreen(athena.LiveFragment):
     def _resetScrollQuery(self):
         self.scrollingFragment.baseConstraint = self._getBaseComparison()
 
+    def viewByPerson(self, webID):
+        if webID is None:
+            self.viewingByPerson = None
+        else:
+            self.viewingByPerson = self.translator.fromWebID(webID)
+
+        self._resetCurrentMessage()
+        self._resetScrollQuery()
+        return (self.getMessageCount(), self._current())
+
     def viewByTag(self, tag):
         self.viewingByTag = tag
         self._resetCurrentMessage()
@@ -325,6 +394,23 @@ class InboxScreen(athena.LiveFragment):
 
     def viewByAccount(self, account):
         self.viewingByAccount = account
+        self._resetCurrentMessage()
+        self._resetScrollQuery()
+        return (self.getMessageCount(), self._current())
+
+    def viewByMailType(self, typ):
+        if typ == 'Inbox':
+            self.inArchiveView = self.inTrashView = self.inSentMailView = False
+        elif typ == 'All':
+            self.inArchiveView = True
+            self.inTrashView = self.inSentMailView = False
+        elif typ == 'Sent':
+            self.inSentMailView = True
+            self.inTrashView = self.inArchiveView = False
+        elif typ == 'Trash':
+            self.inTrashView = True
+            self.inArchiveView = self.inSentMailView = False
+
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current())
@@ -447,6 +533,12 @@ class InboxScreen(athena.LiveFragment):
             comparison = attributes.AND(
                 Message.source == self.viewingByAccount,
                 comparison)
+
+        if self.viewingByPerson is not None:
+            comparison = attributes.AND(
+                Message.sender == people.EmailAddress.address,
+                people.EmailAddress.person == people.Person.storeID,
+                people.Person.storeID == self.viewingByPerson.storeID)
 
         if not self.showRead and not (self.inArchiveView or self.inTrashView):
             comparison = attributes.AND(comparison,

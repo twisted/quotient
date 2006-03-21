@@ -22,44 +22,85 @@ Quotient.Mailbox.MessageDetail.methods(
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();
 Quotient.Mailbox.ScrollingWidget.methods(
     function __init__(self, node) {
-        self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
-        self._scrollViewport.style.height = '100px'
+        self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
+        self.node.style.width = '300px';
+        var ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
+        var pageHeight = document.documentElement.clientHeight;
+        self._scrollViewport.style.height = pageHeight - ypos - 15 + "px";
+    },
+
+    function _createRowHeaders(self, columnNames) {
+        var columnOffsets = {};
+        for( var i = 0; i < columnNames.length; i++ ) {
+            if(self.skipColumn(columnNames[i])) {
+                continue;
+            }
+            columnOffsets[columnNames[i]] = i;
+        }
+        self._columnOffsets = columnOffsets;
+    },
+
+    function setSortInfo(self, currentSortColumn, isAscendingNow) {},
+
+    function setViewportHeight(self, rowCount) {
+        var r = MochiKit.DOM.DIV({"style":"visibility: hidden"},
+                    [MochiKit.DOM.DIV(null, "TEST!!!"),
+                     MochiKit.DOM.DIV(null, "TEST!!!")]);
+
+        self._scrollContent.appendChild(r);
+        var rowHeight = r.clientHeight;
+        self._scrollContent.removeChild(r);
+
+        self._rowHeight = rowHeight;
+        var scrollContentHeight = rowHeight * rowCount;
+        self._scrollContent.style.height = scrollContentHeight + 'px';
     },
 
     function _selectRow(self, rowOffset, row) {
         if(self._selectedRow) {
-            self._selectedRow.style.backgroundColor = '#FFFFFF';
+            self._selectedRow.style.backgroundColor = '';
         }
         if(!row) {
             row = self._rows[rowOffset][1];
         }
 
-        row.style.backgroundColor = '#CACACA';
+        row.style.backgroundColor = '#FFFF00';
         self._selectedRow = row;
         self._selectedRowOffset = rowOffset;
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
+        var style = "height:" + self._rowHeight + "px";
+        if(!rowData["read"]) {
+            style += "font-weight: bold";
+        }
         return MochiKit.DOM.A(
-            {"class": "scroll-row",
+            {"class": ["q-scroll-row-alt", "q-scroll-row"][rowOffset % 2],
              "href": "#",
-             "style": rowData["read"] ? "" : "font-weight: bold",
+             "style": style,
              "onclick": function() {
                 self._selectRow(rowOffset, this);
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
             }},
-            cells);
+            MochiKit.Base.filter(null, cells));
     },
 
     function makeCellElement(self, colName, rowData) {
         if(colName == "receivedWhen") {
             colName = "sentWhen";
         }
-        return MochiKit.DOM.DIV({"class": "scroll-cell"},
-                                self.massageColumnValue(
-                                     colName, self.columnTypes[colName], rowData[colName]));
+        var massage = function(colName) {
+            return self.massageColumnValue(
+                colName, self.columnTypes[colName], rowData[colName]);
+        };
+        if(colName == "senderDisplay") {
+            return MochiKit.DOM.DIV(null, [massage("senderDisplay"), " - ", massage("sentWhen")]);
+        }
+        if(colName == "subject") {
+            return MochiKit.DOM.DIV(null, massage("subject"));
+        }
     },
 
     function formatDate(self, d) {
@@ -81,8 +122,24 @@ Quotient.Mailbox.ScrollingWidget.methods(
         function pad(n) {
             return (n < 10) ? "0" + n : n;
         }
-        var value = [pad(d.getDate()), pad(d.getMonth() + 1), d.getFullYear()].join("/");
-        return value + " " + to12Hour(d.getHours(), pad(d.getMinutes()));
+        function explode(d) {
+            return d.toString().split(/ /);
+        }
+        var parts = explode(d);
+        var todayParts = explode(new Date());
+        
+        /* parts.slice(1,4) == [Month, Day, Year] */
+        if(parts.slice(1, 4) == todayParts.slice(1, 4)) {
+            /* it's today! */
+            return to12Hour(d.getHours(), d.getMinutes()); /* e.g. 12:15 PM */
+        }
+        if(parts[3] == todayParts[3]) {
+            /* it's this year */
+            parts[1] + " " + parts[2]; /* e.g. Jan 12 */
+        }
+        return [pad(d.getFullYear()),
+                pad(d.getMonth()+1),
+                pad(d.getDate())].join("-");
     },
 
     function skipColumn(self, name) {
@@ -127,15 +184,21 @@ Quotient.Mailbox.Controller.methods(
         }
 
         self.messageDetail = firstWithClass("message-detail");
+        var ypos = Quotient.Common.Util.findPosY(self.messageDetail);
+        var pageHeight = document.documentElement.clientHeight;
+        self.messageDetail.style.height = pageHeight - ypos - 15 + "px";
+
         self.nextMessagePreview = firstWithClass("next-message-preview");
 
         var progressMeter = firstWithClass("progress-meter");
         self.progressBar  = firstWithClass("progress-bar", progressMeter);
+        self.scrolltableContainer = self.firstNodeByAttribute("class", "scrolltable-container");
 
         self.messageActions = firstWithClass("message-actions");
 
         self.highlightExtracts();
 
+        self.viewsContainer = self.firstNodeByAttribute("class", "view-pane-container");
         var scrollNode = self.firstNodeByAttribute("athena:class", "Quotient.Mailbox.ScrollingWidget");
         self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
         self._selectAndFetchRow(0, function() { return null });
@@ -144,16 +207,44 @@ Quotient.Mailbox.Controller.methods(
             function(count) { self.setMessageCount(count) });
     },
 
+    function _toggleOutline(self, n, imgn) {
+        var display, img;
+        if(n.style.display == "none") {
+            display = "";
+            img = "/Quotient/static/images/outline-expanded.png";
+        } else {
+            display = "none";
+            img = "/Quotient/static/images/outline-collapsed.png";
+        }
+        n.style.display = display;
+        imgn.src = img;
+        n.blur();
+    },
+
+    function toggleViewsContainer(self, n) {
+        self._toggleOutline(self.viewsContainer, n.firstChild);
+    },
+
+    function toggleScrolltable(self, n) {
+        self._toggleOutline(self.scrolltableContainer, n.firstChild);
+    },
+
     function fastForward(self, toMessageID) {
+        self.messageDetail.style.opacity = .2;
         self.callRemote("fastForward", toMessageID).addCallback(
             function(messageData) {
+                self.messageDetail.style.opacity = 1;
                 self.setMessageContent(messageData, true);
             });
     },
 
-    function _chooseViewParameter(self, viewFunction, select) {
-        var value = select.value;
-        if (value == 'All') {
+    function _chooseViewParameter(self, viewFunction, n, catchAll /* = true */) {
+        if(typeof(catchAll) == 'undefined') {
+            catchAll = true;
+        }
+
+        var value = n.firstChild.nodeValue;
+        if (catchAll && value == 'All') {
             value = null;
         }
         self.callRemote(viewFunction, value).addCallback(
@@ -162,15 +253,44 @@ Quotient.Mailbox.Controller.methods(
                 self.setMessageContent(messageData[1], true);
                 self.scrollWidget.setViewportHeight(messageData[0]);
                 self.scrollWidget.emptyAndRefill();
+                self.scrollWidget._pendingRowSelection = function() {
+                    self._selectAndFetchRow(0, function() { return null }, false);
+                }
             });
     },
 
-    function chooseTag(self, select) {
-        return self._chooseViewParameter('viewByTag', select);
+    function _selectListOption(self, n) {
+        var sibs = n.parentNode.childNodes;
+        for(var i = 0; i < sibs.length; i++) {
+            if(sibs[i].className == "selected-list-option") {
+                sibs[i].className = "list-option";
+                if(!sibs[i].onclick) {
+                    sibs[i].onclick = n.onclick;
+                }
+            }
+        }
+        n.className = "selected-list-option";
     },
 
-    function chooseAccount(self, select) {
-        return self._chooseViewParameter('viewByAccount', select);
+    function chooseTag(self, n) {
+        self._selectListOption(n);
+        return self._chooseViewParameter('viewByTag', n);
+    },
+
+    function chooseMailView(self, n) {
+        self._selectListOption(n);
+        self._chooseViewParameter('viewByMailType', n, false);
+    },
+        
+    function chooseAccount(self, n) {
+        self._selectListOption(n);
+        return self._chooseViewParameter('viewByAccount', n);
+    },
+
+    function choosePerson(self, n) {
+        var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
+        self._selectListOption(n);
+        return self._chooseViewParameter('viewByPerson', keyn);
     },
 
     function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {
@@ -267,10 +387,41 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function showDeferForm(self) {
-        self.deferForm = self.nodeByAttribute("class", "defer-form");
+        if(!self.deferForm) {
+            self.deferForm = self.nodeByAttribute("class", "defer-form");
+        }
         self.deferForm.style.display = "";
     },
 
+    function hideDeferForm(self) {
+        self.deferForm.style.display = "none";
+    },
+
+    function defer(self, node) {
+        var options = node.getElementsByTagName("option");
+        var value = options[node.selectedIndex].firstChild.nodeValue;
+        node.selectedIndex = 0;
+
+        if(value == "other...") {
+            self.showDeferForm();
+            return;
+        }
+        if(value == "Defer") {
+            return;
+        }
+        var args;
+        if(value == "1 day") { 
+            args = [1, 0, 0];
+        } else if(value == "1 hour") {
+            args = [0, 1, 0];
+        } else if(value == "12 hours") {
+            args = [0, 12, 0];
+        } else if(value == "1 week") {
+            args = [7, 0, 0];
+        }
+        self.touch.apply(self, ["defer", true].concat(args));
+    },
+        
     function deferThis(self) {
         var days = parseInt(self.deferForm.days.value);
         var hours = parseInt(self.deferForm.hours.value);

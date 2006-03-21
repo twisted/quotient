@@ -1,22 +1,8 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment">
-
-  <div class="actions-container" align="right">
+  <div align="right">
     (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
-    <!--
-    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).markThisUnread(); return false"
-      >mark unread</a> 
-    <a href="#" oncick="Quotient.Mailbox.Controller.get(this).replyToAllThis(); return false"
-      >reply all</a> |
-    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).redirectThis(); return false"
-      >redirect</a> |
-    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).thisIsSpam(); return false"
-      >this is spam</a> |
-    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deferThis(); return false"
-      >defer</a> |
-    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).todoThis(); return false"
-      >todo</a>-->
   </div>
-  <table class="header-table" cellspacing="0" nevow:render="headerPanel">
+  <table class="header-table" cellspacing="0" nevow:render="headerPanel" style="clear: both">
     <tbody>
       <tr>
         <td class="header-table-first-col">From</td>
@@ -61,9 +47,8 @@
       -->
     </tbody>
   </table>
-  <p />
   <div nevow:render="attachmentPanel" style="float: right" />
-  <div class="message-body" style="font-family: monospace; width: 80%; font-size: 1.3em;" nevow:render="messageBody">
+  <div class="message-body" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
   <nevow:invisible nevow:render="imagePanel" />
