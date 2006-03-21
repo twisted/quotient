@@ -11,6 +11,8 @@ from xquotient.quotientapp import (QuotientBenefactor,
 
 from xquotient.quotienttheme import QuotientTheme
 from xquotient import mail, grabber, compose, popout, publicpage, filter
+from twisted.mail.pop3 import IMailbox
+from twisted.mail.smtp import IMessageDelivery
 
 quotientBenefactorFactory = provisioning.BenefactorFactory(
     name = u'quotient',
@@ -79,4 +81,6 @@ plugin = offering.Offering(
                            popAccessBenefactorFactory,
                            ruleBenefactorFactory,
                            quotientPeopleBenefactorFactory],
+    loginInterfaces = [(IMessageDelivery, "SMTP logins"),
+                       (IMailbox, "POP3 logins")],
     themes = [QuotientTheme('base', 0)])
