@@ -208,10 +208,21 @@ class POP3Grabber(item.Item):
     Flag indicating whether to log traffic from this grabber or not.
     """, default=False)
 
+    created = attributes.timestamp(doc="""
+    Creation time of this grabber.  Used when deciding whether a grabbed
+    message is old enough to automatically archive.
+    """)
+
 
     class installedOn(descriptor.attribute):
         def get(self):
             return self.config.installedOn
+
+
+    def __init__(self, **kw):
+        if 'created' not in kw:
+            kw['created'] = extime.Time()
+        return super(POP3Grabber, self).__init__(**kw)
 
 
     def activate(self):
@@ -291,6 +302,8 @@ class POP3Grabber(item.Item):
 
     def markSuccess(self, uid, msg):
         log.msg(interface=iaxiom.IStatEvent, name='pop3 grabber', stat_messages_grabbed=1)
+        if msg.sentWhen + datetime.timedelta(days=1) < self.created:
+            msg.archived = True
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
 
 
@@ -415,7 +428,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                     log.err(f)
                     self.markFailure(uid, f)
                 else:
-                    self.markSuccess(uid, rece.part)
+                    self.markSuccess(uid, rece.message)
 
         self.setStatus(u"Logging out...")
         d = defer.waitForDeferred(self.quit())
@@ -471,9 +484,9 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
             return self._transact(createIt)
 
 
-    def markSuccess(self, uid, part):
+    def markSuccess(self, uid, msg):
         if self.grabber is not None:
-            return self._transact(self.grabber.markSuccess, uid, part)
+            return self._transact(self.grabber.markSuccess, uid, msg)
 
 
     def markFailure(self, uid, reason):

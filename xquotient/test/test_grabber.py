@@ -6,11 +6,23 @@ from twisted.internet import defer
 from twisted.mail import pop3
 from twisted.cred import error as ecred
 
-from epsilon import structlike
+from epsilon import structlike, extime
 
 from vertex.test import iosim
 
 from xquotient import grabber, mimepart
+
+class StubMessage:
+    sentWhen = extime.Time()
+
+
+
+class StubMIMEReceiver(mimepart.MIMEMessageReceiver):
+    def messageDone(self):
+        mimepart.MIMEMessageReceiver.messageDone(self)
+        self.message = StubMessage()
+
+
 
 class TestPOP3Grabber(grabber.POP3GrabberProtocol):
     def connectionMade(self):
@@ -35,11 +47,11 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
     def createMIMEReceiver(self, source):
         s = StringIO.StringIO()
         self.events.append(('receiver', source, s))
-        return mimepart.MIMEMessageReceiver(s)
+        return StubMIMEReceiver(s)
 
 
-    def markSuccess(self, uid, part):
-        self.events.append(('success', uid, part))
+    def markSuccess(self, uid, msg):
+        self.events.append(('success', uid, msg))
 
 
     def markFailure(self, uid, reason):
@@ -55,13 +67,17 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
         self.events.append(('stopped',))
 
 
+
 class Portal(structlike.record('avatar logout')):
     def login(self, credentials, mind, interface):
         return defer.succeed((interface, self.avatar, self.logout))
 
+
+
 class NoPortal:
     def login(self, credentials, mind, interface):
         return defer.fail(ecred.UnauthorizedLogin())
+
 
 
 class ListMailbox(object):
