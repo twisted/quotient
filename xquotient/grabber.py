@@ -12,7 +12,7 @@ from nevow.flat import flatten
 
 from epsilon import descriptor, extime
 
-from axiom import item, attributes, scheduler
+from axiom import item, attributes, scheduler, iaxiom
 
 from xmantissa import ixmantissa, webapp, webtheme, liveform, tdb, tdbview
 
@@ -303,6 +303,7 @@ class POP3Grabber(item.Item):
     def markSuccess(self, uid, msg):
         if msg.sentWhen + datetime.timedelta(days=1) < self.created:
             msg.archived = True
+        log.msg(interface=iaxiom.IStatEvent, name='pop3 grabber', stat_messages_grabbed=1)
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
 
 
@@ -407,6 +408,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             yield d
             try:
                 d.getResult()
+                 
             except:
                 f = failure.Failure()
                 rece.connectionLost(f)
