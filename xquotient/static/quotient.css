@@ -33,24 +33,17 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     font-size: .8em;
 }
 
-.q-scroll-row, .q-scroll-row-alt {
+.q-scroll-row {
     display: block;
     white-space: nowrap;
     overflow: hidden;
     font-size: .8em;
-}
-
-.q-scroll-row:visited, .q-scroll-row-alt:visited, .q-scroll-row:link, .q-scroll-row-alt:link {
-    color: #000000;
-}
-
-.q-scroll-row {
-    background-color: #FFFFFF;
     margin: 0px 1px 0px 1px;
+    background-color: #FFFFFF;
 }
 
-.q-scroll-row-alt {
-    background-color: #DADADA;
+.q-scroll-row:visited, .q-scroll-row:link {
+    color: #000000;
 }
 
 .progress-bar {
