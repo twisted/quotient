@@ -40,8 +40,8 @@
   </div>
 
   <div nevow:pattern="view-pane" class="view-pane-container">
-    <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
-      <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
+    <div class="views-collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this, 'views-'); return false">
+      <img class="collapse-arrow" src="/Quotient/static/images/views-outline-collapsed.png" />
       <nevow:slot name="name" />
     </div>
     <div class="pane-body" style="display: none; max-height: 6em; overflow: auto">
@@ -57,10 +57,24 @@
         </a>
       </td>
       <td class="view-pane-container" style="display: none">
-        <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" />
-        <nevow:invisible nevow:render="viewPane" name="People" renderer="personChooser" />
-        <nevow:invisible nevow:render="viewPane" name="Tags" renderer="tagChooser" />
-        <nevow:invisible nevow:render="viewPane" name="Accounts" renderer="accountChooser" />
+        <div class="view-pane-content">
+          <div class="content">
+            <img class="border-tl" src="/Quotient/static/images/views-container-tl-corner.png" />
+            <div class="border-top-edge">&#160;</div>
+            <img class="border-tr" src="/Quotient/static/images/views-container-tr-corner.png" />
+            <div class="rounded-corner-spacer">&#160;</div>
+            <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" />
+            <nevow:invisible nevow:render="viewPane" name="People" renderer="personChooser" />
+            <nevow:invisible nevow:render="viewPane" name="Tags" renderer="tagChooser" />
+            <nevow:invisible nevow:render="viewPane" name="Accounts" renderer="accountChooser" />
+          </div>
+          <div style="height: 9px" />
+          <div class="bottom-corners" style="clear: both">
+            <img class="border-bl" src="/Quotient/static/images/views-container-bl-corner.png" />
+            <div class="border-bottom-edge">&#160;</div>
+            <img class="border-br" src="/Quotient/static/images/views-container-br-corner.png" />
+          </div>
+        </div>
       </td>
       <td>
         <a href="#" onclick="Quotient.Mailbox.Controller.get(this).toggleScrolltable(this); return false"

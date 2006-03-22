@@ -173,16 +173,19 @@ Quotient.Common.SenderPerson.methods(
 
 Quotient.Common.CollapsiblePane = {};
 
-Quotient.Common.CollapsiblePane.toggle = function(element) {
+Quotient.Common.CollapsiblePane.toggle = function(element, prefix) {
     var body = Nevow.Athena.NodeByAttribute(element.parentNode, 'class', 'pane-body');
     var img = null;
+    if(typeof(prefix) == 'undefined') {
+        prefix = '';
+    }
 
     if(body.style.display == "none") {
         body.style.display = "block";
-        img = "/Quotient/static/images/outline-expanded.png";
+        img = "/Quotient/static/images/" + prefix + "outline-expanded.png";
     } else {
         body.style.display = "none";
-        img = "/Quotient/static/images/outline-collapsed.png";
+        img = "/Quotient/static/images/" + prefix + "outline-collapsed.png";
     }
 
     Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow").src = img;

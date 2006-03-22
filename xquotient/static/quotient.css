@@ -1,8 +1,63 @@
+body { background-color: #E6EBCD }
+
 table.tdb > tbody > tr > td { cursor: pointer; }
 
 #overlay {
     background-image: url(/Quotient/static/images/overlay.png);
 }
+
+.border-bl, .border-br, .border-tl, .border-tr {
+    width: 12px;
+    height: 12px;
+    padding: 0px;
+    border: 0px;
+    z-index: 99;
+}
+
+.border-tl, .border-bl {
+    float: left;
+    clear: both;
+}
+
+.border-tr, .border-br {
+    float: right;
+    clear: right;
+}
+
+.content {
+    margin: 0px;
+    padding: 0px;
+    border-left: solid 2px #666633;
+    border-right: solid 2px #666633;
+}
+
+.border-top-edge {
+    width: 100%;
+    height: 3px;
+    background-image: url(/Quotient/static/images/views-container-border-top.png);
+    background-repeat: repeat-x;
+}
+
+.border-bottom-edge {
+    width: 100%;
+    height: 3px;
+    background-image: url(/Quotient/static/images/views-container-border-bottom.png);
+    background-repeat: repeat-x;
+}
+
+.rounded-corner-spacer {
+    margin: 0px;
+    padding: 0px;
+    border: 0px;
+    clear: both;
+    font-size: 1px;
+    line-height: 1px;
+}
+
+.border-tl { margin: 0px 0px 0px -2px; }
+.border-tr { margin: -3px -2px 0px 0px; }
+.border-bl { margin: -9px 0px 0px 0px; }
+.border-br { margin: -12px 0px 0px 0px; }
 
 .list-option {
     border: solid 1px #FFFFFF;
@@ -23,6 +78,12 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 
 .view-pane-container {
     width: 200px;
+    padding: 0px;
+    border: 0px;
+}
+
+.view-pane-content {
+    background-color: #CCCC99;
 }
 
 .selected-list-option {
@@ -99,7 +160,7 @@ a.collapse-arrow {
 
 .collapsible-pane {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
-    padding: 2px;
+    padding: 0px 2px 2px 2px;
     cursor: pointer;
     white-space: nowrap;
 }
