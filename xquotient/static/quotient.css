@@ -38,11 +38,15 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     white-space: nowrap;
     overflow: hidden;
     font-size: .8em;
-    width: 100%;
 }
 
 .q-scroll-row:visited, .q-scroll-row-alt:visited, .q-scroll-row:link, .q-scroll-row-alt:link {
     color: #000000;
+}
+
+.q-scroll-row {
+    background-color: #FFFFFF;
+    margin: 0px 1px 0px 1px;
 }
 
 .q-scroll-row-alt {

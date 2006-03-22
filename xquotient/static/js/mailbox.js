@@ -76,7 +76,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             style += "font-weight: bold";
         }
         return MochiKit.DOM.A(
-            {"class": ["q-scroll-row-alt", "q-scroll-row"][rowOffset % 2],
+            {"class": "q-scroll-row",
              "href": "#",
              "style": style,
              "onclick": function() {
@@ -157,12 +157,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self._rows = self._rows.slice(
                         0, self._selectedRowOffset).concat(
                             self._rows.slice(self._selectedRowOffset+1, self._rows.length));
-        if(self._selectedRowOffset == 0) {
-            self.scrolled();
-        }
     },
-        
-   
+
     function cbRowsFetched(self) {
         if(self._pendingRowSelection) {
             self._pendingRowSelection();
@@ -335,18 +331,14 @@ Quotient.Mailbox.Controller.methods(
         for(var i = 3; i < arguments.length; i++) {
             remoteArgs.push(arguments[i]);
         }
-
+        var next = self.scrollWidget._selectedRow.nextSibling;
         self.scrollWidget.removeCurrentRow();
+        
+        self.scrollWidget._selectRow(
+            self.scrollWidget._selectedRowOffset,
+            next);
 
-        var select = self.scrollWidget._selectedRowOffset;
-        if(select == self.scrollWidget._rows.length) {
-            select--;
-        }
-
-        self._selectAndFetchRow(select,
-                                function() {
-                                    return null;
-                                });
+        self.scrollWidget.scrolled();
 
         self.messageDetail.style.opacity = .2;
         self.callRemote.apply(self, remoteArgs).addCallback(
