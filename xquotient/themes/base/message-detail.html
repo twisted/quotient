@@ -2,6 +2,15 @@
   <div align="right">
     (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
   </div>
+  <div nevow:render="headerPanel" style="border-bottom: solid 1px #000000">
+    <div style="float: right">
+      <h3><nevow:slot name="sent" /></h3>
+    </div>
+    <div style="clear: right; font-size: 1.8em"><nevow:slot name="subject" /></div>
+    <nevow:slot name="sender" />
+  </div>
+
+  <!--
   <table class="header-table" cellspacing="0" nevow:render="headerPanel" style="clear: both">
     <tbody>
       <tr>
@@ -21,6 +30,7 @@
         <td class="header-table-first-col">Sent</td>
         <td class="header-table-last-col"><nevow:slot name="sent" /></td>
       </tr>
+    -->
       <!--
       <tr valign="top">
         <td class="header-table-first-col">
@@ -44,9 +54,9 @@
           </form>
         </td>
       </tr>
-      -->
     </tbody>
   </table>
+      -->
   <div nevow:render="attachmentPanel" style="float: right" />
   <div class="message-body" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
