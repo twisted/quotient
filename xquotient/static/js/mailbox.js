@@ -72,7 +72,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
-        var style = "height:" + self._rowHeight + "px";
+        var style = "height:" + self._rowHeight + "px;";
         if(!rowData["read"]) {
             style += "font-weight: bold";
         }
