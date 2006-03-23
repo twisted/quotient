@@ -44,7 +44,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function setSortInfo(self, currentSortColumn, isAscendingNow) {},
 
     function setViewportHeight(self, rowCount) {
-        var r = MochiKit.DOM.DIV({"style":"visibility: hidden"},
+        var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
+                                  "class": "q-scroll-row"},
                     [MochiKit.DOM.DIV(null, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
