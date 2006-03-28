@@ -252,7 +252,7 @@ class InboxScreen(athena.LiveFragment):
         f = ScrollingFragment(self.original.store,
                               Message,
                               self._getBaseComparison(),
-                              [u'senderDisplay', u'subject', u'receivedWhen', u'read', u'sentWhen'],
+                              [u'subject', u'senderDisplay', u'receivedWhen', u'read', u'sentWhen'],
                               defaultSortColumn=Message.receivedWhen)
         f.resort('receivedWhen')
         f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
@@ -296,6 +296,9 @@ class InboxScreen(athena.LiveFragment):
 
             select[opt]
         return select
+
+    def render_messageCount(self, ctx, data):
+        return self.getMessageCount()
 
     def render_mailViewChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')

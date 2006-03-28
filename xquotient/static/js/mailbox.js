@@ -3,6 +3,12 @@
 // import Mantissa.People
 // import LightBox
 // import Mantissa.ScrollTable
+// import NiftyCorners
+
+MochiKit.DOM.addLoadEvent(function() {
+    Nifty("ul.postnav a","transparent small");
+    Nifty("div.next-message-preview", "small");
+});
 
 if(typeof(Quotient.Mailbox) == "undefined") {
     Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
@@ -25,9 +31,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
         self.node.style.width = '300px';
+        self.node.style.borderTop = self.node.style.borderBottom = '';
         var ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
         var pageHeight = document.documentElement.clientHeight;
-        self._scrollViewport.style.height = pageHeight - ypos - 15 + "px";
+        self._scrollViewport.style.height = pageHeight - ypos - 45 + "px";
     },
 
     function _createRowHeaders(self, columnNames) {
@@ -47,6 +54,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
                                   "class": "q-scroll-row"},
                     [MochiKit.DOM.DIV(null, "TEST!!!"),
+                     MochiKit.DOM.DIV(null, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
         self._scrollContent.appendChild(r);
@@ -93,13 +101,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var massage = function(colName) {
             return self.massageColumnValue(
                 colName, self.columnTypes[colName], rowData[colName]);
-        };
-        if(colName == "senderDisplay") {
-            return MochiKit.DOM.DIV(null, [massage("senderDisplay"), " - ", massage("sentWhen")]);
         }
-        if(colName == "subject") {
-            return MochiKit.DOM.DIV(null, massage("subject"));
-        }
+
+        return MochiKit.DOM.DIV(null, massage(colName));
     },
 
     function formatDate(self, d) {
@@ -202,26 +206,25 @@ Quotient.Mailbox.Controller.methods(
             function(count) { self.setMessageCount(count) });
     },
 
-    function _toggleOutline(self, n, imgn) {
-        var display, img;
-        if(n.style.display == "none") {
-            display = "";
-            img = "/Quotient/static/images/outline-expanded.png";
-        } else {
-            display = "none";
-            img = "/Quotient/static/images/outline-collapsed.png";
+    function setComplexity(self, c) {
+        if(c == 1) {
+            self.setViewsContainerDisplay("none");
+            self.setScrollTablePosition("absolute");
+        } else if(c == 2) {
+            self.setViewsContainerDisplay("none");
+            self.setScrollTablePosition("static");
+        } else if(c == 3) {
+            self.setScrollTablePosition("static");
+            self.setViewsContainerDisplay("");
         }
-        n.style.display = display;
-        imgn.src = img;
-        n.blur();
     },
 
-    function toggleViewsContainer(self, n) {
-        self._toggleOutline(self.viewsContainer, n.firstChild);
+    function setViewsContainerDisplay(self, d) {
+        self.viewsContainer.style.display = d;
     },
 
-    function toggleScrolltable(self, n) {
-        self._toggleOutline(self.scrolltableContainer, n.firstChild);
+    function setScrollTablePosition(self, p) {
+        self.scrolltableContainer.style.position = p;
     },
 
     function fastForward(self, toMessageID) {

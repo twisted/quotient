@@ -14,6 +14,6 @@ quotient = athena.JSPackage({
     u'Quotient.Grabber': jsdir.child('grabber.js').path,
     u'Quotient.Filter': jsdir.child('filter.js').path,
 
+    u'NiftyCorners': jsdir.child('nifty-corners').child('niftycube.js').path,
     u'LightBox': jsdir.child('lightbox.js').path,
-
-    })
+})
