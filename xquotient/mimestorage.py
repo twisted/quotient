@@ -3,9 +3,11 @@
 import itertools
 import quopri, binascii, rfc822
 
+from twisted.python import log
+
 from epsilon.extime import Time
 
-from axiom import item, attributes
+from axiom import item, attributes, iaxiom
 
 from xquotient import mimepart, equotient, mimeutil, exmess
 
@@ -68,6 +70,11 @@ class Part(item.Item):
     _children = attributes.inmemory(
         "Temporary storage for child parts before this Part is added to "
         "a database.")
+
+    def __init__(self, *a, **kw):
+        super(Part, self).__init__(*a, **kw)
+        log.msg(interface=iaxiom.IStatEvent, name="email",
+                stat_mimePartsCreated=1)
 
     def addHeader(self, name, value):
         if self.store is not None:
