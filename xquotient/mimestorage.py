@@ -73,7 +73,7 @@ class Part(item.Item):
 
     def __init__(self, *a, **kw):
         super(Part, self).__init__(*a, **kw)
-        log.msg(interface=iaxiom.IStatEvent, name="email",
+        log.msg(interface=iaxiom.IStatEvent,
                 stat_mimePartsCreated=1)
 
     def addHeader(self, name, value):

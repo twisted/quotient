@@ -705,7 +705,7 @@ class MIMEMessageReceiver(object):
         self.part.addHeader('x-divmod-processed', unicode(rfc822.formatdate(localNow)))
         self.file.close()
         self.done = True
-        log.msg(interface=iaxiom.IStatEvent, name="email", stat_messagesReceived=1)
+        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1)
 
 
     # utility methods

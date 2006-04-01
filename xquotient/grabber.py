@@ -303,7 +303,7 @@ class POP3Grabber(item.Item):
     def markSuccess(self, uid, msg):
         if msg.sentWhen + datetime.timedelta(days=1) < self.created:
             msg.archived = True
-        log.msg(interface=iaxiom.IStatEvent, name='pop3 grabber', stat_messages_grabbed=1)
+        log.msg(interface=iaxiom.IStatEvent, stat_messages_grabbed=1)
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
 
 
