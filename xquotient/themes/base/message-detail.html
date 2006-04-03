@@ -1,9 +1,5 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment"
   class="message-detail-fragment">
-  <div align="right">
-    (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
-  </div>
-
   <div nevow:render="headerPanel" style="margin-bottom: 14px">
     <table style="width: 100%">
       <tr valign="top">
@@ -74,4 +70,8 @@
     <nevow:slot name="paragraphs" />
   </div>
   <nevow:invisible nevow:render="imagePanel" />
+  <div align="right" style="clear: both">
+    (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
+  </div>
+
 </div>

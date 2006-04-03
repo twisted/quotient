@@ -67,7 +67,8 @@ class StaticShellContent(Item, InstallableMixin):
         other.powerUp(self, ixmantissa.IStaticShellContent)
 
     def getHeader(self):
-        return tags.img(src='/Quotient/static/images/logo.png')
+        return tags.img(src='/Quotient/static/images/logo.png',
+                        style='margin: 2px')
 
     def getFooter(self):
         return None

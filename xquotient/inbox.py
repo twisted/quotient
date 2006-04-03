@@ -206,6 +206,9 @@ class InboxScreen(athena.LiveFragment):
 
         self._resetCurrentMessage()
 
+    def getInitialArguments(self):
+        return (self.getMessageCount(),)
+
     def _resetCurrentMessage(self):
         self.currentMessage = self._getNextMessage()
         if self.currentMessage is not None:
@@ -267,6 +270,11 @@ class InboxScreen(athena.LiveFragment):
                                            self._getBaseComparison()))
         return list(tags.getColumn('name').distinct())
 
+    def render_button(self, ctx, data):
+        # take the contents of the ctx.tag and stuff it inside the button pattern
+        return inevow.IQ(self.docFactory).onePattern('button').fillSlots(
+                    'content', ctx.tag.children)
+
     def render_viewPane(self, ctx, data):
         attrs = ctx.tag.attributes
         return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
@@ -296,9 +304,6 @@ class InboxScreen(athena.LiveFragment):
 
             select[opt]
         return select
-
-    def render_messageCount(self, ctx, data):
-        return self.getMessageCount()
 
     def render_mailViewChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')
@@ -365,8 +370,7 @@ class InboxScreen(athena.LiveFragment):
         return self._nextMessagePreview()
 
     def head(self):
-        return tags.link(rel='stylesheet', type='text/css',
-                         href='/Quotient/static/reader.css')
+        return None
 
     # remote methods
 

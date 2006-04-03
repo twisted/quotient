@@ -3,16 +3,8 @@
 // import Mantissa.People
 // import LightBox
 // import Mantissa.ScrollTable
-// import NiftyCorners
 
-MochiKit.DOM.addLoadEvent(function() {
-    Nifty("ul.postnav a","transparent small");
-    Nifty("div.next-message-preview", "small");
-});
-
-if(typeof(Quotient.Mailbox) == "undefined") {
-    Quotient.Mailbox = { selectedMessageColor : "#FFFF00" };
-}
+Quotient.Mailbox = {};
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 Quotient.Mailbox.MessageDetail.methods(
@@ -31,10 +23,11 @@ Quotient.Mailbox.ScrollingWidget.methods(
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
         self.node.style.width = '300px';
-        self.node.style.borderTop = self.node.style.borderBottom = '';
+        self.node.style.border = "";
+        self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #336699";
         var ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
         var pageHeight = document.documentElement.clientHeight;
-        self._scrollViewport.style.height = pageHeight - ypos - 45 + "px";
+        self._scrollViewport.style.height = pageHeight - ypos - 15 + "px";
     },
 
     function _createRowHeaders(self, columnNames) {
@@ -53,12 +46,12 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function setRowHeight(self) {
         var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
                                   "class": "q-scroll-row"},
-                    [MochiKit.DOM.DIV(null, "TEST!!!"),
-                     MochiKit.DOM.DIV(null, "TEST!!!"),
+                    [MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
+                     MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
         self._scrollContent.appendChild(r);
-        var rowHeight = r.clientHeight;
+        var rowHeight = r.clientHeight + 1;
         self._scrollContent.removeChild(r);
 
         self._rowHeight = rowHeight;
@@ -72,13 +65,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
             row = self._rows[rowOffset][1];
         }
 
-        row.style.backgroundColor = '#FFFF00';
+        row.style.backgroundColor = '#FFFFFF';
         self._selectedRow = row;
         self._selectedRowOffset = rowOffset;
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
-        var style = "height:" + self._rowHeight + "px;";
+        var style = "";
         if(!rowData["read"]) {
             style += "font-weight: bold";
         }
@@ -103,7 +96,14 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 colName, self.columnTypes[colName], rowData[colName]);
         }
 
-        return MochiKit.DOM.DIV(null, massage(colName));
+        var attrs = {};
+        if(colName == "senderDisplay") {
+            attrs["class"] = "sender";
+        } else if(colName == "subject") {
+            attrs["class"] = "subject";
+        }
+            
+        return MochiKit.DOM.DIV(attrs, massage(colName));
     },
 
     function formatDate(self, d) {
@@ -172,41 +172,77 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function __init__(self, node) {
+    function __init__(self, node, messageCount) {
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
-        self.inboxContainer = self.firstNodeByAttribute("class", "inbox-container");
-        var firstWithClass = function(cls, n) {
-            if(!n) {
-                n = self.inboxContainer;
+        
+        var contentTable = self.firstNodeByAttribute("class", "content-table");
+        var tbody = contentTable.getElementsByTagName("tbody")[0];
+        self.contentTableRows = [];
+        for(var i = 0; i < tbody.childNodes.length; i++) {
+            if(tbody.childNodes[i].tagName && 
+               tbody.childNodes[i].tagName.toLowerCase() == "tr") {
+                self.contentTableRows.push(tbody.childNodes[i]);
             }
-            return Nevow.Athena.FirstNodeByAttribute(n, "class", cls);
         }
+        self.inboxContainer = self.firstWithClass("inbox-container",
+                                                  self.contentTableRows[0]);
 
-        self.messageDetail = firstWithClass("message-detail");
+        self.messageDetail = self.firstWithClass("message-detail",
+                                                 self.contentTableRows[1]);
+        var mastheadBottom = self.firstWithClass("masthead-bottom",
+                                                 self.contentTableRows[2]);
+
         var ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         var pageHeight = document.documentElement.clientHeight;
-        self.messageDetail.style.height = pageHeight - ypos - 15 + "px";
+        self.messageDetail.style.height = pageHeight - ypos - 15 - mastheadBottom.clientHeight + "px";
 
-        self.nextMessagePreview = firstWithClass("next-message-preview");
+        var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.contentTableRows[1],
+                                                           "athena:class",
+                                                           "Quotient.Mailbox.ScrollingWidget");
 
-        var progressMeter = firstWithClass("progress-meter");
-        self.progressBar  = firstWithClass("progress-bar", progressMeter);
-        self.scrolltableContainer = self.firstNodeByAttribute("class", "scrolltable-container");
-
-        self.messageActions = firstWithClass("message-actions");
-
-        self.highlightExtracts();
-
-        self.viewsContainer = self.firstNodeByAttribute("class", "view-pane-container");
-        var scrollNode = self.firstNodeByAttribute("athena:class", "Quotient.Mailbox.ScrollingWidget");
         self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
+        self.scrolltableContainer = self.scrollWidget.node.parentNode;
+        self.scrollWidget._scrollViewport.style.height = 
+            parseInt(self.scrollWidget._scrollViewport.style.height) - mastheadBottom.clientHeight + "px";
+
         self._selectAndFetchRow(0, function() { return null });
 
-        self.callRemote("getMessageCount").addCallback(
-            function(count) { self.setMessageCount(count) });
+        self.setMessageCount(messageCount);
+
+        self.currentComplexity = 1;
+        setTimeout(function() {
+            self.setScrollTablePosition("absolute");
+            self.highlightExtracts();
+            self.finishedLoading();
+        }, 0);
     },
 
-    function setComplexity(self, c) {
+    function finishedLoading(self) {
+        self.node.removeChild(self.firstWithClass("loading", self.node));
+    },
+
+    function firstWithClass(self, cls, n) {
+        if(!n) {
+            n = self.inboxContainer;
+        }
+        return Nevow.Athena.FirstNodeByAttribute(n, "class", cls);
+    },
+
+    function complexityHover(self, img) {
+        if(img.className == "selected-complexity-icon") {
+            return;
+        }
+        if(-1 < img.src.search("unselected")) {
+            img.src = img.src.replace("unselected", "selected");
+        } else {
+            img.src = img.src.replace("selected", "unselected");
+        }
+    },
+
+    function setComplexity(self, c, node) {
+        if(node.className == "selected-complexity-icon") {
+            return;
+        }
         if(c == 1) {
             self.setViewsContainerDisplay("none");
             self.setScrollTablePosition("absolute");
@@ -217,14 +253,38 @@ Quotient.Mailbox.Controller.methods(
             self.setScrollTablePosition("static");
             self.setViewsContainerDisplay("");
         }
+        var gparent = node.parentNode.parentNode;
+        var selected = Nevow.Athena.FirstNodeByAttribute(
+                        gparent, "class", "selected-complexity-icon");
+        selected.className = "complexity-icon";
+        self.complexityHover(selected);
+        node.className = "selected-complexity-icon";
     },
 
     function setViewsContainerDisplay(self, d) {
+        if(!self.viewsContainer) {
+            self.viewsContainer = self.firstWithClass("view-pane-container",
+                                                      self.contentTableRows[1]);
+        }
         self.viewsContainer.style.display = d;
     },
 
     function setScrollTablePosition(self, p) {
         self.scrolltableContainer.style.position = p;
+        var d;
+        if(p == "absolute") {
+            d = "none";
+        } else {
+            d = "";
+        }
+        if(!self.scrolltableHeader) {
+            self.scrolltableHeader = self.firstWithClass("scrolltable-header",
+                                                         self.contentTableRows[0]);
+            self.scrolltableFooter = self.firstWithClass("scrolltable-footer",
+                                                         self.contentTableRows[2]);
+        }
+
+        self.scrolltableHeader.style.display = self.scrolltableFooter.style.display = d;
     },
 
     function fastForward(self, toMessageID) {
@@ -241,7 +301,7 @@ Quotient.Mailbox.Controller.methods(
             catchAll = true;
         }
 
-        var value = n.firstChild.nodeValue;
+        var value = n.firstChild.firstChild.nodeValue;
         if (catchAll && value == 'All') {
             value = null;
         }
@@ -348,7 +408,11 @@ Quotient.Mailbox.Controller.methods(
                 self.messageDetail.style.opacity = 1;
                 self.setMessageContent(nextMessage, true);
                 if(isProgress) {
-                    self.progressBar.style.borderRight = "solid 1px #000000";
+                    if(!self.progressBar) {
+                        self.progressBar = self.firstWithClass("progress-bar",
+                                                               self.contentTableRows[0]);
+                    }
+                    self.progressBar.style.borderRight = "solid 1px #6699CC";
                     self.remainingMessages--;
                     self.setProgressWidth();
                 }
@@ -362,13 +426,22 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function setProgressWidth(self) {
+        if(!self.progressBar) {
+            self.progressBar = self.firstWithClass("progress-bar",
+                                                   self.contentTableRows[0]);
+            self.messageActions = self.nodesByAttribute("class", "message-actions");
+        }
+        var visibility;
         if(self.remainingMessages == 0) {
-            self.messageActions.style.visibility = "hidden";
-            self.progressBar.style.visibility = "hidden";
+            visibility = "hidden";
         } else {
-            self.progressBar.style.visibility = "";
-            self.messageActions.style.visibility = "";
+            visibility = "";
             self.progressBar.style.width = Math.ceil((self.remainingMessages / self.totalMessages) * 100) + "%";
+        }
+
+        self.progressBar.style.visibility = visibility;
+        for(var i = 0; i < self.messageActions.length; i++) {
+            self.messageActions[i].style.visibility = visibility;
         }
     },
 
@@ -515,9 +588,13 @@ Quotient.Mailbox.Controller.methods(
         Divmod.Runtime.theRuntime.setNodeContent(
             n, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[1] + '</div>');
         if(data[0] != null) {
+            if(!self.nextMessagePreview) {
+                self.nextMessagePreview = self.firstWithClass("next-message-preview",
+                                                              self.contentTableRows[0]);
+            }
             /* so this is a message, not a compose fragment */
             Divmod.Runtime.theRuntime.setNodeContent(
                 self.nextMessagePreview, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[0] + '</div>');
             self.highlightExtracts();
         }
-    });
+    })
