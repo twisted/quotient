@@ -27,7 +27,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #336699";
         var ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
         var pageHeight = document.documentElement.clientHeight;
-        self._scrollViewport.style.height = pageHeight - ypos - 15 + "px";
+        self._scrollViewport.style.height = pageHeight - ypos - 14 + "px";
     },
 
     function _createRowHeaders(self, columnNames) {

@@ -150,10 +150,14 @@ table.button {
 .masthead-tr { margin: -1px -1px 0px 0px }
 .view-pane-tl { margin: 0px 0px 0px -1px }
 
-.masthead-content {
+.masthead-content, .masthead-content-bottom {
     background-color: #D2E6FF;
     border: solid 1px #336699;
     border-top: none;
+}
+
+.masthead-content {
+    border-bottom: none;
 }
 
 .masthead-content > .content {
@@ -433,7 +437,6 @@ img.thumbnail { border: none; }
     height: 100%;
     background-color: #FFFFFF;
     border: solid 1px #336699;
-    border-top: none;
 }
 
 .message-body {
