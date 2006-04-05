@@ -178,6 +178,11 @@ table.button {
 
 .view-pane-content {
     border-bottom: solid 1px #336699;
+    margin-bottom: 6px;
+}
+
+.pane-body {
+    margin-bottom: 4px;
 }
 
 .view-pane-cell {
