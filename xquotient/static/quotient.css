@@ -178,7 +178,6 @@ table.button {
 
 .view-pane-content {
     border-bottom: solid 1px #336699;
-    margin-bottom: 6px;
 }
 
 .pane-body {
@@ -194,6 +193,7 @@ table.button {
     cursor: pointer;
     font-weight: bold;
     color: #336699;
+    margin-bottom: 6px;
 }
 
 .list-option {
