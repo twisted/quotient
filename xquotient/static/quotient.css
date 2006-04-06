@@ -226,8 +226,9 @@ table.button {
     white-space: nowrap;
     overflow: hidden;
     font-size: .8em;
+    width: 99%;
     margin: 0px 1px 1px 1px;
-    padding: 8px;
+    padding: 8px 0px 8px 0px;
     background-color: #D2E6FF;
 }
 
