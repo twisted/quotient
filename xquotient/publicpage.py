@@ -32,7 +32,7 @@ class PublicIndexPage(PublicPage):
 
     def __init__(self, original, staticContent, forUser=None):
         super(PublicIndexPage, self).__init__(
-                original, tags.h1["QUOTIENT!"], staticContent, forUser)
+                original, original.store.parent, tags.h1["QUOTIENT!"], staticContent, forUser)
 
     def child_static(self, ctx):
         return static.File(sibpath(__file__, 'static'))
