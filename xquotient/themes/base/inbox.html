@@ -109,28 +109,28 @@
         </div>
       </td>
       <td style="width: 100%">
-        <div class="inbox-container">
-          <table cellpadding="0" cellspacing="0" style="width: 100%">
-            <tr valign="bottom" style="line-height: 0px">
+        <div class="inbox-container"
+          ><table cellpadding="0" cellspacing="0" style="width: 100%"
+            ><tr class="complexity-container" valign="bottom" style="line-height: 0px">
               <td>
                 <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
                   onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
                   onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this)"
+                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
                   class="complexity-icon" />
               </td>
               <td>
                 <img src="/Quotient/static/images/complexity-selector-2-unselected.png"
                   onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
                   onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this)"
+                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this, true)"
                   class="complexity-icon" />
               </td>
               <td>
                 <img src="/Quotient/static/images/complexity-selector-1-selected.png"
                   onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
                   onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this)"
+                  onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this, true)"
                   class="selected-complexity-icon" />
               </td>
               <td style="width: 100%">

@@ -155,6 +155,14 @@ class Inbox(Item, InstallableMixin):
     schemaVersion = 1
 
     installedOn = attributes.reference()
+    uiComplexity = attributes.integer(default=1)
+    # uiComplexity should be an integer between
+    # 1 and 3, where 1 is the least complex and
+    # 3 is the most complex.  the value of this
+    # attribute determines what portions of the
+    # inbox UI will be visible each time it is
+    # loaded (and so should be updated each time
+    # the user changes the setting)
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.6, children=
@@ -196,7 +204,9 @@ class InboxScreen(athena.LiveFragment):
                                   viewByTag=True,
                                   viewByAccount=True,
                                   viewByMailType=True,
-                                  viewByPerson=True)
+                                  viewByPerson=True,
+
+                                  setComplexity=True)
 
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
@@ -207,7 +217,7 @@ class InboxScreen(athena.LiveFragment):
         self._resetCurrentMessage()
 
     def getInitialArguments(self):
-        return (self.getMessageCount(),)
+        return (self.getMessageCount(), self.original.uiComplexity)
 
     def _resetCurrentMessage(self):
         self.currentMessage = self._getNextMessage()
@@ -373,6 +383,9 @@ class InboxScreen(athena.LiveFragment):
         return None
 
     # remote methods
+
+    def setComplexity(self, n):
+        self.original.uiComplexity = n
 
     def fastForward(self, webID):
         self.currentMessage = self.translator.fromWebID(webID)

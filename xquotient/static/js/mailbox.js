@@ -172,7 +172,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function __init__(self, node, messageCount) {
+    function __init__(self, node, messageCount, complexityLevel) {
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
         
         var contentTable = self.firstNodeByAttribute("class", "content-table");
@@ -209,12 +209,36 @@ Quotient.Mailbox.Controller.methods(
 
         self.setMessageCount(messageCount);
 
-        self.currentComplexity = 1;
+        self.delayedLoad(complexityLevel);
+    },
+     
+    function delayedLoad(self, complexityLevel) {
         setTimeout(function() {
             self.setScrollTablePosition("absolute");
             self.highlightExtracts();
+            self.setInitialComplexity(complexityLevel);
             self.finishedLoading();
         }, 0);
+    },
+
+    function setInitialComplexity(self, complexityLevel) {
+        if(1 < complexityLevel) {
+            var cc = self.firstWithClass("complexity-container", self.inboxContainer);
+            self.setComplexity(complexityLevel,
+                                cc.getElementsByTagName("img")[3-complexityLevel],
+                                false);
+            /* firefox goofs the table layout unless we make it
+                factor all three columns into it.  the user won't
+                actually see anything strange */
+            if(complexityLevel == 2) {
+                self._setComplexityVisibility(3);
+                /* two vanilla calls aren't enough, firefox won't
+                    update the viewport */
+                setTimeout(function() {
+                    self._setComplexityVisibility(2);
+                }, 1);
+            }
+        }
     },
 
     function finishedLoading(self) {
@@ -239,25 +263,41 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    function setComplexity(self, c, node) {
-        if(node.className == "selected-complexity-icon") {
-            return;
-        }
+    function _setComplexityVisibility(self, c) {
         if(c == 1) {
             self.setViewsContainerDisplay("none");
             self.setScrollTablePosition("absolute");
         } else if(c == 2) {
-            self.setViewsContainerDisplay("none");
             self.setScrollTablePosition("static");
+            self.setViewsContainerDisplay("none");
         } else if(c == 3) {
             self.setScrollTablePosition("static");
             self.setViewsContainerDisplay("");
         }
+    },
+
+    function setComplexity(self, level, node, report) {
+        /* level = integer between 1 and 3
+           node = the image that represents this complexity level
+           report = boolean - should we persist this change */
+        if(node.className == "selected-complexity-icon") {
+            return;
+        }
+
+        self._setComplexityVisibility(level);
+
+        if(report) {
+            self.callRemote("setComplexity", level);
+        }
+
         var gparent = node.parentNode.parentNode;
         var selected = Nevow.Athena.FirstNodeByAttribute(
                         gparent, "class", "selected-complexity-icon");
         selected.className = "complexity-icon";
         self.complexityHover(selected);
+        if(!report) {
+            self.complexityHover(node);
+        }
         node.className = "selected-complexity-icon";
     },
 
