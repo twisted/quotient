@@ -434,13 +434,18 @@ Quotient.Mailbox.Controller.methods(
             remoteArgs.push(arguments[i]);
         }
         var next = self.scrollWidget._selectedRow.nextSibling;
-        self.scrollWidget.removeCurrentRow();
-        
-        self.scrollWidget._selectRow(
-            self.scrollWidget._selectedRowOffset,
-            next);
+        var index = self.scrollWidget._selectedRowOffset;
 
-        self.scrollWidget.scrolled();
+        if(!next) {
+            next = self.scrollWidget._selectedRow.previousSibling;
+            index--;
+        }
+
+        self.scrollWidget.removeCurrentRow();
+        if(next.tagName) {
+            self.scrollWidget._selectRow(index, next);
+            self.scrollWidget.scrolled();
+        }
 
         self.messageDetail.style.opacity = .2;
         self.callRemote.apply(self, remoteArgs).addCallback(
