@@ -21,6 +21,8 @@ from vertex import sslverify
 
 from axiom import item, attributes, userbase, scheduler, batch
 
+from xmantissa.stats import BandwidthMeasuringFactory
+
 from xquotient import iquotient, exmess, mimestorage
 
 MessageSource = batch.processor(exmess.Message)
@@ -204,7 +206,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, Deliv
             self.factory = policies.TrafficLoggingFactory(self.factory, 'smtp')
 
         if self.portNumber is not None:
-            self.port = reactor.listenTCP(self.portNumber, self.factory)
+            self.port = reactor.listenTCP(self.portNumber, BandwidthMeasuringFactory(self.factory, 'smtp'))
 
         if self.securePortNumber is not None and self.certificateFile is not None:
             cert = sslverify.PrivateCertificate.loadPEM(file(self.certificateFile).read())
@@ -213,7 +215,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, Deliv
                 cert.original,
                 requireCertificate=False,
                 method=SSL.SSLv23_METHOD)
-            self.securePort = reactor.listenSSL(self.securePortNumber, self.factory, certOpts)
+            self.securePort = reactor.listenSSL(self.securePortNumber, BandwidthMeasuringFactory(self.factory, 'smtps'), certOpts)
 
     def stopService(self):
         L = []

@@ -10,6 +10,8 @@ from twisted.internet import defer, reactor, protocol
 from twisted.protocols import policies
 from twisted.cred import portal, checkers
 
+from xmantissa.stats import BandwidthMeasuringFactory
+
 from xquotient.exmess import Message
 
 from vertex import sslverify
@@ -235,7 +237,7 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
             self.factory = policies.TrafficLoggingFactory(self.factory, 'pop3')
 
         if self.portNumber is not None:
-            self.port = reactor.listenTCP(self.portNumber, self.factory)
+            self.port = reactor.listenTCP(self.portNumber, BandwidthMeasuringFactory(self.factory, 'pop3'))
 
         if self.securePortNumber is not None and self.certificateFile is not None:
             cert = sslverify.PrivateCertificate.loadPEM(file(self.certificateFile).read())
@@ -244,7 +246,7 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
                 cert.original,
                 requireCertificate=False,
                 method=SSL.SSLv23_METHOD)
-            self.securePort = reactor.listenSSL(self.securePortNumber, self.factory, certOpts)
+            self.securePort = reactor.listenSSL(self.securePortNumber, BandwidthMeasuringFactory(self.factory, 'pop3s'), certOpts)
 
     def stopService(self):
         L = []

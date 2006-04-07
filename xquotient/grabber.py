@@ -15,6 +15,7 @@ from epsilon import descriptor, extime
 from axiom import item, attributes, scheduler, iaxiom
 
 from xmantissa import ixmantissa, webapp, webtheme, liveform, tdb, tdbview
+from xmantissa.stats import BandwidthMeasuringFactory
 
 from xquotient import mail
 
@@ -257,7 +258,7 @@ class POP3Grabber(item.Item):
                 'pop3client-%d-%f' % (self.storeID, time.time()))
 
         self.status.setStatus(u"Connecting to %s:%d..." % (self.domain, port))
-        connect(self.domain, port, factory)
+        connect(self.domain, port, BandwidthMeasuringFactory(factory, 'pop3-grabber'))
 
 
     def run(self):
