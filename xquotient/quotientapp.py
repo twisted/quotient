@@ -7,7 +7,7 @@ from axiom import attributes, scheduler
 
 from xmantissa import website, webapp, ixmantissa, people, prefs, search
 
-from xquotient import inbox, exmess, mail, gallery, qpeople, extract
+from xquotient import inbox, exmess, mail, gallery, qpeople, extract, spam
 from xquotient.grabber import GrabberConfiguration
 from xquotient.indexinghelp import SyncIndexer
 
@@ -89,8 +89,12 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
         avatar.findOrCreate(website.WebSite).installOn(avatar)
         avatar.findOrCreate(webapp.PrivateApplication).installOn(avatar)
+
         avatar.findOrCreate(mail.DeliveryAgent).installOn(avatar)
         avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
+
+        avatar.findOrCreate(spam.Filter).installOn(avatar)
+
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
 
         avatar.findOrCreate(inbox.Inbox).installOn(avatar)
@@ -231,7 +235,18 @@ class QuotientPreferenceCollection(Item, InstallableMixin):
         setattr(self, pref.key, value)
 
     def getSections(self):
-        gconf = self.store.findUnique(GrabberConfiguration, default=None)
-        if gconf is None:
-            return None
-        return [gconf]
+        # XXX This is wrong because it is backwards.  This class cannot be
+        # responsible for looking for every item that might exist in the
+        # database and want to provide configuration, because plugins make it
+        # impossible for this class to ever have a complete list of such items.
+        # Instead, items need to act as plugins for something so that there
+        # mere existence in the database causes them to show up for
+        # configuration.
+        sections = []
+        for cls in GrabberConfiguration, spam.Filter:
+            item = self.store.findUnique(cls, default=None)
+            if item is not None:
+                sections.append(item)
+        if sections:
+            return sections
+        return None

@@ -16,6 +16,40 @@ class IMIMEDelivery(Interface):
 
 
 
+class IHamFilter(Interface):
+    """
+    Plugin for scoring messages based on their spaminess.
+    """
+
+    def score(message):
+        """
+        Score a message from [0.0..1.0]: lower is spammier.
+
+        @type message: L{xquotient.exmess.Message}
+        @param message: The message to score.
+        """
+
+
+    def train(spam, message):
+        """
+        Learn.
+
+        @type spam: C{bool}
+        @param spam: A flag indicating whether to train the given message as
+        spam or ham.
+
+        @type message: L{xquotient.exmess.Message}
+        @param message: The message to train.
+        """
+
+
+    def forgetTraining():
+        """
+        Lose all stored training information.
+        """
+
+
+
 class IFilteringRule(Interface):
     """
     Defines a particular rule which defines items as either belonging to a

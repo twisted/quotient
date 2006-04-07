@@ -75,11 +75,11 @@ class EmailAddress(object):
         else:
             decode = lambda h: h
 
-        self.display = ' '.join(decode(display).split())
+        self.display = u' '.join(decode(display).split())
         self.email = emailaddress.lower()
 
         # This could be smarter (also, correct, perhaps) someday.
-        if '@' in self.email:
+        if u'@' in self.email:
             self.localpart, self.domain = self.email.split('@', 1)
         else:
             self.localpart, self.domain = self.email, ''

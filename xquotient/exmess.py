@@ -8,7 +8,7 @@ from twisted.python.util import sibpath
 from nevow import rend, inevow, tags, athena
 
 from axiom.tags import Catalog
-from axiom import item, attributes
+from axiom import item, attributes, batch
 
 from xmantissa import ixmantissa, website, people
 from xmantissa.publicresource import getLoader
@@ -30,6 +30,19 @@ def mimeTypeToIcon(mtype,
     if path.exists(localpath):
         return webIconPath + '/' + lastpart
     return defaultIconPath
+
+
+class _TrainingInstruction(item.Item):
+    """
+    Represents a single user-supplied instruction to teach the spam classifier
+    something.
+    """
+    message = attributes.reference()
+    spam = attributes.boolean()
+
+
+_TrainingInstructionSource = batch.processor(_TrainingInstruction)
+
 
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
@@ -60,6 +73,24 @@ class Message(item.Item):
     outgoing = attributes.boolean(default=False)
     draft = attributes.boolean(default=False)
 
+    spam = attributes.boolean(doc="""
+
+    Indicates whether this message has been automatically classified as spam.
+    This will be None until the message is analyzed by a content-based
+    filtering agent; however, application code should always be manipulating
+    messages after that step, so it is generally not something you have to deal
+    with (you may assume it is True or False).
+
+    """, default=None)
+
+    trained = attributes.boolean(doc="""
+
+    Indicates whether the user has explicitly informed us that this is spam or
+    ham.  If True, L{spam} is what the user told us (and so it should never be
+    changed automatically).
+
+    """, default=False, allowNone=False)
+
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()
@@ -88,6 +119,19 @@ class Message(item.Item):
 
     def getAttachment(self, partID):
         return self.impl.getAttachment(partID)
+
+
+    def train(self, spam):
+        if self.trained:
+            if self.spam == spam:
+                return
+            self.spam = spam
+        else:
+            self.trained = True
+            self.spam = spam
+        _TrainingInstruction(store=self.store, message=self, spam=spam)
+
+
 
 class Correspondent(item.Item):
     typeName = 'quotient_correspondent'

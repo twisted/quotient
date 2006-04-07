@@ -174,7 +174,19 @@ Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Con
 Quotient.Mailbox.Controller.methods(
     function __init__(self, node, messageCount, complexityLevel) {
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
-        
+        self.currentMessageData = null;
+
+        /*
+         * This attribute keeps track of which of the weird message view
+         * settings is currently selected.  Currently, the server renders the
+         * initially selected view as Inbox.  If that changes, this code will
+         * need to be updated.
+         *
+         * Hopefully, this will all be thrown away before too long, though,
+         * because it is stupid.
+         */
+        self._viewingByView = 'Inbox';
+
         var contentTable = self.firstNodeByAttribute("class", "content-table");
         var tbody = contentTable.getElementsByTagName("tbody")[0];
         self.contentTableRows = [];
@@ -337,7 +349,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _chooseViewParameter(self, viewFunction, n, catchAll /* = true */) {
-        if(typeof(catchAll) == 'undefined') {
+        if (catchAll == undefined) {
             catchAll = true;
         }
 
@@ -370,21 +382,54 @@ Quotient.Mailbox.Controller.methods(
         n.className = "selected-list-option";
     },
 
+    /**
+     * Select a new tag from which to display messages.  Adjust local state to
+     * indicate which tag is being viewed and, if necessary, ask the server
+     * for the messages to display.
+     *
+     * @param n: The node which this input handler is attached to.
+     * @return: C{undefined}
+     */
     function chooseTag(self, n) {
         self._selectListOption(n);
         return self._chooseViewParameter('viewByTag', n);
     },
 
+    /**
+     * Select a new, semantically random set of messages to display.  Adjust
+     * local state to indicate which random crap is being viewed and, if
+     * necessary, ask the server for the messages to display.
+     *
+     * @param n: The node which this input handler is attached to.
+     * @return: C{undefined}
+     */
     function chooseMailView(self, n) {
+        self._viewingByView = n.firstChild.firstChild.nodeValue;
         self._selectListOption(n);
         self._chooseViewParameter('viewByMailType', n, false);
     },
-        
+
+    /**
+     * Select a new account, the messages from which to display.  Adjust local
+     * state to indicate which account's messages are being viewed and, if
+     * necessary, ask the server for the messages to display.
+     *
+     * @param n: The node which this input handler is attached to.
+     * @return: C{undefined}
+     */
     function chooseAccount(self, n) {
         self._selectListOption(n);
         return self._chooseViewParameter('viewByAccount', n);
     },
 
+    /**
+     * Select a new person, the messages from which to display.  Adjust local
+     * state to indicate which person's messages are being viewed and, if
+     * necessary, ask the server for the messages to display.
+     *
+     * @param n: The node which this input handler is attached to.
+     * @return: C{undefined}
+     */
     function choosePerson(self, n) {
         var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
         self._selectListOption(n);
@@ -428,8 +473,27 @@ Quotient.Mailbox.Controller.methods(
         sw._selectRow(offset, elementFactory());
     },
 
+    /**
+     * Tell the server to perform some action on the currently visible
+     * message.
+     *
+     * @param action: A string describing the action to be performed.  One of::
+     *
+     *     "archive"
+     *     "delete"
+     *     "defer"
+     *     "replyTo"
+     *     "train"
+     *
+     * @param isProgress: A boolean indicating whether the message will be
+     * removed from the current message list and the progress bar updated to
+     * reflect this.
+     *
+     * @return: C{undefined}
+     */
     function touch(self, action, isProgress) {
         var remoteArgs = [action + "CurrentMessage"];
+        remoteArgs.push(isProgress);
         for(var i = 3; i < arguments.length; i++) {
             remoteArgs.push(arguments[i]);
         }
@@ -441,7 +505,10 @@ Quotient.Mailbox.Controller.methods(
             index--;
         }
 
-        self.scrollWidget.removeCurrentRow();
+        if (isProgress) {
+            self.scrollWidget.removeCurrentRow();
+        }
+
         if(next.tagName) {
             self.scrollWidget._selectRow(index, next);
             self.scrollWidget.scrolled();
@@ -491,11 +558,16 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function archiveThis(self, n) {
-        self.touch("archive", true);
+        /*
+         * Archived messages show up in the "All" view.  So, if we are in any
+         * view other than that, this action should make the message
+         * disappear.
+         */
+        self.touch("archive", self._viewingByView != "All");
     },
 
     function deleteThis(self, n) {
-        self.touch("delete", true);
+        self.touch("delete", self._viewingByView != "Trash");
     },
 
     function showDeferForm(self) {
@@ -533,7 +605,7 @@ Quotient.Mailbox.Controller.methods(
         }
         self.touch.apply(self, ["defer", true].concat(args));
     },
-        
+
     function deferThis(self) {
         var days = parseInt(self.deferForm.days.value);
         var hours = parseInt(self.deferForm.hours.value);
@@ -543,11 +615,38 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function replyToThis(self, n) {
+        /*
+         * This brings up a composey widget thing.  When you *send* that
+         * message (or save it as a draft or whatever, I suppose), *then* this
+         * action is considered to have been taken, and the message should be
+         * archived and possibly removed from the view.  But nothing happens
+         * *here*.
+         */
         self.touch("replyTo", false);
     },
 
     function forwardThis(self, n) {
+        /*
+         * See replyToThis
+         */
         self.touch("forward", false);
+    },
+
+
+    function trainSpam(self) {
+        self.touch(
+            "train",
+            (self._viewingByView != "Spam"),
+            true);
+        return false;
+    },
+
+    function trainHam(self) {
+        self.touch(
+            "train",
+            (self._viewingByView == "Spam"),
+            false);
+        return false;
     },
 
     function intermingle(self, string, regex, transformation) {
@@ -622,24 +721,58 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    function setMessageContent(self, data, msg) {
-        /* data = [html for next msg preview, html for curmsg] */
+    function setMessageContent(self, data, isMessage) {
+        /* @param data: Three-Array of the html for next message preview, the
+         * html for the current message, and some structured data describing
+         * the current message (if isMessage is true)
+         *
+         * @param isMessage: Boolean indicating whether a message is actually
+         * being displayed (???).
+         */
+        var nextMessagePreview = data.shift();
+        var currentMessageDisplay = data.shift();
+        var currentMessageData = data.shift();
+
+        self.currentMessageData = currentMessageData;
+
+        Divmod.msg("setMessageContent(" + currentMessageData.toSource() + ")");
+
         var n;
-        if(msg) {
+        if (isMessage) {
             n = self.messageDetail;
         } else {
             n = self.inboxContainer;
         }
+
         Divmod.Runtime.theRuntime.setNodeContent(
-            n, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[1] + '</div>');
-        if(data[0] != null) {
+            n, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
+
+        var isItSpam, spamConfidence;
+        if (currentMessageData.spam) {
+            isItSpam = 'spam';
+        } else {
+            isItSpam = 'not spam';
+        }
+        if (currentMessageData.trained) {
+            spamConfidence = 'definitely';
+        } else {
+            spamConfidence = 'probably';
+        }
+
+        var spambutton = self.nodeByAttribute('class', 'spam-state');
+        Divmod.Runtime.theRuntime.setNodeContent(spambutton,
+                                                 '<span xmlns="http://www.w3.org/1999/xhtml">' +
+                                                 spamConfidence + ' ' + isItSpam +
+                                                 '</span>');
+
+        if (nextMessagePreview != null) {
             if(!self.nextMessagePreview) {
                 self.nextMessagePreview = self.firstWithClass("next-message-preview",
                                                               self.contentTableRows[0]);
             }
             /* so this is a message, not a compose fragment */
             Divmod.Runtime.theRuntime.setNodeContent(
-                self.nextMessagePreview, '<div xmlns="http://www.w3.org/1999/xhtml">' + data[0] + '</div>');
+                self.nextMessagePreview, '<div xmlns="http://www.w3.org/1999/xhtml">' + nextMessagePreview + '</div>');
             self.highlightExtracts();
         }
     })

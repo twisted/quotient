@@ -10,7 +10,7 @@ from xquotient.quotientapp import (QuotientBenefactor,
                                    QuotientPeopleBenefactor)
 
 from xquotient.quotienttheme import QuotientTheme
-from xquotient import mail, grabber, compose, popout, publicpage, filter
+from xquotient import mail, grabber, compose, popout, publicpage, filter, spam
 from twisted.mail.pop3 import IMailbox
 from twisted.mail.smtp import IMessageDelivery
 
@@ -57,6 +57,13 @@ quotientPeopleBenefactorFactory = provisioning.BenefactorFactory(
     description = u'Per-person Image/Extract/Picture lists',
     benefactorClass = QuotientPeopleBenefactor)
 
+spambayesFilteringBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Spambayes-based trainable Ham/Spam Filtering',
+    description = u'Filtering of messages based on a bayesian classification with per-user training information.',
+    benefactorClass = spam.SpambayesBenefactor,
+    dependencies = [quotientBenefactorFactory])
+
+
 plugin = offering.Offering(
     name = u'Quotient',
 
@@ -74,6 +81,7 @@ plugin = offering.Offering(
     appPowerups = (publicpage.QuotientPublicPage,),
 
     benefactorFactories = [quotientBenefactorFactory,
+                           spambayesFilteringBenefactorFactory,
                            extractBenefactorFactory,
                            indexingBenefactorFactory,
                            grabberBenefactorFactory,

@@ -422,26 +422,6 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
 
         self.message.source = self.source
 
-        #for (relation, address) in ((u'sender', self.message.sender),
-        #                            (u'recipient', self.message.recipient)):
-
-        #    if address is not None and 0 < len(address):
-        #        exmess.Correspondent(store=self.store,
-        #                             message=self.message,
-        #                             relation=relation,
-        #                             address=address)
-
-        #try:
-        #    copied = self.part.getHeader(u'cc')
-        #except equotient.NoSuchHeader:
-        #    pass
-        #else:
-        #    for address in mimeutil.parseEmailAddresses(copied):
-        #        exmess.Correspondent(store=self.store,
-        #                             message=self.message,
-        #                             relation=u'copy',
-        #                             address=unicode(address.email))
-
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
     messageDone = item.transacted(messageDone)

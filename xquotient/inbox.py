@@ -93,7 +93,7 @@ class Archive(Item, InstallableMixin):
 def archiveScreen(archiveItem):
     inbox = archiveItem.store.findUnique(Inbox)
     inboxScreen = ixmantissa.INavigableFragment(inbox)
-    inboxScreen.inArchiveView = True
+    inboxScreen.inAllView = True
     return inboxScreen
 
 registerAdapter(archiveScreen, Archive, ixmantissa.INavigableFragment)
@@ -118,7 +118,7 @@ class SentMail(Item, InstallableMixin):
 def sentMailScreen(sentMailItem):
     inbox = sentMailItem.store.findUnique(Inbox)
     inboxScreen = ixmantissa.INavigableFragment(inbox)
-    inboxScreen.inSentMailView = True
+    inboxScreen.inSentView = True
     return inboxScreen
 
 registerAdapter(sentMailScreen, SentMail, ixmantissa.INavigableFragment)
@@ -181,9 +181,10 @@ class InboxScreen(athena.LiveFragment):
     title = ''
     jsClass = 'Quotient.Mailbox.Controller'
 
-    inArchiveView = False
+    inAllView = False
     inTrashView = False
-    inSentMailView = False
+    inSentView = False
+    inSpamView = False
     currentMessage = None
 
     viewingByTag = None
@@ -197,6 +198,7 @@ class InboxScreen(athena.LiveFragment):
                                   deferCurrentMessage=True,
                                   replyToCurrentMessage=True,
                                   forwardCurrentMessage=True,
+                                  trainCurrentMessage=True,
                                   getMessageCount=True,
 
                                   fastForward=True,
@@ -249,8 +251,31 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessageDetail = f
         return f
 
+    def _currentMessageData(self):
+        if self.currentMessage is not None:
+            return {
+                u'spam': self.currentMessage.spam,
+                u'trained': self.currentMessage.trained,
+                }
+        return {}
+
     def render_messageDetail(self, ctx, data):
         return self._currentAsFragment()
+
+
+    def render_spamState(self, ctx, data):
+        if self.currentMessage is None:
+            return ctx.tag['????']
+        if self.currentMessage.spam:
+            spam = 'spam'
+        else:
+            spam = 'not spam'
+        if self.currentMessage.trained:
+            confidence = 'definitely'
+        else:
+            confidence = 'probably'
+        return ctx.tag[confidence, ' ', spam]
+
 
     def render_addPersonFragment(self, ctx, data):
         # the person form is a fair amount of html,
@@ -320,16 +345,17 @@ class InboxScreen(athena.LiveFragment):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = [((not (self.inArchiveView or
-                        self.inTrashView or
-                        self.inSentMailView)), 'Inbox'),
-                 (self.inArchiveView, 'All'),
+        views = [(self.inAllView, 'All'),
                  (self.inTrashView, 'Trash'),
-                 (self.inSentMailView, 'Sent')]
+                 (self.inSentView, 'Sent'),
+                 (self.inSpamView, 'Spam'),
+                 (True, 'Inbox')]
 
+        found = False
         for (truth, view) in views:
-            if truth:
+            if not found and truth:
                 p = selectedOption
+                found = True
             else:
                 p = option
             select[p().fillSlots('mailViewName', view)]
@@ -419,17 +445,10 @@ class InboxScreen(athena.LiveFragment):
         return (self.getMessageCount(), self._current())
 
     def viewByMailType(self, typ):
-        if typ == 'Inbox':
-            self.inArchiveView = self.inTrashView = self.inSentMailView = False
-        elif typ == 'All':
-            self.inArchiveView = True
-            self.inTrashView = self.inSentMailView = False
-        elif typ == 'Sent':
-            self.inSentMailView = True
-            self.inTrashView = self.inArchiveView = False
-        elif typ == 'Trash':
-            self.inTrashView = True
-            self.inArchiveView = self.inSentMailView = False
+        self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = False
+        attr = 'in' + typ + 'View'
+        if hasattr(self, attr):
+            setattr(self, attr, True)
 
         self._resetCurrentMessage()
         self._resetScrollQuery()
@@ -452,7 +471,8 @@ class InboxScreen(athena.LiveFragment):
 
     def _current(self):
         return (self._squish(self._nextMessagePreview()),
-                self._squish(self._currentAsFragment()))
+                self._squish(self._currentAsFragment()),
+                self._currentMessageData())
 
     def _moveToNextMessage(self):
         previousMessage = self.currentMessage
@@ -465,23 +485,25 @@ class InboxScreen(athena.LiveFragment):
             self.currentMessage = self._getNextMessage(before=previousMessage.receivedWhen)
             self.nextMessage = None
 
-    def deleteCurrentMessage(self):
+    def _progressOrDont(self, advance):
+        if advance:
+            self._moveToNextMessage()
+        return self._current()
+
+    def deleteCurrentMessage(self, advance):
         self.currentMessage.deleted = True
-        self._moveToNextMessage()
-        return self._current()
+        return self._progressOrDont(advance)
 
-    def archiveCurrentMessage(self):
+    def archiveCurrentMessage(self, advance):
         self.currentMessage.archived = True
-        self._moveToNextMessage()
-        return self._current()
+        return self._progressOrDont(advance)
 
-    def deferCurrentMessage(self, days, hours, minutes):
+    def deferCurrentMessage(self, advance, days, hours, minutes):
         self.currentMessage.receivedWhen = Time() + timedelta(days=days,
                                                               hours=hours,
                                                               minutes=minutes)
         self.currentMessage.read = False
-        self._moveToNextMessage()
-        return self._current()
+        return self._progressOrDont(advance)
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)
@@ -495,7 +517,7 @@ class InboxScreen(athena.LiveFragment):
 
         return (None, unicode(flatten(cf), 'utf-8'))
 
-    def replyToCurrentMessage(self):
+    def replyToCurrentMessage(self, advance):
         curmsg = self.currentMessage
 
         if curmsg.sender is not None:
@@ -514,7 +536,7 @@ class InboxScreen(athena.LiveFragment):
                                       reSubject(curmsg),
                                       '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
 
-    def forwardCurrentMessage(self):
+    def forwardCurrentMessage(self, advance):
         curmsg = self.currentMessage
 
         reply = ['\nBegin forwarded message:\n']
@@ -532,15 +554,36 @@ class InboxScreen(athena.LiveFragment):
                                       '\n\n' + '\n> '.join(reply),
                                       self.currentMessageDetail.attachmentParts)
 
+    def trainCurrentMessage(self, advance, spam):
+        self.currentMessage.train(spam)
+        return self._progressOrDont(advance)
+
     def _getBaseComparison(self):
         # the only mutually exclusive views are "show read" and archive/trash,
         # so you could look at all messages in trash, tagged with "boring"
         # sent by the Person with name "Joe" or whatever
-        comparison = attributes.AND(Message.deleted == self.inTrashView,
-                                    Message.outgoing == self.inSentMailView,
-                                    Message.receivedWhen < Time(),
-                                    Message.draft == False)
-        if not self.inArchiveView:
+        comparison = attributes.AND(
+            Message.deleted == self.inTrashView,
+            Message.outgoing == self.inSentView,
+
+            # Note - Message.spam defaults to None, and inSpamView will
+            # always be either True or False.  This means messages which
+            # haven't been processed by the spam filtering system will never
+            # show up in any query!  Is this a problem?  It depends how
+            # responsive the spam filtering system ends up being, I suppose. 
+            # Currently, it should be fast enough so as not to make much of
+            # a difference, but that may not always be the case.  However,
+            # ultimately we are going to need to support updating messages
+            # views without doing a complete page re-load, at which point
+            # delivered but unfiltered messages will just show up on the
+            # page, which should result in this minor inequity being more or
+            # less irrelevant.
+            Message.spam == self.inSpamView,
+
+            Message.draft == False,
+            Message.receivedWhen < Time())
+
+        if not (self.inAllView or self.inTrashView or self.inSpamView):
             comparison = attributes.AND(comparison, Message.archived == False)
 
         if self.viewingByTag is not None:
@@ -560,7 +603,7 @@ class InboxScreen(athena.LiveFragment):
                 people.EmailAddress.person == people.Person.storeID,
                 people.Person.storeID == self.viewingByPerson.storeID)
 
-        if not self.showRead and not (self.inArchiveView or self.inTrashView):
+        if not self.showRead and not (self.inAllView or self.inTrashView):
             comparison = attributes.AND(comparison,
                                         Message.read == False)
         return comparison

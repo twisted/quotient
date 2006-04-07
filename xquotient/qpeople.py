@@ -9,8 +9,41 @@ from xmantissa import tdb, tdbview, ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, extract
-from xquotient.exmess import Message
+from xquotient import gallery, extract, compose, mail, exmess, equotient, mimeutil
+
+class CorrespondentExtractor(Item, InstallableMixin):
+    """
+    Creates items based on the people involved with particular messages.
+    """
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(CorrespondentExtractor, self).installOn(other)
+        self.store.findUnique(mail.MessageSource).addReliableListener(self)
+
+
+    def processItem(self, item):
+        for (relation, address) in ((u'sender', item.sender),
+                                    (u'recipient', item.recipient)):
+
+            if address:
+                exmess.Correspondent(store=self.store,
+                                     message=item,
+                                     relation=relation,
+                                     address=address)
+
+        try:
+            copied = item.impl.getHeader(u'cc')
+        except equotient.NoSuchHeader:
+            pass
+        else:
+            for address in mimeutil.parseEmailAddresses(copied, mimeEncoded=False):
+                exmess.Correspondent(store=self.store,
+                                     message=item,
+                                     relation=u'copy',
+                                     address=address.email)
+
+
 
 class LinkToColumnView(tdbview.ColumnViewBase):
     translator = None
@@ -65,14 +98,14 @@ class MessageList(tdbview.TabularDataView):
         self.prefs = ixmantissa.IPreferenceAggregator(person.store)
 
         comparison = attributes.AND(
-                Message.sender == people.EmailAddress.address,
+                exmess.Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == person)
 
         tdm = tdb.TabularDataModel(
                 person.store,
-                Message, (Message.sender,
-                          Message.subject,
-                          Message.sentWhen),
+                exmess.Message, (exmess.Message.sender,
+                                 exmess.Message.subject,
+                                 exmess.Message.sentWhen),
                 baseComparison=comparison,
                 defaultSortColumn='sentWhen',
                 defaultSortAscending=False,
@@ -103,8 +136,8 @@ class ImageList(gallery.GalleryScreen):
 
     def _getComparison(self):
         return attributes.AND(
-                gallery.Image.message == Message.storeID,
-                Message.sender == people.EmailAddress.address,
+                gallery.Image.message == exmess.Message.storeID,
+                exmess.Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == self.person)
 
 class ExtractViewer(tdbview.TabularDataView):
@@ -162,8 +195,8 @@ class ExtractList(athena.LiveFragment):
     def _getComparison(self, extractType):
         # this could be optimized
         return attributes.AND(
-                  extractType.message == Message.storeID,
-                  Message.sender == people.EmailAddress.address,
+                  extractType.message == exmess.Message.storeID,
+                  exmess.Message.sender == people.EmailAddress.address,
                   people.EmailAddress.person == self.person)
 
     def _makeExtractTDB(self, extractType, itemsCalled):

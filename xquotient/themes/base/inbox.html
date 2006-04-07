@@ -1,4 +1,6 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment">
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+     xmlns:athena="http://divmod.org/ns/nevow/0.7"
+     nevow:render="liveFragment">
 
   <div class="loading">
     <h1>Loading...</h1>
@@ -182,6 +184,21 @@
                     reply
                   </a>
                 </nevow:invisible>
+                <span style="float: right;">
+                  <nevow:invisible nevow:render="button">
+                    <span class="spam-state" nevow:render="spamState" />
+                  </nevow:invisible>
+                </span>
+                <span style="float: right;">
+                  <nevow:invisible nevow:render="button">
+                    <a href="#"><athena:handler event="onclick" handler="trainSpam" />Train As Spam</a>
+                  </nevow:invisible>
+                </span>
+                <span style="float: right;">
+                  <nevow:invisible nevow:render="button">
+                    <a href="#"><athena:handler event="onclick" handler="trainHam" />Train As Clean</a>
+                  </nevow:invisible>
+                </span>
                 <div style="height: 2px; clear: both">&#160;</div>
                 <form style="display: none" class="defer-form"
                   onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
