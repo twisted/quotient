@@ -53,8 +53,8 @@ Quotient.Common.Util.normalizeTag = function(tag) {
 Quotient.Common.Util.resizeIFrame = function(frame) {
     // Code is from http://www.ozoneasylum.com/9671&latestPost=true
     try {
-        innerDoc = (frame.contentDocument) ? frame.contentDocument : frame.contentWindow.document;
-        objToResize = (frame.style) ? frame.style : frame;
+        var innerDoc = (frame.contentDocument) ? frame.contentDocument : frame.contentWindow.document;
+        var objToResize = (frame.style) ? frame.style : frame;
         objToResize.height = innerDoc.body.scrollHeight + 20 + 'px';
         objToResize.width = innerDoc.body.scrollWidth + 5 + 'px';
     }
