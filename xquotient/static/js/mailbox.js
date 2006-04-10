@@ -407,6 +407,10 @@ Quotient.Mailbox.Controller.methods(
         if (catchAll && value == 'All') {
             value = null;
         }
+        self._sendViewRequest(viewFunction, value);
+    },
+
+    function _sendViewRequest(self, viewFunction, value) {
         self.callRemote(viewFunction, value).addCallback(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
@@ -484,6 +488,37 @@ Quotient.Mailbox.Controller.methods(
         var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
         self._selectListOption(n);
         return self._chooseViewParameter('viewByPerson', keyn);
+    },
+
+    function viewShortcut(self, n) {
+        var type = n.firstChild.nodeValue;
+        self._sendViewRequest('viewByMailType', type);
+
+        var e;
+        for(var i = 0; i < n.parentNode.childNodes.length; i++) {
+            e = n.parentNode.childNodes[i];
+            if(e.className == "selected-view-shortcut") {
+                e.className = "view-shortcut";
+            }
+        }
+        n.className = "selected-view-shortcut";
+
+        /* make sure the right thing is selected in the full views browser */
+
+        var mailViewPane = self.firstWithClass("view-pane-content",
+                                               self.viewsContainer);
+        var mailViewBody = self.firstWithClass("pane-body",
+                                               mailViewPane);
+        mailViewBody = mailViewBody.getElementsByTagName("div")[0];
+
+        for(i = 0; i < mailViewBody.childNodes.length; i++) {
+            e = mailViewBody.childNodes[i];
+            if(e.tagName && e.firstChild.firstChild.nodeValue ==  type) {
+                self._selectListOption(e);
+                break;
+            }
+        }
+        n.blur();
     },
 
     function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {

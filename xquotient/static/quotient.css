@@ -123,6 +123,10 @@ table.button {
     clear: right;
 }
 
+.selected-view-shortcut {
+    font-weight: bold;
+}
+
 .view-pane-tl, .masthead-bl {
     float: left;
     clear: left;
