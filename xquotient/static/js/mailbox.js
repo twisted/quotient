@@ -25,9 +25,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.node.style.width = '300px';
         self.node.style.border = "";
         self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #336699";
-        var ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
+        self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
+        self.resized();
+    },
+
+    function resized(self) {
         var pageHeight = document.documentElement.clientHeight;
-        self._scrollViewport.style.height = pageHeight - ypos - 14 + "px";
+        self._scrollViewport.style.height = (pageHeight - self.ypos - 14) + "px";
     },
 
     function _createRowHeaders(self, columnNames) {
@@ -173,6 +177,11 @@ Quotient.Mailbox.ScrollingWidget.methods(
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function __init__(self, node, messageCount, complexityLevel) {
+        MochiKit.DOM.addToCallStack(window, "onresize",
+            function() {
+                self.resized(false);
+            }, false);
+
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
         self.currentMessageData = null;
 
@@ -201,12 +210,10 @@ Quotient.Mailbox.Controller.methods(
 
         self.messageDetail = self.firstWithClass("message-detail",
                                                  self.contentTableRows[1]);
-        var mastheadBottom = self.firstWithClass("masthead-bottom",
-                                                 self.contentTableRows[2]);
+        self.mastheadBottom = self.firstWithClass("masthead-bottom",
+                                                  self.contentTableRows[2]);
 
-        var ypos = Quotient.Common.Util.findPosY(self.messageDetail);
-        var pageHeight = document.documentElement.clientHeight;
-        self.messageDetail.style.height = pageHeight - ypos - 15 - mastheadBottom.clientHeight + "px";
+        self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
 
         var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.contentTableRows[1],
                                                            "athena:class",
@@ -214,8 +221,7 @@ Quotient.Mailbox.Controller.methods(
 
         self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
-        self.scrollWidget._scrollViewport.style.height = 
-            parseInt(self.scrollWidget._scrollViewport.style.height) - mastheadBottom.clientHeight + "px";
+        self.resized(true);
 
         self._selectAndFetchRow(0, function() { return null });
 
@@ -251,6 +257,49 @@ Quotient.Mailbox.Controller.methods(
                 }, 1);
             }
         }
+    },
+
+    /* resize the inbox table and contents.
+     * @param initialResize: is this the first/initial resize? 
+     *                       (if so, then our layout constraint jiggery-pokery
+     *                        is not necessary)
+     */
+
+    function resized(self, initialResize) {
+        if(!initialResize) {
+            self.scrollWidget.resized();
+        }
+        self.scrollWidget._scrollViewport.style.height = 
+            (parseInt(self.scrollWidget._scrollViewport.style.height) - self.mastheadBottom.clientHeight) + "px";
+        var pageHeight = document.documentElement.clientHeight;
+        self.messageDetail.style.height = (pageHeight - self.ypos - 15 - self.mastheadBottom.clientHeight) + "px";
+        var pos = self.scrolltableContainer.style.position;
+
+        if(initialResize) {
+            return;
+        }
+
+        if(self.complexityLevel == undefined) {
+            self.complexityLevel = 1;
+        }
+        var complexityLevel = self.complexityLevel;
+        var newComplexityLevel = complexityLevel + 1;
+        if(newComplexityLevel == 4) {
+            newComplexityLevel = 1;
+        }
+        /* so this kind of sucks.  what happens is that changing the
+         * height of the elements in the middle row results in a bunch
+         * of whitespace underneath, because the y position of the
+         * bottom row isn't recalculated for some reason.  once the
+         * browser is jogged a little bit, it recalculates the position
+         * fine.  changing the complexity setting to something different,
+         * and then changing it back after a token delay seems to be the
+         * easiest way to do this */
+
+        self._setComplexityVisibility(newComplexityLevel);
+        setTimeout(function() {
+            self._setComplexityVisibility(complexityLevel)
+            }, 1);
     },
 
     function finishedLoading(self) {
@@ -297,6 +346,7 @@ Quotient.Mailbox.Controller.methods(
         }
 
         self._setComplexityVisibility(level);
+        self.complexityLevel = level;
 
         if(report) {
             self.callRemote("setComplexity", level);
