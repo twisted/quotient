@@ -174,10 +174,10 @@ class PartDisplayer(rend.Page):
 
         if 'withfilename' in request.args:
             try:
-                request.setHeader('content-disposition',
-                                    self.part.getHeader(u'content-disposition').encode('ascii'))
+                h = self.part.getHeader(u'content-disposition').encode('ascii')
             except equotient.NoSuchHeader:
-                pass
+                h = 'filename=No-Name'
+            request.setHeader('content-disposition', h)
 
         return content
 
@@ -274,10 +274,18 @@ class MessageDetail(athena.LiveFragment):
     def render_attachmentPanel(self, ctx, data):
         patterns = list()
         for attachment in self.attachmentParts:
-            p = dictFillSlots(self.patterns['attachment'],
-                                        dict(filename=attachment.filename,
-                                                icon=mimeTypeToIcon(attachment.type)))
+            data = dict(filename=attachment.filename or 'No Name',
+                        icon=mimeTypeToIcon(attachment.type))
 
+            if 'generic' in data['icon']:
+                ctype = self.patterns['content-type'].fillSlots(
+                                            'type', attachment.type)
+            else:
+                ctype = ''
+
+            data['type'] = ctype
+
+            p = dictFillSlots(self.patterns['attachment'], data)
             location = self._partLink(attachment.part) + '?withfilename=1'
             patterns.append(p.fillSlots('location', str(location)))
 

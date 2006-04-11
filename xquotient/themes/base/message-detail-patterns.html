@@ -18,10 +18,14 @@
     <nevow:attr name="src"><nevow:slot name="location" /></nevow:attr>
   </iframe>
 
+  <nevow:invisible nevow:pattern="content-type">
+    (<i><nevow:slot name="type" /></i>)
+  </nevow:invisible>
+
   <div nevow:pattern="attachment" style="text-align: center">
     <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
     <img border="0"><nevow:attr name="src"><nevow:slot name="icon" /></nevow:attr></img><br />
-      <nevow:slot name="filename" /></a>
+    <nevow:slot name="filename" /> <nevow:slot name="type" /></a>
   </div>
 
   <div style="float: left" nevow:pattern="image-attachment">
