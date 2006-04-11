@@ -69,7 +69,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
             row = self._rows[rowOffset][1];
         }
 
+        row.style.fontWeight = "";
         row.style.backgroundColor = '#FFFFFF';
+
         self._selectedRow = row;
         self._selectedRowOffset = rowOffset;
     },
