@@ -266,15 +266,15 @@ class InboxScreen(athena.LiveFragment):
     def render_spamState(self, ctx, data):
         if self.currentMessage is None:
             return ctx.tag['????']
-        if self.currentMessage.spam:
-            spam = 'spam'
-        else:
-            spam = 'not spam'
         if self.currentMessage.trained:
             confidence = 'definitely'
         else:
             confidence = 'probably'
-        return ctx.tag[confidence, ' ', spam]
+        if self.currentMessage.spam:
+            modifier = ''
+        else:
+            modifier = 'not'
+        return ctx.tag[confidence + ' ' + modifier]
 
 
     def render_addPersonFragment(self, ctx, data):
@@ -559,13 +559,18 @@ class InboxScreen(athena.LiveFragment):
         return self._progressOrDont(advance)
 
     def _getBaseComparison(self):
-        # the only mutually exclusive views are "show read" and archive/trash,
-        # so you could look at all messages in trash, tagged with "boring"
-        # sent by the Person with name "Joe" or whatever
         comparison = attributes.AND(
             Message.deleted == self.inTrashView,
-            Message.outgoing == self.inSentView,
+            Message.draft == False,
+            Message.receivedWhen < Time())
 
+        if not self.inTrashView:
+            comparison = attributes.AND(comparison, Message.outgoing == self.inSentView)
+
+        if not (self.inAllView or self.inTrashView or self.inSpamView):
+            comparison = attributes.AND(comparison, Message.archived == False)
+
+        if not (self.inSentView or self.inTrashView):
             # Note - Message.spam defaults to None, and inSpamView will
             # always be either True or False.  This means messages which
             # haven't been processed by the spam filtering system will never
@@ -578,13 +583,8 @@ class InboxScreen(athena.LiveFragment):
             # delivered but unfiltered messages will just show up on the
             # page, which should result in this minor inequity being more or
             # less irrelevant.
-            Message.spam == self.inSpamView,
+            comparison = attributes.AND(comparison, Message.spam == self.inSpamView)
 
-            Message.draft == False,
-            Message.receivedWhen < Time())
-
-        if not (self.inAllView or self.inTrashView or self.inSpamView):
-            comparison = attributes.AND(comparison, Message.archived == False)
 
         if self.viewingByTag is not None:
             comparison = attributes.AND(
@@ -603,9 +603,6 @@ class InboxScreen(athena.LiveFragment):
                 people.EmailAddress.person == people.Person.storeID,
                 people.Person.storeID == self.viewingByPerson.storeID)
 
-        if not self.showRead and not (self.inAllView or self.inTrashView):
-            comparison = attributes.AND(comparison,
-                                        Message.read == False)
         return comparison
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)

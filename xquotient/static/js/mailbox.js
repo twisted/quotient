@@ -460,6 +460,30 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Return a mapping of view names to mappings of
+     * visibility values to lists of button descriptors
+     */
+    function createVisibilityMatrix(self) {
+        var train_clean = ["train-clean", false];
+        var train_spam  = ["train-spam", false];
+        var delete_ = ["delete", true];
+        var archive = ["archive", true];
+        var defer   = ["defer", true];
+
+        return {
+            Spam:  {show: [train_clean, delete_],
+                    hide: [archive, defer, train_spam]},
+            All:   {show: [train_spam, delete_],
+                    hide: [archive, defer, train_clean]},
+            Inbox: {show: [archive, defer, train_spam, delete_],
+                    hide: [train_clean]},
+            Sent:  {show: [delete_],
+                    hide: [train_clean, train_spam, archive, defer]},
+            Trash: {show: [],
+                    hide: [train_clean, train_spam, archive, defer, delete_]}}
+    },
+
+    /**
      * Select a new, semantically random set of messages to display.  Adjust
      * local state to indicate which random crap is being viewed and, if
      * necessary, ask the server for the messages to display.
@@ -470,7 +494,45 @@ Quotient.Mailbox.Controller.methods(
     function chooseMailView(self, n) {
         self._viewingByView = n.firstChild.firstChild.nodeValue;
         self._selectListOption(n);
+
+        if(!self.visibilityByView) {
+            self.visibilityByView = self.createVisibilityMatrix();
+        }
+
+        var visibilityForThisView = self.visibilityByView[self._viewingByView];
+        self.setDisplayForButtons("",     visibilityForThisView["show"]);
+        self.setDisplayForButtons("none", visibilityForThisView["hide"]);
+
         self._chooseViewParameter('viewByMailType', n, false);
+    },
+
+    /**
+     * Return the node for the named button
+     * 
+     * @param topRow: boolean - from top button row?
+     */
+    function getButton(self, name, topRow) {
+        if(!self.buttons) {
+            self.buttons = {};
+        }
+        if(!([name, topRow] in self.buttons)) {
+            self.buttons[[name, topRow]] = self.firstWithClass(
+                                                    name + "-button",
+                                                    self.messageActions[new Number(!topRow)]);
+        }
+        return self.buttons[[name, topRow]];
+    },
+    
+    /**
+     * Apply display value C{display} to each button identified in C{buttonArgs}
+     * @param buttonArgs: list of [C{name}, C{topRow}] (see signature of L{getButton})
+     */
+    function setDisplayForButtons(self, display, buttonArgs) {
+        var button;
+        for(var i = 0; i < buttonArgs.length; i++) {
+            button = self.getButton.apply(self, buttonArgs[i]);
+            button.style.display = display;
+        }
     },
 
     /**
@@ -842,22 +904,22 @@ Quotient.Mailbox.Controller.methods(
         Divmod.Runtime.theRuntime.setNodeContent(
             n, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
 
-        var isItSpam, spamConfidence;
-        if (currentMessageData.spam) {
-            isItSpam = 'spam';
-        } else {
-            isItSpam = 'not spam';
-        }
+        var modifier, spamConfidence;
         if (currentMessageData.trained) {
             spamConfidence = 'definitely';
         } else {
             spamConfidence = 'probably';
         }
+        if (currentMessageData.spam) {
+            modifier = '';
+        } else {
+            modifier = 'not';
+        }
 
         var spambutton = self.nodeByAttribute('class', 'spam-state');
         Divmod.Runtime.theRuntime.setNodeContent(spambutton,
                                                  '<span xmlns="http://www.w3.org/1999/xhtml">' +
-                                                 spamConfidence + ' ' + isItSpam +
+                                                 spamConfidence + ' ' + modifier +
                                                  '</span>');
 
         if (nextMessagePreview != null) {

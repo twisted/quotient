@@ -167,24 +167,30 @@
               <div class="message-actions" style="visibility: hidden">
                 <!-- button renderer will place the contents of the tag inside the
                 "content" slot of an instance of the "button" template pattern -->
-                <nevow:invisible nevow:render="button">
-                  <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false">
-                    archive
-                  </a>
-                </nevow:invisible>
-                <nevow:invisible nevow:render="button">
-                  <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false">
-                    delete
-                  </a>
-                </nevow:invisible>
-                <select onchange="Quotient.Mailbox.Controller.get(this).defer(this)" class="defer">
-                  <option>Defer</option>
-                  <option>1 hour</option>
-                  <option>12 hours</option>
-                  <option>1 day</option>
-                  <option>1 week</option>
-                  <option>other...</option>
-                </select>
+                <span class="archive-button">
+                  <nevow:invisible nevow:render="button">
+                    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false">
+                      archive
+                    </a>
+                  </nevow:invisible>
+                </span>
+                <span class="delete-button">
+                  <nevow:invisible nevow:render="button">
+                    <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false">
+                      delete
+                    </a>
+                  </nevow:invisible>
+                </span>
+                <span class="defer-button">
+                  <select onchange="Quotient.Mailbox.Controller.get(this).defer(this)" class="defer">
+                    <option>Defer</option>
+                    <option>1 hour</option>
+                    <option>12 hours</option>
+                    <option>1 day</option>
+                    <option>1 week</option>
+                    <option>other...</option>
+                  </select>
+                </span>
                 <nevow:invisible nevow:render="button">
                   <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false">
                     forward
@@ -195,21 +201,6 @@
                     reply
                   </a>
                 </nevow:invisible>
-                <span style="float: right;">
-                  <nevow:invisible nevow:render="button">
-                    <span class="spam-state" nevow:render="spamState" />
-                  </nevow:invisible>
-                </span>
-                <span style="float: right;">
-                  <nevow:invisible nevow:render="button">
-                    <a href="#"><athena:handler event="onclick" handler="trainSpam" />Train As Spam</a>
-                  </nevow:invisible>
-                </span>
-                <span style="float: right;">
-                  <nevow:invisible nevow:render="button">
-                    <a href="#"><athena:handler event="onclick" handler="trainHam" />Train As Clean</a>
-                  </nevow:invisible>
-                </span>
                 <div style="height: 2px; clear: both">&#160;</div>
                 <form style="display: none" class="defer-form"
                   onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
@@ -286,56 +277,20 @@
       <td class="masthead-bottom">
         <div class="masthead-content-bottom">
           <div class="message-actions" style="visibility: hidden; padding-top: 4px">
-            <nevow:invisible nevow:render="button">
-              <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false">
-                archive
-              </a>
-            </nevow:invisible>
-            <nevow:invisible nevow:render="button">
-              <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false">
-                delete
-              </a>
-            </nevow:invisible>
-            <select onchange="Quotient.Mailbox.Controller.get(this).defer(this)" class="defer">
-              <option>Defer</option>
-              <option>1 hour</option>
-              <option>12 hours</option>
-              <option>1 day</option>
-              <option>1 week</option>
-              <option>other...</option>
-            </select>
-            <nevow:invisible nevow:render="button">
-              <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false">
-                forward
-              </a>
-            </nevow:invisible>
-            <nevow:invisible nevow:render="button">
-              <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false">
-                reply
-              </a>
-            </nevow:invisible>
+            <span class="train-spam-button">
+              <nevow:invisible nevow:render="button">
+                <a href="#"><athena:handler event="onclick" handler="trainSpam" />Train As Spam</a>
+              </nevow:invisible>
+            </span>
+            <span class="train-clean-button" style="display: none">
+              <nevow:invisible nevow:render="button">
+                <a href="#"><athena:handler event="onclick" handler="trainHam" />Train As Clean</a>
+              </nevow:invisible>
+            </span>
+            <div style="float: right; margin-right: 2px">
+              Spam: <span class="spam-state" nevow:render="spamState" />
+            </div>
             <div style="height: 2px; clear: both">&#160;</div>
-            <form style="display: none" class="defer-form"
-              onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
-              <table>
-                <tr>
-                  <td>Days:</td><td><input type="text" name="days" value="0" /></td>
-                </tr>
-                <tr>
-                  <td>Hours:</td><td><input type="text" name="hours" value="1" /></td>
-                </tr>
-                <tr>
-                  <td>Minutes:</td><td><input type="text" name="minutes" value="0" /></td>
-                </tr>
-                <tr>
-                  <td colspan="2" align="right">
-                    <input type="submit" value="Cancel"
-                      onclick="Quotient.Mailbox.Controller.get(this).hideDeferForm(); return false" />
-                    <input type="submit" value="Defer" />
-                  </td>
-                </tr>
-              </table>
-            </form>
           </div>
           <div class="rounded-corner-spacer" style="padding-bottom: 8px">&#160;</div>
           <img class="masthead-bl" src="/Quotient/static/images/bottom-left-buttress.png" />
