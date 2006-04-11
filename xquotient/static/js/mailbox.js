@@ -15,6 +15,14 @@ Quotient.Mailbox.MessageDetail.methods(
                     self.nodeByAttribute("class", "message-body"),
                     MochiKit.DOM.PRE(null, source));
         });
+    },
+    
+    /* Open a window that contains a printable version of
+       the Message pointed to by the given link
+       
+       @param node: an <a> */
+    function printable(self, node) {
+        window.open(node.href);
     });
 
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();

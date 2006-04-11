@@ -10,7 +10,7 @@ from nevow import rend, inevow, tags, athena
 from axiom.tags import Catalog
 from axiom import item, attributes, batch
 
-from xmantissa import ixmantissa, website, people
+from xmantissa import ixmantissa, website, people, webapp
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
@@ -141,40 +141,53 @@ class Correspondent(item.Item):
     message = attributes.reference(allowNone=False)
     address = attributes.text(allowNone=False)
 
-class PartDisplayer(rend.Page):
-    part = None
-    filename = None
+class ItemGrabber(rend.Page):
+    item = None
 
     def __init__(self, original):
-        self.translator = ixmantissa.IWebTranslator(original.store)
+        self.wt = ixmantissa.IWebTranslator(original.store)
         rend.Page.__init__(self, original)
 
     def locateChild(self, ctx, segments):
+        """
+        I understand path segments that are web IDs of items
+        in the same store as C{self.original}
+
+        When a child is requested from me, I try to find the
+        corresponding item and store it as C{self.item}
+        """
         if len(segments) == 1:
+            itemWebID = segments[0]
+            itemStoreID = self.wt.linkFrom(itemWebID)
 
-            partWebID = segments[0]
-            partStoreID = self.translator.linkFrom(partWebID)
-
-            if partStoreID is not None:
-                self.part = self.original.store.getItemByID(partStoreID)
+            if itemStoreID is not None:
+                self.item = self.original.store.getItemByID(itemStoreID)
                 return (self, ())
-
         return rend.NotFound
 
-    def renderHTTP(self, ctx):
-        request = inevow.IRequest(ctx)
+class PartDisplayer(ItemGrabber):
+    filename = None
 
-        ctype = self.part.getContentType()
+    def renderHTTP(self, ctx):
+        """
+        Serve the content of the L{mimestorage.Part} retrieved
+        by L{ItemGrabber.locateChild}
+        """
+
+        request = inevow.IRequest(ctx)
+        part = self.item
+
+        ctype = part.getContentType()
         request.setHeader('content-type', ctype)
 
         if ctype.startswith('text/'):
-            content = self.part.getUnicodeBody().encode('utf-8')
+            content = part.getUnicodeBody().encode('utf-8')
         else:
-            content = self.part.getBody(decode=True)
+            content = part.getBody(decode=True)
 
         if 'withfilename' in request.args:
             try:
-                h = self.part.getHeader(u'content-disposition').encode('ascii')
+                h = part.getHeader(u'content-disposition').encode('ascii')
             except equotient.NoSuchHeader:
                 h = 'filename=No-Name'
             request.setHeader('content-disposition', h)
@@ -198,6 +211,46 @@ class MessagePartView(item.Item, website.PrefixURLMixin):
     def createResource(self):
         return PartDisplayer(self)
 
+class PrintableMessageResource(ItemGrabber):
+    def __init__(self, original):
+        ItemGrabber.__init__(self, original)
+        self.docFactory = getLoader('printable-shell')
+
+    def renderHTTP(self, ctx):
+        """
+        @return: a L{webapp.GenericNavigationAthenaPage} that wraps
+                 the L{Message} retrieved by L{ItemGrabber.locateChild}.
+        """
+
+        privapp = self.original.store.findUnique(webapp.PrivateApplication)
+
+        frag = ixmantissa.INavigableFragment(self.item)
+        frag.printing = True
+
+        res = webapp.GenericNavigationAthenaPage(
+                    privapp, frag, privapp.getPageComponents())
+
+        res.docFactory = getLoader('printable-shell')
+        return res
+
+class PrintableMessageView(item.Item, website.PrefixURLMixin):
+    """
+    I give C{PrintableMessageResource} a shot at responding
+    to requests made at /private/printable-message
+    """
+
+    typeName = 'quotient_printable_message_view'
+    schemaVersion = 1
+
+    prefixURL = 'private/printable-message'
+    installedOn = attributes.reference()
+
+    sessioned = True
+    sessionless = False
+
+    def createResource(self):
+        return PrintableMessageResource(self)
+
 class MessageDetail(athena.LiveFragment):
     '''i represent the viewable facet of some kind of message'''
 
@@ -208,6 +261,7 @@ class MessageDetail(athena.LiveFragment):
 
     iface = allowedMethods = dict(getMessageSource=True)
 
+    printing = False
     _partsByID = None
 
     def __init__(self, original):
@@ -232,6 +286,18 @@ class MessageDetail(athena.LiveFragment):
         else:
             mtags = mtags[:-1]
         return mtags
+
+    def render_messageSourceLink(self, ctx, data):
+        if self.printing:
+            return ''
+        return self.patterns['message-source-link']()
+
+    def render_printableLink(self, ctx, data):
+        if self.printing:
+            return ''
+        printable = self.original.store.findUnique(PrintableMessageView)
+        return self.patterns['printable-link'].fillSlots(
+                    'link', '/' + printable.prefixURL + '/' + self.translator.toWebID(self.original))
 
     def render_headerPanel(self, ctx, data):
         p = self.organizer.personByEmailAddress(self.original.sender)

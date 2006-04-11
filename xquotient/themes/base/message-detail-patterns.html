@@ -5,6 +5,15 @@
     <td class="header-table-last-col"><nevow:slot name="cc" /></td>
   </tr>
 
+  <div nevow:pattern="message-source-link" align="right" style="clear: both">
+    (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
+  </div>
+
+  <a nevow:pattern="printable-link"
+    onclick="Quotient.Mailbox.MessageDetail.get(this).printable(this); return false"
+    ><nevow:attr name="href"><nevow:slot name="link" /></nevow:attr>
+    [Printable Version]</a>
+
   <nevow:invisible nevow:render="paragraph">
     <div class="text-paragraph" nevow:pattern="paragraph">
       <nevow:attr name="class"><nevow:slot name="quote-class" /></nevow:attr>

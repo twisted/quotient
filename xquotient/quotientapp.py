@@ -103,6 +103,7 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(inbox.SentMail).installOn(avatar)
 
         avatar.findOrCreate(exmess.MessagePartView).installOn(avatar)
+        avatar.findOrCreate(exmess.PrintableMessageView).installOn(avatar)
 
         avatar.findOrCreate(StaticShellContent).installOn(avatar)
 
