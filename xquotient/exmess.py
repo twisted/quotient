@@ -69,7 +69,7 @@ class Message(item.Item):
     # flags!
     read = attributes.boolean(default=False)
     archived = attributes.boolean(default=False)
-    trash = attributes.boolean(default=False)
+    deleted = attributes.boolean(default=False)
     outgoing = attributes.boolean(default=False)
     draft = attributes.boolean(default=False)
 
