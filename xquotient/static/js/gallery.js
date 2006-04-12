@@ -2,10 +2,6 @@
 // import Quotient.Common
 // import LightBox
 
-if(typeof(Quotient.Gallery) == "undefined") {
-    Quotient.Gallery = {};
-}
-
 Quotient.Gallery.Controller = Nevow.Athena.Widget.subclass("Quotient.Gallery.Controller");
 
 Quotient.Gallery.Controller.methods(

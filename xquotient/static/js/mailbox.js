@@ -4,8 +4,6 @@
 // import LightBox
 // import Mantissa.ScrollTable
 
-Quotient.Mailbox = {};
-
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 Quotient.Mailbox.MessageDetail.methods(
     function messageSource(self) {

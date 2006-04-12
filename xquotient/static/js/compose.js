@@ -3,10 +3,6 @@
 // import Mantissa.LiveForm
 // import Fadomatic
 
-if(typeof(Quotient.Compose) == "undefined") {
-    Quotient.Compose = {};
-}
-
 Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
     function loaded(self) { 

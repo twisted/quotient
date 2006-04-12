@@ -3,8 +3,6 @@
 // import Mantissa.LiveForm
 // import Mantissa.TDB
 
-Quotient.Grabber = {};
-
 Quotient.Grabber.Controller = Nevow.Athena.Widget.subclass('Quotient.Grabber.Controller');
 Quotient.Grabber.Controller.methods(
     function loaded(self) {

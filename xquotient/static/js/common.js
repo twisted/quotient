@@ -2,10 +2,6 @@
 // import Quotient
 // import Mantissa.People
 
-if(typeof(Quotient.Common) == "undefined") {
-    Quotient.Common = {};
-}
-
 Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
 /**
