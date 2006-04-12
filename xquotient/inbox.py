@@ -495,7 +495,7 @@ class InboxScreen(athena.LiveFragment):
         return self._current()
 
     def deleteCurrentMessage(self, advance):
-        self.currentMessage.deleted = True
+        self.currentMessage.trash = True
         return self._progressOrDont(advance)
 
     def archiveCurrentMessage(self, advance):
@@ -564,7 +564,7 @@ class InboxScreen(athena.LiveFragment):
 
     def _getBaseComparison(self):
         comparison = attributes.AND(
-            Message.deleted == self.inTrashView,
+            Message.trash == self.inTrashView,
             Message.draft == False,
             Message.receivedWhen < Time())
 
