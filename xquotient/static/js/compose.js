@@ -2,6 +2,30 @@
 // import Quotient.Common
 // import Mantissa.LiveForm
 // import Fadomatic
+// import Mantissa.ScrollTable
+
+Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
+                                                'Quotient.Compose.DraftListScrollingWidget');
+
+Quotient.Compose.DraftListScrollingWidget.methods(
+    function __init__(self, node) {
+        self.columnAliases = {"sentWhen": "Date"};
+        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node);
+    },
+
+    function massageColumnValue(self, columnName, columnType, columnValue) {
+        if(!columnValue) {
+            if(columnName == "recipient") {
+                columnValue = "No Recipient";
+            }
+            if(columnName == "subject") {
+                columnValue = "No Subject";
+            }
+        }
+        return Quotient.Compose.DraftListScrollingWidget.upcall(
+                    self, "massageColumnValue", columnName, columnType, columnValue);
+    
+    });
 
 Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(

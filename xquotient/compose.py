@@ -15,7 +15,8 @@ from epsilon import extime
 from axiom import iaxiom, attributes, item, scheduler, userbase
 
 from xmantissa.fragmentutils import dictFillSlots
-from xmantissa import webnav, ixmantissa, people, liveform, prefs, tdb, tdbview
+from xmantissa import webnav, ixmantissa, people, liveform, prefs
+from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, mail, equotient
@@ -683,45 +684,30 @@ class Drafts(item.Item, item.InstallableMixin):
         super(Drafts, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
 
-class DraftColumnView(tdbview.ColumnViewBase):
-    translator = None
+class DraftsScreen(ScrollingFragment):
+    jsClass = 'Quotient.Compose.DraftListScrollingWidget'
 
-    def __init__(self, name, displayName=None, default=None):
-        super(DraftColumnView, self).__init__(name, displayName=displayName)
-        self.default = default
-
-    def stanFromValue(self, idx, item, value):
-        if self.translator is None:
-            self.translator = ixmantissa.IWebTranslator(item.store)
-            self.composerURL = self.translator.linkTo(
-                                  item.store.findUnique(Composer).storeID)
-        if isinstance(value, extime.Time):
-            value = value.asHumanly()
-        else:
-            if not value:
-                value = self.default
-
-        draft = item.store.findUnique(Draft, Draft.message == item)
-        return tags.a(href=self.composerURL+'?draft='+self.translator.toWebID(draft))[value]
-
-class DraftsScreen(tdbview.TabularDataView):
     def __init__(self, original):
-        prefs = ixmantissa.IPreferenceAggregator(original.store)
-        tdm = tdb.TabularDataModel(
-                    original.store,
-                    Message, (Message.sentWhen,
-                              Message.subject,
-                              Message.recipient),
-                    baseComparison=Message.draft == True,
-                    defaultSortColumn='sentWhen',
-                    defaultSortAscending=False,
-                    itemsPerPage=prefs.getPreferenceValue('itemsPerPage'))
+        ScrollingFragment.__init__(
+            self,
+            original.store,
+            Message,
+            Message.draft == True,
+            (Message.recipient, Message.subject, Message.sentWhen),
+            defaultSortColumn=Message.sentWhen,
+            defaultSortAscending=False)
 
-        views = (DraftColumnView('sentWhen'),
-                 DraftColumnView('subject', default='No Subject'),
-                 DraftColumnView('recipient', 'Recipients', 'No Recipients'))
-
-        tdbview.TabularDataView.__init__(self, tdm, views)
+        self.composerURL = self.wt.linkTo(self.wt.store.findUnique(Composer).storeID)
         self.docFactory = getLoader(self.fragmentName)
+
+    def constructRows(self, items):
+        rows = ScrollingFragment.constructRows(self, items)
+        for (item, row) in zip(items, rows):
+            draft = self.wt.store.findUnique(Draft, Draft.message==item)
+            row['__id__'] = self.composerURL + u'?draft=' + self.wt.toWebID(draft)
+        return rows
+
+    def head(self):
+        return None
 
 registerAdapter(DraftsScreen, Drafts, ixmantissa.INavigableFragment)

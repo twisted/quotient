@@ -113,7 +113,7 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
                        re.UNICODE | re.IGNORECASE)
 
     def asStan(self):
-        return tags.a(href=self.text)[self.text]
+        return tags.b[tags.a(href=self.text)[self.text]]
 
 
 class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):

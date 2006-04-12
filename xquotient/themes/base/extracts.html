@@ -3,7 +3,7 @@
     <div class="collapsible-pane" onclick="Quotient.Common.CollapsiblePane.toggle(this); return false">
       <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
       <nevow:slot name="title" /></div>
-    <div class="pane-body" style="display: none;">
+    <div class="pane-body" style="position: absolute; top: -1000px; left: -1000px">
       <nevow:slot name="body" />
     </div>
   </div>

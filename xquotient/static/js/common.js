@@ -201,11 +201,11 @@ Quotient.Common.CollapsiblePane.toggle = function(element, prefix) {
         prefix = '';
     }
 
-    if(body.style.display == "none") {
-        body.style.display = "block";
+    if(body.style.position == "absolute") {
+        body.style.position = "static";
         img = "/Quotient/static/images/" + prefix + "outline-expanded.png";
     } else {
-        body.style.display = "none";
+        body.style.position = "absolute";
         img = "/Quotient/static/images/" + prefix + "outline-collapsed.png";
     }
 

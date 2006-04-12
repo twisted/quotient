@@ -23,6 +23,22 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     vertical-align: bottom;
 }
 
+.excerpt-column {
+    clear: left;
+    padding: 4px 8px 4px 9px;
+    overflow: hidden;
+    border: solid 1px #000000;
+    border-left: none;
+}
+
+.border-bl, .border-br, .border-tl, .border-tr {
+    width: 12px;
+    height: 12px;
+    padding: 0px;
+    border: 0px;
+    z-index: 99;
+}
+
 .scrolltable-footer-corner {
     vertical-align: top;
 }

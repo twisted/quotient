@@ -14,7 +14,8 @@ from epsilon import descriptor, extime
 
 from axiom import item, attributes, scheduler, iaxiom
 
-from xmantissa import ixmantissa, webapp, webtheme, liveform, tdb, tdbview
+from xmantissa import ixmantissa, webapp, webtheme, liveform, tdbview
+from xmantissa.scrolltable import ScrollingFragment, AttributeColumn, TYPE_FRAGMENT
 from xmantissa.stats import BandwidthMeasuringFactory
 
 from xquotient import mail
@@ -593,8 +594,12 @@ class GrabberConfigFragment(athena.LiveFragment):
         f.setFragmentParent(self)
         return ctx.tag[f]
 
+    wt = None
     def getEditGrabberForm(self, targetID):
-        grabber = self.configuredGrabbersView.itemFromTargetID(targetID)
+        if self.wt is None:
+            self.wt = ixmantissa.IWebTranslator(self.original.store)
+
+        grabber = self.wt.fromWebID(targetID)
 
         f = liveform.LiveForm(
                 lambda **kwargs: self.editGrabber(grabber, **kwargs),
@@ -639,7 +644,6 @@ class GrabberConfigFragment(athena.LiveFragment):
         if password1 != password2:
             raise ValueError("Passwords don't match")
         self.original.addGrabber(username, password1, domain, ssl)
-        return self.configuredGrabbersView.replaceTable()
 
 
     def render_POP3Grabbers(self, ctx, data):
@@ -678,29 +682,18 @@ class LiveStatusFragment(athena.LiveFragment):
 
 
 
-class StatusColumnView(object):
-    attributeID = 'status'
-    displayName = 'Status'
-    typeName = typeHint = None
-
-    def __init__(self, fragment):
+class StatusColumn(AttributeColumn):
+    def __init__(self, attribute, fragment):
+        super(StatusColumn, self).__init__(attribute)
         self.fragment = fragment
 
-
-    def stanFromValue(self, idx, item, value):
+    def extractValue(self, model, item):
         f = LiveStatusFragment(item.status)
         f.setFragmentParent(self.fragment)
-        return f
+        return unicode(flatten(f), 'utf-8')
 
-
-    def getWidth(self):
-        return ''
-
-
-    def onclick(self, idx, item, value):
-        return None
-
-
+    def getType(self):
+        return TYPE_FRAGMENT
 
 class DeleteAction(tdbview.Action):
     def __init__(self, actionID='delete',
@@ -731,10 +724,6 @@ class EditAction(tdbview.Action):
 
     def actionable(self, item):
         return True
-
-    def toLinkStan(self, idx, item):
-        handler = 'Nevow.Athena.Widget.get(this).widgetParent.loadEditForm(%r)' % (idx,)
-        return tags.a(href='#', onclick=handler + ';return false')['Edit']
 
 class PauseAction(tdbview.Action):
     def __init__(self, actionID='pause',
@@ -770,25 +759,18 @@ class ResumeAction(tdbview.Action):
 
 
 
-class ConfiguredGrabbersView(tdbview.TabularDataView):
+class ConfiguredGrabbersView(ScrollingFragment):
+    jsClass = 'Quotient.Grabber.ScrollingWidget'
+
     def __init__(self, store):
-        tdm = tdb.TabularDataModel(
-            store,
-            POP3Grabber,
-            [POP3Grabber.username,
-             POP3Grabber.domain,
-             POP3Grabber.paused,
-             POP3Grabber.status])
-        tdv = [
-            tdbview.ColumnViewBase('username'),
-            tdbview.ColumnViewBase('domain'),
-            tdbview.ColumnViewBase('paused'),
-            StatusColumnView(self)]
-        actions = [
-            PauseAction(),
-            ResumeAction(),
-            DeleteAction(),
-            EditAction()]
+        ScrollingFragment.__init__(self, store, POP3Grabber, None,
+                                   [POP3Grabber.username,
+                                    POP3Grabber.domain,
+                                    POP3Grabber.paused,
+                                    StatusColumn(POP3Grabber.status, self)],
+                                   actions=[PauseAction(),
+                                            ResumeAction(),
+                                            DeleteAction(),
+                                            EditAction()])
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
-        super(ConfiguredGrabbersView, self).__init__(tdm, tdv, actions, itemsCalled='Grabbers')

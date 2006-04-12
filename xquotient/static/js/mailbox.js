@@ -98,7 +98,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function __init__(self, node) {
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
-        self.node.style.width = '300px';
+        self.node.style.width = "300px";
+        self._scrollViewport.style.maxHeight = "";
         self.node.style.border = "";
         self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #336699";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport);

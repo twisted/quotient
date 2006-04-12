@@ -1,15 +1,18 @@
 from zope.interface import implements
 
-from nevow import tags, rend, athena
+from nevow import rend, athena
+from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
 
-from xmantissa import tdb, tdbview, ixmantissa, people
+from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
 from xquotient import gallery, extract, compose, mail, exmess, equotient, mimeutil
+
+from xmantissa.scrolltable import ScrollingFragment, UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
 
 class CorrespondentExtractor(Item, InstallableMixin):
     """
@@ -43,54 +46,18 @@ class CorrespondentExtractor(Item, InstallableMixin):
                                      relation=u'copy',
                                      address=address.email)
 
-
-
-class LinkToColumnView(tdbview.ColumnViewBase):
-    translator = None
-    def stanFromValue(self, idx, item, value):
-        if self.translator is None:
-            self.translator = ixmantissa.IWebTranslator(item.store)
-        return tags.a(href=self.translator.linkTo(item.storeID))[value]
-
-class ExtractSubjectColumnView(LinkToColumnView):
-    def stanFromValue(self, idx, item, value):
-        return LinkToColumnView.stanFromValue(self, idx, item.message,
-                                              item.message.subject)
-
-
-def striptime(time):
-    '''move this into extime.Time maybe.  it is not a replacement
-       for asHumanly(), it does something pretty different.
-
-       12 Dec 1990, 12:15 pm -> Dec 12 1990
-       06:45pm -> 6:45pm'''
-
-    h = time.asHumanly()
-    if ',' in h:
-            h = h.split(',')[0]
-            parts = h.split()
-            (parts[1], parts[0]) = (parts[0], parts[1])
-            h = ' '.join(parts)
-    else:
-            h = h.lstrip('0')
-    return h
-
-class StripTimeColumnView(tdbview.ColumnViewBase):
-    def stanFromValue(self, idx, item, value):
-        return striptime(value)
-
-class ExcerptColumnView(tdbview.ColumnViewBase):
-    def stanFromValue(self, idx, item, value):
-        return item.inContext()
-
-class PersonFragmentColumnView(people.PersonFragmentColumnView):
+class PersonFragmentColumn(UnsortableColumn):
     person = None
 
-    def stanFromValue(self, idx, item, value):
-        return people.PersonFragmentColumnView.stanFromValue(
-                                        self, idx, self.person, value)
+    def extractValue(self, model, item):
+        # XXX BAD
+        f = people.PersonFragment(self.person)
+        return unicode(flatten(f), 'utf-8')
 
-class MessageList(tdbview.TabularDataView):
+    def getType(self):
+        return TYPE_FRAGMENT
+
+class MessageList(ScrollingFragment):
     implements(ixmantissa.IPersonFragment)
     title = 'Messages'
 
@@ -101,29 +68,18 @@ class MessageList(tdbview.TabularDataView):
                 exmess.Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == person)
 
-        tdm = tdb.TabularDataModel(
-                person.store,
-                exmess.Message, (exmess.Message.sender,
-                                 exmess.Message.subject,
-                                 exmess.Message.sentWhen),
-                baseComparison=comparison,
-                defaultSortColumn='sentWhen',
-                defaultSortAscending=False,
-                itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
+        pfc = PersonFragmentColumn(None, 'sender')
+        pfc.person = person
 
-        self.personFragmentColumnView = PersonFragmentColumnView('sender')
-        self.personFragmentColumnView.person = person
+        ScrollingFragment.__init__(
+                self, person.store,
+                exmess.Message,
+                comparison,
+                (pfc, exmess.Message.subject, exmess.Message.sentWhen),
+                defaultSortColumn=exmess.Message.sentWhen,
+                defaultSortAscending=False)
 
-        views = (self.personFragmentColumnView,
-                 LinkToColumnView('subject'),
-                 StripTimeColumnView('sentWhen', displayName='Date'))
-
-        tdbview.TabularDataView.__init__(self, tdm, views)
         self.docFactory = getLoader(self.fragmentName)
-
-    def setFragmentParent(self, parent):
-        self.personFragmentColumnView.page = parent
-        super(MessageList, self).setFragmentParent(parent)
 
 class ImageList(gallery.GalleryScreen):
     implements(ixmantissa.IPersonFragment)
@@ -140,45 +96,24 @@ class ImageList(gallery.GalleryScreen):
                 exmess.Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == self.person)
 
-class ExtractViewer(tdbview.TabularDataView):
 
-    def __init__(self, *a, **k):
-        super(ExtractViewer, self).__init__(*a, **k)
-        self.extractViewerPatterns = PatternDictionary(getLoader('extract-viewer'))
+class ExcerptColumn(AttributeColumn):
+    def extractValue(self, model, item):
+        return unicode(flatten(item.inContext()), 'utf-8')
 
-        for cview in self.columnViews:
-            if cview.attributeID == 'excerpt':
-                self.excerptColumn = cview
-                self.columnViews.remove(cview)
-                break
+    def getType(self):
+        return TYPE_FRAGMENT
 
-    def constructRows(self, modelData):
-        excerptRowPattern = self.extractViewerPatterns['excerpt-row']
-        columnRowPattern = self.patterns['row']
-        cellPattern = self.patterns['cell']
+class SubjectColumn(AttributeColumn):
+    def extractValue(self, model, item):
+        return item.message.subject
 
-        for (idx, row) in enumerate(modelData):
-            cells = []
-            for cview in self.columnViews:
-                if cview.attributeID == 'excerpt':
-                    continue
-                value = row.get(cview.attributeID)
-                cellContents = cview.stanFromValue(
-                                idx, row['__item__'], value)
-                handler = cview.onclick(idx, row['__item__'], value)
-                cellStan = dictFillSlots(cellPattern,
-                                         {'value': cellContents,
-                                          'onclick': handler,
-                                          'class': cview.typeHint})
-                cells.append(cellStan)
-
-            yield dictFillSlots(columnRowPattern,
-                                {'cells': cells,
-                                 'class': 'tdb-row-%s' % (idx,)})
-
-            yield excerptRowPattern.fillSlots('col-value',
-                    self.excerptColumn.stanFromValue(
-                        idx, row['__item__'], row.get('excerpt')))
+class ExtractScrollingFragment(ScrollingFragment):
+    def constructRows(self, items):
+        rows = ScrollingFragment.constructRows(self, items)
+        for (item, row) in zip(items, rows):
+            row['__id__'] = unicode(self.wt.linkTo(item.message.storeID), 'ascii')
+        return rows
 
 class ExtractList(athena.LiveFragment):
     implements(ixmantissa.IPersonFragment)
@@ -199,22 +134,18 @@ class ExtractList(athena.LiveFragment):
                   exmess.Message.sender == people.EmailAddress.address,
                   people.EmailAddress.person == self.person)
 
-    def _makeExtractTDB(self, extractType, itemsCalled):
+    def _makeExtractScrollTable(self, extractType):
         comparison = self._getComparison(extractType)
 
-        tdm = tdb.TabularDataModel(
-                self.person.store,
-                extractType, (extractType.timestamp,),
-                baseComparison=comparison,
-                defaultSortColumn='timestamp',
-                defaultSortAscending=False,
-                itemsPerPage=self.prefs.getPreferenceValue('itemsPerPage'))
-
-        views = (ExtractSubjectColumnView('subject'),
-                 StripTimeColumnView('timestamp'),
-                 ExcerptColumnView('excerpt'))
-
-        return ExtractViewer(tdm, views, itemsCalled=itemsCalled)
+        return ExtractScrollingFragment(
+                    self.person.store,
+                    extractType,
+                    comparison,
+                    (extractType.timestamp,
+                        SubjectColumn(None, 'subject'),
+                        ExcerptColumn(None, 'excerpt')),
+                    defaultSortColumn=extractType.timestamp,
+                    defaultSortAscending=False)
 
     def _countExtracts(self, extractType):
         return self.person.store.count(extractType, self._getComparison(extractType))
@@ -226,17 +157,14 @@ class ExtractList(athena.LiveFragment):
 
         patterns = PatternDictionary(self.docFactory)
 
-        stan = list()
         for (title, etype) in etypes:
-            tdb = self._makeExtractTDB(etype, title)
-            tdb.docFactory = getLoader(tdb.fragmentName)
-            tdb.setFragmentParent(self.page)
+            sf = self._makeExtractScrollTable(etype)
+            sf.jsClass = 'Quotient.Extracts.ScrollingWidget'
+            sf.docFactory = getLoader(sf.fragmentName)
+            sf.setFragmentParent(self.page)
             count = self._countExtracts(etype)
-            stan.append(dictFillSlots(patterns['horizontal-pane'],
-                            dict(title=title + ' (%s)' % (count,),
-                                 body=tdb)))
-
-        return stan
+            yield dictFillSlots(patterns['horizontal-pane'],
+                                dict(title=title + ' (%s)' % (count,), body=sf))
 
 
 class MessageLister(Item, InstallableMixin):

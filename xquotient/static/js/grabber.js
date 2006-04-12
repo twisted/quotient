@@ -2,6 +2,31 @@
 // import Nevow.Athena
 // import Mantissa.LiveForm
 // import Mantissa.TDB
+// import Mantissa.ScrollTable
+
+Quotient.Grabber.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
+                                        'Quotient.Grabber.ScrollingWidget');
+
+Quotient.Grabber.ScrollingWidget.methods(
+    function __init__(self, node) {
+        self.columnWidths = {"username": "150px",
+                             "domain": "150px",
+                             "status": "200px",
+                             "paused": "90px",
+                             "actions": "100px"};
+
+        Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node);
+        self._scrollViewport.style.height = '100px';
+    },
+
+    function clickEventForAction(self, actionID, rowData) {
+        if(actionID == "edit") {
+            return function() {
+                Nevow.Athena.Widget.get(this).widgetParent.loadEditForm(rowData["__id__"]);
+                return false;
+            }
+        }
+    });
 
 Quotient.Grabber.Controller = Nevow.Athena.Widget.subclass('Quotient.Grabber.Controller');
 Quotient.Grabber.Controller.methods(
@@ -61,12 +86,9 @@ Quotient.Grabber.AddGrabberFormWidget = Mantissa.LiveForm.FormWidget.subclass(
 
 Quotient.Grabber.AddGrabberFormWidget.method(
     function submitSuccess(self, result) {
-        var tdbNode = Nevow.Athena.NodeByAttribute(self.widgetParent.node,
-                                                   'athena:class',
-                                                   'Mantissa.TDB.Controller');
+        var sf = Nevow.Athena.NodeByAttribute(self.widgetParent.node,
+                                              'athena:class',
+                                              'Quotient.Grabber.ScrollingWidget');
 
-        var tdbController = Mantissa.TDB.Controller.get(tdbNode);
-
-        tdbController._setTableContent(result[0]);
-        tdbController._setPageState.apply(tdbController, result[1]);
+        Quotient.Grabber.ScrollingWidget.get(sf).emptyAndRefill();
     });
