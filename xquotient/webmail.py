@@ -1,8 +1,14 @@
 from zope.interface import implements
-from nevow import rend, inevow, tags, stan
+from nevow import rend, inevow, tags, stan, flat
 from xmantissa.publicresource import getLoader
 from xmantissa import ixmantissa
 from itertools import imap
+
+def textToRudimentaryHTML(text):
+    return flat.flatten(
+                tags.html[
+                    tags.body[
+                        SpacePreservingStringRenderer(text).rend(None, None)]])
 
 class SpacePreservingStringRenderer(object):
     implements(inevow.IRenderer)
