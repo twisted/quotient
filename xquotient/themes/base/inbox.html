@@ -21,7 +21,7 @@
       ><span><nevow:slot name="accountName" /></span></div>
   </div>
 
-  <div nevow:pattern="tagChooser">
+  <div nevow:pattern="tagChooser" class="tag-chooser">
     <div nevow:pattern="tagChoice" class="list-option"
       onclick="Quotient.Mailbox.Controller.get(this).chooseTag(this); return false"
       ><span><nevow:slot name="tagName" /></span></div>
@@ -236,10 +236,10 @@
             <img class="view-pane-tl" src="/Quotient/static/images/views-container-tl-corner.png" />
             <div class="view-pane-top-edge">&#160;</div>
             <div class="rounded-corner-spacer">&#160;</div>
-              <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" />
-              <nevow:invisible nevow:render="viewPane" name="People" renderer="personChooser" />
-              <nevow:invisible nevow:render="viewPane" name="Tags" renderer="tagChooser" />
-              <nevow:invisible nevow:render="viewPane" name="Accounts" renderer="accountChooser" />
+            <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" />
+            <nevow:invisible nevow:render="viewPane" name="People" renderer="personChooser" />
+            <nevow:invisible nevow:render="viewPane" name="Tags" renderer="tagChooser" />
+            <nevow:invisible nevow:render="viewPane" name="Accounts" renderer="accountChooser" />
           </div>
           <img src="/Quotient/static/images/views-container-bl-corner.png" style="position: relative; top: -13px" />
         </div>

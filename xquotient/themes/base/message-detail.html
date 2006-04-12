@@ -21,10 +21,36 @@
     <div style="clear: both; height: 1px">&#160;</div>
   </div>
 
+  <div class="tags-container">
+    <table>
+      <tr>
+        <td>
+          <b>Tags</b>:
+        </td>
+        <td>
+          <span class="tags-display-container"
+            ><span class="tags-display"
+              ><nevow:invisible nevow:render="tags" /></span>
+            (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).editTags(); return false">Edit</a>)
+          </span>
+
+          <form style="display: none;" class="edit-tags-container"
+            onsubmit="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">
+            <input class="add-tags-dialog-text-input" type="text" name="tags" size="38" />
+            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">Save</a>
+            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
+          </form>
+        </td>
+      </tr>
+    </table>
+  </div>
+
   <div nevow:render="attachmentPanel" style="float: right" />
   <div class="message-body" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
   <nevow:invisible nevow:render="imagePanel" />
-  <nevow:invisible nevow:render="messageSourceLink" />
+  <div class="message-source-container">
+    <nevow:invisible nevow:render="messageSourceLink" />
+  </div>
 </div>

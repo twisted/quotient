@@ -1,5 +1,16 @@
 table.tdb > tbody > tr > td { cursor: pointer; }
 
+.tags-container {
+    border-bottom: solid 1px #CACACA;
+    margin: 0px 2px 4px 2px;
+}
+
+.message-source-container {
+    border-top: solid 1px #CACACA;
+    margin: 4px 2px 0px 2px;
+    clear: both;
+}
+
 .loading {
     position: fixed;
     z-index: 99;

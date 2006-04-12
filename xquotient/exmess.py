@@ -7,7 +7,7 @@ from twisted.python.util import sibpath
 
 from nevow import rend, inevow, tags, athena
 
-from axiom.tags import Catalog
+from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
 
 from xmantissa import ixmantissa, website, people, webapp
@@ -259,7 +259,8 @@ class MessageDetail(athena.LiveFragment):
     live = 'athena'
     jsClass = 'Quotient.Mailbox.MessageDetail'
 
-    iface = allowedMethods = dict(getMessageSource=True)
+    iface = allowedMethods = dict(getMessageSource=True,
+                                  modifyTags=True)
 
     printing = False
     _partsByID = None
@@ -276,15 +277,19 @@ class MessageDetail(athena.LiveFragment):
     def head(self):
         return None
 
-    def tagsAsStan(self):
+    def render_tags(self, ctx, data):
+        """
+        @return: Sequence of tag names that have been assigned to the
+                 message I represent, or "No Tags" if there aren't any
+        """
         catalog = self.original.store.findOrCreate(Catalog)
         mtags = list()
         for tag in catalog.tagsOf(self.original):
-            mtags.extend((tags.a(href='')[tag], ', '))
+            mtags.extend((tag, ', '))
         if len(mtags) == 0:
-            mtags = ['No Tags']
+            return 'No Tags'
         else:
-            mtags = mtags[:-1]
+            return mtags[:-1]
         return mtags
 
     def render_messageSourceLink(self, ctx, data):
@@ -325,7 +330,6 @@ class MessageDetail(athena.LiveFragment):
                      recipient=self.original.recipient,
                      cc=cc,
                      subject=self.original.subject,
-                     tags=self.tagsAsStan(),
                      sent=sentWhen))
 
     def _childLink(self, webItem, item):
@@ -390,6 +394,25 @@ class MessageDetail(athena.LiveFragment):
             return unicode(source, charset, 'replace')
         except LookupError:
             return unicode(source, 'utf-8', 'replace')
+
+    def modifyTags(self, tagsToAdd, tagsToDelete):
+        """
+        Add/delete tags to/from the message I represent
+
+        @param tagsToAdd: sequence of C{unicode} tags
+        @param tagsToDelete: sequence of C{unicode} tags
+        """
+
+        c = self.original.store.findOrCreate(Catalog)
+
+        for t in tagsToAdd:
+            c.tag(self.original, t)
+
+        for t in tagsToDelete:
+            self.original.store.findUnique(Tag,
+                                    attributes.AND(
+                                        Tag.object == self.original,
+                                        Tag.name == t)).deleteFromStore()
 
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

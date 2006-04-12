@@ -8,6 +8,31 @@ if(typeof(Quotient.Common) == "undefined") {
 
 Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
+/**
+ * @return: array of values that appear in a1 and not a2
+ * @param a1: array with no duplicate elements
+ * @param a2: array
+ * 
+ * difference([1,2,3], [1,4,6]) => [2,3]
+ */
+Quotient.Common.Util.difference = function(a1, a2) {
+    var j, seen;
+    var diff = [];
+    for(var i = 0; i < a1.length; i++) {
+        seen = false;
+        for(j = 0; j < a2.length; j++) {
+            if(a1[i] == a2[j]) {
+                seen = true;
+                break;
+            }
+        }
+        if(!seen) {
+            diff.push(a1[i]);
+        }
+    }
+    return diff;
+}
+
 Quotient.Common.Util.findPosX = function(obj) {
     var curleft = 0;
     if (obj.offsetParent)

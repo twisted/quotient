@@ -17,13 +17,83 @@ Quotient.Mailbox.MessageDetail.methods(
         });
     },
     
-    /* Open a window that contains a printable version of
-       the Message pointed to by the given link
-       
-       @param node: an <a> */
+    /**
+     * Open a window that contains a printable version of
+     * the Message pointed to by the given link
+     *  
+     * @param node: an <a>
+     */
     function printable(self, node) {
         window.open(node.href);
+    },
+   
+    /**
+     * Present an element that contains an editable list of tags for my message
+     */
+    function editTags(self) {
+        if(!self.tagsDisplayContainer) {
+            var tagsContainer = self.firstNodeByAttribute("class", "tags-container");
+            self.tagsDisplayContainer = Nevow.Athena.FirstNodeByAttribute(
+                                            tagsContainer, "class", "tags-display-container");
+            self.tagsDisplay = self.tagsDisplayContainer.firstChild;
+            self.editTagsContainer = Nevow.Athena.FirstNodeByAttribute(
+                                        tagsContainer, "class", "edit-tags-container");
+        }
+        var tdc = self.tagsDisplayContainer;
+        var input = self.editTagsContainer.getElementsByTagName("input")[0];
+        if(self.tagsDisplay.firstChild.nodeValue != "No Tags") {
+            input.value = self.tagsDisplay.firstChild.nodeValue;
+        }
+        input.focus();
+            
+        tdc.style.display = "none";
+        self.editTagsContainer.style.display = "";
+    },
+    
+    function hideTagEditor(self) {
+        self.editTagsContainer.style.display = "none";
+        self.tagsDisplayContainer.style.display = "";
+    },
+   
+    /**
+     * Inspect the contents of the tag editor element and persist any
+     * changes that have occured (deleted tags, added tags)
+     */
+    function saveTags(self) {
+        var _gotTags = self.editTagsContainer.tags.value.split(/,\s*/);
+        var  gotTags = [];
+        var seen = {};
+        for(var i = 0; i < _gotTags.length; i++) {
+            if(0 < _gotTags[i].length && !(_gotTags[i] in seen)) {
+                seen[_gotTags[i]] = 1;
+                gotTags.push(_gotTags[i]);
+            }
+        }
+
+        var existingTags;
+        if(self.tagsDisplay.firstChild.nodeValue == "No Tags") {
+            existingTags = [];
+        } else {
+            existingTags = self.tagsDisplay.firstChild.nodeValue.split(/,\s*/);
+        }
+
+        var tagsToDelete = Quotient.Common.Util.difference(existingTags, gotTags);
+        var tagsToAdd = Quotient.Common.Util.difference(gotTags, existingTags);
+
+        if(tagsToAdd || tagsToDelete) {
+            self.callRemote("modifyTags", tagsToAdd, tagsToDelete);
+        }
+
+        if(0 < gotTags.length) {
+            self.tagsDisplay.firstChild.nodeValue = gotTags.join(", ");
+            self.widgetParent.addTagsToViewSelector(tagsToAdd);
+        } else {
+            self.tagsDisplay.firstChild.nodeValue = "No Tags";
+        }
+
+        self.hideTagEditor();
     });
+
 
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();
 Quotient.Mailbox.ScrollingWidget.methods(
@@ -457,6 +527,27 @@ Quotient.Mailbox.Controller.methods(
     function chooseTag(self, n) {
         self._selectListOption(n);
         return self._chooseViewParameter('viewByTag', n);
+    },
+
+    /**
+     * Add the given tags as options inside the "View By Tag" element
+     */
+    function addTagsToViewSelector(self, taglist) {
+        var tc = self.firstWithClass("tag-chooser", self.viewsContainer);
+        var choices = tc.getElementsByTagName("span");
+        var currentTags = [];
+        for(var i = 0; i < choices.length; i++) {
+            currentTags.push(choices[i].firstChild.nodeValue);
+        }
+        var needToAdd = Quotient.Common.Util.difference(taglist, currentTags);
+        /* the tags are unordered at the moment, probably not ideal */
+        for(i = 0; i < needToAdd.length; i++) {
+            tc.appendChild(
+                MochiKit.DOM.DIV({"class": "list-option",
+                                  "onclick": function() {
+                                      self.chooseTag(this);
+                                    }}, MochiKit.DOM.SPAN(null, needToAdd[i])));
+        }
     },
 
     /**
