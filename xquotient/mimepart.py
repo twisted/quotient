@@ -9,15 +9,12 @@ from cStringIO import StringIO
 from zope.interface import implements
 
 from twisted.internet import defer
-from twisted.python import log
 from twisted.python.components import registerAdapter
 from twisted.mail import smtp
 
 from nevow import inevow
 
 from epsilon import cooperator
-
-from axiom import iaxiom
 
 from xquotient import equotient, webmail
 
@@ -705,7 +702,6 @@ class MIMEMessageReceiver(object):
         self.part.addHeader('x-divmod-processed', unicode(rfc822.formatdate(localNow)))
         self.file.close()
         self.done = True
-        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1)
 
 
     # utility methods

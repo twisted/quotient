@@ -422,7 +422,7 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             self.message.sender = self.message.senderDisplay = u'<No Sender>'
 
         self.message.source = self.source
-
+        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1, userstore=self.store)
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
     messageDone = item.transacted(messageDone)

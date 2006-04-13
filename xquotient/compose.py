@@ -83,7 +83,7 @@ class _NeedsDelivery(item.Item):
             d = self.getMailExchange(self.toAddress.split('@', 1)[1])
             def sendMail(mx):
                 host = str(mx.name)
-                log.msg(interface=iaxiom.IStatEvent, stat_messagesSent=1)
+                log.msg(interface=iaxiom.IStatEvent, stat_messagesSent=1, userstore=self.store)
                 return smtp.sendmail(
                     host,
                     self.composer.fromAddress,
