@@ -176,7 +176,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var massage = function(colName) {
             return self.massageColumnValue(
-                colName, self.columnTypes[colName], rowData[colName]);
+                colName, self.columnTypes[colName][0], rowData[colName]);
         }
 
         var attrs = {};
