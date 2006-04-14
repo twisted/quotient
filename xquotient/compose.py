@@ -483,7 +483,7 @@ class ComposeFragment(liveform.LiveForm):
         self._savedDraft.message.draft = False
 
         # once the user has sent a message, we'll consider all subsequent
-        # drafts in the lifetime of this fragment as being drafts of a 
+        # drafts in the lifetime of this fragment as being drafts of a
         # different message
         self._savedDraft.deleteFromStore()
         self._savedDraft = None

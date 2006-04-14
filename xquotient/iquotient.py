@@ -61,8 +61,8 @@ class IFilteringRule(Interface):
         Determine if the indicated item is matched by this rule or not.
 
         @rtype: three-tuple of C{bool, bool, object}
-        @return: The return value represents three pieces of information. 
-        The first boolean in the tuple indicates whether this rule matched. 
+        @return: The return value represents three pieces of information.
+        The first boolean in the tuple indicates whether this rule matched.
         If it did not, the remaining two items are ignored.  If it did: the
         second boolean is interpreted as an indication of whether to proceed
         to subsequent rules or to stop rule processing here; the third value

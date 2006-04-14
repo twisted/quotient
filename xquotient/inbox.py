@@ -581,7 +581,7 @@ class InboxScreen(athena.LiveFragment):
             # always be either True or False.  This means messages which
             # haven't been processed by the spam filtering system will never
             # show up in any query!  Is this a problem?  It depends how
-            # responsive the spam filtering system ends up being, I suppose. 
+            # responsive the spam filtering system ends up being, I suppose.
             # Currently, it should be fast enough so as not to make much of
             # a difference, but that may not always be the case.  However,
             # ultimately we are going to need to support updating messages

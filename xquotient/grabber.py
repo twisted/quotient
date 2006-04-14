@@ -410,7 +410,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             yield d
             try:
                 d.getResult()
-                 
+
             except:
                 f = failure.Failure()
                 rece.connectionLost(f)
