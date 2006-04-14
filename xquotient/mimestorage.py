@@ -342,7 +342,7 @@ class Part(item.Item):
         for part in self.readableParts():
             for child in part.walkMessage(prefer):
                 yield child
-    iterate_multipart_related = iterate_multipart_mixed
+    iterate_multipart_related = iterate_multipart_signed = iterate_multipart_mixed
 
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
