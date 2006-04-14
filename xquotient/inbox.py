@@ -294,7 +294,8 @@ class InboxScreen(athena.LiveFragment):
                                Message.subject,
                                Message.receivedWhen,
                                Message.read,
-                               Message.sentWhen),
+                               Message.sentWhen,
+                               Message.attachments),
                               defaultSortColumn=Message.receivedWhen,
                               defaultSortAscending=False)
         f.jsClass = 'Quotient.Mailbox.ScrollingWidget'

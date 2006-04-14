@@ -14,17 +14,17 @@ Quotient.Mailbox.MessageDetail.methods(
                     MochiKit.DOM.PRE(null, source));
         });
     },
-    
+
     /**
      * Open a window that contains a printable version of
      * the Message pointed to by the given link
-     *  
+     *
      * @param node: an <a>
      */
     function printable(self, node) {
         window.open(node.href);
     },
-   
+
     /**
      * Present an element that contains an editable list of tags for my message
      */
@@ -43,16 +43,16 @@ Quotient.Mailbox.MessageDetail.methods(
             input.value = self.tagsDisplay.firstChild.nodeValue;
         }
         input.focus();
-            
+
         tdc.style.display = "none";
         self.editTagsContainer.style.display = "";
     },
-    
+
     function hideTagEditor(self) {
         self.editTagsContainer.style.display = "none";
         self.tagsDisplayContainer.style.display = "";
     },
-   
+
     /**
      * Inspect the contents of the tag editor element and persist any
      * changes that have occured (deleted tags, added tags)
@@ -127,12 +127,12 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function setRowHeight(self) {
         var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
                                   "class": "q-scroll-row"},
-                    [MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
-                     MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
+                    [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
+                     MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
         self._scrollContent.appendChild(r);
-        var rowHeight = r.clientHeight + 1;
+        var rowHeight = r.clientHeight;
         self._scrollContent.removeChild(r);
 
         self._rowHeight = rowHeight;
@@ -154,9 +154,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
-        var style = "";
+        var style = "border-top: solid 1px #FFFFFF";
         if(!rowData["read"]) {
-            style += "font-weight: bold";
+            style += ";font-weight: bold";
         }
         return MochiKit.DOM.A(
             {"class": "q-scroll-row",
@@ -182,10 +182,16 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
+            var imgAttrs = {"src": "/Quotient/static/images/paperclip.gif", "border": "0"};
+            if(0 == rowData["attachments"]) {
+                imgAttrs["style"] = "width: 0px";
+            }
+            return MochiKit.DOM.DIV(attrs, [MochiKit.DOM.IMG(imgAttrs), massage(colName)]);
+
         } else if(colName == "subject") {
             attrs["class"] = "subject";
         }
-            
+
         return MochiKit.DOM.DIV(attrs, massage(colName));
     },
 
@@ -213,7 +219,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var parts = explode(d);
         var todayParts = explode(new Date());
-        
         /* parts.slice(1,4) == [Month, Day, Year] */
         if(parts.slice(1, 4) == todayParts.slice(1, 4)) {
             /* it's today! */
@@ -229,7 +234,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function skipColumn(self, name) {
-        return name == "read" || name == "sentWhen";
+        return name == "read" || name == "sentWhen" || name == "attachments";
     },
 
     function removeCurrentRow(self) {
