@@ -1,6 +1,6 @@
 # -*- test-case-name: xquotient.test -*-
 
-from zope.interface import Interface, Attribute
+from zope.interface import Interface
 
 class IMIMEDelivery(Interface):
     def createMIMEReceiver(source):

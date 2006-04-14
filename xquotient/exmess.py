@@ -5,7 +5,7 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 
-from nevow import rend, inevow, tags, athena
+from nevow import rend, inevow, athena
 
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch

@@ -7,7 +7,7 @@ from vertex.scripts import certcreate
 
 from axiom import store, userbase, scheduler
 
-from xquotient import mail, mimestorage
+from xquotient import mail
 
 class MailTests(unittest.TestCase):
     def setUp(self):

@@ -10,7 +10,7 @@ from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, extract, compose, mail, exmess, equotient, mimeutil
+from xquotient import gallery, extract, mail, exmess, equotient, mimeutil
 
 from xmantissa.scrolltable import ScrollingFragment, UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
 

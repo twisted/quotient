@@ -12,7 +12,6 @@ from xmantissa import ixmantissa, webnav, website, people, tdb
 from xmantissa.fragmentutils import dictFillSlots, PatternDictionary
 
 from xquotient.actions import SenderPersonFragment
-from xquotient import equotient
 
 from PIL import Image as PilImage
 from cStringIO import StringIO

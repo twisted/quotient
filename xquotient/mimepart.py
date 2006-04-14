@@ -3,6 +3,7 @@
 
 import re, rfc822, time, textwrap
 from email.Header import decode_header
+from email import MIMEMessage
 
 from cStringIO import StringIO
 

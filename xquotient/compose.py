@@ -8,7 +8,7 @@ from twisted.mail import smtp, relaymanager
 from twisted.names import client
 from twisted.internet import error, defer, reactor
 
-from nevow import tags, inevow, flat, rend, json
+from nevow import inevow, rend, json
 
 from epsilon import extime
 
