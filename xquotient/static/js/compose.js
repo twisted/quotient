@@ -24,20 +24,23 @@ Quotient.Compose.DraftListScrollingWidget.methods(
         }
         return Quotient.Compose.DraftListScrollingWidget.upcall(
                     self, "massageColumnValue", columnName, columnType, columnValue);
-    
+
     });
 
 Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
-    function loaded(self) { 
-        //self.fitMessageBodyToPage();
-        self.allPeople = new Array();
-        self.draftNotification = self.nodeByAttribute("class", "draft-notification"); 
+    function __init__(self, node, inline, allPeople) {
+        Quotient.Compose.Controller.upcall(self, "__init__", node);
+
+        if(inline) {
+            self.firstNodeByAttribute("class", "cancel-link").style.display = "";
+        }
+
+        self.inline = inline;
+        self.allPeople = allPeople;
+
+        self.draftNotification = self.nodeByAttribute("class", "draft-notification");
         self.completions = self.nodeByAttribute("class", "address-completions");
-        self.callRemote("getPeople").addCallback(
-            function(people) {
-                self.allPeople = self.allPeople.concat(people);
-            }).addErrback(alert);
 
         self.attachContainer = self.nodeByAttribute("class", "attach-container");
         self.optsContainer = self.nodeByAttribute("class", "options-container");
@@ -47,7 +50,12 @@ Quotient.Compose.Controller.methods(
         setTimeout(function() {
             self.saveDraft(false);
         }, self.autoSaveInterval);
+
         self.makeFileInputs();
+    },
+
+    function cancel(self) {
+        self.widgetParent.hideInlineWidget();
     },
 
     function saveDraft(self, userInitiated) {
@@ -81,7 +89,11 @@ Quotient.Compose.Controller.methods(
             return D;
         }
         return D.addCallback(function(ign) {
-            document.location = self.inboxURL;
+            if(self.inline) {
+                self.cancel();
+            } else {
+                document.location = self.inboxURL;
+            }
         });
     },
 
@@ -99,7 +111,7 @@ Quotient.Compose.Controller.methods(
                                    lis[i].firstChild.nodeValue));
         }
     },
-    
+
     function uploading(self) {
         self.nodeByAttribute("class", "upload-notification").style.visibility = "";
     },
@@ -288,7 +300,7 @@ Quotient.Compose.Controller.methods(
     function _makeHandler(self, f) {
         return "Quotient.Compose.Controller.get(this)." + f + "; return false";
     },
-    
+
     function removeAttachment(self, link) {
         var parent = link.parentNode;
         parent.removeChild(link.previousSibling);

@@ -180,7 +180,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var massage = function(colName) {
             return self.massageColumnValue(
-                colName, self.columnTypes[colName][0], rowData[colName]);
+                colName, self.columnTypes[colName], rowData[colName]);
         }
 
         var attrs = {};
@@ -282,11 +282,12 @@ Quotient.Mailbox.Controller.methods(
         var tbody = contentTable.getElementsByTagName("tbody")[0];
         self.contentTableRows = [];
         for(var i = 0; i < tbody.childNodes.length; i++) {
-            if(tbody.childNodes[i].tagName && 
+            if(tbody.childNodes[i].tagName &&
                tbody.childNodes[i].tagName.toLowerCase() == "tr") {
                 self.contentTableRows.push(tbody.childNodes[i]);
             }
         }
+        self.contentTable = contentTable;
         self.inboxContainer = self.firstWithClass("inbox-container",
                                                   self.contentTableRows[0]);
 
@@ -311,7 +312,7 @@ Quotient.Mailbox.Controller.methods(
 
         self.delayedLoad(complexityLevel);
     },
-     
+
     function delayedLoad(self, complexityLevel) {
         setTimeout(function() {
             self.setScrollTablePosition("absolute");
@@ -733,6 +734,7 @@ Quotient.Mailbox.Controller.methods(
      *     "delete"
      *     "defer"
      *     "replyTo"
+     *     "forward"
      *     "train"
      *
      * @param isProgress: A boolean indicating whether the message will be
@@ -757,19 +759,18 @@ Quotient.Mailbox.Controller.methods(
 
         if (isProgress) {
             self.scrollWidget.removeCurrentRow();
-        }
-
-        if(next.tagName) {
-            self.scrollWidget._selectRow(index, next);
-            self.scrollWidget.scrolled();
+            if(next.tagName) {
+                self.scrollWidget._selectRow(index, next);
+                self.scrollWidget.scrolled();
+            }
         }
 
         self.messageDetail.style.opacity = .2;
         self.callRemote.apply(self, remoteArgs).addCallback(
             function(nextMessage) {
                 self.messageDetail.style.opacity = 1;
-                self.setMessageContent(nextMessage, true);
                 if(isProgress) {
+                    self.setMessageContent(nextMessage);
                     if(!self.progressBar) {
                         self.progressBar = self.firstWithClass("progress-bar",
                                                                self.contentTableRows[0]);
@@ -777,8 +778,30 @@ Quotient.Mailbox.Controller.methods(
                     self.progressBar.style.borderRight = "solid 1px #6699CC";
                     self.remainingMessages--;
                     self.setProgressWidth();
+                } else {
+                    self.displayInlineWidget(nextMessage);
                 }
             });
+    },
+
+    /**
+     * Hide the inbox controls and splat the given HTML ontop
+     */
+    function displayInlineWidget(self, html) {
+        self.contentTable.style.display = "none";
+        if(!self.widgetContainer) {
+            self.widgetContainer = self.firstWithClass("widget-container", self.node);
+        }
+        Divmod.Runtime.theRuntime.setNodeContent(
+            self.widgetContainer, '<div xmlns="http://www.w3.org/1999/xhtml">' + html + '</div>');
+    },
+
+    /**
+     * Inverse of displayInlineWidget()
+     */
+    function hideInlineWidget(self) {
+        MochiKit.DOM.replaceChildNodes(self.widgetContainer);
+        self.contentTable.style.display = "";
     },
 
     function setMessageCount(self, count) {
@@ -971,13 +994,10 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    function setMessageContent(self, data, isMessage) {
+    function setMessageContent(self, data) {
         /* @param data: Three-Array of the html for next message preview, the
          * html for the current message, and some structured data describing
-         * the current message (if isMessage is true)
-         *
-         * @param isMessage: Boolean indicating whether a message is actually
-         * being displayed (???).
+         * the current message
          */
         var nextMessagePreview = data.shift();
         var currentMessageDisplay = data.shift();
@@ -987,15 +1007,8 @@ Quotient.Mailbox.Controller.methods(
 
         Divmod.msg("setMessageContent(" + currentMessageData.toSource() + ")");
 
-        var n;
-        if (isMessage) {
-            n = self.messageDetail;
-        } else {
-            n = self.inboxContainer;
-        }
-
         Divmod.Runtime.theRuntime.setNodeContent(
-            n, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
+            self.messageDetail, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
 
         var modifier, spamConfidence;
         if (currentMessageData.trained) {

@@ -516,11 +516,12 @@ class InboxScreen(athena.LiveFragment):
                                      toAddress=toAddress,
                                      subject=subject,
                                      messageBody=messageBody,
-                                     attachments=attachments)
+                                     attachments=attachments,
+                                     inline=True)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
 
-        return (None, unicode(flatten(cf), 'utf-8'))
+        return unicode(flatten(cf), 'utf-8')
 
     def replyToCurrentMessage(self, advance):
         curmsg = self.currentMessage

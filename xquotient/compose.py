@@ -229,6 +229,28 @@ class FileCabinet(item.Item):
     name = attributes.text()
     filesCount = attributes.integer(default=0)
 
+    def createFileItem(self, name, type, data):
+        """
+        @param name: file name
+        @param type: content-type
+        @param data: file contents
+
+        @return: C{File} item
+        """
+        outf = self.store.newFile('cabinet-'+str(self.storeID),
+                                  str(self.filesCount))
+        outf.write(data)
+        outf.close()
+
+        f = File(store=self.store,
+                 body=outf.finalpath,
+                 name=name,
+                 type=type,
+                 cabinet=self)
+
+        self.filesCount += 1
+        return f
+
 class FileCabinetPage(rend.Page):
     lastFile = None
 
@@ -240,21 +262,10 @@ class FileCabinetPage(rend.Page):
         if req.method == 'POST':
             uploadedFileArg = req.fields['uploaddata']
             def txn():
-                self.original.filesCount += 1
-
-                outf = self.original.store.newFile(
-                                'cabinet-'+str(self.original.storeID),
-                                str(self.original.filesCount))
-
-                outf.write(uploadedFileArg.file.read())
-                outf.close()
-
-                self.lastFile = File(store=self.original.store,
-                                     body=outf.finalpath,
-                                     name=unicode(uploadedFileArg.filename),
-                                     type=unicode(uploadedFileArg.type),
-                                     cabinet=self.original)
-
+                self.lastFile = self.original.createFileItem(
+                                        name=unicode(uploadedFileArg.filename),
+                                        type=unicode(uploadedFileArg.type),
+                                        data=uploadedFileArg.file.read())
             self.original.store.transact(txn)
 
         return rend.Page.renderHTTP(self, ctx)
@@ -279,7 +290,7 @@ class ComposeFragment(liveform.LiveForm):
 
     _savedDraft = None
 
-    def __init__(self, original, toAddress='', subject='', messageBody='', attachments=()):
+    def __init__(self, original, toAddress='', subject='', messageBody='', attachments=(), inline=False):
         self.original = original
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
@@ -306,9 +317,11 @@ class ComposeFragment(liveform.LiveForm):
         self.messageBody = messageBody
         self.attachments = attachments
         self.fileAttachments = []
+        self.inline = inline
 
         self.docFactory = None
         self.translator = ixmantissa.IWebTranslator(original.store)
+        self.cabinet = self.original.store.findUnique(FileCabinet)
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
@@ -331,6 +344,9 @@ class ComposeFragment(liveform.LiveForm):
                 peeps.append((name, email))
         return peeps
 
+    def getInitialArguments(self):
+        return (self.inline, self.getPeople())
+
     def render_inboxLink(self, ctx, data):
         from xquotient.inbox import Inbox
         return self.translator.linkTo(self.original.store.findUnique(Inbox).storeID)
@@ -338,6 +354,9 @@ class ComposeFragment(liveform.LiveForm):
     def render_compose(self, ctx, data):
         req = inevow.IRequest(ctx)
         draftWebID = req.args.get('draft', [None])[0]
+
+        attachmentPattern = inevow.IQ(self.docFactory).patternGenerator('attachment')
+        attachments = []
 
         if draftWebID is not None:
             draft = self.translator.fromWebID(draftWebID)
@@ -349,8 +368,6 @@ class ComposeFragment(liveform.LiveForm):
             except equotient.NoSuchHeader:
                 cc = ''
 
-            attachments = []
-            attachmentPattern = inevow.IQ(self.docFactory).patternGenerator('attachment')
             for f in draft.store.query(File, File.message == draft.message):
                 attachments.append(attachmentPattern.fillSlots(
                                     'id', f.storeID).fillSlots(
@@ -365,18 +382,22 @@ class ComposeFragment(liveform.LiveForm):
             # make subsequent edits overwrite the draft we're editing
             self._savedDraft = draft
         else:
+            for a in self.attachments:
+                attachments.append(attachmentPattern.fillSlots(
+                                    'id', a.part.storeID).fillSlots(
+                                    'name', a.filename or 'No Name'))
+
             slotData = dict(to=self.toAddress,
                             subject=self.subject,
                             body=self.messageBody,
                             cc='',
-                            attachments='')
+                            attachments=attachments)
 
         return dictFillSlots(ctx.tag, slotData)
 
     def render_fileCabinet(self, ctx, data):
-        cabinet = self.original.store.findOrCreate(FileCabinet)
         return inevow.IQ(self.docFactory).onePattern('cabinet-iframe').fillSlots(
-                    'src', ixmantissa.IWebTranslator(cabinet.store).linkTo(cabinet.storeID))
+                    'src', ixmantissa.IWebTranslator(self.cabinet.store).linkTo(self.cabinet.storeID))
 
     def head(self):
         return None
@@ -399,18 +420,17 @@ class ComposeFragment(liveform.LiveForm):
              MT.MIMEText(webmail.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
 
         fileItems = []
-        if self.attachments or files:
+        if files:
             attachmentParts = []
-            for a in self.attachments:
-                part = MB.MIMEBase(*a.type.split('/'))
-                part.set_payload(a.part.getBody(decode=True))
-                fname = a.part.getParam('filename', header=u'content-disposition')
-                if fname is not None:
-                    part.add_header('content-disposition', 'attachment', filename=fname)
-                attachmentParts.append(part)
-
             for storeID in files:
                 a = self.original.store.getItemByID(long(storeID))
+                if isinstance(a, Part):
+                    a = self.cabinet.createFileItem(
+                            a.getParam('filename',
+                                       default=u'',
+                                       header=u'content-disposition'),
+                            unicode(a.getContentType()),
+                            a.getBody(decode=True))
                 fileItems.append(a)
                 part = MB.MIMEBase(*a.type.split('/'))
                 part.set_payload(a.body.getContent())
