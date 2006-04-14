@@ -125,9 +125,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function setSortInfo(self, currentSortColumn, isAscendingNow) {},
 
     function setRowHeight(self) {
-        var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
+        var r = MochiKit.DOM.DIV({"style": "visibility: hidden; font-weight: bold",
                                   "class": "q-scroll-row"},
-                    [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
+                    [MochiKit.DOM.DIV({"class": "sender"},
+                        [MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.gif"}), "TEST!!!"]),
                      MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
