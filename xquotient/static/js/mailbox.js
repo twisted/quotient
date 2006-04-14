@@ -127,8 +127,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function setRowHeight(self) {
         var r = MochiKit.DOM.DIV({"style": "visibility: hidden; font-weight: bold",
                                   "class": "q-scroll-row"},
-                    [MochiKit.DOM.DIV({"class": "sender"},
-                        [MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.gif"}), "TEST!!!"]),
+                    [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
                      MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
@@ -159,6 +158,11 @@ Quotient.Mailbox.ScrollingWidget.methods(
         if(!rowData["read"]) {
             style += ";font-weight: bold";
         }
+        var data = [MochiKit.Base.filter(null, cells)];
+        if(0 < rowData["attachments"]) {
+            data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.gif",
+                                        "style": "float: right; border: none"}));
+        }
         return MochiKit.DOM.A(
             {"class": "q-scroll-row",
              "href": "#",
@@ -167,8 +171,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 self._selectRow(rowOffset, this);
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
-            }},
-            MochiKit.Base.filter(null, cells));
+            }}, data);
     },
 
     function makeCellElement(self, colName, rowData) {
@@ -183,12 +186,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
-            var imgAttrs = {"src": "/Quotient/static/images/paperclip.gif", "border": "0"};
-            if(0 == rowData["attachments"]) {
-                imgAttrs["style"] = "width: 0px";
-            }
-            return MochiKit.DOM.DIV(attrs, [MochiKit.DOM.IMG(imgAttrs), massage(colName)]);
-
         } else if(colName == "subject") {
             attrs["class"] = "subject";
         }
