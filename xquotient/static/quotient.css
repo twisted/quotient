@@ -1,14 +1,26 @@
 table.tdb > tbody > tr > td { cursor: pointer; }
 
 .tags-container {
-    border-bottom: solid 1px #CACACA;
     margin: 0px 2px 4px 2px;
+}
+
+.header-panel {
+    margin-bottom: 14px;
+    border-bottom: solid 1px #CACACA;
 }
 
 .message-source-container {
     border-top: solid 1px #CACACA;
     margin: 4px 2px 0px 2px;
     clear: both;
+}
+
+.sender-container {
+    background-color: #FFFFFF;
+    padding: 4px;
+    margin: 4px;
+    float: left;
+    border: solid 2px #ECF0DA;
 }
 
 .loading {
@@ -481,4 +493,15 @@ img.thumbnail { border: none; }
     font-family: monospace;
     font-size: 1.3em;
     padding-top: 2px;
+}
+
+.attachment, .image-attachment {
+    margin-left: 4px;
+    float: left;
+}
+
+div.attachment-panel > div.pane-body {
+    top: -1000px;
+    left: -1000px;
+    margin: 4px 0px 4px 0px;
 }

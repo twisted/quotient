@@ -1,5 +1,17 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
+  <div nevow:pattern="attachment-panel" class="attachment-panel">
+    <span onclick="Quotient.Common.CollapsiblePane.toggle(this, '')"
+      style="cursor: pointer">
+      <img class="collapse-arrow" src="/Quotient/static/images/outline-collapsed.png" />
+      <img src="/Quotient/static/images/paperclip.gif" />
+      <nevow:slot name="count" /> <nevow:slot name="description" /> <nevow:slot name="size" />
+    </span> <a><nevow:attr name="href"><nevow:slot name="ziplink" /></nevow:attr>Download All</a>
+    <div class="pane-body" style="position: absolute">
+      <nevow:slot name="attachments" />
+    </div>
+  </div>
+
   <tr nevow:pattern="cc">
     <td class="header-table-first-col">CC</td>
     <td class="header-table-last-col"><nevow:slot name="cc" /></td>
@@ -31,13 +43,13 @@
     (<i><nevow:slot name="type" /></i>)
   </nevow:invisible>
 
-  <div nevow:pattern="attachment" style="text-align: center">
+  <div nevow:pattern="attachment" class="attachment" style="text-align: center">
     <a><nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
-    <img border="0"><nevow:attr name="src"><nevow:slot name="icon" /></nevow:attr></img><br />
-    <nevow:slot name="filename" /> <nevow:slot name="type" /></a>
+      <img border="0"><nevow:attr name="src"><nevow:slot name="icon" /></nevow:attr></img><br />
+      <nevow:slot name="filename" /> <nevow:slot name="type" /></a> <nevow:slot name="size" />
   </div>
 
-  <div style="float: left" nevow:pattern="image-attachment">
+  <div class="image-attachment" nevow:pattern="image-attachment">
     <a rel="lightbox">
       <nevow:attr name="href"><nevow:slot name="location" /></nevow:attr>
       <img><nevow:attr name="src"><nevow:slot name="thumbnail-location" /></nevow:attr></img>

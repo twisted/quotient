@@ -195,7 +195,7 @@ Quotient.Common.SenderPerson.methods(
 Quotient.Common.CollapsiblePane = {};
 
 Quotient.Common.CollapsiblePane.toggle = function(element, prefix) {
-    var body = Nevow.Athena.NodeByAttribute(element.parentNode, 'class', 'pane-body');
+    var body = Nevow.Athena.FirstNodeByAttribute(element.parentNode, 'class', 'pane-body');
     var img = null;
     if(typeof(prefix) == 'undefined') {
         prefix = '';

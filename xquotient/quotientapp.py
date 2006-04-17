@@ -104,6 +104,7 @@ class QuotientBenefactor(Item):
 
         avatar.findOrCreate(exmess.MessagePartView).installOn(avatar)
         avatar.findOrCreate(exmess.PrintableMessageView).installOn(avatar)
+        avatar.findOrCreate(exmess.ZippedAttachments).installOn(avatar)
 
         avatar.findOrCreate(StaticShellContent).installOn(avatar)
 

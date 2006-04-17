@@ -1,11 +1,11 @@
 from os import path
-import pytz
+import pytz, zipfile
 
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 
-from nevow import rend, inevow, athena
+from nevow import rend, inevow, athena, static
 
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
@@ -31,6 +31,16 @@ def mimeTypeToIcon(mtype,
         return webIconPath + '/' + lastpart
     return defaultIconPath
 
+def formatSize(size, step=1024.0):
+    suffixes = ['bytes', 'K', 'M', 'G']
+
+    while step <= size:
+        size /= step
+        suffixes.pop(0)
+
+    if suffixes:
+        return '%d%s' % (size, suffixes[0])
+    return 'huge'
 
 class _TrainingInstruction(item.Item):
     """
@@ -156,7 +166,7 @@ class ItemGrabber(rend.Page):
         When a child is requested from me, I try to find the
         corresponding item and store it as C{self.item}
         """
-        if len(segments) == 1:
+        if len(segments) in (1, 2):
             itemWebID = segments[0]
             itemStoreID = self.wt.linkFrom(itemWebID)
 
@@ -251,6 +261,60 @@ class PrintableMessageView(item.Item, website.PrefixURLMixin):
     def createResource(self):
         return PrintableMessageResource(self)
 
+
+class ZippedAttachmentResource(ItemGrabber):
+    def renderHTTP(self, ctx):
+        """
+        @return: a L{static.File} that contains the zipped
+                 attachments of L{self.item}
+        """
+        path = self.original.getZippedAttachments(self.item)
+        return static.File(path, 'application/zip')
+
+class ZippedAttachments(item.Item, website.PrefixURLMixin):
+    """
+    I give C{ZippedAttachmentResource} a shot at responding
+    to requests made at /private/zipped-attachments
+    """
+
+    typeName = 'quotient_zipped_attachments'
+    schemaVersion = 1
+
+    prefixURL = 'private/zipped-attachments'
+    installedOn = attributes.reference()
+
+    sessioned = True
+    sessionless = False
+
+    def createResource(self):
+        return ZippedAttachmentResource(self)
+
+    def getZippedAttachments(self, m):
+        """
+        @param m: L{exmess.Message}
+        @return: pathname of temporary file containing zipped attachments of C{m}
+        """
+        tmpdir = self.store.newTemporaryFilePath('zipped-attachments')
+
+        if not tmpdir.exists():
+            tmpdir.makedirs()
+
+        zipf = zipfile.ZipFile(tmpdir.temporarySibling().path, 'w')
+
+        nameless = 0
+        for a in m.walkAttachments():
+            fname = a.filename
+            if not fname:
+                fname = 'No-Name-' + str(nameless)
+                nameless += 1
+            else:
+                fname = fname.encode('ascii')
+
+            zipf.writestr(fname, a.part.getBody(decode=True))
+
+        return zipf.fp.name
+
+
 class MessageDetail(athena.LiveFragment):
     '''i represent the viewable facet of some kind of message'''
 
@@ -342,14 +406,20 @@ class MessageDetail(athena.LiveFragment):
         return self._childLink(gallery.ThumbnailDisplayer, image)
 
     def render_attachmentPanel(self, ctx, data):
+        acount = len(self.attachmentParts)
+        if 0 == acount:
+            return ''
+
         patterns = list()
+        totalSize = 0
         for attachment in self.attachmentParts:
+            totalSize += attachment.part.bodyLength
             data = dict(filename=attachment.filename or 'No Name',
-                        icon=mimeTypeToIcon(attachment.type))
+                        icon=mimeTypeToIcon(attachment.type),
+                        size=formatSize(attachment.part.bodyLength))
 
             if 'generic' in data['icon']:
-                ctype = self.patterns['content-type'].fillSlots(
-                                            'type', attachment.type)
+                ctype = self.patterns['content-type'].fillSlots('type', attachment.type)
             else:
                 ctype = ''
 
@@ -359,7 +429,17 @@ class MessageDetail(athena.LiveFragment):
             location = self._partLink(attachment.part) + '?withfilename=1'
             patterns.append(p.fillSlots('location', str(location)))
 
-        return ctx.tag[patterns]
+        desc = 'Attachment'
+        if 1 < acount:
+            desc += 's'
+
+        ziplink = self._childLink(ZippedAttachments, self.original) + '/attachments.zip'
+        return dictFillSlots(self.patterns['attachment-panel'],
+                             dict(count=acount,
+                                  attachments=patterns,
+                                  description=desc,
+                                  ziplink=ziplink,
+                                  size=formatSize(totalSize)))
 
     def render_imagePanel(self, ctx, data):
         images = self.original.store.query(
