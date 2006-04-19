@@ -627,6 +627,7 @@ Quotient.Mailbox.Controller.methods(
 
         self._viewingByView = n.firstChild.firstChild.nodeValue;
         self._selectListOption(n);
+        self._selectViewShortcut();
 
         if(!self.visibilityByView) {
             self.visibilityByView = self.createVisibilityMatrix();
@@ -637,6 +638,40 @@ Quotient.Mailbox.Controller.methods(
         self.setDisplayForButtons("none", visibilityForThisView["hide"]);
 
         self._chooseViewParameter('viewByMailType', n, false);
+    },
+
+    /**
+     * Select the view shortcut link that corresponds to the
+     * current mail view, if any.
+     */
+    function _selectViewShortcut(self) {
+        if(self._viewingByView != "Inbox"
+            && self._viewingByView != "Sent"
+            && self._viewingByView != "Spam") {
+            return;
+        }
+
+        if(!self.viewShortcuts) {
+            var viewShortcutContainer = self.firstWithClass(
+                                            "view-shortcut-container",
+                                            self.scrolltableHeader);
+            self.viewShortcuts = Nevow.Athena.NodesByAttribute(viewShortcutContainer,
+                                                               "class",
+                                                               "view-shortcut");
+            self.viewShortcuts.push(
+                self.firstWithClass(
+                    "selected-view-shortcut", viewShortcutContainer));
+        }
+
+        var shortcut;
+        for(var i = 0; i < self.viewShortcuts.length; i++) {
+            shortcut = self.viewShortcuts[i];
+            if(shortcut.firstChild.nodeValue == self._viewingByView) {
+                shortcut.className = "selected-view-shortcut";
+            } else {
+                shortcut.className = "view-shortcut";
+            }
+        }
     },
 
     /**
