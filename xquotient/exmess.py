@@ -201,19 +201,6 @@ class PartDisplayer(ItemGrabber):
 # the standalone parts of a given message, like images,
 # scrubbed text/html parts and such.  this is that thing.
 
-class MessagePartView(item.Item, website.PrefixURLMixin):
-    typeName = 'quotient_message_part_view'
-    schemaVersion = 1
-
-    prefixURL = 'private/message-parts'
-    installedOn = attributes.reference()
-
-    sessioned = True
-    sessionless = False
-
-    def createResource(self):
-        return PartDisplayer(self)
-
 class PrintableMessageResource(ItemGrabber):
     def __init__(self, original):
         ItemGrabber.__init__(self, original)
@@ -235,25 +222,6 @@ class PrintableMessageResource(ItemGrabber):
 
         res.docFactory = getLoader('printable-shell')
         return res
-
-class PrintableMessageView(item.Item, website.PrefixURLMixin):
-    """
-    I give C{PrintableMessageResource} a shot at responding
-    to requests made at /private/printable-message
-    """
-
-    typeName = 'quotient_printable_message_view'
-    schemaVersion = 1
-
-    prefixURL = 'private/printable-message'
-    installedOn = attributes.reference()
-
-    sessioned = True
-    sessionless = False
-
-    def createResource(self):
-        return PrintableMessageResource(self)
-
 
 class ZippedAttachmentResource(ItemGrabber):
     def renderHTTP(self, ctx):
@@ -405,6 +373,9 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
 
     def child_attachments(self, ctx):
         return PartDisplayer(self.original)
+
+    def child_printable(self, ctx):
+        return PrintableMessageResource(self.original)
 
     def render_attachmentPanel(self, ctx, data):
         acount = len(self.attachmentParts)
