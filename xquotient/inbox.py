@@ -212,8 +212,6 @@ class InboxScreen(athena.LiveFragment):
 
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
-        self.prefs = ixmantissa.IPreferenceAggregator(original.store)
-        self.showRead = self.prefs.getPreferenceValue('showRead')
         self.translator = ixmantissa.IWebTranslator(original.store)
 
         self._resetCurrentMessage()
@@ -345,6 +343,14 @@ class InboxScreen(athena.LiveFragment):
             select[opt]
         return select
 
+    def getUnreadMessageCount(self):
+        """
+        @return: number of unread messages in current view
+        """
+        return self.original.store.count(Message,
+                                         attributes.AND(self._getBaseComparison(),
+                                                        Message.read == False))
+
     def render_mailViewChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
@@ -363,7 +369,13 @@ class InboxScreen(athena.LiveFragment):
                 found = True
             else:
                 p = option
-            select[p().fillSlots('mailViewName', view)]
+
+            self.changeView(view)
+            select[p().fillSlots(
+                        'mailViewName', view).fillSlots(
+                        'count', self.getUnreadMessageCount())]
+
+        self.changeView('Inbox')
         return select
 
     def render_tagChooser(self, ctx, data):
@@ -427,6 +439,13 @@ class InboxScreen(athena.LiveFragment):
     def _resetScrollQuery(self):
         self.scrollingFragment.baseConstraint = self._getBaseComparison()
 
+    def mailViewCounts(self):
+        counts = {}
+        for v in (u'Trash', u'Sent', u'Spam', u'All', u'Inbox'):
+            self.changeView(v)
+            counts[v] = self.getUnreadMessageCount()
+        return counts
+
     def viewByPerson(self, webID):
         if webID is None:
             self.viewingByPerson = None
@@ -435,29 +454,31 @@ class InboxScreen(athena.LiveFragment):
 
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current())
+        return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
     def viewByTag(self, tag):
         self.viewingByTag = tag
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current())
+        return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
     def viewByAccount(self, account):
         self.viewingByAccount = account
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current())
+        return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
-    def viewByMailType(self, typ):
+    def changeView(self, typ):
         self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = False
         attr = 'in' + typ + 'View'
         if hasattr(self, attr):
             setattr(self, attr, True)
 
+    def viewByMailType(self, typ):
+        self.changeView(typ)
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current())
+        return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
     def getMessageCount(self):
         return self.original.store.count(Message, self._getBaseComparison())

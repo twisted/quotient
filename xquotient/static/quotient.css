@@ -244,7 +244,7 @@ table.button {
     margin-bottom: 1px;
 }
 
-.list-option > span, .selected-list-option > span {
+.list-option > span.opt-name, .selected-list-option > span.opt-name {
     margin-left: 18px;
 }
 

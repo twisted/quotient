@@ -18,27 +18,27 @@
   <div nevow:pattern="accountChooser">
     <div nevow:pattern="accountChoice" class="list-option"
       onclick="Quotient.Mailbox.Controller.get(this).chooseAccount(this); return false"
-      ><span><nevow:slot name="accountName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="accountName" /></span></div>
     <div nevow:pattern="selectedAccountChoice" class="selected-list-option"
-      ><span><nevow:slot name="accountName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="accountName" /></span></div>
   </div>
 
   <div nevow:pattern="tagChooser" class="tag-chooser">
     <div nevow:pattern="tagChoice" class="list-option"
       onclick="Quotient.Mailbox.Controller.get(this).chooseTag(this); return false"
-      ><span><nevow:slot name="tagName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="tagName" /></span></div>
     <div nevow:pattern="selectedTagChoice" class="selected-list-option"
-      ><span><nevow:slot name="tagName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="tagName" /></span></div>
   </div>
 
   <div nevow:pattern="personChooser">
     <div nevow:pattern="personChoice" class="list-option"
       onclick="Quotient.Mailbox.Controller.get(this).choosePerson(this); return false"
-      ><span><nevow:slot name="personName" /></span>
+      ><span class="opt-name"><nevow:slot name="personName" /></span>
       <span style="display: none" class="person-key"
         ><nevow:slot name="personKey" /></span></div>
     <div nevow:pattern="selectedPersonChoice" class="selected-list-option"
-      ><span><nevow:slot name="personName" /></span>
+      ><span class="opt-name"><nevow:slot name="personName" /></span>
       <span style="display: none" class="person-key"
         ><nevow:slot name="personKey" /></span></div>
   </div>
@@ -46,9 +46,11 @@
   <div nevow:pattern="mailViewChooser">
     <div nevow:pattern="mailViewChoice" class="list-option"
       onclick="Quotient.Mailbox.Controller.get(this).chooseMailView(this); return false"
-      ><span><nevow:slot name="mailViewName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
+      (<span class="count"><nevow:slot name="count" /></span>)</div>
     <div nevow:pattern="selectedMailViewChoice" class="selected-list-option"
-      ><span><nevow:slot name="mailViewName" /></span></div>
+      ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
+      (<span class="count"><nevow:slot name="count" /></span>)</div>
   </div>
 
   <div style="display: none; background-color: #FFFFFF" id="add-person-fragment">

@@ -146,6 +146,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
             row = self._rows[rowOffset][1];
         }
 
+        if(row.style.fontWeight == "bold") {
+            self.widgetParent.decrementActiveMailViewCount();
+        }
+
         row.style.fontWeight = "";
         row.style.backgroundColor = '#FFFFFF';
 
@@ -267,17 +271,6 @@ Quotient.Mailbox.Controller.methods(
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
         self.currentMessageData = null;
 
-        /*
-         * This attribute keeps track of which of the weird message view
-         * settings is currently selected.  Currently, the server renders the
-         * initially selected view as Inbox.  If that changes, this code will
-         * need to be updated.
-         *
-         * Hopefully, this will all be thrown away before too long, though,
-         * because it is stupid.
-         */
-        self._viewingByView = 'Inbox';
-
         var contentTable = self.firstNodeByAttribute("class", "content-table");
         var tbody = contentTable.getElementsByTagName("tbody")[0];
         self.contentTableRows = [];
@@ -288,6 +281,20 @@ Quotient.Mailbox.Controller.methods(
             }
         }
         self.contentTable = contentTable;
+
+        /*
+         * This attribute keeps track of which of the weird message view
+         * settings is currently selected.  Currently, the server renders the
+         * initially selected view as Inbox.  If that changes, this code will
+         * need to be updated.
+         *
+         * Hopefully, this will all be thrown away before too long, though,
+         * because it is stupid.
+         */
+
+        self._viewingByView = 'Inbox';
+        self.setupMailViewNodes();
+
         self.inboxContainer = self.firstWithClass("inbox-container",
                                                   self.contentTableRows[0]);
 
@@ -311,6 +318,39 @@ Quotient.Mailbox.Controller.methods(
         self.setMessageCount(messageCount);
 
         self.delayedLoad(complexityLevel);
+    },
+
+    /* Decrement the unread message count that is displayed next to
+     * the name of the currently active view in the view selector.
+     *
+     * (e.g. "Inbox (31)" -> "Inbox (30)")
+     */
+    function decrementActiveMailViewCount(self) {
+        var decrementNodeValue = function(node) {
+            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - 1;
+        }
+
+        var cnode = self.firstWithClass(
+                            "count", self.mailViewNodes[self._viewingByView]);
+        decrementNodeValue(cnode);
+
+        if(self._viewingByView == "Inbox") {
+            decrementNodeValue(self.firstWithClass("count", self.mailViewNodes["All"]));
+        }
+    },
+
+    /* Update the counts that are displayed next
+     * to the names of mailbox views in the view selector
+     *
+     * @param counts: mapping of view names to unread
+     *                message counts
+     */
+    function updateMailViewCounts(self, counts) {
+        var cnode;
+        for(var k in counts) {
+            cnode = self.firstWithClass("count", self.mailViewNodes[k]);
+            cnode.firstChild.nodeValue = counts[k];
+        }
     },
 
     function delayedLoad(self, complexityLevel) {
@@ -343,7 +383,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /* resize the inbox table and contents.
-     * @param initialResize: is this the first/initial resize? 
+     * @param initialResize: is this the first/initial resize?
      *                       (if so, then our layout constraint jiggery-pokery
      *                        is not necessary)
      */
@@ -352,7 +392,7 @@ Quotient.Mailbox.Controller.methods(
         if(!initialResize) {
             self.scrollWidget.resized();
         }
-        self.scrollWidget._scrollViewport.style.height = 
+        self.scrollWidget._scrollViewport.style.height =
             (parseInt(self.scrollWidget._scrollViewport.style.height) - self.mastheadBottom.clientHeight) + "px";
         var pageHeight = document.documentElement.clientHeight;
         self.messageDetail.style.height = (pageHeight - self.ypos - 15 - self.mastheadBottom.clientHeight) + "px";
@@ -447,10 +487,6 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function setViewsContainerDisplay(self, d) {
-        if(!self.viewsContainer) {
-            self.viewsContainer = self.firstWithClass("view-pane-container",
-                                                      self.contentTableRows[1]);
-        }
         self.viewsContainer.style.display = d;
     },
 
@@ -498,6 +534,7 @@ Quotient.Mailbox.Controller.methods(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
                 self.setMessageContent(messageData[1], true);
+                self.updateMailViewCounts(messageData[2]);
                 self.scrollWidget.setViewportHeight(messageData[0]);
                 self.scrollWidget.emptyAndRefill();
                 self.scrollWidget._pendingRowSelection = function() {
@@ -586,6 +623,8 @@ Quotient.Mailbox.Controller.methods(
      * @return: C{undefined}
      */
     function chooseMailView(self, n) {
+        self.mailViewNode = n;
+
         self._viewingByView = n.firstChild.firstChild.nodeValue;
         self._selectListOption(n);
 
@@ -602,7 +641,7 @@ Quotient.Mailbox.Controller.methods(
 
     /**
      * Return the node for the named button
-     * 
+     *
      * @param topRow: boolean - from top button row?
      */
     function getButton(self, name, topRow) {
@@ -616,7 +655,7 @@ Quotient.Mailbox.Controller.methods(
         }
         return self.buttons[[name, topRow]];
     },
-    
+
     /**
      * Apply display value C{display} to each button identified in C{buttonArgs}
      * @param buttonArgs: list of [C{name}, C{topRow}] (see signature of L{getButton})
@@ -671,32 +710,41 @@ Quotient.Mailbox.Controller.methods(
 
         /* make sure the right thing is selected in the full views browser */
 
-        var mailViewPane = self.firstWithClass("view-pane-content",
-                                               self.viewsContainer);
-        var mailViewBody = self.firstWithClass("pane-body",
-                                               mailViewPane);
-        mailViewBody = mailViewBody.getElementsByTagName("div")[0];
+        self._selectListOption(/* ZZZZZ */);
 
-        for(i = 0; i < mailViewBody.childNodes.length; i++) {
-            e = mailViewBody.childNodes[i];
-            if(e.tagName && e.firstChild.firstChild.nodeValue ==  type) {
-                self._selectListOption(e);
-                break;
+        n.blur();
+    },
+
+    function setupMailViewNodes(self) {
+        if(!self.mailViewBody) {
+            self.viewsContainer = self.firstWithClass("view-pane-container",
+                                                      self.contentTableRows[1]);
+            var mailViewPane = self.firstWithClass("view-pane-content",
+                                                   self.viewsContainer);
+            var mailViewBody = self.firstWithClass("pane-body", mailViewPane);
+            self.mailViewBody = mailViewBody.getElementsByTagName("div")[0];
+        }
+
+        var nodes = {"All": null, "Trash": null, "Sent": null, "Spam": null, "Inbox": null};
+        for(i = 0; i < self.mailViewBody.childNodes.length; i++) {
+            e = self.mailViewBody.childNodes[i];
+            if(e.tagName && (e.firstChild.firstChild.nodeValue in nodes)) {
+                nodes[e.firstChild.firstChild.nodeValue] = e;
             }
         }
-        n.blur();
+        self.mailViewNodes = nodes;
     },
 
     function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {
         /* ideally we want to disable these actions if they aren't going
            to behave as advertised - as it stands they'll just do nothing
            if there isn't a next/prev row.
-           
+
            elementFactory is a function that returns the row that should be
            highlighted.  it is a function because the row element might or
            might not exist when we called (e.g. if we have to request more
            rows to fufill the request) */
-        
+
         if(offset < 0) { return }
         if(typeof requestMoreRowsIfNeeded === 'undefined') {
             requestMoreRowsIfNeeded = true;
@@ -867,7 +915,7 @@ Quotient.Mailbox.Controller.methods(
             return;
         }
         var args;
-        if(value == "1 day") { 
+        if(value == "1 day") {
             args = [1, 0, 0];
         } else if(value == "1 hour") {
             args = [0, 1, 0];
