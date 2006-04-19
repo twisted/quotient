@@ -201,20 +201,21 @@ class PartDisplayer(ItemGrabber):
 # the standalone parts of a given message, like images,
 # scrubbed text/html parts and such.  this is that thing.
 
-class PrintableMessageResource(ItemGrabber):
-    def __init__(self, original):
-        ItemGrabber.__init__(self, original)
+class PrintableMessageResource(rend.Page):
+    def __init__(self, message):
+        self.message = message
+        rend.Page.__init__(self, message)
         self.docFactory = getLoader('printable-shell')
 
     def renderHTTP(self, ctx):
         """
         @return: a L{webapp.GenericNavigationAthenaPage} that wraps
-                 the L{Message} retrieved by L{ItemGrabber.locateChild}.
+                 the L{Message} our constructor was passed
         """
 
-        privapp = self.original.store.findUnique(webapp.PrivateApplication)
+        privapp = self.message.store.findUnique(webapp.PrivateApplication)
 
-        frag = ixmantissa.INavigableFragment(self.item)
+        frag = ixmantissa.INavigableFragment(self.message)
         frag.printing = True
 
         res = webapp.GenericNavigationAthenaPage(
@@ -327,9 +328,8 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
     def render_printableLink(self, ctx, data):
         if self.printing:
             return ''
-        printable = self.original.store.findUnique(PrintableMessageView)
         return self.patterns['printable-link'].fillSlots(
-                    'link', '/' + printable.prefixURL + '/' + self.translator.toWebID(self.original))
+                    'link', self.translator.linkTo(self.original.storeID) + '/printable')
 
     def render_headerPanel(self, ctx, data):
         p = self.organizer.personByEmailAddress(self.original.sender)
