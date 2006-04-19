@@ -344,6 +344,11 @@ class Part(item.Item):
                 yield child
     iterate_multipart_related = iterate_multipart_signed = iterate_multipart_mixed
 
+    def getFilename(self, default='No-Name'):
+        return self.getParam('filename',
+                             default=default,
+                             header=u'content-disposition')
+
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
     def __init__(self, store, fObj, source):

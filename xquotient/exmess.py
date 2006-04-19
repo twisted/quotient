@@ -195,13 +195,6 @@ class PartDisplayer(ItemGrabber):
         else:
             content = part.getBody(decode=True)
 
-        if 'withfilename' in request.args:
-            try:
-                h = part.getHeader(u'content-disposition').encode('ascii')
-            except equotient.NoSuchHeader:
-                h = 'filename=No-Name'
-            request.setHeader('content-disposition', h)
-
         return content
 
 # somewhere there needs to be an IResource that can display
@@ -315,7 +308,9 @@ class ZippedAttachments(item.Item, website.PrefixURLMixin):
         return zipf.fp.name
 
 
-class MessageDetail(athena.LiveFragment):
+from nevow.rend import ChildLookupMixin
+
+class MessageDetail(athena.LiveFragment, ChildLookupMixin):
     '''i represent the viewable facet of some kind of message'''
 
     implements(ixmantissa.INavigableFragment)
@@ -400,10 +395,16 @@ class MessageDetail(athena.LiveFragment):
         return '/' + webItem.prefixURL + '/' + self.translator.toWebID(item)
 
     def _partLink(self, part):
-        return self._childLink(MessagePartView, part)
+        return (self.translator.linkTo(self.original.storeID)
+                + '/attachments/'
+                + self.translator.toWebID(part)
+                + '/' + part.getFilename())
 
     def _thumbnailLink(self, image):
         return self._childLink(gallery.ThumbnailDisplayer, image)
+
+    def child_attachments(self, ctx):
+        return PartDisplayer(self.original)
 
     def render_attachmentPanel(self, ctx, data):
         acount = len(self.attachmentParts)
@@ -426,7 +427,7 @@ class MessageDetail(athena.LiveFragment):
             data['type'] = ctype
 
             p = dictFillSlots(self.patterns['attachment'], data)
-            location = self._partLink(attachment.part) + '?withfilename=1'
+            location = self._partLink(attachment.part)
             patterns.append(p.fillSlots('location', str(location)))
 
         desc = 'Attachment'
@@ -447,7 +448,7 @@ class MessageDetail(athena.LiveFragment):
                     gallery.Image.message == self.original)
 
         for image in images:
-            location = self._partLink(image.part) + '?withfilename=1'
+            location = self._partLink(image.part)
 
             yield dictFillSlots(self.patterns['image-attachment'],
                                 {'location': location,
