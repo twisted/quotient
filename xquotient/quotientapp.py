@@ -53,27 +53,6 @@ class QuotientSearchProvider(Item, InstallableMixin):
         return self.indexer.search(term, count, offset).addCallback(searchCompleted)
 
 
-
-class StaticShellContent(Item, InstallableMixin):
-    implements(ixmantissa.IStaticShellContent)
-
-    schemaVersion = 2
-    typeName = 'quotient_static_shell_content'
-
-    installedOn = attributes.reference()
-
-    def installOn(self, other):
-        super(StaticShellContent, self).installOn(other)
-        other.powerUp(self, ixmantissa.IStaticShellContent)
-
-    def getHeader(self):
-        return tags.img(src='/Quotient/static/images/logo.png',
-                        style='margin: 2px')
-
-    def getFooter(self):
-        return None
-
-
 class QuotientBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
@@ -98,15 +77,6 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
 
         avatar.findOrCreate(inbox.Inbox).installOn(avatar)
-        avatar.findOrCreate(inbox.Archive).installOn(avatar)
-        avatar.findOrCreate(inbox.Trash).installOn(avatar)
-        avatar.findOrCreate(inbox.SentMail).installOn(avatar)
-
-        avatar.findOrCreate(exmess.MessagePartView).installOn(avatar)
-        avatar.findOrCreate(exmess.PrintableMessageView).installOn(avatar)
-        avatar.findOrCreate(exmess.ZippedAttachments).installOn(avatar)
-
-        avatar.findOrCreate(StaticShellContent).installOn(avatar)
 
 
 class ExtractBenefactor(Item):

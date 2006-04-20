@@ -10,7 +10,7 @@ from nevow import rend, inevow, athena, static
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
 
-from xmantissa import ixmantissa, website, people, webapp
+from xmantissa import ixmantissa, people, webapp
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
@@ -142,6 +142,30 @@ class Message(item.Item):
         _TrainingInstruction(store=self.store, message=self, spam=spam)
 
 
+    def zipAttachments(self):
+        """
+        @return: pathname of temporary file containing my zipped attachments
+        """
+        tmpdir = self.store.newTemporaryFilePath('zipped-attachments')
+
+        if not tmpdir.exists():
+            tmpdir.makedirs()
+
+        zipf = zipfile.ZipFile(tmpdir.temporarySibling().path, 'w')
+
+        nameless = 0
+        for a in self.walkAttachments():
+            fname = a.filename
+            if not fname:
+                fname = 'No-Name-' + str(nameless)
+                nameless += 1
+            else:
+                fname = fname.encode('ascii')
+
+            zipf.writestr(fname, a.part.getBody(decode=True))
+
+        return zipf.fp.name
+
 
 class Correspondent(item.Item):
     typeName = 'quotient_correspondent'
@@ -201,33 +225,21 @@ class PartDisplayer(ItemGrabber):
 # the standalone parts of a given message, like images,
 # scrubbed text/html parts and such.  this is that thing.
 
-class MessagePartView(item.Item, website.PrefixURLMixin):
-    typeName = 'quotient_message_part_view'
-    schemaVersion = 1
-
-    prefixURL = 'private/message-parts'
-    installedOn = attributes.reference()
-
-    sessioned = True
-    sessionless = False
-
-    def createResource(self):
-        return PartDisplayer(self)
-
-class PrintableMessageResource(ItemGrabber):
-    def __init__(self, original):
-        ItemGrabber.__init__(self, original)
+class PrintableMessageResource(rend.Page):
+    def __init__(self, message):
+        self.message = message
+        rend.Page.__init__(self, message)
         self.docFactory = getLoader('printable-shell')
 
     def renderHTTP(self, ctx):
         """
         @return: a L{webapp.GenericNavigationAthenaPage} that wraps
-                 the L{Message} retrieved by L{ItemGrabber.locateChild}.
+                 the L{Message} our constructor was passed
         """
 
-        privapp = self.original.store.findUnique(webapp.PrivateApplication)
+        privapp = self.message.store.findUnique(webapp.PrivateApplication)
 
-        frag = ixmantissa.INavigableFragment(self.item)
+        frag = ixmantissa.INavigableFragment(self.message)
         frag.printing = True
 
         res = webapp.GenericNavigationAthenaPage(
@@ -236,81 +248,19 @@ class PrintableMessageResource(ItemGrabber):
         res.docFactory = getLoader('printable-shell')
         return res
 
-class PrintableMessageView(item.Item, website.PrefixURLMixin):
-    """
-    I give C{PrintableMessageResource} a shot at responding
-    to requests made at /private/printable-message
-    """
+class ZippedAttachmentResource(rend.Page):
+    def __init__(self, message):
+        self.message = message
+        rend.Page.__init__(self, message)
 
-    typeName = 'quotient_printable_message_view'
-    schemaVersion = 1
-
-    prefixURL = 'private/printable-message'
-    installedOn = attributes.reference()
-
-    sessioned = True
-    sessionless = False
-
-    def createResource(self):
-        return PrintableMessageResource(self)
-
-
-class ZippedAttachmentResource(ItemGrabber):
     def renderHTTP(self, ctx):
         """
         @return: a L{static.File} that contains the zipped
-                 attachments of L{self.item}
+                 attachments of the L{Message} our constructor was passed
         """
-        path = self.original.getZippedAttachments(self.item)
-        return static.File(path, 'application/zip')
+        return static.File(self.message.zipAttachments(), 'application/zip')
 
-class ZippedAttachments(item.Item, website.PrefixURLMixin):
-    """
-    I give C{ZippedAttachmentResource} a shot at responding
-    to requests made at /private/zipped-attachments
-    """
-
-    typeName = 'quotient_zipped_attachments'
-    schemaVersion = 1
-
-    prefixURL = 'private/zipped-attachments'
-    installedOn = attributes.reference()
-
-    sessioned = True
-    sessionless = False
-
-    def createResource(self):
-        return ZippedAttachmentResource(self)
-
-    def getZippedAttachments(self, m):
-        """
-        @param m: L{exmess.Message}
-        @return: pathname of temporary file containing zipped attachments of C{m}
-        """
-        tmpdir = self.store.newTemporaryFilePath('zipped-attachments')
-
-        if not tmpdir.exists():
-            tmpdir.makedirs()
-
-        zipf = zipfile.ZipFile(tmpdir.temporarySibling().path, 'w')
-
-        nameless = 0
-        for a in m.walkAttachments():
-            fname = a.filename
-            if not fname:
-                fname = 'No-Name-' + str(nameless)
-                nameless += 1
-            else:
-                fname = fname.encode('ascii')
-
-            zipf.writestr(fname, a.part.getBody(decode=True))
-
-        return zipf.fp.name
-
-
-from nevow.rend import ChildLookupMixin
-
-class MessageDetail(athena.LiveFragment, ChildLookupMixin):
+class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     '''i represent the viewable facet of some kind of message'''
 
     implements(ixmantissa.INavigableFragment)
@@ -332,6 +282,8 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
         self.organizer = original.store.findUnique(people.Organizer)
+
+        self.children = {'attachments.zip': ZippedAttachmentResource(original)}
 
     def head(self):
         return None
@@ -359,9 +311,8 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
     def render_printableLink(self, ctx, data):
         if self.printing:
             return ''
-        printable = self.original.store.findUnique(PrintableMessageView)
         return self.patterns['printable-link'].fillSlots(
-                    'link', '/' + printable.prefixURL + '/' + self.translator.toWebID(self.original))
+                    'link', self.translator.linkTo(self.original.storeID) + '/printable')
 
     def render_headerPanel(self, ctx, data):
         p = self.organizer.personByEmailAddress(self.original.sender)
@@ -406,6 +357,9 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
     def child_attachments(self, ctx):
         return PartDisplayer(self.original)
 
+    def child_printable(self, ctx):
+        return PrintableMessageResource(self.original)
+
     def render_attachmentPanel(self, ctx, data):
         acount = len(self.attachmentParts)
         if 0 == acount:
@@ -434,7 +388,8 @@ class MessageDetail(athena.LiveFragment, ChildLookupMixin):
         if 1 < acount:
             desc += 's'
 
-        ziplink = self._childLink(ZippedAttachments, self.original) + '/attachments.zip'
+        ziplink = self.translator.linkTo(self.original.storeID) + '/attachments.zip'
+
         return dictFillSlots(self.patterns['attachment-panel'],
                              dict(count=acount,
                                   attachments=patterns,

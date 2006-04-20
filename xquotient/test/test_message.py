@@ -3,8 +3,10 @@ import zipfile
 from twisted.trial.unittest import TestCase
 
 from axiom.store import Store
+from axiom.item import Item
+from axiom.attributes import text
 
-from xquotient.exmess import Message, ZippedAttachments
+from xquotient.exmess import Message
 
 class MockPart:
     def __init__(self, filename, body):
@@ -15,12 +17,15 @@ class MockPart:
     def getBody(self, decode):
         return self.body
 
-class MockMessage:
-    def __init__(self, attachmentParts):
-        self.attachmentParts = attachmentParts
+class PartItem(Item):
+    typeName = 'xquotient_test_part_item'
+    schemaVersion = 1
+
+    z = text()
 
     def walkAttachments(self):
-        return self.attachmentParts
+        return (MockPart('foo.bar', 'XXX'),
+                MockPart('bar.baz', 'YYY'))
 
 class MessageTestCase(TestCase):
     def testDeletion(self):
@@ -30,12 +35,8 @@ class MessageTestCase(TestCase):
 
     def testAttachmentZipping(self):
         s = Store(self.mktemp())
-        z = ZippedAttachments(store=s)
 
-        m = MockMessage((MockPart('foo.bar', 'XXX'),
-                         MockPart('bar.baz', 'YYY')))
-
-        path = z.getZippedAttachments(m)
+        path = Message(store=s, impl=PartItem(store=s)).zipAttachments()
 
         zf = zipfile.ZipFile(path)
         zf.testzip()
