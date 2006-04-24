@@ -281,7 +281,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
         self.translator = ixmantissa.IWebTranslator(original.store)
-        self.organizer = original.store.findUnique(people.Organizer)
+        # temporary measure, until we can express this dependency less weirdly
+        self.organizer = original.store.findUnique(people.Organizer, default=None)
 
         self.children = {'attachments.zip': ZippedAttachmentResource(original)}
 
@@ -315,11 +316,12 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                     'link', self.translator.linkTo(self.original.storeID) + '/printable')
 
     def render_headerPanel(self, ctx, data):
-        p = self.organizer.personByEmailAddress(self.original.sender)
-        if p is None:
-            personStan = SenderPersonFragment(self.original)
-        else:
-            personStan = people.PersonFragment(p, self.original.sender)
+        personStan = SenderPersonFragment(self.original)
+        if self.organizer is not None:
+            p = self.organizer.personByEmailAddress(self.original.sender)
+            if p is not None:
+                personStan = people.PersonFragment(p, self.original.sender)
+
         personStan.page = self.page
 
         prefs = ixmantissa.IPreferenceAggregator(self.original.store)
