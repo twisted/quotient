@@ -321,7 +321,7 @@ class ComposeFragment(liveform.LiveForm):
 
         self.docFactory = None
         self.translator = ixmantissa.IWebTranslator(original.store)
-        self.cabinet = self.original.store.findUnique(FileCabinet)
+        self.cabinet = self.original.store.findOrCreate(FileCabinet)
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
