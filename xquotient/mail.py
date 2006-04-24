@@ -178,7 +178,10 @@ class MailTransferAgent(item.Item, item.InstallableMixin, service.Service, Deliv
         other.powerUp(self, service.IService)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
         scheduler.IScheduler(self.store).schedule(self.store.findOrCreate(MessageSource), extime.Time())
-        self.setServiceParent(other)
+        if self.store.parent is None:
+            other.powerUp(self, service.IService)
+            if self.parent is None:
+                self.setServiceParent(other)
 
     def privilegedStartService(self):
         if SSL is None and self.securePortNumber is not None:

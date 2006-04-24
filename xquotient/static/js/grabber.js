@@ -68,6 +68,7 @@ Quotient.Grabber.StatusWidget = Nevow.Athena.Widget.subclass('Grabber.StatusWidg
 Quotient.Grabber.StatusWidget.method(
     function __init__(self, node) {
         Quotient.Grabber.StatusWidget.upcall(self, '__init__', node);
+        self._pendingStatusUpdate = null;
         var d = self.callRemote('startObserving');
         d.addCallback(function(newStatus) { self.setStatus(newStatus); });
         d.addErrback(function(err) { self.setStatus(err.message); });
@@ -75,10 +76,14 @@ Quotient.Grabber.StatusWidget.method(
 
 Quotient.Grabber.StatusWidget.method(
     function setStatus(self, newStatus) {
-        while (self.node.childNodes.length) {
-            self.node.removeChild(self.node.firstChild);
+        self._pendingStatus = newStatus;
+        if (self._pendingStatusUpdate == null) {
+            self._pendingStatusUpdate = setTimeout(function() {
+                var pendingStatus = self._pendingStatus;
+                self._pendingStatus = self._pendingStatusUpdate = null;
+                self.node.innerHTML = pendingStatus;
+            }, 5);
         }
-        self.node.appendChild(document.createTextNode(newStatus));
     });
 
 Quotient.Grabber.AddGrabberFormWidget = Mantissa.LiveForm.FormWidget.subclass(

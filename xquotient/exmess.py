@@ -58,6 +58,8 @@ _TrainingInstructionSource = batch.processor(_TrainingInstruction)
 # core of Quotient.
 
 class Message(item.Item):
+    implements(ixmantissa.IFulltextIndexable)
+
     typeName = 'quotient_message'
     schemaVersion = 1
 
@@ -165,6 +167,26 @@ class Message(item.Item):
             zipf.writestr(fname, a.part.getBody(decode=True))
 
         return zipf.fp.name
+
+
+    # IFulltextIndexable
+    def uniqueIdentifier(self):
+        return str(self.storeID)
+
+
+    def textParts(self):
+        return [part.getUnicodeBody()
+                for part
+                in self.impl.getTypedParts('text/plain', 'text/rtf')]
+
+
+    def valueParts(self):
+        return [('subject', self.subject)]
+
+
+    def keywordParts(self):
+        return []
+
 
 
 class Correspondent(item.Item):

@@ -1,56 +1,45 @@
 from zope.interface import implements
 
-from nevow import tags
-
 from axiom.item import Item, InstallableMixin
-from axiom import attributes, scheduler
+from axiom import iaxiom, attributes, scheduler
 
-from xmantissa import website, webapp, ixmantissa, people, prefs, search
+from xmantissa import website, webapp, ixmantissa, people, prefs
+from xmantissa import fulltext, search
 
-from xquotient import inbox, exmess, mail, gallery, qpeople, extract, spam
+from xquotient import inbox, mail, gallery, qpeople, extract, spam, _mailsearchui
 from xquotient.grabber import GrabberConfiguration
-from xquotient.indexinghelp import SyncIndexer
 
-class QuotientSearchProvider(Item, InstallableMixin):
-    implements(ixmantissa.ISearchProvider)
 
-    typeName = 'quotient_search_provider'
-    schemaVersion = 1
+INDEXER_TYPE = fulltext.PyLuceneIndexer
 
+
+class MessageSearchProvider(Item, InstallableMixin, search.SearchProviderMixin):
+    """
+    Wrapper around an ISearchProvider which will hand back search results
+    wrapped in a fragment that knows about Messages.
+    """
     installedOn = attributes.reference()
-    _indexer = attributes.inmemory()
+
+    indexer = attributes.reference(doc="""
+    The actual fulltext indexing implementation object which will perform
+    searches.  The results it returns will be wrapped up in a fragment which
+    knows how to display L{exmess.Message} instances.
+    """, allowNone=False)
+
 
     def installOn(self, other):
-        super(QuotientSearchProvider, self).installOn(other)
+        super(MessageSearchProvider, self).installOn(other)
         other.powerUp(self, ixmantissa.ISearchProvider)
 
 
-    def activate(self):
-        self._indexer = None
-
-
-    def _getIndexer(self):
-        if self._indexer is None:
-            self._indexer = self.store.findUnique(SyncIndexer)
-        return self._indexer
-    indexer = property(_getIndexer)
-
-
     def count(self, term):
-        return self.indexer.search(term).addCallback(len)
+        raise NotImplementedError("No one should ever call count, I think.")
 
 
-    def search(self, term, count, offset):
-        translator = ixmantissa.IWebTranslator(self.store)
-        def searchCompleted(results):
-            for (i, document) in enumerate(results):
-                msg = self.store.getItemByID(long(document['@uri']))
-                yield search.SearchResult(description=msg.subject,
-                                          url=translator.linkTo(msg.storeID),
-                                          summary=document.text[:200],
-                                          timestamp=msg.sentWhen,
-                                          score=0)
-        return self.indexer.search(term, count, offset).addCallback(searchCompleted)
+    def wrapSearchResults(self, searchIdentifier):
+        return _mailsearchui.SearchAggregatorFragment(searchIdentifier, self.store)
+
+
 
 
 class QuotientBenefactor(Item):
@@ -99,6 +88,8 @@ class ExtractBenefactor(Item):
         avatar.findUnique(gallery.Gallery).deleteFromStore()
         avatar.findUnique(gallery.ThumbnailDisplayer).deleteFromStore()
 
+
+
 class QuotientPeopleBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
@@ -115,6 +106,8 @@ class QuotientPeopleBenefactor(Item):
         avatar.findOrCreate(qpeople.ExtractLister).installOn(organizer)
         avatar.findOrCreate(qpeople.ImageLister).installOn(organizer)
 
+
+
 class IndexingBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
@@ -125,13 +118,15 @@ class IndexingBenefactor(Item):
 
 
     def endow(self, ticket, avatar):
-        avatar.findOrCreate(SyncIndexer).installOn(avatar)
-        avatar.findOrCreate(QuotientSearchProvider).installOn(avatar)
+        indexer = avatar.findOrCreate(INDEXER_TYPE)
+        searcher = MessageSearchProvider(store=avatar, indexer=indexer)
+        searcher.installOn(avatar)
+        avatar.findUnique(mail.MessageSource).addReliableListener(indexer, iaxiom.REMOTE)
 
 
     def revoke(self, ticket, avatar):
-        avatar.findUnique(SyncIndexer).deleteFromStore()
-        avatar.findUnique(QuotientSearchProvider).deleteFromStore()
+        avatar.findUnique(MessageSearchProvider).deleteFromStore()
+
 
 
 class _PreferredMimeType(prefs.MultipleChoicePreference):
