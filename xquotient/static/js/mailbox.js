@@ -184,7 +184,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var massage = function(colName) {
             return self.massageColumnValue(
-                colName, self.columnTypes[colName], rowData[colName]);
+                colName, self.columnTypes[colName][0], rowData[colName]);
         }
 
         var attrs = {};
@@ -228,7 +228,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         if(parts[3] == todayParts[3]) {
             /* it's this year */
-            parts[1] + " " + parts[2]; /* e.g. Jan 12 */
+            return parts[1] + " " + parts[2]; /* e.g. Jan 12 */
         }
         return [pad(d.getFullYear()),
                 pad(d.getMonth()+1),
