@@ -763,8 +763,8 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var nodes = {"All": null, "Trash": null, "Sent": null, "Spam": null, "Inbox": null};
-        for(i = 0; i < self.mailViewBody.childNodes.length; i++) {
-            e = self.mailViewBody.childNodes[i];
+        for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
+            var e = self.mailViewBody.childNodes[i];
             if(e.tagName && (e.firstChild.firstChild.nodeValue in nodes)) {
                 nodes[e.firstChild.firstChild.nodeValue] = e;
             }
