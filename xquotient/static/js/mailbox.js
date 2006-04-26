@@ -192,6 +192,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
             attrs["class"] = "sender";
         } else if(colName == "subject") {
             attrs["class"] = "subject";
+        } else {
+            attrs["class"] = "date";
         }
 
         return MochiKit.DOM.DIV(attrs, massage(colName));
@@ -526,11 +528,11 @@ Quotient.Mailbox.Controller.methods(
         if (catchAll && value == 'All') {
             value = null;
         }
-        self._sendViewRequest(viewFunction, value);
+        return self._sendViewRequest(viewFunction, value);
     },
 
     function _sendViewRequest(self, viewFunction, value) {
-        self.callRemote(viewFunction, value).addCallback(
+        return self.callRemote(viewFunction, value).addCallback(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
                 self.setMessageContent(messageData[1], true);
