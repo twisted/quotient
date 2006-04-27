@@ -103,6 +103,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.node.style.border = "";
         self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #336699";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport);
+        self.throbber = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
         self.resized();
     },
 
@@ -254,8 +255,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
                             self._rows.slice(self._selectedRowOffset+1, self._rows.length));
     },
 
-    function cbRowsFetched(self) {
-        if(self._pendingRowSelection) {
+    function cbRowsFetched(self, count) {
+        self.throbber.style.display = "none";
+        if(0 < count && self._pendingRowSelection) {
             self._pendingRowSelection();
             self._pendingRowSelection = null;
         }
@@ -532,6 +534,8 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _sendViewRequest(self, viewFunction, value) {
+        self.scrollWidget.throbber.style.display = "";
+
         return self.callRemote(viewFunction, value).addCallback(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
