@@ -57,7 +57,16 @@ Quotient.Test.InboxTestCase.methods(
         self.assertEquals(rows[0]["subject"], "Message 2");
         self.assertEquals(rows[1]["subject"], "Message 1");
 
-        self.assertEquals(rows[1]["date"], "1999-12-13");
+        /*
+         * Months are zero-based instead of one-based.  Account for this by
+         * subtracting or adding a one.
+         */
+        var expectedDate = new Date(Date.UTC(1999, 11, 13));
+        self.assertEquals(
+            expectedDate.getFullYear() + "-" +
+            (expectedDate.getMonth() + 1) + "-" +
+            expectedDate.getDate(),
+            rows[1]["date"]);
 
         return self.mailbox._sendViewRequest("viewByMailType", "Spam").addCallback(
             function() {
