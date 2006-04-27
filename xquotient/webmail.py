@@ -114,6 +114,8 @@ class HTMLPartRenderer(object):
         translator = ixmantissa.IWebTranslator(self.original.part.store)
         webid = translator.toWebID(self.original.part)
 
+        messageURL = translator.linkTo(self.original.part.message.storeID)
+
         return self.iframePattern.fillSlots('location', # argh
-                '/private/message-parts/' + webid)
+                messageURL + '/attachments/' + webid)
 
