@@ -592,7 +592,7 @@ Quotient.Mailbox.Controller.methods(
                 MochiKit.DOM.DIV({"class": "list-option",
                                   "onclick": function() {
                                       self.chooseTag(this);
-                                    }}, MochiKit.DOM.SPAN(null, needToAdd[i])));
+                                    }}, MochiKit.DOM.SPAN({"class": "opt-name"}, needToAdd[i])));
         }
     },
 
