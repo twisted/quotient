@@ -159,9 +159,17 @@ class DSPAMFilter(item.Item, item.InstallableMixin):
         result, clas, conf = dspam.classifyMessage(self.lib,
                                             self.username, self._homePath().path.encode('ascii'),
                                             item.impl.source.open().read(), train=True)
+        if result == dspam.DSR_ISSPAM:
+            log.msg(interface=iaxiom.IStatEvent, stat_spamClassified=1)
+        else:
+            log.msg(interface=iaxiom.IStatEvent, stat_hamClassified=1)
         return result == dspam.DSR_ISSPAM, conf
 
     def train(self, spam, item):
+        if spam:
+            log.msg(interface=iaxiom.IStatEvent, stat_spamFalseNegative=1)
+        else:
+            log.msg(interface=iaxiom.IStatEvent, stat_spamFalsePositive=1)
         dspam.trainMessageFromError(
             self.lib, self.username, self._homePath().path.encode('ascii'),
             item.impl.source.open().read(),
