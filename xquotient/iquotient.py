@@ -21,12 +21,15 @@ class IHamFilter(Interface):
     Plugin for scoring messages based on their spaminess.
     """
 
-    def score(message):
+    def classify(message):
         """
-        Score a message from [0.0..1.0]: lower is spammier.
+        Determine whether a mail is spam or not.
+        Scores a message from [0.0..1.0]: lower is spammier.
 
         @type message: L{xquotient.exmess.Message}
         @param message: The message to score.
+
+        @return: A 2-tuple containing a boolean indicating whether a message is spam or not, and the score.
         """
 
 

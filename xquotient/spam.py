@@ -12,11 +12,11 @@ from nevow import athena
 
 from epsilon import cooperator
 
-from axiom import iaxiom, item, attributes
+from axiom import iaxiom, item, attributes, userbase
 
 from xmantissa import ixmantissa
 
-from xquotient import mail, iquotient, exmess
+from xquotient import mail, iquotient, exmess, dspam
 
 SPAM_THRESHHOLD = 0.3
 
@@ -55,19 +55,16 @@ class Filter(item.Item, item.InstallableMixin):
         #   that they, too, will not be garbage collected.  This isn't strictly
         #   necessary, but it is a useful (if somewhat unsightly) optimization.
         self._filters = list(self.powerupsFor(iquotient.IHamFilter))
-
+        if len(self._filters) > 1:
+            raise NotImplementedError("multiple spam filters not yet supported")
         if isinstance(item, exmess._TrainingInstruction):
             for f in self._filters:
                 f.train(item.spam, item.message)
             item.deleteFromStore()
         elif not item.trained:
-            score = 1.0
-            n = 1.0
-            for n, f in enumerate(self._filters):
-                n += 1
-                score *= f.score(item)
-            score = score ** (1.0 / n)
-            item.spam = (score < SPAM_THRESHHOLD)
+            f = self._filters[0]
+            isSpam, score = f.classify(item)
+            item.spam = isSpam
             log.msg("spam batch processor scored message at %0.2f: %r" % (score, item.spam))
         else:
             log.msg("Skipping classification of message already user-specified as " + (item.spam and "spam" or "ham"))
@@ -135,6 +132,45 @@ class HamFilterFragment(athena.LiveFragment):
 components.registerAdapter(HamFilterFragment, Filter, ixmantissa.INavigableFragment)
 
 
+class DSPAMFilter(item.Item, item.InstallableMixin):
+    """
+    libdspam-based L{iquotient.IHamFilter} powerup.
+    """
+    implements(iquotient.IHamFilter)
+
+    installedOn = attributes.reference()
+    classifier = attributes.inmemory()
+    username = attributes.inmemory()
+    lib = attributes.inmemory()
+
+    def installOn(self, other):
+        super(DSPAMFilter, self).installOn(other)
+        other.powerUp(self, iquotient.IHamFilter)
+
+    def _homePath(self):
+        return self.store.newFilePath('dspam-%d' % (self.storeID,))
+
+    def activate(self):
+        username, domain = userbase.getAccountNames(self.store).next()
+        self.username = ("%s@%s" % (username, domain)).encode('ascii')
+        self.lib = dspam.startDSPAM(self.username, self._homePath().path.encode('ascii'))
+
+    def classify(self, item):
+        result, clas, conf = dspam.classifyMessage(self.lib,
+                                            self.username, self._homePath().path.encode('ascii'),
+                                            item.impl.source.open().read(), train=True)
+        return result == dspam.DSR_ISSPAM, conf
+
+    def train(self, spam, item):
+        dspam.trainMessageFromError(
+            self.lib, self.username, self._homePath().path.encode('ascii'),
+            item.impl.source.open().read(),
+            spam and dspam.DSR_ISSPAM or dspam.DSR_ISINNOCENT)
+
+    def forgetTraining(self):
+        p = self._homePath()
+        if p.exists():
+            p.remove()
 
 class SpambayesFilter(item.Item, item.InstallableMixin):
     """
@@ -173,9 +209,10 @@ class SpambayesFilter(item.Item, item.InstallableMixin):
 
 
     # IHamFilter
-    def score(self, item):
+    def classify(self, item):
         # SpamBayes thinks 0 is ham, 1 is spam.  We have a different idea.
-        return 1.0 - self.guesser.score(item.impl.source.open())
+        score = 1.0 - self.guesser.score(item.impl.source.open())
+        return score <= SPAM_THRESHHOLD, score
 
 
     def train(self, spam, item):
@@ -221,3 +258,15 @@ class SpambayesBenefactor(item.Item):
 
     def revoke(self, ticket, avatar):
         avatar.findUnique(SpambayesFilter).deleteFromStore()
+
+
+class DSPAMBenefactor(item.Item):
+    endowed = attributes.integer(default=0)
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(DSPAMFilter).installOn(avatar.findUnique(Filter))
+
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(DSPAMFilter).deleteFromStore()
+

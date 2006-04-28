@@ -65,6 +65,12 @@ spambayesFilteringBenefactorFactory = provisioning.BenefactorFactory(
     benefactorClass = spam.SpambayesBenefactor,
     dependencies = [quotientBenefactorFactory])
 
+spambayesFilteringBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'DSPAM-based trainable Ham/Spam Filtering',
+    description = u'Filtering of messages based on a bayesian classification with per-user training information.',
+    benefactorClass = spam.DSPAMBenefactor,
+    dependencies = [quotientBenefactorFactory])
+
 
 plugin = offering.Offering(
     name = u'Quotient',
