@@ -658,6 +658,8 @@ components.registerAdapter(GrabberConfigFragment, GrabberConfiguration, ixmantis
 class LiveStatusFragment(athena.LiveFragment):
     docFactory = loaders.stan(tags.span(render=tags.directive('liveFragment')))
     jsClass = u'Quotient.Grabber.StatusWidget'
+    _pending = False
+    _pendingStatus = None
 
     def __init__(self, status):
         self.status = status
@@ -672,7 +674,19 @@ class LiveStatusFragment(athena.LiveFragment):
 
 
     def statusChanged(self, newStatus):
-        self.callRemote('setStatus', newStatus).addErrback(self._observerError)
+        if self._pending:
+            self._pendingStatus = newStatus
+        else:
+            self._pending = True
+            self.callRemote('setStatus', newStatus).addCallback(self._unpend)
+
+
+    def _unpend(self, ign):
+        pendingStatus = self._pendingStatus
+        self._pendingStatus = None
+        self._pending = False
+        if pendingStatus is not None:
+            self.statusChanged(pendingStatus)
 
 
     allowedMethods = ['startObserving']
