@@ -229,9 +229,7 @@ class InboxScreen(athena.LiveFragment):
         return f
 
     def getTags(self):
-        tags = self.original.store.query(Tag,
-                            attributes.AND(Tag.object == Message.storeID,
-                                           self._getBaseComparison()))
+        tags = self.original.store.query(Tag, Tag.object == Message.storeID)
         return list(tags.getColumn('name').distinct())
 
     def render_button(self, ctx, data):
