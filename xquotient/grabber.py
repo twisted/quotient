@@ -202,6 +202,11 @@ class POP3Grabber(item.Item):
     ControlledPOP3GrabberProtocol that is grabbing stuff
     for me""")
 
+    connector = attributes.inmemory(doc="""
+    implementor of L{twisted.internet.interfaces.IConnector}, representing
+    our connection to the POP server
+    """)
+
     scheduled = attributes.timestamp(doc="""
     When this grabber is next scheduled to run.
     """)
@@ -233,6 +238,15 @@ class POP3Grabber(item.Item):
         if self.status is None:
             self.status = Status(store=self.store, message=u'idle')
 
+    def delete(self):
+        scheduler.IScheduler(self.store).unscheduleAll(self)
+        if self.running:
+            if self.protocol is not None:
+                self.protocol.stop()
+                self.protocol.grabber = None
+            else:
+                self.connector.disconnect()
+        self.deleteFromStore()
 
     def grab(self):
         # Don't run concurrently, ever.
@@ -259,7 +273,7 @@ class POP3Grabber(item.Item):
                 'pop3client-%d-%f' % (self.storeID, time.time()))
 
         self.status.setStatus(u"Connecting to %s:%d..." % (self.domain, port))
-        connect(self.domain, port, BandwidthMeasuringFactory(factory, 'pop3-grabber'))
+        self.connector = connect(self.domain, port, BandwidthMeasuringFactory(factory, 'pop3-grabber'))
 
 
     def run(self):
@@ -717,11 +731,7 @@ class DeleteAction(tdbview.Action):
         super(DeleteAction, self).__init__(actionID, iconURL, description, disabledIconURL)
 
     def performOn(self, grabber):
-        scheduler.IScheduler(grabber.store).unscheduleAll(grabber)
-        if grabber.running:
-            grabber.protocol.stop()
-            grabber.protocol.grabber = None
-        grabber.deleteFromStore()
+        grabber.delete()
 
     def actionable(self, item):
         return True
