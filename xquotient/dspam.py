@@ -8,6 +8,10 @@ HOME="/var/spool/dspam"
 STORAGE_DRIVER="/usr/lib/dspam/libsqlite3_drv.so"
 DSPAM_LIB="/usr/lib/libdspam.so.7"
 
+if not os.path.exists(STORAGE_DRIVER) or not os.path.exists(DSPAM_LIB):
+    raise ImportError(STORAGE_DRIVER + " or " + DSPAM_LIB + " missing, dspam unavailable.")
+
+
 def startDSPAM(user, home):
     """
     Load DSPAM and create a database handle.

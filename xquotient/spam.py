@@ -16,7 +16,12 @@ from axiom import iaxiom, item, attributes, userbase
 
 from xmantissa import ixmantissa
 
-from xquotient import mail, iquotient, exmess, dspam
+from xquotient import mail, iquotient, exmess
+
+try:
+    from xquotient import dspam
+except ImportError:
+    dspam = None
 
 SPAM_THRESHHOLD = 0.3
 

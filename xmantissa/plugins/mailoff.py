@@ -65,11 +65,16 @@ spambayesFilteringBenefactorFactory = provisioning.BenefactorFactory(
     benefactorClass = spam.SpambayesBenefactor,
     dependencies = [quotientBenefactorFactory])
 
-spambayesFilteringBenefactorFactory = provisioning.BenefactorFactory(
-    name = u'DSPAM-based trainable Ham/Spam Filtering',
-    description = u'Filtering of messages based on a bayesian classification with per-user training information.',
-    benefactorClass = spam.DSPAMBenefactor,
-    dependencies = [quotientBenefactorFactory])
+if spam.dspam is not None:
+    dspamFilteringBenefactorFactory = provisioning.BenefactorFactory(
+        name = u'DSPAM-based trainable Ham/Spam Filtering',
+        description = u'Filtering of messages based on a bayesian classification with per-user training information.',
+        benefactorClass = spam.DSPAMBenefactor,
+        dependencies = [quotientBenefactorFactory])
+    _dspam = [dspamFilteringBenefactorFactory]
+else:
+    dspamFilteringBenefactorFactory = None
+    _dspam = []
 
 
 plugin = offering.Offering(
@@ -89,14 +94,15 @@ plugin = offering.Offering(
     appPowerups = (publicpage.QuotientPublicPage,),
 
     benefactorFactories = [quotientBenefactorFactory,
-                           spambayesFilteringBenefactorFactory,
                            extractBenefactorFactory,
                            indexingBenefactorFactory,
                            grabberBenefactorFactory,
                            composeBenefactorFactory,
                            popAccessBenefactorFactory,
                            ruleBenefactorFactory,
-                           quotientPeopleBenefactorFactory],
+                           quotientPeopleBenefactorFactory,
+                           spambayesFilteringBenefactorFactory,
+                           ] + _dspam,
     loginInterfaces = [(IMessageDelivery, "SMTP logins"),
                        (IMailbox, "POP3 logins")],
     themes = [QuotientTheme('base', 0)],
