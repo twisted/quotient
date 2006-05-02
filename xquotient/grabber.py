@@ -134,7 +134,7 @@ class POP3UID(item.Item):
     grabberID = attributes.text(doc="""
     A string identifying the email-address/port parts of a
     configured grabber
-    """)
+    """, indexed=True)
 
     value = attributes.bytes(doc="""
     A POP3 UID which has already been retrieved.
