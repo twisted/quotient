@@ -109,7 +109,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
     function resized(self) {
         var pageHeight = document.documentElement.clientHeight;
-        self._scrollViewport.style.height = (pageHeight - self.ypos - 14) + "px";
+        var footer = document.getElementById("mantissa-footer");
+        self._scrollViewport.style.height = (pageHeight - self.ypos - 14 - footer.clientHeight) + "px";
     },
 
     function _createRowHeaders(self, columnNames) {
@@ -409,7 +410,12 @@ Quotient.Mailbox.Controller.methods(
         self.scrollWidget._scrollViewport.style.height =
             (parseInt(self.scrollWidget._scrollViewport.style.height) - self.mastheadBottom.clientHeight) + "px";
         var pageHeight = document.documentElement.clientHeight;
-        self.messageDetail.style.height = (pageHeight - self.ypos - 15 - self.mastheadBottom.clientHeight) + "px";
+        var footer = document.getElementById("mantissa-footer");
+        self.messageDetail.style.height = (pageHeight -
+                                           self.ypos -
+                                           15 -
+                                           self.mastheadBottom.clientHeight -
+                                           footer.clientHeight) + "px";
         var pos = self.scrolltableContainer.style.position;
 
         if(initialResize) {
