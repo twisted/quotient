@@ -139,12 +139,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self._rowHeight = rowHeight;
     },
 
-    function _selectRow(self, rowOffset, row) {
+    function _selectRow(self, row) {
         if(self._selectedRow) {
             self._selectedRow.style.backgroundColor = '';
-        }
-        if(!row) {
-            row = self._rows[rowOffset][1];
         }
 
         if(row.style.fontWeight == "bold") {
@@ -155,7 +152,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
         row.style.backgroundColor = '#FFFFFF';
 
         self._selectedRow = row;
-        self._selectedRowOffset = rowOffset;
+    },
+
+    function _selectFirstRow(self) {
+        self._selectRow(self._rows[0][1]);
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
@@ -173,7 +173,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "href": "#",
              "style": style,
              "onclick": function() {
-                self._selectRow(rowOffset, this);
+                /* don't select based on rowOffset because it'll change as rows are removed */
+                self._selectRow(this);
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
             }}, data);
@@ -245,14 +246,23 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function removeCurrentRow(self) {
         self._selectedRow.parentNode.removeChild(self._selectedRow);
         self.adjustViewportHeight(-1);
-        var top;
-        for(var i = self._selectedRowOffset; i < self._rows.length && self._rows[i]; i++) {
-            top = parseInt(self._rows[i][1].style.top);
-            self._rows[i][1].style.top = (top - self._rowHeight) + "px";
+
+        var row, found, index;
+        for(var i = 0; i < self._rows.length; i++) {
+            if(!self._rows[i]) {
+                continue;
+            }
+            row = self._rows[i][1];
+            if(found) {
+                row.style.top = (parseInt(row.style.top) - self._rowHeight) + "px";
+            } else if(row == self._selectedRow) {
+                found = true;
+                index = i;
+            }
         }
-        self._rows = self._rows.slice(
-                        0, self._selectedRowOffset).concat(
-                            self._rows.slice(self._selectedRowOffset+1, self._rows.length));
+
+        self._rows = self._rows.slice(0, index).concat(
+                            self._rows.slice(index+1, self._rows.length));
     },
 
     function cbRowsFetched(self, count) {
@@ -317,7 +327,7 @@ Quotient.Mailbox.Controller.methods(
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
         self.resized(true);
 
-        self._selectAndFetchRow(0, function() { return null });
+        self._selectAndFetchFirstRow();
 
         self.setMessageCount(messageCount);
 
@@ -544,7 +554,7 @@ Quotient.Mailbox.Controller.methods(
                 self.scrollWidget.setViewportHeight(messageData[0]);
                 self.scrollWidget.emptyAndRefill();
                 self.scrollWidget._pendingRowSelection = function() {
-                    self._selectAndFetchRow(0, function() { return null }, false);
+                    self._selectAndFetchFirstRow(false);
                 }
             });
     },
@@ -776,23 +786,13 @@ Quotient.Mailbox.Controller.methods(
         self.mailViewNodes = nodes;
     },
 
-    function _selectAndFetchRow(self, offset, elementFactory, requestMoreRowsIfNeeded) {
-        /* ideally we want to disable these actions if they aren't going
-           to behave as advertised - as it stands they'll just do nothing
-           if there isn't a next/prev row.
-
-           elementFactory is a function that returns the row that should be
-           highlighted.  it is a function because the row element might or
-           might not exist when we called (e.g. if we have to request more
-           rows to fufill the request) */
-
-        if(offset < 0) { return }
+    function _selectAndFetchFirstRow(self, requestMoreRowsIfNeeded) {
         if(typeof requestMoreRowsIfNeeded === 'undefined') {
             requestMoreRowsIfNeeded = true;
         }
 
         var sw = self.scrollWidget;
-        if(sw._rows.length < offset+1) {
+        if(sw._rows.length == 0) {
             if(requestMoreRowsIfNeeded) {
                 /* free up some space */
                 sw._scrollViewport.scrollTop += sw._rowHeight * 3;
@@ -804,13 +804,13 @@ Quotient.Mailbox.Controller.methods(
                     /* call ourselves, passing additional argument
                        indicating that we shouldn't go through this
                        rigmarole a second time if there still aren't enough rows */
-                    self._selectAndFetchRow(offset, elementFactory, false);
+                    self._selectAndFetchFirstRow(false);
                 }
             }
             return;
         }
 
-        sw._selectRow(offset, elementFactory());
+        sw._selectFirstRow();
     },
 
     /**
@@ -839,17 +839,15 @@ Quotient.Mailbox.Controller.methods(
             remoteArgs.push(arguments[i]);
         }
         var next = self.scrollWidget._selectedRow.nextSibling;
-        var index = self.scrollWidget._selectedRowOffset;
 
         if(!next) {
             next = self.scrollWidget._selectedRow.previousSibling;
-            index--;
         }
 
         if (isProgress) {
             self.scrollWidget.removeCurrentRow();
             if(next.tagName) {
-                self.scrollWidget._selectRow(index, next);
+                self.scrollWidget._selectRow(next);
                 self.scrollWidget.scrolled();
             }
         }

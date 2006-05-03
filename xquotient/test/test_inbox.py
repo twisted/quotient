@@ -77,6 +77,7 @@ class InboxTestCase(TestCase):
 
         PrivateApplication(store=s).installOn(s)
         inboxScreen = INavigableFragment(Inbox(store=s))
+        self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
 
         def assertCountsAre(**d):
             for k in ('Trash', 'Sent', 'Spam', 'All', 'Inbox'):
@@ -105,3 +106,13 @@ class InboxTestCase(TestCase):
             Message(store=s, read=False, outgoing=True, receivedWhen=Time())
 
         assertCountsAre(Inbox=8, All=11, Spam=4, Trash=2, Sent=4)
+        self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
+
+    def testViewSwitching(self):
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+        inboxScreen = INavigableFragment(Inbox(store=s))
+
+        for view in ('Inbox', 'All', 'Spam', 'Trash', 'Sent'):
+            inboxScreen.changeView(view)
+            self.assertEqual(inboxScreen.getCurrentViewName(), view)

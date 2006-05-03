@@ -16,9 +16,6 @@ from xquotient.actions import SenderPersonFragment
 from PIL import Image as PilImage
 from cStringIO import StringIO
 
-class CannotThumbnail(Exception):
-    pass
-
 def makeThumbnail(data, outpath, thumbSize=135):
     try:
         # i since noticed that PIL.Image has a thumbnail method, maybe use
@@ -31,7 +28,7 @@ def makeThumbnail(data, outpath, thumbSize=135):
         # Do the thumbnailing
         image.resize((int(width * scale), int(height * scale)), True).save(outpath, 'jpeg')
     except IOError:
-        raise CannotThumbnail()
+        pass
 
 class Image(Item):
     typeName = 'quotient_image'

@@ -365,10 +365,21 @@ class InboxScreen(athena.LiveFragment):
 
     def mailViewCounts(self):
         counts = {}
+        curview = self.getCurrentViewName()
         for v in (u'Trash', u'Sent', u'Spam', u'All', u'Inbox'):
             self.changeView(v)
             counts[v] = self.getUnreadMessageCount()
+        self.changeView(curview)
         return counts
+
+    def getCurrentViewName(self):
+        for (truth, name) in ((self.inAllView, 'All'),
+                              (self.inTrashView, 'Trash'),
+                              (self.inSentView, 'Sent'),
+                              (self.inSpamView, 'Spam'),
+                              (True, 'Inbox')):
+            if truth:
+                return name
 
     def viewByPerson(self, webID):
         if webID is None:
@@ -510,16 +521,16 @@ class InboxScreen(athena.LiveFragment):
         return self._progressOrDont(advance)
 
     def _getBaseComparison(self):
-        comparison = attributes.AND(
+        comparison = [
             Message.trash == self.inTrashView,
             Message.draft == False,
-            Message.receivedWhen < Time())
+            Message.receivedWhen < Time()]
 
         if not self.inTrashView:
-            comparison = attributes.AND(comparison, Message.outgoing == self.inSentView)
+            comparison.append(Message.outgoing == self.inSentView)
 
         if not (self.inAllView or self.inTrashView or self.inSpamView):
-            comparison = attributes.AND(comparison, Message.archived == False)
+            comparison.append(Message.archived == False)
 
         if not (self.inSentView or self.inTrashView):
             # Note - Message.spam defaults to None, and inSpamView will
@@ -534,27 +545,24 @@ class InboxScreen(athena.LiveFragment):
             # delivered but unfiltered messages will just show up on the
             # page, which should result in this minor inequity being more or
             # less irrelevant.
-            comparison = attributes.AND(comparison, Message.spam == self.inSpamView)
+            comparison.append(Message.spam == self.inSpamView)
 
 
         if self.viewingByTag is not None:
-            comparison = attributes.AND(
+            comparison.extend((
                 Tag.object == Message.storeID,
-                Tag.name == self.viewingByTag,
-                comparison)
+                Tag.name == self.viewingByTag))
 
         if self.viewingByAccount is not None:
-            comparison = attributes.AND(
-                Message.source == self.viewingByAccount,
-                comparison)
+            comparison.append(Message.source == self.viewingByAccount)
 
         if self.viewingByPerson is not None:
-            comparison = attributes.AND(
+            comparison.extend((
                 Message.sender == people.EmailAddress.address,
                 people.EmailAddress.person == people.Person.storeID,
-                people.Person.storeID == self.viewingByPerson.storeID)
+                people.Person.storeID == self.viewingByPerson.storeID))
 
-        return comparison
+        return attributes.AND(*comparison)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
 
