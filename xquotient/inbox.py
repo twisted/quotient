@@ -91,7 +91,7 @@ class Inbox(Item, InstallableMixin):
     # the user changes the setting)
 
     def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.25, children=
+        return [webnav.Tab('Mail', self.storeID, 0.75, children=
                     [webnav.Tab('Inbox', self.storeID, 0.4)],
                 authoritative=True)]
 
