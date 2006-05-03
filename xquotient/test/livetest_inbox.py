@@ -36,7 +36,8 @@ class InboxTestCase(testcase.TestCase):
     docFactory = loaders.stan(tags.div[
                     tags.div(render=tags.directive('liveTest'))['InboxTestCase'],
                     tags.div(render=tags.directive('inbox'),
-                             style='visibility: hidden')])
+                             style='visibility: hidden'),
+                    tags.div(id='mantissa-footer')])
 
     def render_inbox(self, ctx, data):
         s = Store()
