@@ -160,7 +160,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function makeRowElement(self, rowOffset, rowData, cells) {
-        var style = "border-top: solid 1px #FFFFFF";
+        var style = "border-top: solid 1px #FFFFFF; height: " + (self._rowHeight - 9) + "px";
         if(!rowData["read"]) {
             style += ";font-weight: bold";
         }
@@ -179,6 +179,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
             }}, data);
+    },
+
+    function massageColumnValue(self, name, type, value) {
+        var res = Quotient.Mailbox.ScrollingWidget.upcall(
+                        self, "massageColumnValue", name, type, value);
+
+        var ALL_WHITESPACE = /^\s*$/;
+        if(name == "subject" && ALL_WHITESPACE.test(res)) {
+            res = "<Empty Subject>";
+        }
+        return res;
     },
 
     function makeCellElement(self, colName, rowData) {
