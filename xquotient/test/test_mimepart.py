@@ -55,6 +55,31 @@ Hello Bob,
     def testTrivialMessage(self):
         self._messageTest(self.trivialMessage, self.assertTrivialMessageStructure)
 
+
+    messageWithUnicode = msg("""\
+From: =?utf-8?b?VMOpc3Qgx5NzZXIgPHRlc3R1c2VyQGV4YW1wbGUuY29tPg==?=
+
+Body.
+""")
+
+
+    def assertUnicodeHeaderValues(self, msg):
+        self.assertEquals(
+            msg.getHeader(u"from"),
+            u"T\N{LATIN SMALL LETTER E WITH ACUTE}st "
+            u"\N{LATIN CAPITAL LETTER U WITH CARON}ser "
+            u"<testuser@example.com>")
+
+
+    def testUnicodeHeaderValues(self):
+        """
+        MIME Headers may be encoded in various ways.  Assert that none of these
+        encoding details make it into the resulting Header objects and that the
+        non-ASCII payload is correctly interpreted.
+        """
+        self._messageTest(self.messageWithUnicode, self.assertUnicodeHeaderValues)
+
+
     multipartMessage = msg("""\
 Envelope-to: test@domain.tld
 Received: from pool-138-88-80-171.res.east.verizon.net

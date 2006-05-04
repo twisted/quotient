@@ -28,7 +28,9 @@ class _Part(Item):
     walkAttachments = walkMessage
 
     def getHeader(self, *z):
-        return u'hi!'
+        return u'hi!\N{WHITE SMILING FACE}<>'
+
+
 
 class InboxTestCase(testcase.TestCase):
     jsClass = u'Quotient.Test.InboxTestCase'

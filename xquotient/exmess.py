@@ -353,11 +353,11 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         try:
             cc = self.original.impl.getHeader(u'cc')
         except equotient.NoSuchHeader:
-            cc = ''
+            cc = u''
         else:
+            addrs = mimeutil.parseEmailAddresses(cc, mimeEncoded=False)
             cc = self.patterns['cc'].fillSlots(
-                                'cc', ', '.join(e.anyDisplayName()
-                                                    for e in mimeutil.parseEmailAddresses(cc)))
+                'cc', ', '.join(e.anyDisplayName() for e in addrs))
 
         return dictFillSlots(ctx.tag,
                 dict(sender=personStan,
