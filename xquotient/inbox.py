@@ -219,10 +219,18 @@ class InboxScreen(athena.LiveFragment):
         self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
         return self.addPersonFragment
 
+    def _getScrolltableComparison(self):
+        if self.currentMessage is not None:
+            beforeTime = self.currentMessage.receivedWhen
+        else:
+            beforeTime = None
+
+        return self._getBaseComparison(beforeTime)
+
     def render_scroller(self, ctx, data):
         f = ScrollingFragment(self.original.store,
                               Message,
-                              self._getBaseComparison(),
+                              self._getScrolltableComparison(),
                               (Message.senderDisplay,
                                Message.subject,
                                Message.receivedWhen,
@@ -231,6 +239,7 @@ class InboxScreen(athena.LiveFragment):
                                Message.attachments),
                               defaultSortColumn=Message.receivedWhen,
                               defaultSortAscending=False)
+
         f.jsClass = 'Quotient.Mailbox.ScrollingWidget'
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
@@ -370,7 +379,7 @@ class InboxScreen(athena.LiveFragment):
         return self._current()
 
     def _resetScrollQuery(self):
-        self.scrollingFragment.baseConstraint = self._getBaseComparison()
+        self.scrollingFragment.baseConstraint = self._getScrolltableComparison()
 
     def mailViewCounts(self):
         counts = {}
@@ -529,11 +538,14 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessage.train(spam)
         return self._progressOrDont(advance)
 
-    def _getBaseComparison(self):
+    def _getBaseComparison(self, beforeTime=None):
+        if beforeTime is None:
+            beforeTime = Time()
+
         comparison = [
             Message.trash == self.inTrashView,
             Message.draft == False,
-            Message.receivedWhen < Time()]
+            Message.receivedWhen <= beforeTime]
 
         if not self.inTrashView:
             comparison.append(Message.outgoing == self.inSentView)

@@ -17,6 +17,31 @@ class InboxTestCase(TestCase):
         # ord('\t') < ord('\n') < ord('\r')
         self.assertEquals(replaceControlChars(s), '\t\n\rfoobar')
 
+    def testTimeMismatch(self):
+        s = Store()
+        PrivateApplication(store=s).installOn(s) # IWebTranslator
+        inboxScreen = INavigableFragment(Inbox(store=s))
+
+        # we should see this message in the result set
+        m1 = Message(store=s, receivedWhen=Time(), spam=False)
+        # and this, because we set it as the current message,
+        # and the query should show us only messages received
+        # at <= the time the current message was received
+        m2 = Message(store=s, receivedWhen=Time(), spam=False)
+
+        inboxScreen.currentMessage = m2
+
+        # but not these
+        for i in xrange(5):
+            Message(store=s, receivedWhen=Time(), spam=False)
+
+        # urggg
+        query = inboxScreen._getScrolltableComparison()
+        self.assertEqual(list(s.query(Message, query,
+                                      sort=Message.receivedWhen.asc).getColumn('receivedWhen')),
+                         [m1.receivedWhen, m2.receivedWhen])
+
+
     def testUnreadMessageCount(self):
         s = Store()
 
