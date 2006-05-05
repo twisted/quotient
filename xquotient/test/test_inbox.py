@@ -8,10 +8,15 @@ from xmantissa.ixmantissa import INavigableFragment
 from xmantissa.webapp import PrivateApplication
 
 from xquotient.exmess import Message
-from xquotient.inbox import Inbox
+from xquotient.inbox import Inbox, replaceControlChars
 
 
 class InboxTestCase(TestCase):
+    def testControlChars(self):
+        s = ''.join(map(chr, range(1, 32))) + 'foobar'
+        # ord('\t') < ord('\n') < ord('\r')
+        self.assertEquals(replaceControlChars(s), '\t\n\rfoobar')
+
     def testUnreadMessageCount(self):
         s = Store()
 

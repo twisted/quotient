@@ -1,4 +1,6 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
+import re
+
 from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
@@ -21,6 +23,13 @@ from xquotient.exmess import Message
 from xquotient import mimepart, equotient, compose
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
+
+# C0 control set (0x01-0x1F), minus CR (0x0D), LF (0x0A) & HT (0x09)
+# These can't appear in XML or XHTML (apparently they can be escaped in XML 1.1)
+# See: http://lists.w3.org/Archives/Public/public-i18n-geo/2003May/att-0030/W3C_I18N_Q_A_C0_Range.htm
+
+_UNSUPPORTED_C0_CHARS = re.compile(r'[\x01-\x08\x0B\x0C\x0E-\x1F]')
+replaceControlChars = lambda s: _UNSUPPORTED_C0_CHARS.sub('', s)
 
 def quoteBody(m, maxwidth=78):
     for part in m.walkMessage(prefer='text/plain'):
@@ -428,7 +437,7 @@ class InboxScreen(athena.LiveFragment):
         #    entity = getattr(entities, eref, None)
         #    if entity is not None:
         #        text = text.replace('&' + eref + ';', '&#' + entity.num + ';')
-        return unicode(flatten(thing), 'utf-8')
+        return replaceControlChars(unicode(flatten(thing), 'utf-8'))
 
     def _current(self):
         return (self._squish(self._nextMessagePreview()),
