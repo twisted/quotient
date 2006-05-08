@@ -68,19 +68,34 @@ Quotient.Test.InboxTestCase.methods(
             expectedDate.getDate(),
             rows[1]["date"]);
 
-        return self.mailbox._sendViewRequest("viewByMailType", "Spam").addCallback(
+        var waitForScrollTableRefresh = function() {
+            var d = new Divmod.Defer.Deferred();
+            var pendingRowSelection =
+            self.mailbox.scrollWidget._pendingRowSelection;
+            self.mailbox.scrollWidget._pendingRowSelection = function() {
+                pendingRowSelection && pendingRowSelection();
+                d.callback(null);
+            }
+            return d;
+        }
+
+        var onSwitchView = function(viewn, f) {
+            return self.mailbox._sendViewRequest("viewByMailType", viewn).addCallback(
+                function() {
+                    /* this doesn't work unless f is wrapped in another function */
+                    return waitForScrollTableRefresh().addCallback(function() { f() });
+                });
+        }
+
+        return onSwitchView("Spam",
             function() {
-                var deferred = new Divmod.Defer.Deferred();
-                var pendingRowSelection = self.mailbox.scrollWidget._pendingRowSelection;
-                self.mailbox.scrollWidget._pendingRowSelection = function() {
-                    pendingRowSelection && pendingRowSelection();
-                    deferred.callback(null);
-                }
-                return deferred;
-        }).addCallback(
-            function() {
-                    rows = collectRows();
-                    self.assertEquals(rows[0]["subject"], "SPAM SPAM SPAM");
-                    self.assertEquals(rows.length, 1);
+                var rows = collectRows();
+                self.assertEquals(rows[0]["subject"], "SPAM SPAM SPAM");
+                self.assertEquals(rows.length, 1);
+
+                return onSwitchView("Sent",
+                    function() {
+                        self.assertEquals(collectRows().length, 0);
+                    });
             });
     });
