@@ -279,8 +279,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
     function cbRowsFetched(self, count) {
         self.throbber.style.display = "none";
-        if(0 < count && self._pendingRowSelection) {
-            self._pendingRowSelection();
+        if(self._pendingRowSelection) {
+            self._pendingRowSelection(count);
             self._pendingRowSelection = null;
         }
     });
@@ -570,8 +570,10 @@ Quotient.Mailbox.Controller.methods(
                 self.updateMailViewCounts(messageData[2]);
                 self.scrollWidget.setViewportHeight(messageData[0]);
                 self.scrollWidget.emptyAndRefill();
-                self.scrollWidget._pendingRowSelection = function() {
-                    self._selectAndFetchFirstRow(false);
+                self.scrollWidget._pendingRowSelection = function(count) {
+                    if(0 < count) {
+                        self._selectAndFetchFirstRow(false);
+                    }
                 }
             });
     },
@@ -817,11 +819,13 @@ Quotient.Mailbox.Controller.methods(
                 /* the scroll widget's cbRowsFetched
                    method will call this function when
                    it gets rows */
-                sw._pendingRowSelection = function() {
+                sw._pendingRowSelection = function(count) {
                     /* call ourselves, passing additional argument
                        indicating that we shouldn't go through this
                        rigmarole a second time if there still aren't enough rows */
-                    self._selectAndFetchFirstRow(false);
+                    if(0 < count) {
+                        self._selectAndFetchFirstRow(false);
+                    }
                 }
             }
             return;
