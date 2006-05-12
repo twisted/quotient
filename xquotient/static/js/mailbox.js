@@ -93,7 +93,8 @@ Quotient.Mailbox.MessageDetail.methods(
     });
 
 
-Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass();
+Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
+    "Quotient.Mailbox.ScrollingWidget");
 Quotient.Mailbox.ScrollingWidget.methods(
     function __init__(self, node) {
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
@@ -335,7 +336,7 @@ Quotient.Mailbox.Controller.methods(
                                                            "athena:class",
                                                            "Quotient.Mailbox.ScrollingWidget");
 
-        self.scrollWidget = Quotient.Mailbox.ScrollingWidget.get(scrollNode);
+        self.scrollWidget = Nevow.Athena.Widget.get(scrollNode);
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
         self.resized(true);
 
