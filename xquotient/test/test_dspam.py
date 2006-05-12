@@ -1,21 +1,20 @@
 from twisted.trial import unittest
 from axiom import store, userbase
-from xquotient import spam, dspam
-import ctypes
+from xquotient import spam
 
 MESSAGE = """Return-path: <cannataumaybe@lib.dote.hu>
 Envelope-to: washort@divmod.org
 Delivery-date: Tue, 25 Apr 2006 15:50:29 -0400
 Received: from exprod6mx149.postini.com ([64.18.1.129] helo=psmtp.com)
-	by divmod.org with smtp (Exim 4.52 #1 (Debian))
-	id 1FYTYL-00057b-EU
-	for <washort@divmod.org>; Tue, 25 Apr 2006 15:50:29 -0400
+\tby divmod.org with smtp (Exim 4.52 #1 (Debian))
+\tid 1FYTYL-00057b-EU
+\tfor <washort@divmod.org>; Tue, 25 Apr 2006 15:50:29 -0400
 Received: from source ([198.49.126.190]) (using TLSv1) by exprod6mx149.postini.com ([64.18.5.10]) with SMTP;
-	Tue, 25 Apr 2006 14:50:25 CDT
+\tTue, 25 Apr 2006 14:50:25 CDT
 Received: from ol5-29.fibertel.com.ar ([24.232.29.5] helo=lib.dote.hu)
-	by pyramid.twistedmatrix.com with smtp (Exim 3.35 #1 (Debian))
-	id 1FYTYA-0001DS-00
-	for <washort@twistedmatrix.com>; Tue, 25 Apr 2006 14:50:20 -0500
+\tby pyramid.twistedmatrix.com with smtp (Exim 3.35 #1 (Debian))
+\tid 1FYTYA-0001DS-00
+\tfor <washort@twistedmatrix.com>; Tue, 26 Apr 2006 14:50:20 -0500
 Message-ID: <000001c668a1$66a6ab20$f0dba8c0@xym95>
 Reply-To: "Maybelle Cannata" <cannataumaybe@lib.dote.hu>
 From: "Maybelle Cannata" <cannataumaybe@lib.dote.hu>
@@ -97,6 +96,8 @@ class DSPAMTestCase(unittest.TestCase):
                           EMPTY_MESSAGE, True)
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage, d, "test", self, unicode(MESSAGE), True)
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage, d, u"test", self, MESSAGE, True)
+
+
 class DSPAMFilterTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -116,3 +117,9 @@ class DSPAMFilterTestCase(unittest.TestCase):
         self.f.classify(FakeMessage(MESSAGE))
         self.f.train(True, FakeMessage(MESSAGE))
 
+if spam.dspam == None:
+  DSPAMFilterTestCase.skip = "DSPAM not installed"
+  DSPAMTestCase.skip = "DSPAM not installed"
+else:
+ dspam = spam.dspam
+ import ctypes
