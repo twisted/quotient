@@ -67,6 +67,8 @@ class Filter(item.Item, item.InstallableMixin):
                 f.train(item.spam, item.message)
             item.deleteFromStore()
         elif not item.trained:
+            if not self._filters:
+                return
             f = self._filters[0]
             isSpam, score = f.classify(item)
             item.spam = isSpam
