@@ -1131,8 +1131,12 @@ Quotient.Mailbox.Controller.methods(
             modifier = 'not';
         }
 
-        var spambutton = self.nodeByAttribute('class', 'spam-state');
-        Divmod.Runtime.theRuntime.setNodeContent(spambutton,
+
+        if(!self.spamButton) {
+            self.spamButton = self.firstWithClass("spam-state", self.messageActions[1]);
+        }
+
+        Divmod.Runtime.theRuntime.setNodeContent(self.spamButton,
                                                  '<span xmlns="http://www.w3.org/1999/xhtml">' +
                                                  spamConfidence + ' ' + modifier +
                                                  '</span>');
