@@ -1064,8 +1064,10 @@ Quotient.Mailbox.Controller.methods(
 
     function highlightExtracts(self) {
         try {
-            var messageBody = self.firstNodeByAttribute("class", "message-body");
-        } catch(e) { return }
+            var messageBody = self.firstWithClass("message-body", self.messageDetail);
+        } catch(e) {
+            return
+        }
         var replacements, replacement, replacementLen, j, elem;
         var i = 0;
         var regex = /(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]/;
