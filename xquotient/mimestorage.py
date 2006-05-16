@@ -31,7 +31,12 @@ class Header(item.Item):
         allowNone=False)
     index = attributes.integer(
         "The position of this header within a part.",
-        allowNone=False)
+        indexed=True, allowNone=False)
+
+    # This compound index matches the getHeader[s] query and is critical for
+    # interactive performance.
+
+    attributes.compoundIndex(part, name)
 
 
 

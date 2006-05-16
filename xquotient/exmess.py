@@ -1,3 +1,5 @@
+# -*- test-case-name: xquotient.test -*-
+
 from os import path
 import pytz, zipfile
 
@@ -106,6 +108,12 @@ class Message(item.Item):
     impl = attributes.reference()
 
     _prefs = attributes.inmemory()
+
+    # Mailbox Display Indexes - these are _critical_ for interactive
+    # performance (roughly 100,000% speedup)
+
+    attributes.compoundIndex(trash, draft, receivedWhen, outgoing, archived, sender)
+    attributes.compoundIndex(trash, draft, receivedWhen, outgoing, sender)
 
     def activate(self):
         self._prefs = None
