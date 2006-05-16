@@ -158,7 +158,8 @@ Quotient.Compose.Controller.methods(
 
     function fitMessageBodyToPage(self) {
         var e = self.nodeByAttribute("class", "message-body");
-        e.style.height = document.documentElement.clientHeight - Quotient.Common.Util.findPosY(e) - 55 + "px";
+        e.style.height = Divmod.Runtime.theRuntime.getPageHeight().h -
+                         Quotient.Common.Util.findPosY(e) - 55 + "px";
     },
 
     function addrAutocompleteKeyDown(self, event) {
@@ -280,7 +281,8 @@ Quotient.Compose.Controller.methods(
         if(0 < completions.length) {
             var input = self.nodeByAttribute("class", "compose-to-address");
             MochiKit.DOM.setDisplayForElement("", self.completions);
-            self.completions.style.top  = Quotient.Common.Util.findPosY(input) + input.clientHeight + "px";
+            self.completions.style.top  = Quotient.Common.Util.findPosY(input) +
+                                          Divmod.Runtime.theRuntime.getElementSize(input).h + "px";
             self.completions.style.left = Quotient.Common.Util.findPosX(input) + "px";
             self.highlightFirstAddrCompletion();
         }

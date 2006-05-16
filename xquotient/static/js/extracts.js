@@ -11,7 +11,7 @@ Quotient.Extracts.ScrollingWidget.methods(
         Quotient.Extracts.ScrollingWidget.upcall(self, "__init__", node);
         self._scrollViewport.style.maxHeight = '200px';
     },
-    
+
     function setViewportHeight(self, rowCount) {
         var r = MochiKit.DOM.DIV({"style": "visibility: hidden",
                                   "class": "scroll-row"},
@@ -21,14 +21,14 @@ Quotient.Extracts.ScrollingWidget.methods(
                                        "style": "float: none"}, "TEST!!!")]);
 
         self._scrollContent.appendChild(r);
-        var rowHeight = r.clientHeight
+        var rowHeight = Divmod.Runtime.theRuntime.getElementSize(r).h;
         self._scrollContent.removeChild(r);
 
         self._rowHeight = rowHeight;
         var scrollContentHeight = rowHeight * rowCount;
         self._scrollContent.style.height = scrollContentHeight + 'px';
     },
-    
+
     function makeRowElement(self, rowOffset, rowData, cells) {
         var ecol = self.makeCellElement("excerpt", rowData);
         ecol.style.width = "500px";

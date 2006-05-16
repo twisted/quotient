@@ -109,9 +109,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function resized(self) {
-        var pageHeight = document.documentElement.clientHeight;
         var footer = document.getElementById("mantissa-footer");
-        self._scrollViewport.style.height = (pageHeight - self.ypos - 14 - footer.clientHeight) + "px";
+        self._scrollViewport.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
+                                             self.ypos - 14 -
+                                             Divmod.Runtime.theRuntime.getElementSize(footer).h) + "px";
     },
 
     function _createRowHeaders(self, columnNames) {
@@ -135,7 +136,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
         self._scrollContent.appendChild(r);
-        var rowHeight = r.clientHeight;
+        var rowHeight = Divmod.Runtime.theRuntime.getElementSize(r).h;
         self._scrollContent.removeChild(r);
 
         self._rowHeight = rowHeight;
@@ -419,15 +420,15 @@ Quotient.Mailbox.Controller.methods(
         if(!initialResize) {
             self.scrollWidget.resized();
         }
+        var mastheadHeight = Divmod.Runtime.theRuntime.getElementSize(self.mastheadBottom).h;
         self.scrollWidget._scrollViewport.style.height =
-            (parseInt(self.scrollWidget._scrollViewport.style.height) - self.mastheadBottom.clientHeight) + "px";
-        var pageHeight = document.documentElement.clientHeight;
+            (parseInt(self.scrollWidget._scrollViewport.style.height) - mastheadHeight) + "px";
         var footer = document.getElementById("mantissa-footer");
-        self.messageDetail.style.height = (pageHeight -
+        self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
                                            self.ypos -
                                            15 -
-                                           self.mastheadBottom.clientHeight -
-                                           footer.clientHeight) + "px";
+                                           mastheadHeight -
+                                           Divmod.Runtime.theRuntime.getElementSize(footer).h) + "px";
         var pos = self.scrolltableContainer.style.position;
 
         if(initialResize) {
