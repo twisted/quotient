@@ -220,6 +220,11 @@ class POP3Grabber(item.Item):
     message is old enough to automatically archive.
     """)
 
+    _pop3uids = attributes.inmemory(doc="""
+    A set of strings representing all the POP3 UIDs which have already been
+    downloaded by this grabber.
+    """)
+
 
     class installedOn(descriptor.attribute):
         def get(self):
@@ -233,6 +238,7 @@ class POP3Grabber(item.Item):
 
 
     def activate(self):
+        self._pop3uids = None
         self.running = False
         self.protocol = None
         if self.status is None:
@@ -305,15 +311,19 @@ class POP3Grabber(item.Item):
 
 
     def shouldRetrieve(self, uidList):
-        d = {}
-        for (idx, uid) in uidList:
-            d[uid] = (idx, uid)
-        for uid in self.store.query(
-            POP3UID,
-            attributes.AND(POP3UID.grabberID == self.grabberID,
-                           POP3UID.value.oneOf(d.keys()))).getColumn('value'):
-            del d[uid]
-        return d.values()
+        """
+        Return a list of (index, uid) pairs from C{uidList} which have not
+        already been grabbed.
+        """
+        if self._pop3uids is None:
+            before = time.time()
+            # Load all the POP3 UIDs at once and put them in a set for
+            # super-fast lookup later.
+            self._pop3uids = set(self.store.query(POP3UID, POP3UID.grabberID == self.grabberID).getColumn("value"))
+            after = time.time()
+            log.msg(interface=iaxiom.IStatEvent, stat_pop3uid_load_time=after - before)
+        log.msg(interface=iaxiom.IStatEvent, stat_pop3uid_check=len(uidList))
+        return [pair for pair in uidList if pair[1] not in self._pop3uids]
 
 
     def markSuccess(self, uid, msg):

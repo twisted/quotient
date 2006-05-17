@@ -10,6 +10,8 @@ from epsilon import structlike, extime
 
 from vertex.test import iosim
 
+from axiom import store
+
 from xquotient import grabber, mimepart
 
 class StubMessage:
@@ -144,3 +146,27 @@ class POP3GrabberTestCase(unittest.TestCase):
         self.assertEquals(
             [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
             'stopped')
+
+
+
+class PersistentControllerTestCase(unittest.TestCase):
+    """
+    Tests for the Axiom-y parts of L{xquotient.grabber.POP3Grabber}.
+    """
+    def setUp(self):
+        self.store = store.Store()
+
+
+    def testShouldRetrieve(self):
+        g = grabber.POP3Grabber(
+            store=self.store,
+            username=u"testuser",
+            domain=u"example.com",
+            password=u"password")
+        for i in xrange(100, 200):
+            grabber.POP3UID(store=self.store, grabberID=g.grabberID, value=str(i))
+
+        self.assertEquals(
+            g.shouldRetrieve([(1, '99'), (2, '100'), (3, '150'), (4, '200')]),
+            [(1, '99'), (4, '200')])
+
