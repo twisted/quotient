@@ -5,7 +5,7 @@ from ctypes import SetPointerType, RTLD_GLOBAL
 import os
 
 HOME="/var/spool/dspam"
-STORAGE_DRIVER="/usr/lib/dspam/libsqlite3_drv.so"
+STORAGE_DRIVER="/usr/lib/dspam/libhash_drv.so"
 DSPAM_LIB="/usr/lib/libdspam.so.7"
 
 if not os.path.exists(STORAGE_DRIVER) or not os.path.exists(DSPAM_LIB):
@@ -229,11 +229,15 @@ class _sqlite_drv_storage(Structure):
 
 DSPAM_ALGORITHMS = DSA_GRAHAM | DSA_BURTON | DSP_GRAHAM
 DSPAM_TRAININGBUFFER = 5
-DSPAM_MODE =  DST_TEFT
+DSPAM_MODE =  DST_TOE
 
 def configureContext(d, user, home, mode, classification, source):
     MTX = d.dspam_create(user, None, home, mode, DSF_CHAINED | DSF_NOISE | DSF_WHITELIST)
-    d.dspam_addattribute(MTX, "SQLitePragma", "synchronous = OFF")
+    d.dspam_addattribute(MTX, "HashRecMax", "98317")
+    d.dspam_addattribute(MTX, "HashAutoExtend", "on")
+    d.dspam_addattribute(MTX, "HashMaxExtents", "0")
+    d.dspam_addattribute(MTX, "HashExtentSize", "49157")
+    d.dspam_addattribute(MTX, "HashMaxSeek", "100")
     d.dspam_attach(MTX, None)
     CTX = MTX.contents
     CTX.algorithms = DSPAM_ALGORITHMS
