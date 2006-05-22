@@ -2,7 +2,7 @@
 import StringIO
 
 from twisted.trial import unittest
-from twisted.internet import defer
+from twisted.internet import defer, error
 from twisted.mail import pop3
 from twisted.cred import error as ecred
 
@@ -13,6 +13,15 @@ from vertex.test import iosim
 from axiom import store
 
 from xquotient import grabber, mimepart
+
+
+class AbortableStringIO(StringIO.StringIO):
+    aborted = False
+
+    def abort(self):
+        self.aborted = True
+
+
 
 class StubMessage:
     sentWhen = extime.Time()
@@ -47,7 +56,7 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
 
 
     def createMIMEReceiver(self, source):
-        s = StringIO.StringIO()
+        s = AbortableStringIO()
         self.events.append(('receiver', source, s))
         return StubMIMEReceiver(s)
 
@@ -63,6 +72,10 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
     def paused(self):
         self.events.append(('paused',))
         return False
+
+
+    def transientFailure(self, err):
+        self.events.append(('transient', err))
 
 
     def stoppedRunning(self):
@@ -109,16 +122,31 @@ class ListMailbox(object):
         self.deleted = []
 
 
+class DelayedListMailbox(ListMailbox):
+    """
+    Like ListMailbox, but with hooks to arbitrarily delay responses.  This
+    allows us to test various failure conditions in the client.
+    """
+    def __init__(self, *a, **kw):
+        super(DelayedListMailbox, self).__init__(*a, **kw)
+        self.messageRequestDeferreds = []
+
+
+    def getMessage(self, index):
+        d = defer.Deferred()
+        self.messageRequestDeferreds.append(d)
+        d.addCallback(lambda ign: super(DelayedListMailbox, self).getMessage(index))
+        return d
+
+
 
 class POP3GrabberTestCase(unittest.TestCase):
     def setUp(self):
         self.client = TestPOP3Grabber()
         self.client.setCredentials('test_user', 'test_pass')
-
         self.server = pop3.POP3()
-        self.server.portal = Portal(
-            ListMailbox(['First message', 'Second message', 'Last message']),
-            lambda: None)
+        self.server.schedule = list
+        self.server.timeOut = None
 
 
     def tearDown(self):
@@ -126,6 +154,9 @@ class POP3GrabberTestCase(unittest.TestCase):
 
 
     def testBasicGrabbing(self):
+        self.server.portal = Portal(
+            ListMailbox(['First message', 'Second message', 'Last message']),
+            lambda: None)
         c, s, pump = iosim.connectedServerAndClient(
             lambda: self.server,
             lambda: self.client)
@@ -137,6 +168,7 @@ class POP3GrabberTestCase(unittest.TestCase):
             [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
             'stopped')
 
+
     def testFailedLogin(self):
         self.server.portal = NoPortal()
         c, s, pump = iosim.connectedServerAndClient(
@@ -146,6 +178,44 @@ class POP3GrabberTestCase(unittest.TestCase):
         self.assertEquals(
             [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
             'stopped')
+
+
+    def testLostConnectionDuringRetrieve(self):
+        """
+        Make sure that if a connection drops while waiting for a retrieve() to
+        complete, it is properly noticed, the right Deferreds errback, and so
+        forth.
+        """
+        mbox = DelayedListMailbox(['First message', 'Second message', 'Last message'])
+        self.server.portal = Portal(mbox, lambda: None)
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda : self.server,
+            lambda : self.client)
+        pump.flush()
+        s.transport.loseConnection()
+        pump.flush()
+        self.assertEquals(self.client.events[-1][0], 'stopped')
+
+
+    def testConnectionTimeout(self):
+        """
+        Make sure that if we receive no bytes for a really long time after
+        issuing a retrieve command, we give up and disassociate ourself from
+        our grabber object.
+        """
+        sched = []
+        self.client.callLater = lambda n, f: sched.append((n, f))
+
+        mbox = DelayedListMailbox(['First message', 'Second message', 'Last message'])
+        self.server.portal = Portal(mbox, lambda: None)
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda: self.server,
+            lambda: self.client)
+        self.assertEquals(len(sched), 1)
+        sched.pop()[1]()
+        self.assertEquals(self.client.events[-2][0], 'transient')
+        self.client.events[-2][1].trap(error.TimeoutError)
+        self.assertEquals(self.client.events[-1][0], 'stopped')
 
 
 
@@ -169,4 +239,3 @@ class PersistentControllerTestCase(unittest.TestCase):
         self.assertEquals(
             g.shouldRetrieve([(1, '99'), (2, '100'), (3, '150'), (4, '200')]),
             [(1, '99'), (4, '200')])
-

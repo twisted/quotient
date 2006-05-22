@@ -1,9 +1,12 @@
 # -*- test-case-name: xquotient.test.test_grabber -*-
 
+from epsilon import hotfix
+hotfix.require('twisted', 'deferredgenerator_tfailure')
+
 import time, datetime
 
 from twisted.mail import pop3, pop3client
-from twisted.internet import protocol, defer, ssl
+from twisted.internet import protocol, defer, ssl, error
 from twisted.python import log, components, failure
 from twisted.protocols import policies
 
@@ -342,6 +345,28 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
     _rate = 50
     _delay = 2.0
 
+    # An hour without bytes from the server and we'll just give up.  The exact
+    # duration is arbitrary.  It is intended to be long enough to deal with
+    # really slow servers or really big mailboxes or some combination of the
+    # two, but still short enough so that if something actually hangs we won't
+    # be stuck on it for long enough so as to upset the user.  This is probably
+    # an insufficient solution to the problem of hung SSL connections, which is
+    # the problem it is primarily targetted at solving.
+    timeout = (60 * 60)
+
+    def timeoutConnection(self):
+        """
+        Idle timeout expired while waiting for some bytes from the server.
+        Disassociate the protocol object from the POP3Grabber and drop the
+        connection.
+        """
+        addr, peer = self.transport.getHost(), self.transport.getPeer()
+        log.msg("POP3GrabberProtocol/%s->%s timed out" % (addr, peer))
+        self.transientFailure(failure.Failure(
+            error.TimeoutError("Timed out waiting for server response.")))
+        self.stoppedRunning()
+        self.transport.loseConnection()
+
 
     def setCredentials(self, username, password):
         self._username = username
@@ -376,7 +401,6 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                 log.err(f)
             self.setStatus(u'Login failed: ' + unicode(f.getErrorMessage(), 'ascii'), False)
             self.transport.loseConnection()
-            yield None                  # defgen error handling work-around.
             return
 
 
@@ -408,6 +432,9 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         yield d
         try:
             d.getResult()
+        except (error.ConnectionDone, error.ConnectionLost):
+            self.setStatus(unicode(u"Connection lost"), False)
+            return
         except:
             f = failure.Failure()
             log.err(f)
@@ -434,7 +461,9 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             yield d
             try:
                 d.getResult()
-
+            except (error.ConnectionDone, error.ConnectionLost):
+                self.setStatus(unicode(u"Connection lost"), False)
+                return
             except:
                 f = failure.Failure()
                 rece.connectionLost(f)
@@ -473,14 +502,13 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
     def connectionLost(self, reason):
         # XXX change status here - maybe?
+        pop3.AdvancedPOP3Client.connectionLost(self, reason)
         self.stoppedRunning()
 
-    stopped = False
 
+    stopped = False
     def stop(self):
         self.stopped = True
-
-
 
 
 
@@ -539,6 +567,7 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
                 self.grabber,
                 self.grabber.scheduled,
                 extime.Time())
+        self.grabber = None
 
 
 
