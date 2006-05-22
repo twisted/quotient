@@ -48,26 +48,18 @@ class Filter(item.Item, item.InstallableMixin):
 
 
     def processItem(self, item):
-
-        # Do two things that seem weird here:
-
-        #   1> Toss this do-nothing callable into the reactor's call queue so
-        #   that there will be a strong reference to prevent filter from being
-        #   garbage collected.
-        reactor.callLater(10, lambda: self)
-
-        #   2> Keep a list of references to all the current filter powerups so
-        #   that they, too, will not be garbage collected.  This isn't strictly
-        #   necessary, but it is a useful (if somewhat unsightly) optimization.
-        self._filters = list(self.powerupsFor(iquotient.IHamFilter))
-        if len(self._filters) > 1:
+        _filters = list(self.powerupsFor(iquotient.IHamFilter))
+        if len(_filters) > 1:
             raise NotImplementedError("multiple spam filters not yet supported")
         if isinstance(item, exmess._TrainingInstruction):
-            for f in self._filters:
+            for f in _filters:
                 f.train(item.spam, item.message)
             item.deleteFromStore()
         elif not item.trained:
-            f = self._filters[0]
+            if not _filters:
+                item.spam = False # well, we can't say it _is_ spam
+                return
+            f = _filters[0]
             isSpam, score = f.classify(item)
             item.spam = isSpam
             log.msg("spam batch processor scored message at %0.2f: %r" % (score, item.spam))

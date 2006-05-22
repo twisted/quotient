@@ -1,6 +1,8 @@
+from twisted.internet import reactor
 from twisted.trial import unittest
 from axiom import store, userbase
 from xquotient import spam
+import time
 
 MESSAGE = """Return-path: <cannataumaybe@lib.dote.hu>
 Envelope-to: washort@divmod.org
@@ -64,6 +66,8 @@ class FakeMessage:
         self.impl = self
         self.source = self
         self.msg = msg
+        self.trained = False
+        
     def open(self):
         return self
     def read(self):
@@ -107,16 +111,36 @@ class DSPAMFilterTestCase(unittest.TestCase):
         ls.installOn(s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
         ss = acc.avatars.open()
-        self.f = spam.DSPAMFilter(store=ss)
-        self.f.installOn(ss)
+        self.df = spam.DSPAMFilter(store=ss)
+        self.df.installOn(ss)
+        self.f = spam.Filter(store=ss)
 
     def testMessageClassification(self):
-        self.f.classify(FakeMessage(MESSAGE))
+        self.f.processItem(FakeMessage(MESSAGE))
 
     def testMessageTraining(self):
-        self.f.classify(FakeMessage(MESSAGE))
-        self.f.train(True, FakeMessage(MESSAGE))
+        self.df.classify(FakeMessage(MESSAGE))
+        self.df.train(True, FakeMessage(MESSAGE))
 
+class FilterTestCase(unittest.TestCase):
+
+    def setUp(self):
+        dbdir = self.mktemp()
+        s = store.Store(dbdir)
+        ls = userbase.LoginSystem(store=s)
+        ls.installOn(s)
+        acc = ls.addAccount('username', 'dom.ain', 'password')
+        ss = acc.avatars.open()
+        self.f = spam.Filter(store=ss)
+
+    def testMessageClassification(self):
+        """
+        If there's no spam classifier installed, messages should still get processed OK
+        """
+        m = FakeMessage(MESSAGE)
+        self.f.processItem(m)
+        self.assertNotEqual(m.spam, None)
+        
 if spam.dspam == None:
   DSPAMFilterTestCase.skip = "DSPAM not installed"
   DSPAMTestCase.skip = "DSPAM not installed"
