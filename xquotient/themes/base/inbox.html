@@ -110,6 +110,27 @@
               onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
               >Spam</a>
           </div>
+          <form name="group-actions">
+            <table align="center">
+              <tr>
+                <td>
+                  <select style="opacity: .3" name="group-action" disabled="true" class="group-action">
+                    <option value="archive">Archive</option>
+                    <option value="delete">Delete</option>
+                    <option value="train-ham">Train Ham</option>
+                    <option value="train-spam">Train Spam</option>
+                  </select>
+                </td>
+                <td>
+                  <nevow:invisible nevow:render="button">
+                    <a style="opacity: .3; cursor: default" href="#"
+                      onclick="return false" class="group-action-perform"
+                      >perform</a>
+                  </nevow:invisible>
+                </td>
+              </tr>
+            </table>
+          </form>
           <table cellpadding="0" cellspacing="0" style="width: 100%">
             <tr valign="bottom">
               <td style="height: 14px">
@@ -289,7 +310,7 @@
                 <a href="#"><athena:handler event="onclick" handler="trainSpam" />This Is Spam</a>
               </nevow:invisible>
             </span>
-            <span class="train-clean-button" style="display: none">
+            <span class="train-ham-button" style="display: none">
               <nevow:invisible nevow:render="button">
                 <a href="#"><athena:handler event="onclick" handler="trainHam" />Not Spam</a>
               </nevow:invisible>

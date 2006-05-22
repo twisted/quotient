@@ -35,8 +35,8 @@ Quotient.Test.InboxTestCase.methods(
     function waitForScrollTableRefresh(self) {
         var d = new Divmod.Defer.Deferred();
         var pendingRowSelection = self.mailbox.scrollWidget._pendingRowSelection;
-        self.mailbox.scrollWidget._pendingRowSelection = function() {
-            pendingRowSelection && pendingRowSelection();
+        self.mailbox.scrollWidget._pendingRowSelection = function(count) {
+            pendingRowSelection && pendingRowSelection(count);
             d.callback(null);
         }
         return d;
@@ -190,5 +190,96 @@ Quotient.Test.InboxTestCase.methods(
         for(var i = 0; i < args.length; i++) {
             D.addCallback(self.makeViewSwitcher.apply(self, args[i]));
         }
+
+        D.addCallback(function() { self.testActionGroupStuff() });
+
         return D;
+    },
+
+    function testActionGroupStuff(self) {
+        var sw = self.mailbox.scrollWidget;
+
+        var anyPredicate = function() {
+            return true;
+        }
+
+        for(var i = 0; i < 3; i++) {
+            self.assertEquals(sw.findNextRow(sw._rows[i][1], anyPredicate), sw._rows[i+1][1]);
+        }
+        self.assertEquals(sw.findNextRow(sw._rows[3][1], anyPredicate), undefined);
+
+        for(i = 3; 0 < i; i--) {
+            self.assertEquals(sw.findPrevRow(sw._rows[i][1], anyPredicate), sw._rows[i-1][1]);
+        }
+        self.assertEquals(sw.findPrevRow(sw._rows[0][1], anyPredicate), undefined);
+
+        var nonePredicate = function() {
+            return false;
+        }
+
+        self.assertEquals(sw.findNextRow(sw._rows[0][1], nonePredicate), undefined);
+        self.assertEquals(sw.findNextRow(sw._rows[3][1], nonePredicate), undefined);
+
+        self.assertEquals(sw.findPrevRow(sw._rows[3][1], nonePredicate), undefined);
+        self.assertEquals(sw.findPrevRow(sw._rows[0][1], nonePredicate), undefined);
+
+        var richAssertEquals = function(x, y) {
+            self.assertEquals(MochiKit.Base.compare(x, y), 0, x + " != " + y);
+        }
+
+        richAssertEquals(sw.findNextRow(sw._rows[0][1], anyPredicate, true), [sw._rows[1][1], 1]);
+        self.assertEquals(sw.findNextRow(sw._rows[3][1], anyPredicate, true), undefined);
+
+        richAssertEquals(sw.findPrevRow(sw._rows[3][1], anyPredicate, true), [sw._rows[2][1], 2]);
+        self.assertEquals(sw.findPrevRow(sw._rows[0][1], anyPredicate, true), undefined);
+
+        var select = document.forms["group-actions"].elements["group-action"];
+
+        self.assertEquals(select.value, "archive");
+
+        /* find out what appears right after 'archive' in the <select> */
+        var nextAction = select.getElementsByTagName("option")[select.selectedIndex+1];
+
+        /* hide the archive option */
+        self.mailbox.setDisplayForGroupActions("none", ["archive"]);
+        self.mailbox.selectFirstVisible(select);
+
+        self.assertEquals(select.value, nextAction.value);
+
+        self.mailbox.setDisplayForGroupActions("", ["archive"]);
+        self.mailbox.selectFirstVisible(select);
+
+        self.assertEquals(select.value, "archive");
+
+        var groupSelect = function(i) {
+            var row = sw._rows[i][1];
+            var img = Nevow.Athena.FirstNodeByAttribute(
+                        row, "src", "/Quotient/static/images/checkbox-off.gif");
+            sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
+        }
+
+        /* select the first and last messages */
+        groupSelect(0);
+        groupSelect(3);
+
+        self.assertEquals(sw.findRowOffset(sw._selectedRow), 0);
+
+        var selectedIDs = MochiKit.Base.keys(sw.selectedGroup);
+        selectedIDs.sort();
+
+        var expectedIDs = [sw._rows[0][0]["__id__"], sw._rows[3][0]["__id__"]];
+        expectedIDs.sort();
+
+        richAssertEquals(selectedIDs, expectedIDs);
+
+        /* find out the webID of the second row, which is what should become
+           the active message once we get the first and third out of the way */
+        var nextActiveWebID = sw._rows[1][0]["__id__"];
+
+        /* declare 0 & 3 to be spam */
+        var D = self.mailbox.touchSelectedGroup("train", true, true);
+        return D.addCallback(
+            function() {
+                self.assertEquals(sw._rows[0][0]["__id__"], nextActiveWebID);
+            });
     });

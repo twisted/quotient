@@ -10,7 +10,7 @@ from nevow.flat import flatten
 
 from epsilon.extime import Time
 
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item, InstallableMixin, transacted
 from axiom.tags import Tag
 from axiom import attributes
 
@@ -129,11 +129,18 @@ class InboxScreen(athena.LiveFragment):
     translator = None
 
     iface = allowedMethods = dict(deleteCurrentMessage=True,
+                                  deleteMessageGroup=True,
+
                                   archiveCurrentMessage=True,
+                                  archiveMessageGroup=True,
+
                                   deferCurrentMessage=True,
                                   replyToCurrentMessage=True,
                                   forwardCurrentMessage=True,
+
                                   trainCurrentMessage=True,
+                                  trainMessageGroup=True,
+
                                   getMessageCount=True,
 
                                   fastForward=True,
@@ -148,6 +155,7 @@ class InboxScreen(athena.LiveFragment):
     def __init__(self, original):
         athena.LiveFragment.__init__(self, original)
         self.translator = ixmantissa.IWebTranslator(original.store)
+        self.store = original.store
 
         self._resetCurrentMessage()
 
@@ -298,26 +306,21 @@ class InboxScreen(athena.LiveFragment):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = [(self.inAllView, 'All'),
-                 (self.inTrashView, 'Trash'),
-                 (self.inSentView, 'Sent'),
-                 (self.inSpamView, 'Spam'),
-                 (True, 'Inbox')]
+        views = ['All', 'Trash', 'Sent', 'Spam', 'Inbox']
+        counts = self.mailViewCounts()
+        counts = sorted(counts.iteritems(), key=lambda (v, c): views.index(v))
 
-        found = False
-        for (truth, view) in views:
-            if not found and truth:
+        curview = self.getCurrentViewName()
+        for (view, count) in counts:
+            if view == curview:
                 p = selectedOption
-                found = True
             else:
                 p = option
 
-            self.changeView(view)
             select[p().fillSlots(
                         'mailViewName', view).fillSlots(
-                        'count', self.getUnreadMessageCount())]
+                        'count', count)]
 
-        self.changeView('Inbox')
         return select
 
     def render_tagChooser(self, ctx, data):
@@ -372,11 +375,15 @@ class InboxScreen(athena.LiveFragment):
     def setComplexity(self, n):
         self.original.uiComplexity = n
 
+    setComplexity = transacted(setComplexity)
+
     def fastForward(self, webID):
         self.currentMessage = self.translator.fromWebID(webID)
         self.currentMessage.read = True
         self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
         return self._current()
+
+    fastForward = transacted(fastForward)
 
     def _resetScrollQuery(self):
         self.scrollingFragment.baseConstraint = self._getScrolltableComparison()
@@ -409,17 +416,23 @@ class InboxScreen(athena.LiveFragment):
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
+    viewByPerson = transacted(viewByPerson)
+
     def viewByTag(self, tag):
         self.viewingByTag = tag
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
+    viewByTag = transacted(viewByTag)
+
     def viewByAccount(self, account):
         self.viewingByAccount = account
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
+
+    viewByAccount = transacted(viewByAccount)
 
     def changeView(self, typ):
         self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = False
@@ -433,8 +446,12 @@ class InboxScreen(athena.LiveFragment):
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
 
+    viewByMailType = transacted(viewByMailType)
+
     def getMessageCount(self):
         return self.original.store.count(Message, self._getBaseComparison())
+
+    getMessageCount = transacted(getMessageCount)
 
     def _squish(self, thing):
         # replacing &nbsp with &#160 in webmail.SpacePreservingStringRenderer
@@ -473,9 +490,33 @@ class InboxScreen(athena.LiveFragment):
         self.currentMessage.trash = True
         return self._progressOrDont(advance)
 
+    deleteCurrentMessage = transacted(deleteCurrentMessage)
+
+    def deleteMessageGroup(self, advance, nextMessageWebID, webIDs):
+        for wid in webIDs:
+            self.translator.fromWebID(wid).trash = True
+        if advance:
+            if nextMessageWebID is not None:
+                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
+            return self._progressOrDont(advance)
+
+    deleteMessageGroup = transacted(deleteMessageGroup)
+
     def archiveCurrentMessage(self, advance):
         self.currentMessage.archived = True
         return self._progressOrDont(advance)
+
+    archiveCurrentMessage = transacted(archiveCurrentMessage)
+
+    def archiveMessageGroup(self, advance, nextMessageWebID, webIDs):
+        for wid in webIDs:
+            self.translator.fromWebID(wid).archived = True
+        if advance:
+            if nextMessageWebID is not None:
+                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
+            return self._progressOrDont(advance)
+
+    archiveMessageGroup = transacted(archiveMessageGroup)
 
     def deferCurrentMessage(self, advance, days, hours, minutes):
         self.currentMessage.receivedWhen = Time() + timedelta(days=days,
@@ -483,6 +524,8 @@ class InboxScreen(athena.LiveFragment):
                                                               minutes=minutes)
         self.currentMessage.read = False
         return self._progressOrDont(advance)
+
+    deferCurrentMessage = transacted(deferCurrentMessage)
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)
@@ -537,6 +580,18 @@ class InboxScreen(athena.LiveFragment):
     def trainCurrentMessage(self, advance, spam):
         self.currentMessage.train(spam)
         return self._progressOrDont(advance)
+
+    trainCurrentMessage = transacted(trainCurrentMessage)
+
+    def trainMessageGroup(self, advance, nextMessageWebID, webIDs, spam):
+        for wid in webIDs:
+            self.translator.fromWebID(wid).train(spam)
+        if advance:
+            if nextMessageWebID is not None:
+                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
+            return self._progressOrDont(advance)
+
+    trainMessageGroup = transacted(trainMessageGroup)
 
     def _getBaseComparison(self, beforeTime=None):
         if beforeTime is None:
