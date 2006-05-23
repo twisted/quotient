@@ -673,7 +673,7 @@ class MIMEMessageReceiver(object):
         self.messageDone()
         return defer.succeed(None)
 
-    def connectionLost(self, reason):
+    def connectionLost(self):
         if not self.done:
             self.file.abort()
             self.done = True

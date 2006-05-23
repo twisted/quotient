@@ -9,6 +9,7 @@ from epsilon import extime
 from axiom import store, scheduler
 
 from xquotient import mail, mimepart, mimestorage
+from xquotient.test import test_grabber
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
@@ -247,3 +248,15 @@ Some body
                 extime.Time.fromRFC2822("Wed, 15 Feb 2006 03:58:50 GMT"))
 
         self._messageTest(self.datelessMessage, assertSentWhen)
+
+
+class MessageTestCase(unittest.TestCase):
+    """
+    Test aspects of the L{twisted.mail.smtp.IMessage} implementation.
+    """
+    
+    def testConnectionLost(self):
+        fObj = test_grabber.AbortableStringIO()
+        msg = mimepart.MIMEMessageReceiver(fObj, lambda: None)
+        msg.connectionLost()
+        self.failUnless(fObj.aborted, "Underlying message file not aborted on lost connection.")
