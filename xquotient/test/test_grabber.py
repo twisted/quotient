@@ -225,17 +225,49 @@ class PersistentControllerTestCase(unittest.TestCase):
     """
     def setUp(self):
         self.store = store.Store()
-
-
-    def testShouldRetrieve(self):
-        g = grabber.POP3Grabber(
+        self.grabber = grabber.POP3Grabber(
             store=self.store,
             username=u"testuser",
             domain=u"example.com",
             password=u"password")
         for i in xrange(100, 200):
-            grabber.POP3UID(store=self.store, grabberID=g.grabberID, value=str(i))
+            grabber.POP3UID(store=self.store,
+                            grabberID=self.grabber.grabberID,
+                            value=str(i))
 
+
+    def testShouldRetrieve(self):
         self.assertEquals(
-            g.shouldRetrieve([(1, '99'), (2, '100'), (3, '150'), (4, '200')]),
+            self.grabber.shouldRetrieve([(1, '99'), (2, '100'),
+                                         (3, '150'), (4, '200')]),
             [(1, '99'), (4, '200')])
+
+
+    def testMarkSuccess(self):
+        """
+        Test that a message marked as successfully retrieved is not returned
+        from subsequent calls to L{shouldRetrieve}.
+        """
+        self.testShouldRetrieve()
+
+        msg = StubMessage()
+        self.grabber.markSuccess('50', msg)
+        self.assertEquals(
+            self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
+                                         (51, '51')]),
+            [(49, '49'), (51, '51')])
+
+
+    def testMarkFailure(self):
+        """
+        Test that a message marked as having incurred an error during retrieval
+        is not returned from subsequent calls to L{shouldRetrieve}.
+        """
+        self.testShouldRetrieve()
+
+        msg = StubMessage()
+        self.grabber.markFailure('50', msg)
+        self.assertEquals(
+            self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
+                                         (51, '51')]),
+            [(49, '49'), (51, '51')])

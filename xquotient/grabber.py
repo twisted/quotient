@@ -334,10 +334,14 @@ class POP3Grabber(item.Item):
             msg.archived = True
         log.msg(interface=iaxiom.IStatEvent, stat_messages_grabbed=1, userstore=self.store)
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
+        if self._pop3uids is not None:
+            self._pop3uids.add(uid)
 
 
     def markFailure(self, uid, err):
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid, failed=True)
+        if self._pop3uids is not None:
+            self._pop3uids.add(uid)
 
 
 
@@ -490,6 +494,8 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         yield d
         try:
             d.getResult()
+        except (error.ConnectionDone, error.ConnectionLost):
+            self.setStatus(u"idle")
         except:
             f = failure.Failure()
             log.err(f)
