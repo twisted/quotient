@@ -3,7 +3,7 @@ from twisted.trial import unittest
 from twisted.application import service
 from twisted.mail import smtp
 
-from vertex.scripts import certcreate
+from epsilon.scripts import certcreate
 
 from axiom import store, userbase, scheduler
 

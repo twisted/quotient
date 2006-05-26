@@ -8,7 +8,7 @@ from twisted.cred import error as ecred
 
 from epsilon import structlike, extime
 
-from vertex.test import iosim
+from epsilon.test import iosim
 
 from axiom import store
 
