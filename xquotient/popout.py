@@ -14,7 +14,7 @@ from xmantissa.stats import BandwidthMeasuringFactory
 
 from xquotient.exmess import Message
 
-from epsilon import sslverify
+from vertex import sslverify
 
 from axiom import item, attributes
 
