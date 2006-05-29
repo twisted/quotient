@@ -16,8 +16,7 @@ from twisted.cred import portal, checkers
 from twisted.mail import smtp
 
 from epsilon import extime
-
-from vertex import sslverify
+from epsilon import sslverify
 
 from axiom import item, attributes, userbase, scheduler, batch
 
