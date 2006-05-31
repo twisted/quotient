@@ -128,7 +128,7 @@ Quotient.Test.InboxTestCase.methods(
             rows[1]["date"]);
 
         var personChooser = Nevow.Athena.FirstNodeByAttribute(
-                                self.mailbox.viewsContainer, "class", "person-chooser");
+                                self.mailbox.contentTableGrid[1][0], "class", "person-chooser");
         var personChoices = Nevow.Athena.NodesByAttribute(
                                 personChooser, "class", "list-option");
         var nameToPersonKey = {};

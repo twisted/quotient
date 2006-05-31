@@ -1,5 +1,23 @@
 table.tdb > tbody > tr > td { cursor: pointer; }
 
+.complexity-container {
+    background-color: #7FCCE5;
+    width: 100%;
+}
+
+.complexity-icons {
+    padding-left: 4px;
+}
+
+.inbox {
+    padding-left: 77px;
+}
+
+.inbox-corner {
+    position: relative;
+    top: -6px;
+}
+
 .tags-container {
     margin: 0px 2px 4px 2px;
 }
@@ -7,6 +25,12 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 .header-panel {
     margin-bottom: 14px;
     border-bottom: solid 1px #CACACA;
+}
+
+.view-pane-header {
+    background-color: #D9F0F7;
+    border-top: solid 1px #0099CC;
+    border-left: solid 1px #7FCCE5;
 }
 
 .message-source-container {
@@ -31,10 +55,6 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     width: 100%;
 }
 
-.scrolltable-corner {
-    vertical-align: bottom;
-}
-
 .excerpt-column {
     clear: left;
     padding: 4px 8px 4px 9px;
@@ -43,20 +63,13 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     border-left: none;
 }
 
-.border-bl, .border-br, .border-tl, .border-tr {
-    width: 12px;
-    height: 12px;
-    padding: 0px;
-    border: 0px;
-    z-index: 99;
-}
-
-.scrolltable-footer-corner {
-    vertical-align: top;
-}
-
 img.complexity-icon:hover {
     cursor: pointer;
+}
+
+.complexity-icon, .selected-complexity-icon {
+    margin: 2px 0px 2px 2px;
+    vertical-align: middle;
 }
 
 img.corner {
@@ -103,9 +116,9 @@ table.button {
 }
 
 .button-content {
-    font: bold 100% Verdana, Arial, sans-serif;
+    font: bold 90% Helvetica, Arial, sans-serif;
     text-transform: uppercase;
-    background-color: #7AADE0;
+    background-color: #4CB7DB;
 }
 
 .button-content > a:active {
@@ -113,29 +126,44 @@ table.button {
 }
 
 .button-content > a:visited, .button-content > a:link {
-    color: #000000;
+    color: #FFFFFF;
 }
 
 .scrolltable-container {
-    border-top: solid 1px #336699;
+    border-top: solid 1px #7FCCE5;
 }
 
-.scrolltable-header-stretcher, .scrolltable-footer-stretcher {
+.scrolltable-header {
+    border-top: solid 1px #0099CC;
+    border-left: solid 1px #7FCCE5;
+    height: 24px;
+}
+
+.scrolltable-header-container {
+    background-color: #D9F0F7;
+}
+
+.left-block-footer, .mid-block-footer, .right-block-footer {
+    background-color: #D9F0F7;
+    border-left: solid 1px #7FCCE5;
+    border-bottom: solid 1px #7FCCE5;
+}
+
+.right-block-footer {
+    border-right: solid 1px #7FCCE5;
+}
+
+.view-shortcut-container {
+    padding: 4px;
+}
+
+.message-block {
     width: 100%;
-    background-repeat: repeat-x;
-    height: 14px;
-}
-
-.scrolltable-header-stretcher {
-    background-image: url(/Quotient/static/images/scrolltable-header-bg.png);
-}
-
-.scrolltable-footer-stretcher {
-    background-image: url(/Quotient/static/images/scrolltable-footer-bg.png);
+    border-top: solid 1px #0099CC;
 }
 
 .sender {
-    color: #408C40;
+    color: #109FCF;
 }
 
 .subject {
@@ -148,33 +176,28 @@ table.button {
     font-size: 1.2em;
 }
 
-.progress-actions {
-    background-color: #F0F5D7;
-    padding: 4px;
-}
-
 #overlay {
     background-image: url(/Quotient/static/images/overlay.png);
 }
 
-.masthead-tr, .masthead-br {
+.masthead-br {
     float: right;
     clear: right;
 }
 
-.selected-view-shortcut {
+.selected-view-shortcut:link, .selected-view-shortcut:visited {
     font-weight: bold;
+    color: #000000;
 }
 
-.view-pane-tl, .masthead-bl {
+.view-shortcut:link, .view-shortcut:visited {
+    font-weight: bold;
+    color: #0099CC;
+}
+
+.masthead-bl {
     float: left;
     clear: left;
-}
-
-.masthead-top-edge, .view-pane-top-edge {
-    width: 100%;
-    height: 1px;
-    background-color: #336699;
 }
 
 .rounded-corner-spacer {
@@ -195,16 +218,17 @@ table.button {
 
 .masthead-content, .masthead-content-bottom {
     background-color: #D2E6FF;
-    border: solid 1px #336699;
+    border: solid 1px #7FCCE5;
     border-top: none;
+    padding-top: 2px;
 }
 
 .masthead-content {
     border-bottom: none;
 }
 
-.masthead-content > .content {
-    margin-right: 4px;
+.masthead-content {
+    padding-right: 4px;
 }
 
 .view-pane-container {
@@ -214,13 +238,13 @@ table.button {
 .view-pane {
     width: 200px;
     height: 100%;
-    border: solid 1px #336699;
+    border: solid 1px #7FCCE5;
     border-right: none;
     border-top: none;
 }
 
 .view-pane-content {
-    border-bottom: solid 1px #336699;
+    border-bottom: solid 1px #7FCCE5;
 }
 
 .pane-body {
@@ -230,12 +254,13 @@ table.button {
 .view-pane-cell {
     height: 100%;
     padding-bottom: 1px;
+    border-top: solid 1px #7FCCE5;
 }
 
 .views-collapsible-pane {
     cursor: pointer;
     font-weight: bold;
-    color: #336699;
+    color: #11A0CF;
     margin-bottom: 6px;
 }
 
@@ -261,7 +286,7 @@ table.button {
     margin-top: 1px;
     margin-bottom: 1px;
     color: #FFFFFF;
-    background-color: #336699;
+    background-color: #7FCCE5;
 }
 
 .q-scroll-row {
@@ -272,7 +297,7 @@ table.button {
     width: 99%;
     margin: 0px 1px 1px 1px;
     padding: 8px 0px 8px 0px;
-    background-color: #D2E6FF;
+    background-color: #EDF8FB;
 }
 
 .q-scroll-row:visited, .q-scroll-row:link {
@@ -281,12 +306,13 @@ table.button {
 
 .progress-bar {
     height: 4px;
-    background-color: #CCFF99;
+    background: #D1FFA3 url(/Quotient/static/images/progress-bar-bg.png) top left repeat-x;
 }
 
 .progress-meter {
     background-color: #6699CC;
     border: solid 1px #6699CC;
+    margin-top: 2px;
 }
 
 .next-message-preview {
@@ -373,10 +399,6 @@ img.collapse-arrow {
     border: solid 1px #000000;
 }
 
-.view-selectors {
-    margin-bottom: 4px;
-}
-
 /* the header table */
 
 table.header-table {
@@ -394,11 +416,6 @@ table.header-table {
 
 .header-table-first-col {
     white-space: nowrap;
-}
-
-.embedded-action-dialog {
-    font-size: 1.4em;
-    text-align: center;
 }
 
 /* put a grey border around all other rows */
@@ -470,28 +487,17 @@ img.thumbnail { border: none; }
     padding-left: 2px;
 }
 
-.tag-panel {
-    border: solid 1px #000000;
-    background-color: #DADADA;
-    padding: 4px;
-}
-
-.tag-form {
-    text-align: right;
-    padding: 2px;
-}
-
 .message-detail {
     overflow: auto;
     height: 100%;
     background-color: #FFFFFF;
-    border: solid 1px #336699;
+    border: solid 1px #7FCCE5;
 }
 
 .message-body {
     margin-left: 4px;
     font-family: monospace;
-    font-size: 1.3em;
+    font-size: 1.6em;
     padding-top: 2px;
 }
 
