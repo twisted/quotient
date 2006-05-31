@@ -104,3 +104,54 @@ class InboxTestCase(testcase.TestCase):
         inboxFrag.docFactory = getLoader(inboxFrag.fragmentName)
 
         return ctx.tag[inboxFrag]
+
+class BatchActionsTestCase(testcase.TestCase):
+    jsClass = u'Quotient.Test.BatchActionsTestCase'
+
+    docFactory = loaders.stan(tags.div[
+                    tags.div(render=tags.directive('liveTest'))['BatchActionsTestCase'],
+                    tags.div(render=tags.directive('inbox'),
+                             style='visibility: hidden'),
+                    tags.div(id='mantissa-footer')])
+
+    def render_inbox(self, ctx, data):
+        s = Store()
+
+        def makeMessage(subj, spam=False, date=None, sender=u'joe@divmod.com', read=False):
+            if date is None:
+                date = Time()
+
+            m = Message(store=s,
+                        sender=sender,
+                        subject=subj,
+                        receivedWhen=date,
+                        sentWhen=date,
+                        spam=spam,
+                        impl=_Part(store=s),
+                        archived=False,
+                        read=read)
+
+        PrivateApplication(store=s).installOn(s)
+        QuotientPreferenceCollection(store=s).installOn(s)
+        o = Organizer(store=s)
+        o.installOn(s)
+
+        for i in xrange(10):
+            Message(store=s,
+                    sender=u'joe@divmod.com',
+                    subject=u'Message #' + str(9 - i),
+                    receivedWhen=Time(),
+                    sentWhen=Time(),
+                    spam=False,
+                    impl=_Part(store=s))
+
+        inbox = Inbox(store=s)
+        inbox.installOn(s)
+
+        inboxFrag = ixmantissa.INavigableFragment(inbox)
+
+        inboxFrag.jsClass = 'Quotient.Test.TestableMailboxSubclass'
+        inboxFrag.setFragmentParent(self)
+        inboxFrag.docFactory = getLoader(inboxFrag.fragmentName)
+
+        return ctx.tag[inboxFrag]

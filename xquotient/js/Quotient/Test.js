@@ -12,8 +12,8 @@ Quotient.Test.TestableMailboxSubclass.methods(
         self.pendingDeferred.callback(null);
     });
 
-Quotient.Test.InboxTestCase = Nevow.Athena.Test.TestCase.subclass('InboxTestCase');
-Quotient.Test.InboxTestCase.methods(
+Quotient.Test.MailboxTestBase = Nevow.Athena.Test.TestCase.subclass('MailboxTestBase');
+Quotient.Test.MailboxTestBase.methods(
     function run(self) {
         self.mailbox = Quotient.Test.TestableMailboxSubclass.get(
                                 Nevow.Athena.NodeByAttribute(
@@ -90,8 +90,10 @@ Quotient.Test.InboxTestCase.methods(
             rows[i] = row;
         }
         return rows;
-    },
+    });
 
+Quotient.Test.InboxTestCase = Quotient.Test.MailboxTestBase.subclass('InboxTestCase');
+Quotient.Test.InboxTestCase.methods(
     function doTests(self) {
         var unreadCountsPerView = function(view) {
             return parseInt(Nevow.Athena.NodeByAttribute(
@@ -272,6 +274,9 @@ Quotient.Test.InboxTestCase.methods(
 
         richAssertEquals(selectedIDs, expectedIDs);
 
+        self.assertEquals(0, sw.findRowOffset(sw._rows[0][1]));
+        self.assertEquals(3, sw.findRowOffset(sw._rows[3][1]));
+
         /* find out the webID of the second row, which is what should become
            the active message once we get the first and third out of the way */
         var nextActiveWebID = sw._rows[1][0]["__id__"];
@@ -282,4 +287,152 @@ Quotient.Test.InboxTestCase.methods(
             function() {
                 self.assertEquals(sw._rows[0][0]["__id__"], nextActiveWebID);
             });
+    });
+
+Quotient.Test.BatchActionsTestCase = Quotient.Test.MailboxTestBase.subclass('BatchActionsTestCase');
+Quotient.Test.BatchActionsTestCase.methods(
+    function doTests(self) {
+        var sw = self.mailbox.scrollWidget;
+
+        var webIDToSubject = function(webID) {
+            return sw.findRowData(webID)["subject"];
+        }
+
+        self.assertEquals(sw._rows[0][0]["subject"], "Message #0");
+        self.assertEquals(sw._rows[0][0]["read"], true);
+
+        /* assert every row after the first is unread, and has the right subject */
+        for(var i = 1; i < sw._rows.length; i++) {
+            self.assertEquals(sw._rows[i][0]["read"], false);
+            self.assertEquals(sw._rows[i][0]["subject"], "Message #" + i);
+        }
+
+        var checkSubjects = function(indices) {
+            self.assertSubjectsAre(
+                MochiKit.Base.map(function(n) {
+                    return "Message #" + n;
+                }, indices));
+        }
+
+        /* select row #2 */
+        return self.mailbox.fastForward(sw._rows[2][0]["__id__"]).addCallback(
+            function() {
+                /* assert that it's now read */
+                self.assertEquals(sw._rows[2][0]["read"], true);
+
+                self.mailbox.changeBatchSelection("read");
+
+                return self.mailbox.touchBatch("archive", true);
+        }).addCallback(
+            function() {
+                var indices = [/* 0 is gone */ 1, /* 2 is gone */ 3, 4, 5, 6, 7, 8, 9];
+                checkSubjects(indices);
+
+                /* deleting #0 and #2 should load #1, which is now at index 0 */
+                self.assertEquals(sw._rows[0][0]["read"], true);
+
+                self.mailbox.changeBatchSelection("read");
+
+                return self.mailbox.touchBatch("delete", true).addCallback(
+                    function() {
+                        indices.shift();
+                        checkSubjects(indices);
+                    });
+        }).addCallback(
+            self.makeViewSwitcher(null, "Trash", ["Message #1"], "Trash view")
+        ).addCallback(
+            function() {
+                var D = self.mailbox._sendViewRequest("viewByMailType", "All");
+                return D.addCallback(
+                    function() {
+                        return self.waitForScrollTableRefresh();
+                    });
+        }).addCallback(
+            function() {
+                checkSubjects([0, /* #1 is missing (trash) */ 2, 3, 4, 5, 6, 7, 8, 9]);
+                var D = self.mailbox._sendViewRequest("viewByMailType", "Inbox");
+                return D.addCallback(
+                    function() {
+                        return self.waitForScrollTableRefresh();
+                    });
+        }).addCallback(
+            function() {
+                /* 0 = archived, 1 = trash, 2 = archived */
+                checkSubjects([3, 4, 5, 6, 7, 8, 9]);
+
+                /* now #3 (index 0) has been read */
+                self.assertEquals(sw._rows[0][0]["read"], true);
+
+                /* mark #5 (index 2) as read */
+                return self.mailbox.fastForward(sw._rows[2][0]["__id__"]);
+        }).addCallback(
+            function() {
+                self.assertEquals(sw._rows[2][0]["read"], true);
+
+                self.mailbox.changeBatchSelection("read");
+
+                var selectedMessages = MochiKit.Base.keys(sw.selectedGroup).length;
+                self.assertEquals(selectedMessages, 2, "selected message count is " +
+                                                       selectedMessages +
+                                                       " instead of 2");
+
+                /* let's include an unread message in the selection (#6) */
+                sw.selectedGroup[sw._rows[3][0]["__id__"]] = sw._rows[3][1];
+
+                var batchExceptions = self.mailbox.getBatchExceptions();
+                var included = batchExceptions[0];
+                var excluded = batchExceptions[1];
+
+                if(included.length != 1 || included[0] != sw._rows[3][0]["__id__"]) {
+                    self.fail("getBatchExceptions() included these subjects: " +
+                              MochiKit.Base.map(webIDToSubject, included) +
+                              " instead of only 'Message #6'");
+                }
+                self.assertEquals(excluded.length, 0,
+                                  "getBatchExceptions() excluded these subjects: " +
+                                  MochiKit.Base.map(webIDToSubject, excluded) +
+                                  " but it wasn't supposed to exclude any");
+
+                /* so #3 & #5 are read, and will be affected by the batch
+                 * action.  #6 is unread, but we manually selected it, so
+                 * it should also be affected */
+                return self.mailbox.touchBatch("train", true, /*spam=*/true);
+        }).addCallback(
+            self.makeViewSwitcher(null, "Spam", ["Message #3",
+                                                 "Message #5",
+                                                 "Message #6"], "Spam view")
+        ).addCallback(
+            self.makeViewSwitcher(null, "Inbox", ["Message #4",
+                                                  "Message #7",
+                                                  "Message #8",
+                                                  "Message #9"], "Inbox view")
+        ).addCallback(
+            function() {
+                self.assertEquals(sw._rows[0][0]["read"], true);
+
+                self.mailbox.changeBatchSelection("unread");
+
+                /* unselect the last message */
+                delete(sw.selectedGroup[sw._rows[3][0]["__id__"]]);
+
+                var batchExceptions = self.mailbox.getBatchExceptions();
+                var included = batchExceptions[0];
+                var excluded = batchExceptions[1];
+
+                self.assertEquals(included.length, 0,
+                                  "getBatchExceptions() included these subjects: " +
+                                  MochiKit.Base.map(webIDToSubject, included) +
+                                  " but it wasn't supposed to include any");
+
+                if(excluded.length != 1 || excluded[0] != sw._rows[3][0]["__id__"]) {
+                    self.fail("getBatchExceptions() excluded these subjects: " +
+                              MochiKit.Base.map(webIDToSubject, excluded) +
+                              " instead of only 'Message #9'");
+                }
+
+                return self.mailbox.touchBatch("delete", true);
+        }).addCallback(
+            function() {
+                checkSubjects([4, 9]);
+        });
     });

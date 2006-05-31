@@ -83,6 +83,25 @@ class AddPersonFragment(people.AddPersonFragment):
         return unicode(flatten(personFrag), 'utf-8')
 
 
+def makeBatchAction(actionName):
+    def batchAction(self, batchType, include=(), exclude=(), *args):
+        return self._performBatchAction(actionName,
+                                        self._messagesForBatchType(batchType, include, exclude),
+                                        args)
+    return transacted(batchAction)
+
+def makeGroupAction(actionName):
+    def groupAction(self, advance, nextMessageWebID, webIDs, *args):
+        return self._performGroupAction(actionName,
+                                        advance, nextMessageWebID, webIDs, args)
+    return transacted(groupAction)
+
+def makeSingleAction(actionName):
+    def singleAction(self, advance, *args):
+        return self._performSingleAction(actionName, advance, args)
+
+    return transacted(singleAction)
+
 class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
@@ -130,9 +149,11 @@ class InboxScreen(athena.LiveFragment):
 
     iface = allowedMethods = dict(deleteCurrentMessage=True,
                                   deleteMessageGroup=True,
+                                  deleteMessageBatch=True,
 
                                   archiveCurrentMessage=True,
                                   archiveMessageGroup=True,
+                                  archiveMessageBatch=True,
 
                                   deferCurrentMessage=True,
                                   replyToCurrentMessage=True,
@@ -140,6 +161,7 @@ class InboxScreen(athena.LiveFragment):
 
                                   trainCurrentMessage=True,
                                   trainMessageGroup=True,
+                                  trainMessageBatch=True,
 
                                   getMessageCount=True,
 
@@ -486,46 +508,85 @@ class InboxScreen(athena.LiveFragment):
             self._moveToNextMessage()
         return self._current()
 
-    def deleteCurrentMessage(self, advance):
-        self.currentMessage.trash = True
-        return self._progressOrDont(advance)
+    def action_archive(self, message):
+        message.archived = True
 
-    deleteCurrentMessage = transacted(deleteCurrentMessage)
+    def action_delete(self, message):
+        message.trash = True
 
-    def deleteMessageGroup(self, advance, nextMessageWebID, webIDs):
-        for wid in webIDs:
-            self.translator.fromWebID(wid).trash = True
+    def action_defer(self, message, days, hours, minutes):
+        message.receivedWhen = Time() + timedelta(days=days,
+                                                  hours=hours,
+                                                  minutes=minutes)
+        message.read = False
+
+    def action_train(self, message, spam):
+        message.train(spam)
+
+    def _getActionMethod(self, actionName):
+        return getattr(self, 'action_' + actionName)
+
+    def _performMany(self, actionName, messages=(), webIDs=(), args=()):
+        action = self._getActionMethod(actionName)
+        for message in messages:
+            action(message, *args)
+        for webID in webIDs:
+            action(self.translator.fromWebID(webID), *args)
+
+    archiveCurrentMessage = makeSingleAction('archive')
+    deleteCurrentMessage  = makeSingleAction('delete')
+    deferCurrentMessage   = makeSingleAction('defer')
+    trainCurrentMessage   = makeSingleAction('train')
+
+    archiveMessageGroup = makeGroupAction('archive')
+    deleteMessageGroup  = makeGroupAction('delete')
+    trainMessageGroup   = makeGroupAction('train')
+
+    archiveMessageBatch = makeBatchAction('archive')
+    deleteMessageBatch  = makeBatchAction('delete')
+    trainMessageBatch   = makeBatchAction('train')
+
+    def _getComparisonForBatchType(self, batchType):
+        comp = self._getBaseComparison()
+        if batchType in ("read", "unread"):
+            comp = attributes.AND(comp, Message.read == (batchType == "read"))
+        return comp
+
+    def _performBatchAction(self, actionName, messages, args):
+        self._performMany(actionName, messages, args=args)
+
+        # this could probably be more fine-grained
+        if self.currentMessage in messages or self.nextMessage in messages:
+            self._resetCurrentMessage()
+
+        return (self._current(), len(messages), sum(1 for m in messages if not m.read))
+
+    def _performGroupAction(self, actionName, advance, nextMessageWebID, webIDs, args):
+        self._performMany(actionName, webIDs=webIDs, args=args)
+
         if advance:
             if nextMessageWebID is not None:
                 self.nextMessage = self.translator.fromWebID(nextMessageWebID)
             return self._progressOrDont(advance)
 
-    deleteMessageGroup = transacted(deleteMessageGroup)
+    def _performSingleAction(self, actionName, advance, args):
+        action = self._getActionMethod(actionName)
+        action(self.currentMessage, *args)
 
-    def archiveCurrentMessage(self, advance):
-        self.currentMessage.archived = True
         return self._progressOrDont(advance)
 
-    archiveCurrentMessage = transacted(archiveCurrentMessage)
+    def _messagesForBatchType(self, batchType, include, exclude):
+        comp = attributes.AND(
+                Message.storeID.notOneOf(
+                    self.translator.linkFrom(wid) for wid in exclude),
+                self._getComparisonForBatchType(batchType))
 
-    def archiveMessageGroup(self, advance, nextMessageWebID, webIDs):
-        for wid in webIDs:
-            self.translator.fromWebID(wid).archived = True
-        if advance:
-            if nextMessageWebID is not None:
-                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
-            return self._progressOrDont(advance)
+        comp = attributes.OR(
+                Message.storeID.oneOf(
+                    self.translator.linkFrom(wid) for wid in include),
+                comp)
 
-    archiveMessageGroup = transacted(archiveMessageGroup)
-
-    def deferCurrentMessage(self, advance, days, hours, minutes):
-        self.currentMessage.receivedWhen = Time() + timedelta(days=days,
-                                                              hours=hours,
-                                                              minutes=minutes)
-        self.currentMessage.read = False
-        return self._progressOrDont(advance)
-
-    deferCurrentMessage = transacted(deferCurrentMessage)
+        return list(self.store.query(Message, comp))
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.original.store.findUnique(compose.Composer)
@@ -576,22 +637,6 @@ class InboxScreen(athena.LiveFragment):
                                       reSubject(curmsg, 'Fwd: '),
                                       '\n\n' + '\n> '.join(reply),
                                       self.currentMessageDetail.attachmentParts)
-
-    def trainCurrentMessage(self, advance, spam):
-        self.currentMessage.train(spam)
-        return self._progressOrDont(advance)
-
-    trainCurrentMessage = transacted(trainCurrentMessage)
-
-    def trainMessageGroup(self, advance, nextMessageWebID, webIDs, spam):
-        for wid in webIDs:
-            self.translator.fromWebID(wid).train(spam)
-        if advance:
-            if nextMessageWebID is not None:
-                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
-            return self._progressOrDont(advance)
-
-    trainMessageGroup = transacted(trainMessageGroup)
 
     def _getBaseComparison(self, beforeTime=None):
         if beforeTime is None:

@@ -136,7 +136,8 @@ table.button {
 .scrolltable-header {
     border-top: solid 1px #0099CC;
     border-left: solid 1px #7FCCE5;
-    height: 24px;
+    height: 30px;
+    width: 100%;
 }
 
 .scrolltable-header-container {
@@ -154,7 +155,7 @@ table.button {
 }
 
 .view-shortcut-container {
-    padding: 4px;
+    white-space: nowrap;
 }
 
 .message-block {

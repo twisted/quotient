@@ -109,6 +109,11 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.throbber = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
     },
 
+    function emptyAndRefill(self) {
+        Quotient.Mailbox.ScrollingWidget.upcall(self, "emptyAndRefill");
+        self.selectedGroup = {};
+    },
+
     function resized(self, wp) {
         if(!wp) {
             wp = self.widgetParent;
@@ -168,6 +173,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
         row.style.backgroundColor = '#FFFFFF';
 
         self._selectedRow = row;
+        var rowData = self._rows[self.findRowOffset(row)][0];
+        rowData["read"] = true;
     },
 
     function _selectFirstRow(self) {
@@ -265,6 +272,55 @@ Quotient.Mailbox.ScrollingWidget.methods(
         checkboxImage.src = segs.join("/");
     },
 
+    /**
+     * Add, or remove all *already requested* rows to the group selection
+     * @param selectRows: if true, select matching rows, otherwise deselect
+     * @param predicate: function that accepts a mapping of column names to
+     *                   column values & returns a boolean indicating whether
+     *                   the row should be included in the selection
+     * @return: the number of matching rows
+     */
+    function massSelectOrNot(self,
+                             selectRows/*=true*/,
+                             predicate/*=null*/) {
+
+        if(selectRows == undefined) {
+            selectRows = true;
+        }
+        if(predicate == undefined) {
+            predicate = function(r) {
+                return true
+            }
+        }
+
+        var getCheckbox = function(n) {
+            return Nevow.Athena.FirstNodeByAttribute(n, "class", "checkbox-image");
+        }
+
+        var selected, row, webID, count=0;
+        for(var i = 0; i < self._rows.length; i++) {
+            row = self._rows[i];
+            if(row) {
+                webID = row[0]["__id__"];
+                selected = (webID in self.selectedGroup);
+                /* if we like this row */
+                if(predicate(row[0])) {
+                    /* and it's selection status isn't the desired one */
+                    if(selected != selectRows) {
+                        /* then change it */
+                        self.groupSelectRow(webID, getCheckbox(row[1]));
+                        count++;
+                    }
+                /* if we don't like it, but it's in the target state */
+                } else if(selected == selectRows) {
+                    /* then change it */
+                    self.groupSelectRow(webID, getCheckbox(row[1]));
+                }
+            }
+        }
+        return count;
+    },
+
     function formatDate(self, d) {
         function to12Hour(HH, MM) {
             var meridian;
@@ -340,6 +396,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
+     * Find the row data for the row with web id C{webID}
+     */
+    function findRowData(self, webID) {
+        for(var i = 0; i < self._rows.length; i++) {
+            if(self._rows[i] && self._rows[i][0]["__id__"] == webID) {
+                return self._rows[i][0];
+            }
+        }
+    },
+
+    /**
      * Find the first row which appears after C{row} in the scrolltable and
      * satisfies C{predicate}
      *
@@ -392,6 +459,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             self._pendingRowSelection(count);
             self._pendingRowSelection = null;
         }
+        self.widgetParent.rowsFetched(count);
     });
 
 
@@ -413,6 +481,10 @@ Quotient.Mailbox.Controller.methods(
             }
 
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
+
+        self._batchSelectionPredicates = {read:   function(r) { return  r["read"] },
+                                          unread: function(r) { return !r["read"] }}
+
         self.currentMessageData = null;
 
         self._cacheContentTableGrid();
@@ -479,6 +551,119 @@ Quotient.Mailbox.Controller.methods(
             }, self.contentTableGrid);
     },
 
+    function rowsFetched(self, count) {
+        if(0 < count && self._batchSelection) {
+            var pred = self._batchSelectionPredicates[self._batchSelection];
+            self.scrollWidget.massSelectOrNot(true, pred);
+        }
+    },
+
+    function changeBatchSelection(self, to) {
+        if(to == undefined) {
+            to = document.forms["batch-selection"].elements["batch-type"].value;
+        }
+        var args = [to != "none"];
+        if(to in self._batchSelectionPredicates) {
+            args.push(self._batchSelectionPredicates[to]);
+        }
+
+        /* we can't actually do anything useful with this count, like
+         * only enabling aggregate actions if it's > 0 because there
+         * could be as-yet unrequested rows that the action will affect.
+         * we could probably treat is as meaningful if we know we've
+         * already requested all of the rows, but that's not so important
+         * right now */
+        var count = self.scrollWidget.massSelectOrNot.apply(self.scrollWidget, args);
+        if(to == "none") {
+            self._changeGroupActionAvailability(false);
+            self._batchSelection = null;
+        } else {
+            self._changeGroupActionAvailability(true);
+            self._batchSelection = to;
+        }
+    },
+
+    function adjustProgressBar(self, lessHowManyMessages) {
+        if(self.progressBar) {
+            self.progressBar = self.firstWithClass(self.contentTableGrid[0][2],
+                                                   "progress-bar");
+        }
+        self.progressBar.style.borderRight = "solid 1px #6699CC";
+        self.remainingMessages -= lessHowManyMessages;
+        self.setProgressWidth();
+    },
+
+    /**
+     * Return a two element list.  The first element will be a sequence
+     * of web IDs for currently selected messages who do not fit the batch
+     * selection criteria, and the second element will be a sequence of
+     * web IDs for messages who fit the batch selection criteria but are
+     * not currently selected.  Both lists may be empty
+     */
+    function getBatchExceptions(self) {
+        var row, webID,
+            sw = self.scrollWidget,
+            rows = sw._rows,
+            pred = self._batchSelectionPredicates[self._batchSelection],
+            include = [],
+            exclude = [];
+
+        for(var i = 0; i < rows.length; i++) {
+            row = rows[i];
+            if(row) {
+                webID = row[0]["__id__"];
+                /* if it's selected */
+                if(webID in sw.selectedGroup) {
+                    /* and it doesn't fulfill the predicate */
+                    if(!pred(row[0])) {
+                        /* then mark it for explicit inclusion */
+                        include.push(webID);
+                    }
+                /* or it's not selected and does fulfill the predicate */
+                } else if(pred(row[0])) {
+                    /* then mark it for explicit exclusion */
+                    exclude.push(webID);
+                }
+            }
+        }
+        return [include, exclude];
+    },
+
+    function touchBatch(self, action, isDestructive) {
+        var remoteArgs = [action + "MessageBatch", self._batchSelection];
+        remoteArgs = remoteArgs.concat(self.getBatchExceptions());
+
+        for(var i = 3; i < arguments.length; i++) {
+            remoteArgs.push(arguments[i]);
+        }
+
+        self.messageDetail.style.opacity = .2;
+        return self.callRemote.apply(self, remoteArgs).addCallback(
+            function(data) {
+                self.messageDetail.style.opacity = 1;
+                self.setMessageContent(data[0]);
+
+                var affectedCount = data[1];
+                var affectedUnreadCount = data[2];
+
+                self.adjustProgressBar(affectedCount);
+                self.decrementActiveMailViewCount(affectedUnreadCount);
+
+                self._batchSelection = null;
+                self._changeGroupActionAvailability(false);
+                self.scrollWidget.emptyAndRefill();
+
+                var D = Divmod.Defer.Deferred();
+
+                self.scrollWidget._pendingRowSelection = function(count) {
+                    if(0 < count) {
+                        self.scrollWidget._selectFirstRow();
+                    }
+                    D.callback(null);
+                }
+                return D;
+            });
+    },
     /**
      * similar to document.getElementsByTagName(), except it only returns
      * matching elements that are immediate children of C{node}
@@ -506,14 +691,19 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    /* Decrement the unread message count that is displayed next to
+    /**
+     * Decrement the unread message count that is displayed next to
      * the name of the currently active view in the view selector.
      *
      * (e.g. "Inbox (31)" -> "Inbox (30)")
      */
-    function decrementActiveMailViewCount(self) {
+    function decrementActiveMailViewCount(self, byHowMuch/*=1*/) {
+        if(byHowMuch == undefined) {
+            byHowMuch = 1;
+        }
+
         var decrementNodeValue = function(node) {
-            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - 1;
+            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - byHowMuch;
         }
 
         var cnode = self.firstWithClass(
@@ -687,9 +877,6 @@ Quotient.Mailbox.Controller.methods(
      * report = boolean - should we persist this change
      */
     function setComplexity(self, level, node, report) {
-        /* level = integer between 1 and 3
-           node = the image that represents this complexity level
-           report = boolean - should we persist this change */
         if(node.className == "selected-complexity-icon") {
             return;
         }
@@ -729,8 +916,9 @@ Quotient.Mailbox.Controller.methods(
 
     function fastForward(self, toMessageID) {
         self.messageDetail.style.opacity = .2;
-        self.callRemote("fastForward", toMessageID).addCallback(
+        return self.callRemote("fastForward", toMessageID).addCallback(
             function(messageData) {
+                self.scrollWidget.findRowData(toMessageID)["read"] = true;
                 self.messageDetail.style.opacity = 1;
                 self.setMessageContent(messageData, true);
             });
@@ -1107,7 +1295,7 @@ Quotient.Mailbox.Controller.methods(
             }
         }
 
-        self.doTouch(remoteArgs, isProgress, 1);
+        self.doTouch(remoteArgs, isProgress, 1, 0);
     },
 
     /**
@@ -1122,21 +1310,35 @@ Quotient.Mailbox.Controller.methods(
      *                       group being acted upon.
      */
     function touchSelectedGroup(self, action, isDestructive) {
-        var selgroup = self.scrollWidget.selectedGroup;
+        if(self._batchSelection) {
+            return self.touchBatch(action, isDestructive);
+        }
+        var sw = self.scrollWidget;
+        var selgroup = sw.selectedGroup;
         var webIDs = MochiKit.Base.keys(selgroup);
-        var selectedRowOffset = self.scrollWidget.findRowOffset(self.scrollWidget._selectedRow);
-        var selectedRowID = self.scrollWidget._rows[selectedRowOffset][0]["__id__"];
+        var selectedRowOffset = sw.findRowOffset(sw._selectedRow);
+        var selectedRowID = sw._rows[selectedRowOffset][0]["__id__"];
         var next, isProgress = isDestructive;
 
+        var affectedUnreadCount = 0;
         if(isDestructive) {
+            var rowData;
+            /* FIXME optimize.  selectedGroup can be a mapping of
+               webIDs to column dictionaries or something */
+            for(var i in selgroup) {
+                rowData = sw._rows[sw.findRowOffset(selgroup[i])][0];
+                if(!rowData["read"]) {
+                    affectedUnreadCount++;
+                }
+            }
             /* if this action is going to dismiss the message being viewed */
             if(selectedRowID in selgroup) {
                 /* is there a row after the selected row that isn't earmarked for destruction */
                 var predicate = function(rowOffset, rowData, rowElement) {
                                     return !(rowData["__id__"] in selgroup);
                                 }
-                next = self.scrollWidget.findNextRow(self.scrollWidget._selectedRow, predicate, true)
-                        || self.scrollWidget.findPrevRow(self.scrollWidget._selectedRow, predicate, true);
+                next = sw.findNextRow(sw._selectedRow, predicate, true)
+                        || sw.findPrevRow(sw._selectedRow, predicate, true);
             /* if it isn't, then we aren't going to progress */
             } else {
                 isProgress = false;
@@ -1145,28 +1347,28 @@ Quotient.Mailbox.Controller.methods(
 
         var nextMessageID = null;
         if(next) {
-            nextMessageID = self.scrollWidget._rows[next[1]][0]["__id__"];
+            nextMessageID = sw._rows[next[1]][0]["__id__"];
         }
 
         if(isDestructive) {
             for(var k in selgroup) {
-                self.scrollWidget.removeRow(selgroup[k]);
+                sw.removeRow(selgroup[k]);
             }
             self.disableGroupActions();
             if(next && next[0].tagName) {
-                self.scrollWidget._selectRow(next[0]);
-                self.scrollWidget.scrolled();
+                sw._selectRow(next[0]);
+                sw.scrolled();
             }
         }
 
-        self.scrollWidget.selectedGroup = {};
+        sw.selectedGroup = {};
         var remoteArgs = [action + "MessageGroup", isProgress, nextMessageID, webIDs];
 
         for(var i = 3; i < arguments.length; i++) {
             remoteArgs.push(arguments[i]);
         }
 
-        return self.doTouch(remoteArgs, isProgress, webIDs.length);
+        return self.doTouch(remoteArgs, isProgress, webIDs.length, affectedUnreadCount);
     },
 
     /**
@@ -1183,24 +1385,23 @@ Quotient.Mailbox.Controller.methods(
      * @param touchingHowMany: integer, indicating the number of messages
      *                         that are affected by this action
      */
-    function doTouch(self, remoteArgs, isProgress, touchingHowMany) {
+    function doTouch(self, remoteArgs, isProgress, touchingHowMany, touchingHowManyUnread) {
         self.messageDetail.style.opacity = .2;
         return self.callRemote.apply(self, remoteArgs).addCallback(
             function(nextMessage) {
-                self.messageDetail.style.opacity = 1;
-                if(isProgress) {
-                    self.setMessageContent(nextMessage);
-                    if(!self.progressBar) {
-                        self.progressBar = self.firstWithClass(
-                                            self.contentTableGrid[0][2], "progress-bar");
-                    }
-                    self.progressBar.style.borderRight = "solid 1px #6699CC";
-                    self.remainingMessages -= touchingHowMany;
-                    self.setProgressWidth();
-                } else if(nextMessage) {
-                    self.displayInlineWidget(nextMessage);
-                }
+                self._cbTouched(nextMessage, isProgress, touchingHowMany, touchingHowManyUnread);
             });
+    },
+
+    function _cbTouched(self, nextMessage, isProgress, touchingHowMany, touchingHowManyUnread) {
+        self.messageDetail.style.opacity = 1;
+        if(isProgress) {
+            self.setMessageContent(nextMessage);
+            self.adjustProgressBar(touchingHowMany);
+            self.decrementActiveMailViewCount(touchingHowManyUnread);
+        } else if(nextMessage) {
+            self.displayInlineWidget(nextMessage);
+        }
     },
 
     /**
@@ -1326,10 +1527,6 @@ Quotient.Mailbox.Controller.methods(
         for(var i = 0; i < self.messageActions.length; i++) {
             self.messageActions[i].style.visibility = visibility;
         }
-    },
-
-    function archiveSelectedGroup(self) {
-        self.touchSelectedGroup("archive", self._viewingByView != "All");
     },
 
     function archiveThis(self, n) {

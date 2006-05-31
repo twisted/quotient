@@ -119,19 +119,46 @@
       <tr valign="top">
         <td class="view-pane-header" style="display: none">&#160;</td>
         <td class="scrolltable-header-container" style="display: none">
-          <div class="scrolltable-header">
-            <div class="view-shortcut-container" style="text-align: center">
-              <a class="selected-view-shortcut" href="#"
-                onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                >Inbox</a> |
-              <a class="view-shortcut" href="#"
-                onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                >Sent</a> |
-              <a class="view-shortcut" href="#"
-                onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                >Spam</a>
-            </div>
-          </div>
+          <table class="scrolltable-header">
+            <tr>
+              <td>
+                <div class="view-shortcut-container" style="text-align: center">
+                  <a class="selected-view-shortcut" href="#"
+                    onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
+                    >Inbox</a> |
+                  <a class="view-shortcut" href="#"
+                    onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
+                    >Sent</a> |
+                  <a class="view-shortcut" href="#"
+                    onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
+                    >Spam</a>
+                </div>
+              </td>
+              <td>
+                <form name="batch-selection">
+                  <table align="center">
+                    <tr>
+                      <td>
+                        <select name="batch-type" class="group-action">
+                          <option value="all">All</option>
+                          <option value="none">None</option>
+                          <option value="read">Read</option>
+                          <option value="unread">Unread</option>
+                        </select>
+                      </td>
+                      <td>
+                        <nevow:invisible nevow:render="button">
+                          <a href="#"
+                            onclick="Quotient.Mailbox.Controller.get(this).changeBatchSelection(); return false"
+                            class="selection-perform">select</a>
+                        </nevow:invisible>
+                      </td>
+                    </tr>
+                  </table>
+                </form>
+              </td>
+            </tr>
+          </table>
         </td>
         <td rowspan="2" style="width: 100%">
           <table style="width: 100%" cellpadding="0" cellspacing="0">
