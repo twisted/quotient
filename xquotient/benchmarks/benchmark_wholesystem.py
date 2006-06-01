@@ -11,6 +11,7 @@ from twisted.python import filepath
 from twisted.internet import reactor
 
 from epsilon import extime
+from epsilon.scripts import benchmark
 
 from axiom import item, attributes, scheduler
 
@@ -33,7 +34,9 @@ def main():
 
     pop3server = filepath.FilePath(__file__).sibling("pop3server.tac")
     os.system("twistd -y " + pop3server.path)
+    benchmark.start()
     os.system("axiomatic -d wholesystem.axiom start -n")
+    benchmark.stop()
     os.system("kill `cat twistd.pid`")
 
 

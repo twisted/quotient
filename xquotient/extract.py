@@ -100,7 +100,7 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     start = attributes.integer()
     end = attributes.integer()
-    text = attributes.text()
+    text = attributes.text(indexed=True)
 
     message = attributes.reference()
     part = attributes.reference()
@@ -123,7 +123,7 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     start = attributes.integer()
     end = attributes.integer()
-    text = attributes.text()
+    text = attributes.text(indexed=True)
 
     message = attributes.reference()
     part = attributes.reference()
@@ -147,7 +147,7 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     start = attributes.integer()
     end = attributes.integer()
-    text = attributes.text()
+    text = attributes.text(indexed=True)
 
     message = attributes.reference()
     part = attributes.reference()

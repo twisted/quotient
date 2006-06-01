@@ -6,6 +6,8 @@ of times.
 
 import StringIO
 
+from epsilon.scripts import benchmark
+
 from axiom import store, userbase
 
 from xquotient import spam
@@ -42,7 +44,9 @@ def main():
     def process():
         for i in xrange(10000):
             classifier.processItem(Message())
+    benchmark.start()
     s.transact(process)
+    benchmark.stop()
 
 
 if __name__ == '__main__':

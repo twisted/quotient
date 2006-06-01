@@ -5,14 +5,13 @@ from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import tags, inevow, athena
+from nevow import tags as T, inevow, athena
 from nevow.flat import flatten
 
 from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin, transacted
-from axiom.tags import Tag
-from axiom import attributes
+from axiom import attributes, tags
 
 from xmantissa import ixmantissa, webnav, people
 from xmantissa.fragmentutils import dictFillSlots
@@ -109,14 +108,26 @@ class Inbox(Item, InstallableMixin):
     schemaVersion = 1
 
     installedOn = attributes.reference()
+
+    # uiComplexity should be an integer between 1 and 3, where 1 is the least
+    # complex and 3 is the most complex.  the value of this attribute
+    # determines what portions of the inbox UI will be visible each time it is
+    # loaded (and so should be updated each time the user changes the setting)
     uiComplexity = attributes.integer(default=1)
-    # uiComplexity should be an integer between
-    # 1 and 3, where 1 is the least complex and
-    # 3 is the most complex.  the value of this
-    # attribute determines what portions of the
-    # inbox UI will be visible each time it is
-    # loaded (and so should be updated each time
-    # the user changes the setting)
+
+
+    catalog = attributes.reference(doc="""
+    A reference to an L{axiom.tags.Catalog} Item.  This will be used to
+    determine which tags should be displayed to the user and to create new
+    tags.  If no catalog is specified at creation time, one will be found in
+    the database or created if none exists at all.
+    """)
+
+    def __init__(self, **kw):
+        super(Inbox, self).__init__(**kw)
+        if self.catalog is None:
+            self.catalog = self.store.findOrCreate(tags.Catalog)
+
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.75, children=
@@ -276,9 +287,13 @@ class InboxScreen(athena.LiveFragment):
         self.scrollingFragment = f
         return f
 
+
     def getTags(self):
-        tags = self.original.store.query(Tag, Tag.object == Message.storeID)
-        return list(tags.getColumn('name').distinct())
+        """
+        Return a list of unique tag names as unicode strings.
+        """
+        return list(self.original.catalog.tagNames())
+
 
     def render_button(self, ctx, data):
         # take the contents of the ctx.tag and stuff it inside the button pattern
@@ -289,7 +304,7 @@ class InboxScreen(athena.LiveFragment):
         attrs = ctx.tag.attributes
         return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
                              {'name': attrs['name'],
-                              'renderer': tags.directive(attrs['renderer'])})
+                              'renderer': T.directive(attrs['renderer'])})
 
     def render_personChooser(self, ctx, data):
         select = inevow.IQ(self.docFactory).onePattern('personChooser')
@@ -671,8 +686,8 @@ class InboxScreen(athena.LiveFragment):
 
         if self.viewingByTag is not None:
             comparison.extend((
-                Tag.object == Message.storeID,
-                Tag.name == self.viewingByTag))
+                tags.Tag.object == Message.storeID,
+                tags.Tag.name == self.viewingByTag))
 
         if self.viewingByAccount is not None:
             comparison.append(Message.source == self.viewingByAccount)

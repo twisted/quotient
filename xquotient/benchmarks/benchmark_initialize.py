@@ -9,6 +9,8 @@ import os
 from twisted import plugin
 from twisted.python import filepath
 
+from epsilon.scripts import benchmark
+
 from axiom import store, userbase
 
 import xmantissa.plugins
@@ -40,7 +42,9 @@ def initializeStore():
 
 
 def main():
+    benchmark.start()
     initializeStore()
+    benchmark.stop()
 
 if __name__ == '__main__':
     main()

@@ -8,6 +8,7 @@ of UIDs to determine if they should be downloaded or not.
 import time
 
 from epsilon import extime
+from epsilon.scripts import benchmark
 
 from xquotient import grabber
 from xquotient.benchmarks import benchmark_initialize
@@ -38,7 +39,9 @@ def main():
         for i in xrange(20000 * FACTOR / 100):
             r = xrange(i * 100, i * 100 + 100)
             g.shouldRetrieve(list(enumerate(map(str, r))))
+    benchmark.start()
     userStore.transact(filterPOP3UIDs)
+    benchmark.stop()
 
 
 if __name__ == '__main__':
