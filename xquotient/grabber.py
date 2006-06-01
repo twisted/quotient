@@ -470,7 +470,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                 return
             except:
                 f = failure.Failure()
-                rece.connectionLost(f)
+                rece.connectionLost()
                 self.markFailure(uid, f)
                 if f.check(pop3client.LineTooLong):
                     # reschedule, the connection has dropped

@@ -169,6 +169,27 @@ class POP3GrabberTestCase(unittest.TestCase):
             'stopped')
 
 
+    def testLineTooLong(self):
+        """
+        Make sure a message illegally served with a line longer than we will
+        accept is handled and marked as a failure, but doesn't completely
+        derail the grabber.
+        """
+        self.server.portal = Portal(
+            ListMailbox(['X' * (2 ** 16)]),
+            lambda: None)
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda: self.server,
+            lambda: self.client)
+        pump.flush()
+        for evt in self.client.events:
+            if evt[0] == 'transient':
+                evt[1].trap(pop3.LineTooLong)
+                break
+        else:
+            self.fail("No transient failure recorded.")
+
+
     def testFailedLogin(self):
         self.server.portal = NoPortal()
         c, s, pump = iosim.connectedServerAndClient(
