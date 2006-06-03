@@ -67,7 +67,7 @@ class FakeMessage:
         self.source = self
         self.msg = msg
         self.trained = False
-
+        
     def open(self):
         return self
     def read(self):
@@ -112,9 +112,8 @@ class DSPAMFilterTestCase(unittest.TestCase):
         acc = ls.addAccount('username', 'dom.ain', 'password')
         ss = acc.avatars.open()
         self.df = spam.DSPAMFilter(store=ss)
+        self.df.installOn(ss)
         self.f = spam.Filter(store=ss)
-        self.f.installedOn = ss #XXX sorta cheating
-        self.df.installOn(self.f)
 
     def testMessageClassification(self):
         self.f.processItem(FakeMessage(MESSAGE))
@@ -127,7 +126,7 @@ class FilterTestCase(unittest.TestCase):
 
     def setUp(self):
         dbdir = self.mktemp()
-        self.store = s = store.Store(dbdir)
+        s = store.Store(dbdir)
         ls = userbase.LoginSystem(store=s)
         ls.installOn(s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
@@ -141,14 +140,7 @@ class FilterTestCase(unittest.TestCase):
         m = FakeMessage(MESSAGE)
         self.f.processItem(m)
         self.assertNotEqual(m.spam, None)
-
-    def testGlobalMessageClassification(self):
-        m = FakeMessage(MESSAGE)
-        home = self.store.newFilePath("dspam").path
-        d = dspam.startDSPAM("global", home)
-        dspam.testSpam(m, 'global', home, d, False)
-        self.f.processItem(m)
-
+        
 if spam.dspam == None:
   DSPAMFilterTestCase.skip = "DSPAM not installed"
   DSPAMTestCase.skip = "DSPAM not installed"

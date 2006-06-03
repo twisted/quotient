@@ -1,5 +1,5 @@
 
-import cPickle, errno, os
+import cPickle, errno
 
 from spambayes import hammie, classifier
 
@@ -139,12 +139,10 @@ class DSPAMFilter(item.Item, item.InstallableMixin):
     classifier = attributes.inmemory()
     username = attributes.inmemory()
     lib = attributes.inmemory()
-    globalPath = attributes.bytes()
 
     def installOn(self, other):
         super(DSPAMFilter, self).installOn(other)
         other.powerUp(self, iquotient.IHamFilter)
-        self.globalPath = other.installedOn.parent.newFilePath("dspam").path
 
     def _homePath(self):
         return self.store.newFilePath('dspam-%d' % (self.storeID,))
@@ -155,11 +153,9 @@ class DSPAMFilter(item.Item, item.InstallableMixin):
         self.lib = dspam.startDSPAM(self.username, self._homePath().path.encode('ascii'))
 
     def classify(self, item):
-        result, clas, conf = dspam.classifyMessageWithGlobalGroup(
-            self.lib, self.username, 'global',
-            self._homePath().path.encode('ascii'),
-            self.globalPath,
-            item.impl.source.open().read(), train=True)
+        result, clas, conf = dspam.classifyMessage(self.lib,
+                                            self.username, self._homePath().path.encode('ascii'),
+                                            item.impl.source.open().read(), train=True)
         return result == dspam.DSR_ISSPAM, conf
 
     def train(self, spam, item):
