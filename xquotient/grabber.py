@@ -450,6 +450,10 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         if uidWorkingSet:
             processBatch()
 
+        log.msg(
+            '%s: Retrieving %d messages.' % (self.getSource(),
+                                             len(uidList)))
+
         # XXX This is a bad loop.
         for idx, uid in uidList:
             if self.stopped:
