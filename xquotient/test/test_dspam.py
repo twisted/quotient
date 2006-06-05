@@ -149,9 +149,9 @@ class FilterTestCase(unittest.TestCase):
         dspam.testSpam(m, 'global', home, d, False)
         self.f.processItem(m)
 
-if spam.dspam == None:
-  DSPAMFilterTestCase.skip = "DSPAM not installed"
-  DSPAMTestCase.skip = "DSPAM not installed"
+if spam.dspam is None:
+    for testcase in (DSPAMFilterTestCase, DSPAMTestCase, FilterTestCase):
+        testcase.skip = "DSPAM not installed"
 else:
  dspam = spam.dspam
  import ctypes
