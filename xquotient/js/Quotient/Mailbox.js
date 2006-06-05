@@ -473,7 +473,6 @@ Quotient.Mailbox.Controller.methods(
 
             var search = document.getElementById("search-button");
             if(search) {
-                alert(search);
                 /* if there aren't any search providers available,
                  * then there won't be a search button */
                 var width = Divmod.Runtime.theRuntime.getElementSize(search.parentNode).w;
