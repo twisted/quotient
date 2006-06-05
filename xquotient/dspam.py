@@ -2,9 +2,8 @@
 from ctypes import CDLL, Structure, c_char_p, c_float, c_long, c_char
 from ctypes import c_ulonglong, c_int, c_uint, c_void_p, POINTER
 from ctypes import SetPointerType, RTLD_GLOBAL
-import os
+import os, time
 
-HOME="/var/spool/dspam"
 STORAGE_DRIVER="/usr/lib/dspam/libhash_drv.so"
 DSPAM_LIB="/usr/lib/libdspam.so.7"
 
@@ -48,23 +47,24 @@ def train(user, home, spamDir, hamDir, verbose=False):
         if len(nonspamCorpus) > 0:
             count = 0
             msg = os.path.join(hamDir, nonspamCorpus.pop(0))
-            testNonspam(hamDir, msg, user, home, d, verbose)
+            testNonspam(msg, user, home, d, verbose)
             if len(spamCorpus) > 0:
                 count = len(nonspamCorpus) / float(len(spamCorpus))
             for x in range(1, int(count)):
                 msg = os.path.join(hamDir, nonspamCorpus.pop(0))
-                testNonspam(hamDir, msg, user, home, d, verbose)
+                testNonspam(msg, user, home, d, verbose)
+                time.sleep(0.1) #XXX Going too fast makes dspam blow up sometimes. 
 
         if len(spamCorpus) > 0:
             count = 0
             msg = os.path.join(spamDir, spamCorpus.pop(0))
-            testSpam(spamDir, msg, user, home, d, verbose)
+            testSpam(msg, user, home, d, verbose)
             if len(nonspamCorpus) > 0:
                 count = len(spamCorpus) / float(len(nonspamCorpus))
             for x in range(1, int(count)):
                 msg = os.path.join(spamDir, spamCorpus.pop(0))
-                testSpam(spamDir, msg, user, home, d,  verbose)
-
+                testSpam(msg, user, home, d,  verbose)
+                time.sleep(0.1)
 def classifyMessage(d, user, home, msg, train=True):
     """
     Classify a single message.
@@ -94,6 +94,51 @@ def classifyMessage(d, user, home, msg, train=True):
         raise IOError(os.strerror(result))
     d.dspam_destroy(MTX)
     return CTX.result, CTX.class_, CTX.confidence
+
+def classifyMessageWithGlobalGroup(d, user, groupname, userhome,
+                                   globalhome, msg, train=True):
+    """
+    Classify a single message. If the user's filter hasn't been
+    trained sufficiently, use the global filter.
+
+    @param d: the dspam library.
+    @param user: The username.
+    @param groupname: The group name of the global filter.
+    @param userhome: The name of the DSPAM homedir for the user.
+    @param globalhome: the name of the DSPAM homedir for the global group.
+    @param msg: The actual text of the message.
+    @param train: If true, this message will train the database with
+    its tokens. If false, only a classification will be returned, with
+    no modification to the database.
+
+    @return: A 3-tuple containing the result of classification
+    (DSR_ISSPAM or DSR_ISINNOCENT), a string describing the
+    classification, and the confidence of the classification as a
+    float.
+    """
+    if train:
+        mode = DSM_PROCESS
+    else:
+        mode = DSM_CLASSIFY
+
+    MTX = configureContext(d, user, userhome, mode, DSR_NONE, DSR_NONE)
+    CTX = MTX.contents
+    result = d.dspam_process(MTX, msg)
+    if (((CTX.totals.innocent_learned + CTX.totals.innocent_corpusfed < 1000) or
+         (CTX.totals.spam_learned + CTX.totals.spam_corpusfed) < 250) and
+        "Whitelisted" not in CTX.class_):
+        d.dspam_destroy(MTX)
+        MTX = configureContext(d, groupname, globalhome,
+                               DSM_CLASSIFY, DSR_NONE, DSR_NONE)
+        CTX = MTX.contents
+        result = d.dspam_process(MTX, msg)
+
+    if result:
+        raise IOError(os.strerror(result))
+    result, class_, conf = CTX.result, CTX.class_, CTX.confidence
+    d.dspam_destroy(MTX)
+    return result, class_, conf
+
 
 def trainMessageFromError(d, user, home, msg, classification):
     """
@@ -264,10 +309,12 @@ def loadLibDSPAM(storageDriver, libName=DSPAM_LIB):
     return d
 
 
-def testNonspam(dir, msgFile, user, home, d, verbose):
-    msg = open(msgFile).read()
+def testNonspam(msgFile, user, home, d, verbose):
+    if isinstance(msgFile, basestring):
+        msgFile = open(msgFile)
+    msg = msgFile.read()
     if verbose:
-        print ("[test: nonspam] " + (os.path.split(msgFile)[1] + " " * 32)[:32] + " result:"),
+        print ("[test: nonspam] " + (os.path.split(msgFile.name)[1] + " " * 32)[:32] + " result:"),
     result, class_, conf = classifyMessage(d, user, home, msg, train=True)
     if result != DSR_ISINNOCENT:
         if verbose:
@@ -277,10 +324,12 @@ def testNonspam(dir, msgFile, user, home, d, verbose):
         if verbose:
             print "PASS: %s %s" % (result, class_)
 
-def testSpam(dir, msgFile, user, home, d, verbose):
-    msg = open(msgFile).read()
+def testSpam(msgFile, user, home, d, verbose):
+    if isinstance(msgFile, basestring):
+        msgFile = open(msgFile)
+    msg = msgFile.read()
     if verbose:
-        print ("[test: spam   ] " + (os.path.split(msgFile)[1] + " " * 32)[:32] + " result:"),
+        print ("[test: spam   ] " + (os.path.split(msgFile.name)[1] + " " * 32)[:32] + " result:"),
     result, class_, conf = classifyMessage(d, user, home, msg, train=True)
 
     if result != DSR_ISSPAM:
