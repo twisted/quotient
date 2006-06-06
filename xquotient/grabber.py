@@ -399,11 +399,24 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         yield d
         try:
             loginResult = d.getResult()
+        except pop3client.ServerErrorResponse, e:
+            self.setStatus(
+                u'Login failed: ' + str(e).decode('ascii', 'replace'),
+                False)
+            self.transport.loseConnection()
+            return
+        except pop3.InsecureAuthenticationDisallowed:
+            self.setStatus(
+                u'Login aborted: server not secure.',
+                False)
+            self.transport.loseConnection()
+            return
         except:
             f = failure.Failure()
-            if not f.check(pop3client.ServerErrorResponse):
-                log.err(f)
-            self.setStatus(u'Login failed: ' + unicode(f.getErrorMessage(), 'ascii'), False)
+            log.err(f)
+            self.setStatus(
+                u'Login failed: internal error.',
+                False)
             self.transport.loseConnection()
             return
 

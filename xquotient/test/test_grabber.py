@@ -122,6 +122,14 @@ class ListMailbox(object):
         self.deleted = []
 
 
+
+class POP3WithoutAPOP(pop3.POP3):
+    def connectionMade(self):
+        self.successResponse('Hello')
+        self.setTimeout(self.timeOut)
+
+
+
 class DelayedListMailbox(ListMailbox):
     """
     Like ListMailbox, but with hooks to arbitrarily delay responses.  This
@@ -196,9 +204,34 @@ class POP3GrabberTestCase(unittest.TestCase):
             lambda : self.server,
             lambda : self.client)
         pump.flush()
-        self.assertEquals(
-            [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
-            'stopped')
+
+        status = [evt[1] for evt in self.client.events if evt[0] == 'status'][-1]
+        lastEvent = [evt[0] for evt in self.client.events if evt[0] != 'status'][-1]
+
+        self.assertEquals(status, u'Login failed: Authentication failed')
+        self.assertEquals(lastEvent, u'stopped')
+
+
+    def testInsecureLogin(self):
+        """
+        Test that if login isn't even attempted because there is no way to do
+        it without revealing a password that the grabber status is set
+        properly.
+        """
+        self.server = POP3WithoutAPOP()
+        self.server.schedule = list
+        self.server.timeOut = None
+
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda : self.server,
+            lambda : self.client)
+        pump.flush()
+
+        status = [evt[1] for evt in self.client.events if evt[0] == 'status'][-1]
+        lastEvent = [evt[0] for evt in self.client.events if evt[0] != 'status'][-1]
+
+        self.assertEquals(status, u'Login aborted: server not secure.')
+        self.assertEquals(lastEvent, u'stopped')
 
 
     def testLostConnectionDuringRetrieve(self):
