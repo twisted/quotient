@@ -375,6 +375,13 @@ class HeaderBodyParser(object):
         self.part.headersLength = linebegin - self.part.headersOffset
         self.part.bodyOffset = lineend
 
+    def updateLength(self, linebegin):
+        # We update our parents' length because we might be in the middle of a
+        # truncated part or something.
+        self.part.bodyLength = linebegin - self.part.bodyOffset
+        if self.parent is not None:
+            self.parent.updateLength(linebegin)
+
     def lineReceived(self, line, linebegin, lineend):
         if self.parsingHeaders:
             if not self.gotFirstHeader:
@@ -382,6 +389,10 @@ class HeaderBodyParser(object):
                 self.gotFirstHeader = True
             return self.parseHeaders(line, linebegin, lineend)
         else:
+            # This is a bit redundant, but the old strategy for updating
+            # bodyLength is too confusing to totally untangle right now and
+            # this should be more correct.
+            self.updateLength(linebegin)
             return self.parseBody(line, linebegin, lineend)
 
     def warn(self, text):
