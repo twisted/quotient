@@ -20,6 +20,7 @@ from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message
 from xquotient import mimepart, equotient, compose
+from xquotient.qpeople import AddPersonFragment
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
 
@@ -59,28 +60,6 @@ def replyTo(m):
     except equotient.NoSuchHeader:
         recipient = m.sender
     return recipient
-
-class AddPersonFragment(people.AddPersonFragment):
-    jsClass = 'Quotient.Common.AddPerson'
-
-    iface = allowedMethods = dict(getPersonHTML=True)
-    lastPerson = None
-
-    def makePerson(self, nickname):
-        person = super(AddPersonFragment, self).makePerson(nickname)
-        self.lastPerson = person
-        return person
-
-    def getPersonHTML(self):
-        # come up with a better way to identify people.
-        # i kind of hate that we have to do this at all, it's really, really ugly.
-        # once we have some kind of history thing set up, we should just
-        # reload the page instead of dousing ourselves with petrol
-        # and jumping through flaming hoops
-        assert self.lastPerson is not None
-        personFrag = people.PersonFragment(self.lastPerson)
-        return unicode(flatten(personFrag), 'utf-8')
-
 
 def makeBatchAction(actionName):
     def batchAction(self, batchType, include=(), exclude=(), *args):

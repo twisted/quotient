@@ -5,8 +5,36 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     width: 100%;
 }
 
+.extract-text > span {
+    background-color: #FFA366;
+    padding: 1px;
+}
+
 .complexity-icons {
     padding-left: 4px;
+}
+
+.person-message-list {
+    border-spacing: 4px;
+    color: #666666;
+    white-space: nowrap;
+}
+
+.no-messages {
+    padding: 6px;
+    font-size: 1.4em;
+}
+
+.unread-person-message:link, .unread-person-message:visited {
+    font-weight: bold;
+}
+
+.person-message-subject {
+    width: 100%;
+}
+
+.person-message-subject .subject-wrapper {
+    overflow: hidden;
 }
 
 .inbox {

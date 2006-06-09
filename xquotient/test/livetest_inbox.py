@@ -77,8 +77,7 @@ class InboxTestCase(testcase.TestCase):
         def makePerson(name, address):
             EmailAddress(store=s,
                          person=Person(store=s, organizer=o, name=name),
-                         address=address,
-                         type=u'default')
+                         address=address)
 
         makePerson(u'Joe', u'joe@divmod.com')
 

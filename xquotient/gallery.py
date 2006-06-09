@@ -3,10 +3,11 @@ import itertools
 from zope.interface import implements
 from twisted.python.components import registerAdapter
 
-from nevow import rend, static, flat, athena
+from nevow import rend, static, flat, athena, tags, inevow
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, webnav, website, people, tdb
 from xmantissa.fragmentutils import dictFillSlots, PatternDictionary
@@ -30,15 +31,50 @@ def makeThumbnail(data, outpath, thumbSize=135):
     except IOError:
         pass
 
+class ImageSetRenderer:
+    implements(inevow.IRenderer)
+
+    def __init__(self, imageSet):
+        self.imageSet = imageSet
+
+    def rend(self, *junk):
+        prefixURL = '/' + self.imageSet.store.findUnique(ThumbnailDisplayer).prefixURL + '/'
+        toWebID = ixmantissa.IWebTranslator(self.imageSet.store).toWebID
+
+        return (tags.img(src=prefixURL + toWebID(img), width='20%', height='20%')
+                    for img in self.imageSet.getImages())
+
+class ImageSet(Item):
+    message = attributes.reference()
+    person = attributes.reference()
+
+    def getImages(self):
+        return self.store.query(Image, Image.imageSet == self)
+
+registerAdapter(ImageSetRenderer, ImageSet, inevow.IRenderer)
+
 class Image(Item):
     typeName = 'quotient_image'
-    schemaVersion = 1
+    schemaVersion = 2
 
     part = attributes.reference()
     thumbnailPath = attributes.path()
     mimeType = attributes.text()
+    imageSet = attributes.reference()
 
     message = attributes.reference()
+
+def image1to2(old):
+    new = old.upgradeVersion('quotient_image', 1, 2,
+                             part=old.part,
+                             mimeType=old.mimeType,
+                             message=old.message,
+                             imageSet=None)
+    # XXX HACK
+    new.thumbnailPath = old.thumbnailPath
+    return new
+
+registerUpgrader(image1to2, 'quotient_image', 1, 2)
 
 class ThumbnailDisplay(rend.Page):
 

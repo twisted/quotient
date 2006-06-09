@@ -1,17 +1,26 @@
 import re
 
+from zope.interface import implements
+
+from twisted.python.components import registerAdapter
+
 from nevow import tags
+from nevow.inevow import IRenderer
 
 from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
+from axiom.upgrade import registerUpgrader
+
+from xmantissa.people import EmailAddress
 
 from xquotient import mail
-from xquotient.gallery import Image, makeThumbnail
+from xquotient.gallery import Image, ImageSet, makeThumbnail
 from xquotient.exmess import Message
 
 def extractImages(message):
+    imageSet = None
     for attachment in message.walkAttachments():
         if attachment.type.startswith('image/'):
             thumbdir = message.store.newDirectory('thumbnails')
@@ -26,11 +35,30 @@ def extractImages(message):
             thumbf = thumbdir.child(basename)
             makeThumbnail(imgdata, thumbf.path)
 
+            if imageSet is None:
+                imageSet = ImageSet(store=message.store,
+                                    message=message)
+
             Image(part=attachment.part,
                   thumbnailPath=thumbf,
                   message=message,
                   mimeType=unicode(attachment.type),
+                  imageSet=imageSet,
                   store=message.store)
+
+class ExtractRenderer:
+    implements(IRenderer)
+
+    def __init__(self, extract):
+        self.extract = extract
+
+    def rend(self, *junk):
+        (l, middle, r) = self.extract.inContext()
+        return tags.div(class_='extract-container')[
+                l,
+                tags.div(class_='extract-text')[
+                    tags.span[middle]],
+                r]
 
 # the idea with extraction is that we only store an extract
 # once per sender.  so if you import the last 5 years worth
@@ -93,10 +121,12 @@ class SimpleExtractMixin(object):
                 self.asStan(),
                 text[end:end+chars])
 
-class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
+def registerExtractUpgrader1to2(itemClass):
+    registerUpgrader(lambda old: old.deleteFromStore(), itemClass.typeName, 1, 2)
 
+class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
     typeName = 'quotient_url_extract'
-    schemaVersion = 1
+    schemaVersion = 2
 
     start = attributes.integer()
     end = attributes.integer()
@@ -106,8 +136,7 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
     part = attributes.reference()
     timestamp = attributes.timestamp()
 
-    actedUpon = attributes.boolean(default=False)
-    ignored = attributes.boolean(default=False)
+    person = attributes.reference()
 
     regex = re.compile(ur'(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]',
                        re.UNICODE | re.IGNORECASE)
@@ -115,11 +144,13 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
     def asStan(self):
         return tags.b[tags.a(href=self.text)[self.text]]
 
+registerAdapter(ExtractRenderer, URLExtract, IRenderer)
+registerExtractUpgrader1to2(URLExtract)
 
 class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     typeName = 'quotient_phone_number_extract'
-    schemaVersion = 1
+    schemaVersion = 2
 
     start = attributes.integer()
     end = attributes.integer()
@@ -129,8 +160,7 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
     part = attributes.reference()
     timestamp = attributes.timestamp()
 
-    actedUpon = attributes.boolean(default=False)
-    ignored = attributes.boolean(default=False)
+    person = attributes.reference()
 
     regex = re.compile(ur'%(area)s%(body)s%(extn)s' % dict(area=r'(?:(?:\(?\d{3}\)?[-.\s]?|\d{3}[-.\s]))?',
                                                            body=r'\d{3}[-.\s]\d{4}',
@@ -140,10 +170,13 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
     def asStan(self):
         return tags.b[self.text]
 
+registerAdapter(ExtractRenderer, PhoneNumberExtract, IRenderer)
+registerExtractUpgrader1to2(PhoneNumberExtract)
+
 class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     typeName = 'quotient_email_address_extract'
-    schemaVersion = 1
+    schemaVersion = 2
 
     start = attributes.integer()
     end = attributes.integer()
@@ -153,8 +186,7 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
     part = attributes.reference()
     timestamp = attributes.timestamp()
 
-    actedUpon = attributes.boolean(default=False)
-    ignored = attributes.boolean(default=False)
+    person = attributes.reference()
 
     regex = re.compile(ur'[\w\-\.]+@(?:[a-z0-9-]+\.)+[a-z]+',
                        re.UNICODE | re.IGNORECASE)
@@ -166,6 +198,9 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     def asStan(self):
         return tags.b[self.text]
+
+registerAdapter(ExtractRenderer, EmailAddressExtract, IRenderer)
+registerExtractUpgrader1to2(EmailAddressExtract)
 
 extractTypes = {'url': URLExtract,
                 'phone number': PhoneNumberExtract,

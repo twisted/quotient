@@ -1,18 +1,63 @@
 from zope.interface import implements
 
-from nevow import rend, athena
+from nevow import rend, inevow, tags
 from nevow.flat import flatten
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
-from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
+from xmantissa.fragmentutils import dictFillSlots
 
-from xquotient import gallery, extract, mail, exmess, equotient, mimeutil
+from xquotient import extract, mail, exmess, equotient, mimeutil, gallery
 
-from xmantissa.scrolltable import ScrollingFragment, UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
+from xmantissa.scrolltable import UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
+
+def makePersonExtracts(store, person):
+    def queryMessageSenderPerson(typ):
+        # having Message.person might speed this up, but it would
+        # need some kind of notification thing that fires each time
+        # an email address is associated with a Person item so we
+        # can update the attribute
+
+        return store.query(typ, attributes.AND(
+                                    typ.message == exmess.Message.storeID,
+                                    exmess.Message.sender == people.EmailAddress.address,
+                                    people.EmailAddress.person == person))
+
+    for etyp in extract.extractTypes.itervalues():
+        for e in queryMessageSenderPerson(etyp):
+            person.registerExtract(e)
+            e.person = person
+
+    for imageSet in queryMessageSenderPerson(gallery.ImageSet):
+        person.registerExtract(imageSet)
+        imageSet.person = person
+
+class AddPersonFragment(people.AddPersonFragment):
+    jsClass = 'Quotient.Common.AddPerson'
+
+    iface = allowedMethods = dict(getPersonHTML=True)
+    lastPerson = None
+
+    def makePerson(self, nickname):
+        person = super(AddPersonFragment, self).makePerson(nickname)
+        makePersonExtracts(self.original.store, person)
+        self.lastPerson = person
+        return person
+
+    def getPersonHTML(self):
+        # come up with a better way to identify people.
+        # i kind of hate that we have to do this at all, it's really, really ugly.
+        # once we have some kind of history thing set up, we should just
+        # reload the page instead of dousing ourselves with petrol
+        # and jumping through flaming hoops
+        assert self.lastPerson is not None
+        personFrag = people.PersonFragment(self.lastPerson)
+        return unicode(flatten(personFrag), 'utf-8')
+
 
 class CorrespondentExtractor(Item, InstallableMixin):
     """
@@ -57,45 +102,47 @@ class PersonFragmentColumn(UnsortableColumn):
     def getType(self):
         return TYPE_FRAGMENT
 
-class MessageList(ScrollingFragment):
+class MessageList(rend.Fragment):
     implements(ixmantissa.IPersonFragment)
     title = 'Messages'
 
-    def __init__(self, person):
-        self.prefs = ixmantissa.IPreferenceAggregator(person.store)
-
-        comparison = attributes.AND(
-                exmess.Message.sender == people.EmailAddress.address,
-                people.EmailAddress.person == person)
-
-        pfc = PersonFragmentColumn(None, 'sender')
-        pfc.person = person
-
-        ScrollingFragment.__init__(
-                self, person.store,
-                exmess.Message,
-                comparison,
-                (pfc, exmess.Message.subject, exmess.Message.sentWhen),
-                defaultSortColumn=exmess.Message.sentWhen,
-                defaultSortAscending=False)
-
-        self.docFactory = getLoader(self.fragmentName)
-
-class ImageList(gallery.GalleryScreen):
-    implements(ixmantissa.IPersonFragment)
-    title = 'Images'
-
-    def __init__(self, person):
+    def __init__(self, messageLister, person):
+        self.messageLister = messageLister
         self.person = person
-        gallery.GalleryScreen.__init__(self, person)
-        self.docFactory = self.translator.getDocFactory(self.fragmentName)
+        rend.Fragment.__init__(self, docFactory=getLoader('person-messages'))
 
-    def _getComparison(self):
-        return attributes.AND(
-                gallery.Image.message == exmess.Message.storeID,
-                exmess.Message.sender == people.EmailAddress.address,
-                people.EmailAddress.person == self.person)
+    def render_messages(self, *junk):
+        iq = inevow.IQ(self.docFactory)
+        msgpatt = iq.patternGenerator('message')
+        newpatt = iq.patternGenerator('unread-message')
+        content = []
+        addresses = set(self.person.store.query(
+                            people.EmailAddress,
+                            people.EmailAddress.person == self.person).getColumn('address'))
 
+        wt = ixmantissa.IWebTranslator(self.person.store)
+        link = lambda href, text: tags.a(href=href, style='display: block')[text]
+
+        displayName = self.person.getDisplayName()
+        for m in self.messageLister.mostRecentMessages(self.person):
+            if m.sender in addresses:
+                sender = displayName
+            else:
+                sender = 'Me'
+            if m.read:
+                patt = msgpatt
+            else:
+                patt = newpatt
+
+            url = wt.linkTo(m.storeID)
+            content.append(dictFillSlots(patt,
+                                         dict(sender=link(url, sender),
+                                              subject=link(url, m.subject),
+                                              date=link(url, m.receivedWhen.asHumanly()))))
+
+        if 0 < len(content):
+            return iq.onePattern('messages').fillSlots('messages', content)
+        return iq.onePattern('no-messages')
 
 class ExcerptColumn(AttributeColumn):
     def extractValue(self, model, item):
@@ -107,64 +154,6 @@ class ExcerptColumn(AttributeColumn):
 class SubjectColumn(AttributeColumn):
     def extractValue(self, model, item):
         return item.message.subject
-
-class ExtractScrollingFragment(ScrollingFragment):
-    def constructRows(self, items):
-        rows = ScrollingFragment.constructRows(self, items)
-        for (item, row) in zip(items, rows):
-            row['__id__'] = unicode(self.wt.linkTo(item.message.storeID), 'ascii')
-        return rows
-
-class ExtractList(athena.LiveFragment):
-    implements(ixmantissa.IPersonFragment)
-    title = 'Extracts'
-    live = 'athena'
-
-    def __init__(self, person):
-        self.person = person
-        rend.Fragment.__init__(self, person)
-        self.docFactory = getLoader('extracts')
-
-        self.prefs = ixmantissa.IPreferenceAggregator(person.store)
-
-    def _getComparison(self, extractType):
-        # this could be optimized
-        return attributes.AND(
-                  extractType.message == exmess.Message.storeID,
-                  exmess.Message.sender == people.EmailAddress.address,
-                  people.EmailAddress.person == self.person)
-
-    def _makeExtractScrollTable(self, extractType):
-        comparison = self._getComparison(extractType)
-
-        return ExtractScrollingFragment(
-                    self.person.store,
-                    extractType,
-                    comparison,
-                    (extractType.timestamp,
-                        SubjectColumn(None, 'subject'),
-                        ExcerptColumn(None, 'excerpt')),
-                    defaultSortColumn=extractType.timestamp,
-                    defaultSortAscending=False)
-
-    def _countExtracts(self, extractType):
-        return self.person.store.count(extractType, self._getComparison(extractType))
-
-    def render_extractPanes(self, ctx, data):
-        etypes = (('URLs', extract.URLExtract),
-                  ('Phone Numbers', extract.PhoneNumberExtract),
-                  ('Email Addresses', extract.EmailAddressExtract))
-
-        patterns = PatternDictionary(self.docFactory)
-
-        for (title, etype) in etypes:
-            sf = self._makeExtractScrollTable(etype)
-            sf.jsClass = 'Quotient.Extracts.ScrollingWidget'
-            sf.docFactory = getLoader(sf.fragmentName)
-            sf.setFragmentParent(self.page)
-            count = self._countExtracts(etype)
-            yield dictFillSlots(patterns['horizontal-pane'],
-                                dict(title=title + ' (%s)' % (count,), body=sf))
 
 
 class MessageLister(Item, InstallableMixin):
@@ -180,35 +169,43 @@ class MessageLister(Item, InstallableMixin):
         other.powerUp(self, ixmantissa.IOrganizerPlugin)
 
     def personalize(self, person):
-        return MessageList(person)
+        return MessageList(self, person)
 
-class ImageLister(Item, InstallableMixin):
-    implements(ixmantissa.IOrganizerPlugin)
+    def mostRecentMessages(self, person, n=5):
+        """
+        @param person: L{xmantissa.people.Person}
+        @return: sequence of C{n} L{xquotient.exmess.Message} instances,
+                 each one a message either to or from C{person}, ordered
+                 descendingly by received date.
+        """
+        # probably the slowest query in the world.
+        return self.store.query(exmess.Message,
+                                attributes.AND(
+                                    attributes.OR(
+                                        exmess.Message.sender == people.EmailAddress.address,
+                                        exmess.Message.recipient == people.EmailAddress.address),
+                                    people.EmailAddress.person == person,
+                                    exmess.Message.trash == False,
+                                    exmess.Message.draft == False,
+                                    exmess.Message.spam == False),
+                                sort=exmess.Message.receivedWhen.desc,
+                                limit=n)
 
+
+class ImageLister(Item):
     typeName = 'quotient_image_lister_plugin'
-    schemaVersion = 1
+    schemaVersion = 2
+    z = attributes.integer()
 
-    installedOn = attributes.reference()
-
-    def installOn(self, other):
-        super(ImageLister, self).installOn(other)
-        other.powerUp(self, ixmantissa.IOrganizerPlugin)
-
-    def personalize(self, person):
-        return ImageList(person)
-
-class ExtractLister(Item, InstallableMixin):
-    implements(ixmantissa.IOrganizerPlugin)
-
+class ExtractLister(Item):
     typeName = 'quotient_extract_lister_plugin'
-    schemaVersion = 1
+    schemaVersion = 2
+    z = attributes.integer()
 
-    installedOn = attributes.reference()
+def anyLister1to2(old):
+    new = old.upgradeVersion(old.typeName, 1, 2)
+    new.store.findUnique(people.Organizer).powerDown(new, ixmantissa.IOrganizerPlugin)
+    new.deleteFromStore()
 
-    def installOn(self, other):
-        super(ExtractLister, self).installOn(other)
-        other.powerUp(self, ixmantissa.IOrganizerPlugin)
-
-    def personalize(self, person):
-        return ExtractList(person)
-
+registerUpgrader(anyLister1to2, ImageLister.typeName, 1, 2)
+registerUpgrader(anyLister1to2, ExtractLister.typeName, 1, 2)

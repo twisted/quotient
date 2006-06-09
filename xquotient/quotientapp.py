@@ -103,8 +103,6 @@ class QuotientPeopleBenefactor(Item):
         organizer.installOn(avatar)
 
         avatar.findOrCreate(qpeople.MessageLister).installOn(organizer)
-        avatar.findOrCreate(qpeople.ExtractLister).installOn(organizer)
-        avatar.findOrCreate(qpeople.ImageLister).installOn(organizer)
 
 
 
