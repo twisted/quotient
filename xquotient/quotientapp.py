@@ -118,10 +118,11 @@ class IndexingBenefactor(Item):
 
 
     def endow(self, ticket, avatar):
+        messageSource = avatar.findUnique(mail.MessageSource)
         indexer = avatar.findOrCreate(INDEXER_TYPE)
+        indexer.addSource(messageSource)
         searcher = MessageSearchProvider(store=avatar, indexer=indexer)
         searcher.installOn(avatar)
-        avatar.findUnique(mail.MessageSource).addReliableListener(indexer, iaxiom.REMOTE)
 
 
     def revoke(self, ticket, avatar):
