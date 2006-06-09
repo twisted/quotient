@@ -1714,6 +1714,9 @@ Quotient.Mailbox.Controller.methods(
 
         Divmod.msg("setMessageContent(" + currentMessageData.toSource() + ")");
 
+        self.messageDetail.scrollTop = 0;
+        self.messageDetail.scrollLeft = 0;
+
         Divmod.Runtime.theRuntime.setNodeContent(
             self.messageDetail, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
 
