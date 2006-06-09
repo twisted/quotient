@@ -773,13 +773,14 @@ Quotient.Mailbox.Controller.methods(
         if(!self.totalFooterHeight) {
             var footer = document.getElementById("mantissa-footer");
             var blockFooter = self.firstNodeByAttribute("class", "right-block-footer");
-            self.totalFooterHeight = getHeight(blockFooter) + getHeight(footer);
+            self.blockFooterHeight = getHeight(blockFooter);
+            self.totalFooterHeight = self.blockFooterHeight + getHeight(footer);
         }
 
         self.scrollWidget.resized(self);
 
         var scrollViewport = self.scrollWidget._scrollViewport;
-        scrollViewport.style.height = (scrollViewport.style.height - getHeight(blockFooter)) + "px";
+        scrollViewport.style.height = (scrollViewport.style.height - self.blockFooterHeight) + "px";
 
         self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
                                            self.ypos - 13 -
