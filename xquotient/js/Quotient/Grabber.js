@@ -96,4 +96,5 @@ Quotient.Grabber.AddGrabberFormWidget.method(
                                               'Quotient.Grabber.ScrollingWidget');
 
         Quotient.Grabber.ScrollingWidget.get(sf).emptyAndRefill();
+        return Quotient.Grabber.AddGrabberFormWidget.upcall(self, "submitSuccess", result);
     });
