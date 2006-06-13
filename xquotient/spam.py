@@ -226,12 +226,12 @@ class SpambayesFilter(item.Item, item.InstallableMixin):
         for i in xrange(10):
             self.guesser.train(item.impl.source.open(), spam)
             if spam:
-                if self.score(item) < SPAM_THRESHHOLD:
+                if self.classify(item) < SPAM_THRESHHOLD:
                     break
             else:
-                if self.score(item) > SPAM_THRESHHOLD:
+                if self.classify(item) > SPAM_THRESHHOLD:
                     break
-        sc = self.score(item)
+        sc = self.classify(item)
         p = self._classifierPath()
         if not p.parent().exists():
             p.parent().makedirs()
