@@ -1,3 +1,11 @@
-x.x.x (YYYY-MM-DD):
-  - Added xquotient.mail.MessageSource, a batch processor for
-    xquotient.exmess.Messages.
+0.1.0 (2006-06-12):
+  - Initial public release.
+
+    This system is still _HIGHLY_ experimental!  Use at your own risk.  The
+    only _supported_ use for it is deployment on the Divmod service, where we
+    can closely monitor, manage, and update it.
+
+    This release is simply to get Quotient integrated into the Divmod release
+    procedure and streamline the process for publishing future releases.  We do
+    not promise to provide even such basic support as database upgraders for
+    objects whose schema we change, yet.
