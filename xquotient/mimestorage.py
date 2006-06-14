@@ -94,12 +94,23 @@ class Part(item.Item):
                                     message=self.message,
                                     index=len(self._headers)))
 
-    def walk(self):
-        # this depends on the order the parts are returned by the query
+    def walk(self, shallow=False):
+        """
+        @param shallow: return only immediate children?
+        """
+        # this depends on the order the parts are returned by the queries
+        if shallow:
+            return self._walkShallow()
+        return self._walkDeep()
+
+    def _walkDeep(self):
         yield self
         for child in self.store.query(Part, Part.parent == self):
             for grandchild in child.walk():
                 yield grandchild
+
+    def _walkShallow(self):
+        return self.store.query(Part, Part.parent == self)
 
     def getSubPart(self, partID):
         return self.store.findUnique(Part,
@@ -321,14 +332,13 @@ class Part(item.Item):
                                 part=self)
 
 
-    def readableParts(self):
+    def readableParts(self, shallow=False):
         '''return all parts with a content type of text/*'''
-        return (part for part in self.walk()
-                    if part.getContentType().startswith('text/'))
+        return (part for part in self.walk(shallow=shallow) is part.isReadable())
 
-    def readablePart(self, prefer):
+    def readablePart(self, prefer, shallow=False):
         '''return one text/* part, preferably of type prefer.  or None'''
-        parts = list(self.readableParts())
+        parts = list(self.readableParts(shallow=shallow))
         if len(parts) == 0:
             return None
         for part in parts:
@@ -337,17 +347,77 @@ class Part(item.Item):
         return parts[0]
 
     def iterate_multipart_alternative(self, prefer):
-        part = self.readablePart(prefer)
-        if part is not None:
-            for child in part.walkMessage(prefer):
-                yield child
+        # the previous implementation of this method returned the first
+        # text/* part at any level below the current part.  that was a
+        # problem because it bypassed the logic of any intermediate
+        # multiparts.  e.g. it would do the wrong this for this (unrealistic)
+        # example part layout:
+        #
+        # multipart/alternative:
+        #     multipart/related:
+        #         text/plain
+        #         text/plain
+        #     multipart/related:
+        #         text/html
+        #         text/html
+        #
+        # it would have picked the first text/plain child inside the first
+        # multipart/related, without displaying the second one.
+        #
+        # this is explicit as possible to avoid further confusion:
+
+        # find all immediate children
+        parts = list(self.walk(shallow=True))
+        # go through each of them
+        for part in parts:
+            # stop if we find one with a content-type that matches
+            # the "prefer" argument
+            if part.getContentType() == prefer:
+                break
+        # we didn't find one
+        else:
+            # go through them again
+            for part in parts:
+                # stop if we find a readable/renderable one
+                if part.isReadable():
+                    break
+            # we didn't find one
+            else:
+                # go through them again
+                for part in parts:
+                    # stop if we find a multipart
+                    if part.isMultipart():
+                        break
+                # we didn't find one
+                else:
+                    # there is no renderable or readable component
+                    # to this message, at any level
+                    return
+
+        # delegate to whichever part we found
+        for child in part.walkMessage(prefer):
+            yield child
 
     def iterate_multipart_mixed(self, prefer):
-        # maybe dont shove these all on one page
-        for part in self.readableParts():
-            for child in part.walkMessage(prefer):
-                yield child
+        # the previous implementation of this method had a similar problem
+        # to iterate_multipart_alternative, in that it would just return
+        # all readable parts at any level below the current part with
+        # considering the logic of any multiparts in between.
+
+        # for each immediate child of this part
+        for part in self.walk(shallow=True):
+            # if the part is readable/renderable or is a multipart
+            if part.isReadable() or part.isMultipart():
+                # delegate the decision about what components to render
+                for child in part.walkMessage(prefer):
+                    yield child
     iterate_multipart_related = iterate_multipart_signed = iterate_multipart_mixed
+
+    def isReadable(self):
+        return self.getContentType() in ('text/plain', 'text/html')
+
+    def isMultipart(self):
+        return self.getContentType().startswith('multipart/')
 
     def getFilename(self, default='No-Name'):
         return self.getParam('filename',

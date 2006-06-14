@@ -8,11 +8,49 @@ from epsilon import extime
 
 from axiom import store, scheduler
 
-from xquotient import mail, mimepart, mimestorage
+from xquotient import mail, mimepart
+from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
+
+from cStringIO import StringIO
+
+from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
+
+class PartMaker:
+    parent = None
+
+    def __init__(self, ctype, body, *children):
+        self.ctype = ctype
+        self.body = body
+        for c in children:
+            assert c.parent is None
+            c.parent = self
+        self.children = children
+
+    def _make(self):
+        (major, minor) = self.ctype.split('/')
+
+        if major == 'multipart':
+            p = MMP.MIMEMultipart(minor,
+                                  None,
+                                  list(c._make() for c in self.children))
+        elif major == 'text':
+            p = MT.MIMEText(self.body, minor)
+        elif major == 'image':
+            p = MI.MIMEImage(self.body, minor)
+        else:
+            assert False
+
+        return p
+
+    def make(self):
+        s = StringIO()
+        G.Generator(s).flatten(self._make())
+        s.seek(0)
+        return s.read()
 
 class MessageTestMixin:
     trivialMessage = msg("""\
@@ -225,9 +263,67 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
         part = mr.feedStringNow(self.multipartMessage)
         self.assertEquals(part.partID, 0)
         partIDs = list(part.store.query(
-                            mimestorage.Part, sort=mimestorage.Part.partID).getColumn('partID'))
+                            Part, sort=Part.partID).getColumn('partID'))
         self.assertEquals(partIDs, range(len(partIDs)))
 
+    alternativeInsideMixed = PartMaker('multipart/mixed', 'mixed',
+                                PartMaker('multipart/alternative', 'alt',
+                                    PartMaker('text/plain', 'plain-1'),
+                                    PartMaker('text/html', 'html-1')),
+                                PartMaker('text/plain', 'plain-2')).make()
+
+    def testAlternativeInsideMixed(self):
+        part = self.setUpMailStuff().feedStringNow(self.alternativeInsideMixed)
+
+        self.assertEquals(part.getContentType(), 'multipart/mixed')
+
+        def getKidsAndCheckTypes(parent, types):
+            kids = list(part.store.query(Part, Part.parent == parent))
+            self.assertEquals(list(p.getContentType() for p in kids), types)
+            return kids
+
+        kids = getKidsAndCheckTypes(part, ['multipart/alternative', 'text/plain'])
+
+        # RFC 2046, section 5.1.1, says:
+        #    "The CRLF preceding the boundary delimiter line is conceptually attached
+        #     to the boundary so that it is possible to have a part that does not end
+        #     with a CRLF (line break). Body parts that must be considered to end with
+        #     line breaks, therefore, must have two CRLFs preceding the boundary
+        #     delimiter line, the first of which is part of the preceding body part,
+        #     and the second of which is part of the encapsulation boundary."
+        #
+        # - there is only one CRLF between the end of the body of each part
+        # and the next boundary, which would seem to indicate that we shouldn't
+        # have to to embed newlines to get these assertions to pass
+
+        self.assertEquals(kids[-1].getBody(), 'plain-2\n')
+
+        gkids = getKidsAndCheckTypes(kids[0], ['text/plain', 'text/html'])
+
+        self.assertEquals(gkids[0].getBody(), 'plain-1\n')
+        self.assertEquals(gkids[1].getBody(), 'html-1\n')
+
+        def checkDisplayBodies(parent, ctype, bodies):
+            displayParts = list(parent.walkMessage(ctype))
+            self.assertEquals(list(p.part.getBody() for p in displayParts), bodies)
+
+        # we're calling walkMessage() on the multipart/mixed part,
+        # so we should get back 'plain-1' and 'plain-2', not 'html-1',
+        # because it's inside a nested multipart/alternative with 'plain-1'
+
+        checkDisplayBodies(part, 'text/plain', ['plain-1\n', 'plain-2\n'])
+
+        # this should still show us 'plain-2', but 'html-1' should get
+        # selected from the multipart/alternative part
+
+        checkDisplayBodies(part, 'text/html', ['html-1\n', 'plain-2\n'])
+
+        # now try the same on the multipart/alternative part directly.
+        # the results should be the same, except plain-2 shouldn't be
+        # considered, because it's a sibling part
+
+        checkDisplayBodies(kids[0], 'text/plain', ['plain-1\n'])
+        checkDisplayBodies(kids[0], 'text/html',  ['html-1\n'])
 
     typelessMessage = msg("""\
 To: you
