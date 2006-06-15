@@ -11,6 +11,7 @@ from nevow import rend, inevow, athena, static
 
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, people, webapp
 from xmantissa.publicresource import getLoader
@@ -63,7 +64,7 @@ class Message(item.Item):
     implements(ixmantissa.IFulltextIndexable)
 
     typeName = 'quotient_message'
-    schemaVersion = 1
+    schemaVersion = 2
 
     source = attributes.text(doc="""
     A short string describing the means by which this Message came to exist.
@@ -86,6 +87,7 @@ class Message(item.Item):
     trash = attributes.boolean(default=False)
     outgoing = attributes.boolean(default=False)
     draft = attributes.boolean(default=False)
+    deferred = attributes.boolean(default=False)
 
     spam = attributes.boolean(doc="""
 
@@ -112,8 +114,8 @@ class Message(item.Item):
     # Mailbox Display Indexes - these are _critical_ for interactive
     # performance (roughly 100,000% speedup)
 
-    attributes.compoundIndex(trash, draft, receivedWhen, outgoing, archived, sender)
-    attributes.compoundIndex(trash, draft, receivedWhen, outgoing, sender)
+    attributes.compoundIndex(trash, draft, deferred, outgoing, archived, sender)
+    attributes.compoundIndex(trash, draft, deferred, outgoing, sender)
 
     def activate(self):
         self._prefs = None
@@ -196,6 +198,14 @@ class Message(item.Item):
         return []
 
 
+def registerAttributeCopyingUpgrader(itemType, fromVersion, toVersion):
+    def upgrader(old):
+        return old.upgradeVersion(itemType.typeName, fromVersion, toVersion,
+                                  **dict((str(name), getattr(old, name))
+                                            for (name, _) in old.getSchema()))
+    registerUpgrader(upgrader, itemType.typeName, fromVersion, toVersion)
+
+registerAttributeCopyingUpgrader(Message, 1, 2)
 
 class Correspondent(item.Item):
     typeName = 'quotient_correspondent'

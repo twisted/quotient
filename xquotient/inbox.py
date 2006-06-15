@@ -11,7 +11,7 @@ from nevow.flat import flatten
 from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin, transacted
-from axiom import attributes, tags
+from axiom import attributes, tags, iaxiom
 
 from xmantissa import ixmantissa, webnav, people
 from xmantissa.fragmentutils import dictFillSlots
@@ -80,6 +80,22 @@ def makeSingleAction(actionName):
 
     return transacted(singleAction)
 
+class UndeferTask(Item):
+    """
+    Created when a message is deferred.  When run, I undefer
+    the message, mark it as unread, and delete myself from the
+    database
+    """
+    message = attributes.reference(reftype=Message,
+                                   whenDeleted=attributes.reference.CASCADE,
+                                   allowNone=False)
+    deferredUntil = attributes.timestamp(allowNone=False)
+
+    def run(self):
+        self.message.deferred = False
+        self.message.read = False
+        self.deleteFromStore()
+
 class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
@@ -116,6 +132,25 @@ class Inbox(Item, InstallableMixin):
     def installOn(self, other):
         super(Inbox, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
+
+    def action_archive(self, message):
+        message.archived = True
+
+    def action_delete(self, message):
+        message.trash = True
+
+    def action_defer(self, message, days, hours, minutes):
+        message.deferred = True
+        task = UndeferTask(store=self.store,
+                           message=message,
+                           deferredUntil=Time() + timedelta(days=days,
+                                                            hours=hours,
+                                                            minutes=minutes))
+        iaxiom.IScheduler(self.store).schedule(task, task.deferredUntil)
+        return task
+
+    def action_train(self, message, spam):
+        message.train(spam)
 
 class InboxScreen(athena.LiveFragment):
     implements(ixmantissa.INavigableFragment)
@@ -164,10 +199,11 @@ class InboxScreen(athena.LiveFragment):
 
                                   setComplexity=True)
 
-    def __init__(self, original):
-        athena.LiveFragment.__init__(self, original)
-        self.translator = ixmantissa.IWebTranslator(original.store)
-        self.store = original.store
+    def __init__(self, inbox):
+        athena.LiveFragment.__init__(self, inbox)
+        self.translator = ixmantissa.IWebTranslator(inbox.store)
+        self.store = inbox.store
+        self.inbox = inbox
 
         self._resetCurrentMessage()
 
@@ -469,6 +505,9 @@ class InboxScreen(athena.LiveFragment):
 
     getMessageCount = transacted(getMessageCount)
 
+    def getMessages(self, **k):
+        return self.original.store.query(Message, self._getBaseComparison(), **k)
+
     def _squish(self, thing):
         # replacing &nbsp with &#160 in webmail.SpacePreservingStringRenderer
         # fixed all issues with calling setNodeContent on flattened message
@@ -502,23 +541,8 @@ class InboxScreen(athena.LiveFragment):
             self._moveToNextMessage()
         return self._current()
 
-    def action_archive(self, message):
-        message.archived = True
-
-    def action_delete(self, message):
-        message.trash = True
-
-    def action_defer(self, message, days, hours, minutes):
-        message.receivedWhen = Time() + timedelta(days=days,
-                                                  hours=hours,
-                                                  minutes=minutes)
-        message.read = False
-
-    def action_train(self, message, spam):
-        message.train(spam)
-
     def _getActionMethod(self, actionName):
-        return getattr(self, 'action_' + actionName)
+        return getattr(self.inbox, 'action_' + actionName)
 
     def _performMany(self, actionName, messages=(), webIDs=(), args=()):
         action = self._getActionMethod(actionName)
@@ -639,7 +663,7 @@ class InboxScreen(athena.LiveFragment):
         comparison = [
             Message.trash == self.inTrashView,
             Message.draft == False,
-            Message.receivedWhen <= beforeTime]
+            Message.deferred == False]
 
         if not self.inTrashView:
             comparison.append(Message.outgoing == self.inSentView)

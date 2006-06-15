@@ -3,12 +3,13 @@ from twisted.trial.unittest import TestCase
 from epsilon.extime import Time
 
 from axiom.store import Store
+from axiom.scheduler import Scheduler
 
 from xmantissa.ixmantissa import INavigableFragment
 from xmantissa.webapp import PrivateApplication
 
 from xquotient.exmess import Message
-from xquotient.inbox import Inbox, replaceControlChars
+from xquotient.inbox import Inbox, replaceControlChars, UndeferTask
 
 
 class InboxTestCase(TestCase):
@@ -16,31 +17,6 @@ class InboxTestCase(TestCase):
         s = ''.join(map(chr, range(1, 32))) + 'foobar'
         # ord('\t') < ord('\n') < ord('\r')
         self.assertEquals(replaceControlChars(s), '\t\n\rfoobar')
-
-    def testTimeMismatch(self):
-        s = Store()
-        PrivateApplication(store=s).installOn(s) # IWebTranslator
-        inboxScreen = INavigableFragment(Inbox(store=s))
-
-        # we should see this message in the result set
-        m1 = Message(store=s, receivedWhen=Time(), spam=False)
-        # and this, because we set it as the current message,
-        # and the query should show us only messages received
-        # at <= the time the current message was received
-        m2 = Message(store=s, receivedWhen=Time(), spam=False)
-
-        inboxScreen.currentMessage = m2
-
-        # but not these
-        for i in xrange(5):
-            Message(store=s, receivedWhen=Time(), spam=False)
-
-        # urggg
-        query = inboxScreen._getScrolltableComparison()
-        self.assertEqual(list(s.query(Message, query,
-                                      sort=Message.receivedWhen.asc).getColumn('receivedWhen')),
-                         [m1.receivedWhen, m2.receivedWhen])
-
 
     def testUnreadMessageCount(self):
         s = Store()
@@ -146,3 +122,31 @@ class InboxTestCase(TestCase):
         for view in ('Inbox', 'All', 'Spam', 'Trash', 'Sent'):
             inboxScreen.changeView(view)
             self.assertEqual(inboxScreen.getCurrentViewName(), view)
+
+    def testDefer(self):
+        s = Store()
+        inbox = Inbox(store=s)
+
+        scheduler = Scheduler(store=s)
+        scheduler.installOn(s)
+
+        message = Message(store=s, deferred=False, read=True)
+        task = inbox.action_defer(message, 365, 0, 0)
+        self.failUnless(message.deferred, 'message was not deferred')
+        scheduler.reschedule(task, task.deferredUntil, Time())
+        scheduler.tick()
+        self.failIf(message.deferred, 'message is still deferred')
+        self.failIf(message.read, 'message is marked read')
+        self.assertEquals(s.count(UndeferTask), 0)
+
+    def testDeferCascadingDelete(self):
+        s = Store()
+        inbox = Inbox(store=s)
+
+        scheduler = Scheduler(store=s)
+        scheduler.installOn(s)
+
+        message = Message(store=s)
+        task = inbox.action_defer(message, 365, 0, 0)
+        message.deleteFromStore()
+        self.assertEquals(s.count(UndeferTask), 0)
