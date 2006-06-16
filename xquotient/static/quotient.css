@@ -2,6 +2,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 
 .complexity-container {
     background-color: #7FCCE5;
+    border-bottom: solid 1px #0099CC;
     width: 100%;
 }
 
@@ -38,7 +39,11 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 }
 
 .inbox {
-    padding-left: 77px;
+    border-top: solid 1px #0099CC;
+}
+
+.content-table {
+    padding-left: 50px;
 }
 
 .inbox-corner {
@@ -57,7 +62,6 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 
 .view-pane-header {
     background-color: #D9F0F7;
-    border-top: solid 1px #0099CC;
     border-left: solid 1px #7FCCE5;
 }
 
@@ -157,12 +161,7 @@ table.button {
     color: #FFFFFF;
 }
 
-.scrolltable-container {
-    border-top: solid 1px #7FCCE5;
-}
-
 .scrolltable-header {
-    border-top: solid 1px #0099CC;
     border-left: solid 1px #7FCCE5;
     height: 30px;
     width: 100%;
@@ -170,6 +169,10 @@ table.button {
 
 .scrolltable-header-container {
     background-color: #D9F0F7;
+}
+
+.scrolltable-container {
+    border-top: solid 1px #7FCCE5;
 }
 
 .left-block-footer, .mid-block-footer, .right-block-footer {
@@ -188,7 +191,6 @@ table.button {
 
 .message-block {
     width: 100%;
-    border-top: solid 1px #0099CC;
 }
 
 .sender {

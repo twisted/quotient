@@ -476,7 +476,8 @@ Quotient.Mailbox.Controller.methods(
                 /* if there aren't any search providers available,
                  * then there won't be a search button */
                 var width = Divmod.Runtime.theRuntime.getElementSize(search.parentNode).w;
-                node.style.paddingRight = width + "px";
+                Nevow.Athena.FirstNodeByAttribute(
+                    node, "class", "content-table").style.paddingRight = width + "px";
             }
 
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
