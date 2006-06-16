@@ -434,5 +434,10 @@ Quotient.Test.BatchActionsTestCase.methods(
         }).addCallback(
             function() {
                 checkSubjects([4, 9]);
+                self.mailbox.changeBatchSelection("all");
+                return self.mailbox.touchBatch("train", true, true);
+        }).addCallback(
+            function() {
+                checkSubjects([]);
         });
     });

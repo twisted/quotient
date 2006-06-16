@@ -604,9 +604,17 @@ Quotient.Mailbox.Controller.methods(
         var row, webID,
             sw = self.scrollWidget,
             rows = sw._rows,
-            pred = self._batchSelectionPredicates[self._batchSelection],
+            sel = self._batchSelection,
+            pred = self._batchSelectionPredicates[sel],
             include = [],
             exclude = [];
+
+        if(!pred) {
+            pred = function(r) {
+                /* always true for "all", always false for "none" */
+                return sel == "all";
+            }
+        }
 
         for(var i = 0; i < rows.length; i++) {
             row = rows[i];
@@ -1324,8 +1332,13 @@ Quotient.Mailbox.Controller.methods(
      *                       group being acted upon.
      */
     function touchSelectedGroup(self, action, isDestructive) {
+        var args = [];
+        for(var i = 1; i < arguments.length; i++) {
+            args.push(arguments[i]);
+        }
+        /* make sure additional arguments get forwarded correctly */
         if(self._batchSelection) {
-            return self.touchBatch(action, isDestructive);
+            return self.touchBatch.apply(self, args);
         }
         var sw = self.scrollWidget;
         var selgroup = sw.selectedGroup;
@@ -1377,10 +1390,7 @@ Quotient.Mailbox.Controller.methods(
 
         sw.selectedGroup = {};
         var remoteArgs = [action + "MessageGroup", isProgress, nextMessageID, webIDs];
-
-        for(var i = 3; i < arguments.length; i++) {
-            remoteArgs.push(arguments[i]);
-        }
+        remoteArgs = remoteArgs.concat(args.slice(2));
 
         return self.doTouch(remoteArgs, isProgress, webIDs.length, affectedUnreadCount);
     },
