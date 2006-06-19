@@ -191,11 +191,12 @@ class Message(item.Item):
 
 
     def valueParts(self):
-        return [('subject', self.subject)]
+        return []
 
 
     def keywordParts(self):
-        return []
+        return {u'subject': self.subject,
+                u'sender': self.sender}
 
 
 def registerAttributeCopyingUpgrader(itemType, fromVersion, toVersion):

@@ -1,5 +1,7 @@
 
 import os
+from cStringIO import StringIO
+from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
 from twisted.trial import unittest
 from twisted.python import filepath
@@ -12,9 +14,7 @@ from xquotient import mail, mimepart
 from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
 
-from cStringIO import StringIO
-
-from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
+from xmantissa import ixmantissa
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
@@ -93,6 +93,7 @@ Hello Bob,
 
     def testTrivialMessage(self):
         self._messageTest(self.trivialMessage, self.assertTrivialMessageStructure)
+
 
 
     messageWithUnicode = msg("""\
@@ -251,6 +252,25 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
         mr = self.setUpMailStuff()
         msg = mr.feedStringNow(source)
         assertMethod(msg)
+
+
+    def assertIndexability(self, msg):
+        fi = ixmantissa.IFulltextIndexable(msg.message)
+        self.assertEquals(fi.textParts(), [
+            u'Hello Bob,\n  How are you?\n-A\n'])
+        self.assertEquals(fi.valueParts(), [])
+        self.assertEquals(fi.keywordParts(), {
+            u'subject': u'a test message, comma separated',
+            u'sender': u'alice@example.com'})
+
+
+    def testIndexability(self):
+        """
+        Test that the result is adaptable to IFulltextIndexable and the
+        resulting object spits out the right data.
+        """
+        self._messageTest(self.trivialMessage, self.assertIndexability)
+
 
     def testAttachmentsAllHaveLength(self):
         def checkAttachments(msgitem):
