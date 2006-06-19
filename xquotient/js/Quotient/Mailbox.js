@@ -1023,16 +1023,18 @@ Quotient.Mailbox.Controller.methods(
         var defer   = ["defer", true];
 
         return {
-            Spam:  {show: [train_ham, delete_],
-                    hide: [archive, defer, train_spam]},
-            All:   {show: [train_spam, delete_],
-                    hide: [archive, defer, train_ham]},
-            Inbox: {show: [archive, defer, train_spam, delete_],
-                    hide: [train_ham]},
-            Sent:  {show: [delete_],
-                    hide: [train_ham, train_spam, archive, defer]},
-            Trash: {show: [],
-                    hide: [train_ham, train_spam, archive, defer, delete_]}}
+            Spam:     {show: [train_ham, delete_],
+                       hide: [archive, defer, train_spam]},
+            All:      {show: [train_spam, delete_],
+                       hide: [archive, defer, train_ham]},
+            Inbox:    {show: [archive, defer, train_spam, delete_],
+                       hide: [train_ham]},
+            Sent:     {show: [delete_],
+                       hide: [train_ham, train_spam, archive, defer]},
+            Trash:    {show: [],
+                       hide: [train_ham, train_spam, archive, defer, delete_]},
+            Deferred: {show: [],
+                       hide: [train_ham, train_spam, archive, defer, delete_]}}
     },
 
     /**
@@ -1230,7 +1232,8 @@ Quotient.Mailbox.Controller.methods(
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
 
-        var nodes = {"All": null, "Trash": null, "Sent": null, "Spam": null, "Inbox": null};
+        var nodes = {"All": null, "Trash": null, "Sent": null,
+                     "Spam": null, "Inbox": null, "Deferred": null};
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
             var e = self.mailViewBody.childNodes[i];
             if(e.tagName && (e.firstChild.firstChild.nodeValue in nodes)) {

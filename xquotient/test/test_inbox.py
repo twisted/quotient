@@ -86,7 +86,7 @@ class InboxTestCase(TestCase):
         self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
 
         def assertCountsAre(**d):
-            for k in ('Trash', 'Sent', 'Spam', 'All', 'Inbox'):
+            for k in ('Trash', 'Sent', 'Spam', 'All', 'Inbox', 'Deferred'):
                 if not k in d:
                     d[k] = 0
             self.assertEqual(inboxScreen.mailViewCounts(), d)

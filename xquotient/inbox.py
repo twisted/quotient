@@ -164,6 +164,7 @@ class InboxScreen(athena.LiveFragment):
     inTrashView = False
     inSentView = False
     inSpamView = False
+    inDeferredView = False
     currentMessage = None
 
     viewingByTag = None
@@ -358,7 +359,7 @@ class InboxScreen(athena.LiveFragment):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = ['All', 'Trash', 'Sent', 'Spam', 'Inbox']
+        views = ['All', 'Trash', 'Sent', 'Spam', 'Deferred', 'Inbox']
         counts = self.mailViewCounts()
         counts = sorted(counts.iteritems(), key=lambda (v, c): views.index(v))
 
@@ -443,7 +444,7 @@ class InboxScreen(athena.LiveFragment):
     def mailViewCounts(self):
         counts = {}
         curview = self.getCurrentViewName()
-        for v in (u'Trash', u'Sent', u'Spam', u'All', u'Inbox'):
+        for v in (u'Trash', u'Sent', u'Spam', u'All', u'Deferred', u'Inbox'):
             self.changeView(v)
             counts[v] = self.getUnreadMessageCount()
         self.changeView(curview)
@@ -454,6 +455,7 @@ class InboxScreen(athena.LiveFragment):
                               (self.inTrashView, 'Trash'),
                               (self.inSentView, 'Sent'),
                               (self.inSpamView, 'Spam'),
+                              (self.inDeferredView, 'Deferred'),
                               (True, 'Inbox')):
             if truth:
                 return name
@@ -487,7 +489,7 @@ class InboxScreen(athena.LiveFragment):
     viewByAccount = transacted(viewByAccount)
 
     def changeView(self, typ):
-        self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = False
+        self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = self.inDeferredView = False
         attr = 'in' + typ + 'View'
         if hasattr(self, attr):
             setattr(self, attr, True)
@@ -663,7 +665,7 @@ class InboxScreen(athena.LiveFragment):
         comparison = [
             Message.trash == self.inTrashView,
             Message.draft == False,
-            Message.deferred == False]
+            Message.deferred == self.inDeferredView]
 
         if not self.inTrashView:
             comparison.append(Message.outgoing == self.inSentView)
