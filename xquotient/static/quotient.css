@@ -369,7 +369,7 @@ table.button {
     z-index: 99;
 }
 
-.draft-timestamp {
+.draft-dialog {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
     text-shadow: 2px 2px 1px #2A7DB3;
     color: #FFFFFF;

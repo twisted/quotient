@@ -59,19 +59,23 @@ Quotient.Compose.Controller.methods(
     },
 
     function saveDraft(self, userInitiated) {
+        var showDialog = function(text, fade) {
+            var elem = MochiKit.DOM.DIV({"class": "draft-dialog"}, text);
+            MochiKit.DOM.replaceChildNodes(self.draftNotification, elem);
+            if(fade) {
+                new Fadomatic(elem, 2).fadeOut();
+                setTimeout(function() {
+                    MochiKit.DOM.replaceChildNodes(self.draftNotification);
+                }, 1700);
+            }
+        }
+        showDialog("Saving draft...");
         var e = self.nodeByAttribute("name", "draft");
         e.checked = true;
         self.submit().addCallback(
             function(ign) {
                 var time = (new Date()).toTimeString();
-                var msg = MochiKit.DOM.DIV({"class": "draft-timestamp"},
-                                        "Draft saved at " + time.substr(0, time.indexOf(' ')));
-
-                MochiKit.DOM.replaceChildNodes(self.draftNotification, msg);
-                new Fadomatic(msg, 2).fadeOut();
-                setTimeout(function() {
-                    MochiKit.DOM.replaceChildNodes(self.draftNotification);
-                }, 1700);
+                showDialog("Draft saved at " + time.substr(0, time.indexOf(' ')), true);
                 if(!userInitiated) {
                     setTimeout(function() {
                         self.saveDraft(false)
