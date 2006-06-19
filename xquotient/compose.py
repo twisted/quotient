@@ -439,7 +439,14 @@ class ComposeFragment(liveform.LiveForm):
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
-        m['From'] = encode(self.original.fromAddress)
+        # XXX XXX XXX
+        if self.original.fromAddress.endswith('.divmod.com'):
+            (localpart, domain) = self.original.fromAddress.split('@')
+            fromAddress = localpart + '@divmod.com'
+        else:
+            fromAddress = self.original.fromAddress
+
+        m['From'] = encode(fromAddress)
         m['To'] = encode(toAddress)
         m['Subject'] = encode(subject)
         m['Date'] = EU.formatdate()
