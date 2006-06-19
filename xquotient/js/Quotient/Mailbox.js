@@ -196,7 +196,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "href": "#",
              "style": style,
              "onclick": function(event) {
-                if(event.target.onclick) {
+                if(event.target.onclick && event.target != this) {
                     return false;
                 }
                 /* don't select based on rowOffset because it'll change as rows are removed */
