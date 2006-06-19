@@ -272,6 +272,7 @@ table.button {
     border: solid 1px #7FCCE5;
     border-right: none;
     border-top: none;
+    overflow: auto;
 }
 
 .view-pane-content {

@@ -512,6 +512,7 @@ Quotient.Mailbox.Controller.methods(
         self.scrollHeaderHeight = Divmod.Runtime.theRuntime.getElementSize(scrollHeader).h;
         scrollHeader.parentNode.style.display = "none";
         self.scrollHeader = scrollHeader;
+        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[1][0], "view-pane-cell");
 
         var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.node,
                                                            "athena:class",
@@ -790,6 +791,7 @@ Quotient.Mailbox.Controller.methods(
 
         var scrollViewport = self.scrollWidget._scrollViewport;
         scrollViewport.style.height = (scrollViewport.style.height - self.blockFooterHeight) + "px";
+        self.viewPaneCell.style.height = scrollViewport.style.height;
 
         self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
                                            self.ypos - 13 -
