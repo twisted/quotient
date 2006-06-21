@@ -19,7 +19,7 @@ from xmantissa import webnav, ixmantissa, people, liveform, prefs
 from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
-from xquotient import iquotient, mail, equotient, webmail
+from xquotient import iquotient, mail, equotient, webmail, mimeutil
 from xquotient.exmess import Message
 from xquotient.mimestorage import Header, Part
 
@@ -80,7 +80,8 @@ class _NeedsDelivery(item.Item):
                 [self.toAddress],
                 self.message.impl.source.open())
         else:
-            d = self.getMailExchange(self.toAddress.split('@', 1)[1])
+            d = self.getMailExchange(mimeutil.EmailAddress(
+                                        self.toAddress, mimeEncoded=False).domain)
             def sendMail(mx):
                 host = str(mx.name)
                 log.msg(interface=iaxiom.IStatEvent, stat_messagesSent=1, userstore=self.store)
