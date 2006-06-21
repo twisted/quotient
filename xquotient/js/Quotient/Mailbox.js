@@ -935,12 +935,25 @@ Quotient.Mailbox.Controller.methods(
             });
     },
 
-    function _chooseViewParameter(self, viewFunction, n, catchAll /* = true */) {
+    /**
+     * pre-process a request to call a remote view-changing method.
+     * @param viewFunction: name of the remote method
+     * @param node: (optional) node containing the argument for the method
+     * @param catchAll: treat "All" as a special view name
+     * @param value: (optional) must be specified if C{node} isn't.
+     *               this is the argument that'll get passed to the remote
+     *               method
+     */
+    function _chooseViewParameter(self, viewFunction, node,
+                                  catchAll /* = true */,
+                                  value /* = null */) {
         if (catchAll == undefined) {
             catchAll = true;
         }
 
-        var value = n.firstChild.firstChild.nodeValue;
+        if(value == undefined) {
+            value = node.firstChild.firstChild.nodeValue;
+        }
         if (catchAll && value == 'All') {
             value = null;
         }
@@ -1204,7 +1217,7 @@ Quotient.Mailbox.Controller.methods(
     function choosePerson(self, n) {
         var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
         self._selectListOption(n);
-        return self._chooseViewParameter('viewByPerson', keyn);
+        return self._chooseViewParameter('viewByPerson', null, true, keyn.firstChild.nodeValue);
     },
 
     function viewShortcut(self, n) {

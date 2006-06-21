@@ -357,13 +357,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                     'link', self.translator.linkTo(self.original.storeID) + '/printable')
 
     def render_headerPanel(self, ctx, data):
-        personStan = SenderPersonFragment(self.original)
         if self.organizer is not None:
+            personStan = SenderPersonFragment(self.original)
             p = self.organizer.personByEmailAddress(self.original.sender)
             if p is not None:
                 personStan = people.PersonFragment(p, self.original.sender)
-
-        personStan.page = self.page
+            personStan.page = self.page
+        else:
+            personStan = self.original.sender
 
         prefs = ixmantissa.IPreferenceAggregator(self.original.store)
         tzinfo = pytz.timezone(prefs.getPreferenceValue('timezone'))

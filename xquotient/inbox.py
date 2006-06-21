@@ -332,12 +332,12 @@ class InboxScreen(athena.LiveFragment):
                 p = selectedOption
             else:
                 p = option
+
             if person:
                 name = person.getDisplayName()
                 key = self.translator.toWebID(person)
             else:
-                name = 'All'
-                key = None
+                name = key = 'All'
 
             opt = p().fillSlots(
                     'personName', name).fillSlots(
