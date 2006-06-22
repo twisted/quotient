@@ -42,7 +42,10 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     border-top: solid 1px #0099CC;
 }
 
-.content-table {
+/* the content table and the table that contains the bottom corners
+ * are both padded by 50px to the left so their left edges line up
+ * with each-other and the end of the divmod menubar icon */
+.content-table, .corner-footer {
     padding-left: 50px;
 }
 
