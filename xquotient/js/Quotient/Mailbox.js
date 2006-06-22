@@ -1113,14 +1113,14 @@ Quotient.Mailbox.Controller.methods(
      */
     function _selectViewShortcut(self) {
         if(self._viewingByView != "Inbox"
-            || self._viewingByView != "Sent"
-            || self._viewingByView != "Spam") {
+            && self._viewingByView != "Sent"
+            && self._viewingByView != "Spam") {
             return;
         }
 
         if(!self.viewShortcuts) {
             var viewShortcutContainer = self.firstWithClass(
-                                            self.scrolltableHeader,
+                                            self.scrollHeader,
                                             "view-shortcut-container");
             self.viewShortcuts = Nevow.Athena.NodesByAttribute(viewShortcutContainer,
                                                                "class",
@@ -1223,6 +1223,11 @@ Quotient.Mailbox.Controller.methods(
         return self._chooseViewParameter('viewByPerson', null, true, keyn.firstChild.nodeValue);
     },
 
+    /**
+     * Select the view shortcut whose label is C{n}.
+     * Also select the corresponding list-item in the main view selector
+     * @param n: node
+     */
     function viewShortcut(self, n) {
         var type = n.firstChild.nodeValue;
         self._sendViewRequest('viewByMailType', type);
@@ -1236,10 +1241,29 @@ Quotient.Mailbox.Controller.methods(
         }
         n.className = "selected-view-shortcut";
 
-        /* make sure the right thing is selected in the full views browser
-           FIXME
-           self._selectListOption(...); */
+        /* if we haven't done this before */
+        if(!self.viewOptions) {
+            /* fetch the node that represents the main view chooser */
+            var viewChooser = self.firstWithClass(
+                                self.contentTableGrid[1][0],
+                                "view-chooser"),
+                /* and all of the view option nodes inside it */
+                _viewOptions = Nevow.Athena.NodesByAttribute(
+                                    viewChooser, "class", "opt-name"),
+                viewOptions = {};
 
+            /* for each view option node */
+            for(i = 0; i < _viewOptions.length; i++) {
+                /* associate the node's text with the <li> that contains it */
+                viewOptions[_viewOptions[i].firstChild.nodeValue] = _viewOptions[i].parentNode;
+            }
+            self.viewOptions = viewOptions;
+        }
+
+        /* and select the <li> that corresponds to whatever view
+         * shortcut we just selected, so the view list and view
+         * shortcut list don't get out of sync */
+        self._selectListOption(self.viewOptions[type]);
         n.blur();
     },
 
