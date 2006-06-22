@@ -1,3 +1,15 @@
+0.1.2 (2006-06-20):
+  - "From" addresses ending in ".divmod.com" are now rewritten to
+    "divmod.com", for QA/testing purposes.
+  - Notification is now displayed when a draft is saved.
+  - Email messages are now searchable on sender and subject fields.
+
+0.1.1 (2006-06-16):
+  - Updated CSS
+  - A view for deferred messages has been added.
+  - Inbox queries have been sped up.
+  - Various cosmetic and bug fixes.
+
 0.1.0 (2006-06-12):
   - Initial public release.
 
