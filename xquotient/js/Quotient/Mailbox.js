@@ -229,15 +229,20 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
-            return MochiKit.DOM.DIV(attrs,
-                [MochiKit.DOM.IMG({"src": "/Quotient/static/images/checkbox-off.gif",
-                                   "class": "checkbox-image",
-                                   "border": 0,
-                                   "onclick": function(event) {
-                                        self.groupSelectRow(rowData["__id__"], this);
-                                        event.target.blur();
-                                        return false;
-                                   }}), massage(colName)]);
+            var content = [MochiKit.DOM.IMG({"src": "/Quotient/static/images/checkbox-off.gif",
+                                             "class": "checkbox-image",
+                                             "border": 0,
+                                             "onclick": function(event) {
+                                                self.groupSelectRow(rowData["__id__"], this);
+                                                event.target.blur();
+                                                return false;
+                                             }}), massage(colName)];
+            if(rowData["everDeferred"]) {
+                content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
+                                  "border": "0"}));
+            }
+
+            return MochiKit.DOM.DIV(attrs, content);
 
         } else if(colName == "subject") {
             attrs["class"] = "subject";
@@ -360,7 +365,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function skipColumn(self, name) {
-        return name == "read" || name == "sentWhen" || name == "attachments";
+        /* don't display any of the columns from which we're extracting row metadata */
+        return name == "read" || name == "sentWhen" || name == "attachments" || name == "everDeferred";
     },
 
     /**

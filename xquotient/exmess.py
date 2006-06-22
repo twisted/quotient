@@ -11,7 +11,7 @@ from nevow import rend, inevow, athena, static
 
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
-from axiom.upgrade import registerUpgrader
+from axiom.upgrade import registerAttributeCopyingUpgrader
 
 from xmantissa import ixmantissa, people, webapp
 from xmantissa.publicresource import getLoader
@@ -64,7 +64,7 @@ class Message(item.Item):
     implements(ixmantissa.IFulltextIndexable)
 
     typeName = 'quotient_message'
-    schemaVersion = 2
+    schemaVersion = 3
 
     source = attributes.text(doc="""
     A short string describing the means by which this Message came to exist.
@@ -88,6 +88,7 @@ class Message(item.Item):
     outgoing = attributes.boolean(default=False)
     draft = attributes.boolean(default=False)
     deferred = attributes.boolean(default=False)
+    everDeferred = attributes.boolean(default=False)
 
     spam = attributes.boolean(doc="""
 
@@ -198,15 +199,27 @@ class Message(item.Item):
         return {u'subject': self.subject,
                 u'sender': self.sender}
 
-
-def registerAttributeCopyingUpgrader(itemType, fromVersion, toVersion):
-    def upgrader(old):
-        return old.upgradeVersion(itemType.typeName, fromVersion, toVersion,
-                                  **dict((str(name), getattr(old, name))
-                                            for (name, _) in old.getSchema()))
-    registerUpgrader(upgrader, itemType.typeName, fromVersion, toVersion)
+item.declareLegacyItem(Message.typeName, 2,
+                       dict(sender=attributes.text(),
+                            subject=attributes.text(),
+                            recipient=attributes.text(),
+                            senderDisplay=attributes.text(),
+                            spam=attributes.boolean(),
+                            archived=attributes.boolean(),
+                            source=attributes.text(),
+                            trash=attributes.boolean(),
+                            outgoing=attributes.boolean(),
+                            deferred=attributes.boolean(),
+                            draft=attributes.boolean(),
+                            trained=attributes.boolean(),
+                            read=attributes.boolean(),
+                            attachments=attributes.integer(),
+                            sentWhen=attributes.timestamp(),
+                            receivedWhen=attributes.timestamp(),
+                            impl=attributes.reference()))
 
 registerAttributeCopyingUpgrader(Message, 1, 2)
+registerAttributeCopyingUpgrader(Message, 2, 3)
 
 class Correspondent(item.Item):
     typeName = 'quotient_correspondent'

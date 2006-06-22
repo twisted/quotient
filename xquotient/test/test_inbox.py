@@ -137,6 +137,7 @@ class InboxTestCase(TestCase):
         scheduler.tick()
         self.failIf(message.deferred, 'message is still deferred')
         self.failIf(message.read, 'message is marked read')
+        self.failUnless(message.everDeferred, 'everDeferred is not set')
         self.assertEquals(s.count(UndeferTask), 0)
 
     def testDeferCascadingDelete(self):

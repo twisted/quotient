@@ -93,6 +93,8 @@ class UndeferTask(Item):
 
     def run(self):
         self.message.deferred = False
+        if not self.message.everDeferred:
+            self.message.everDeferred = True
         self.message.read = False
         self.deleteFromStore()
 
@@ -293,7 +295,8 @@ class InboxScreen(athena.LiveFragment):
                                Message.receivedWhen,
                                Message.read,
                                Message.sentWhen,
-                               Message.attachments),
+                               Message.attachments,
+                               Message.everDeferred),
                               defaultSortColumn=Message.receivedWhen,
                               defaultSortAscending=False)
 

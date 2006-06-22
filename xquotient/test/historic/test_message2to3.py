@@ -9,4 +9,4 @@ class MessageUpgradeTest(stubloader.StubbedTest):
         for (k, v) in attrs.iteritems():
             self.assertEquals(v, getattr(m, k))
         self.assertIdentical(self.store.findUnique(Part), m.impl)
-        self.failIf(m.deferred)
+        self.failIf(m.everDeferred)
