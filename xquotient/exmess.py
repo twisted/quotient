@@ -72,7 +72,7 @@ class Message(item.Item):
     """)
 
     sentWhen = attributes.timestamp()
-    receivedWhen = attributes.timestamp()
+    receivedWhen = attributes.timestamp(indexed=True)
 
     sender = attributes.text()
     senderDisplay = attributes.text()
@@ -115,8 +115,18 @@ class Message(item.Item):
     # Mailbox Display Indexes - these are _critical_ for interactive
     # performance (roughly 100,000% speedup)
 
-    attributes.compoundIndex(trash, draft, deferred, outgoing, archived, sender)
-    attributes.compoundIndex(trash, draft, deferred, outgoing, sender)
+    # Trash view
+    attributes.compoundIndex(trash, draft, deferred, receivedWhen)
+
+    # Sent view
+    attributes.compoundIndex(trash, draft, deferred, outgoing, archived, receivedWhen)
+
+    # Archive and spam view
+    attributes.compoundIndex(trash, draft, deferred, outgoing, spam, receivedWhen)
+
+    # Inbox view
+    attributes.compoundIndex(trash, draft, deferred, outgoing, archived, spam, receivedWhen)
+
 
     def activate(self):
         self._prefs = None

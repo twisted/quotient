@@ -38,6 +38,7 @@ def initializeStore():
         for benefactorFactory in off.benefactorFactories:
             benefactor = benefactorFactory.instantiate(store=s)
             benefactor.endow(None, userStore)
+
     return s, userStore
 
 

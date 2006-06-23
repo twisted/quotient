@@ -719,7 +719,7 @@ class MIMEMessageReceiver(object):
     # utility methods
 
     def feedFile(self, fObj):
-        return cooperator.iterateInReactor(self._deliverer().next)
+        return cooperator.iterateInReactor(self._deliverer(fObj).next)
 
     def feedString(self, s):
         """Feed a string in.

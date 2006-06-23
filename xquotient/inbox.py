@@ -214,26 +214,63 @@ class InboxScreen(athena.LiveFragment):
         return (self.getMessageCount(), self.original.uiComplexity)
 
     def _resetCurrentMessage(self):
-        self.currentMessage = self._getNextMessage()
+        self.currentMessage = self.getLastMessage()
         if self.currentMessage is not None:
             self.currentMessage.read = True
-            self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
+            self.nextMessage = self.getMessageAfter(self.currentMessage)
         else:
             self.nextMessage = None
 
-    def _getNextMessage(self, after=None, before=None):
-        comparison = self._getBaseComparison()
-        sort = Message.receivedWhen.desc
-        if after is not None:
-            comparison = attributes.AND(comparison, Message.receivedWhen < after)
-        if before is not None:
-            comparison = attributes.AND(comparison, before < Message.receivedWhen)
-            sort = Message.receivedWhen.asc
 
+    def getFirstMessage(self):
+        """
+        Retrieve the message which was received before all other messages.
+        """
+        return self.original.store.findFirst(
+            Message,
+            self._getBaseComparison(),
+            sort=Message.receivedWhen.ascending)
+
+
+    def getLastMessage(self):
+        """
+        Retrieve the message which was received after all other messages.
+        """
+        return self.original.store.findFirst(
+            Message,
+            self._getBaseComparison(),
+            sort=Message.receivedWhen.descending)
+
+
+    def getMessageBefore(self, whichMessage):
+        """
+        Retrieve the first message which was received before the given time.
+
+        @type whichMessage: L{exmess.Message}
+        """
+        sort = Message.receivedWhen.desc
+        comparison = attributes.AND(self._getBaseComparison(),
+                                    Message.receivedWhen < whichMessage.receivedWhen)
         return self.original.store.findFirst(Message,
                                              comparison,
                                              default=None,
                                              sort=sort)
+
+
+    def getMessageAfter(self, whichMessage):
+        """
+        Retrieve the first message which was received after the given time.
+
+        @type whichMessage: L{exmess.Message}
+        """
+        sort = Message.receivedWhen.asc
+        comparison = attributes.AND(self._getBaseComparison(),
+                                    Message.receivedWhen > whichMessage.receivedWhen)
+        return self.original.store.findFirst(Message,
+                                             comparison,
+                                             default=None,
+                                             sort=sort)
+
 
     def _currentAsFragment(self):
         if self.currentMessage is None:
@@ -242,6 +279,7 @@ class InboxScreen(athena.LiveFragment):
         f.setFragmentParent(self)
         self.currentMessageDetail = f
         return f
+
 
     def _currentMessageData(self):
         if self.currentMessage is not None:
@@ -436,7 +474,7 @@ class InboxScreen(athena.LiveFragment):
     def fastForward(self, webID):
         self.currentMessage = self.translator.fromWebID(webID)
         self.currentMessage.read = True
-        self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
+        self.nextMessage = self.getMessageAfter(self.currentMessage)
         return self._current()
 
     fastForward = transacted(fastForward)
@@ -536,9 +574,9 @@ class InboxScreen(athena.LiveFragment):
 
         if self.currentMessage is not None:
             self.currentMessage.read = True
-            self.nextMessage = self._getNextMessage(self.currentMessage.receivedWhen)
+            self.nextMessage = self.getMessageAfter(self.currentMessage)
         else:
-            self.currentMessage = self._getNextMessage(before=previousMessage.receivedWhen)
+            self.currentMessage = self.getMessageBefore(previousMessage)
             self.nextMessage = None
 
     def _progressOrDont(self, advance):

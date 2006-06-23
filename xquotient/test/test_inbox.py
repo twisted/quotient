@@ -1,3 +1,6 @@
+
+from datetime import datetime, timedelta
+
 from twisted.trial.unittest import TestCase
 
 from epsilon.extime import Time
@@ -9,7 +12,110 @@ from xmantissa.ixmantissa import INavigableFragment
 from xmantissa.webapp import PrivateApplication
 
 from xquotient.exmess import Message
-from xquotient.inbox import Inbox, replaceControlChars, UndeferTask
+from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, UndeferTask
+
+
+class MessageRetrievalTestCase(TestCase):
+    """
+    Test various methods for finding messages.
+    """
+    def setUp(self):
+        """
+        Create a handful of messages spread out over a brief time period so
+        that tests can assert things about methods which operate on messages.
+        """
+        s = Store()
+
+        # Inbox requires but does not provide IWebTranslator.
+        PrivateApplication(store=s).installOn(s)
+
+        baseTime = datetime(year=2001, month=3, day=6)
+        self.msgs = []
+        for i in xrange(5):
+            self.msgs.append(
+                Message(store=s,
+                        read=False,
+                        spam=False,
+                        receivedWhen=Time.fromDatetime(
+                            baseTime + timedelta(seconds=i))))
+        self.inbox = InboxScreen(Inbox(store=s))
+
+
+    def testGetFirstMessage(self):
+        """
+        Test that InboxScreen.getFirstMessage returns the first message,
+        ordered by received time.
+        """
+        self.assertIdentical(self.msgs[0], self.inbox.getFirstMessage())
+
+
+    def testGetLastMessage(self):
+        """
+        Test that InboxScreen.getLastMessage returns the last message, ordered
+        by received time.
+        """
+        self.assertIdentical(self.msgs[-1], self.inbox.getLastMessage())
+
+
+    def testGetMessageAfter(self):
+        """
+        Test that the next message, chronologically, is returned by
+        InboxScreen.getMessageAfter.  Also test that None is returned if there
+        is no such message.
+        """
+        self.assertIdentical(self.msgs[1],
+                             self.inbox.getMessageAfter(self.msgs[0]))
+        self.assertIdentical(None,
+                             self.inbox.getMessageAfter(self.msgs[-1]))
+
+
+    def testGetMessageBefore(self):
+        """
+        Test that the previous message, chronologically, is returned by
+        InboxScreen.getMessageBefore.  Also test that None is returned if there
+        is no such message.
+        """
+        self.assertIdentical(self.msgs[-2],
+                             self.inbox.getMessageBefore(self.msgs[-1]))
+        self.assertIdentical(None,
+                             self.inbox.getMessageBefore(self.msgs[0]))
+
+
+    def testGetFirstMessageWithFlags(self):
+        """
+        Test that messages which do not satisfy the view requirements of the
+        inbox are not considered for return by InboxScreen.getFirstMessage.
+        """
+        self.msgs[0].archived = True
+        self.assertIdentical(self.msgs[1], self.inbox.getFirstMessage())
+
+
+    def testGetLastMessageWithFlags(self):
+        """
+        Test that messages which do not satisfy the view requirements of the
+        inbox are not considered for return by InboxScreen.getLastMessage.
+        """
+        self.msgs[-1].archived = True
+        self.assertIdentical(self.msgs[-2], self.inbox.getLastMessage())
+
+
+    def testGetMessageAfterWithFlags(self):
+        """
+        Test that messages which do not satisfy the view requirements of the
+        inbox are not considered for return by InboxScreen.getMessageAfter.
+        """
+        self.msgs[1].archived = True
+        self.assertIdentical(self.msgs[2], self.inbox.getMessageAfter(self.msgs[0]))
+
+
+    def testGetMessageBeforeWithFlags(self):
+        """
+        Test that messages which do not satisfy the view requirements of the
+        inbox are not considered for return by InboxScreen.getMessageAfter.
+        """
+        self.msgs[-2].archived = True
+        self.assertIdentical(self.msgs[-3], self.inbox.getMessageBefore(self.msgs[-1]))
+
 
 
 class InboxTestCase(TestCase):
@@ -18,11 +124,23 @@ class InboxTestCase(TestCase):
         # ord('\t') < ord('\n') < ord('\r')
         self.assertEquals(replaceControlChars(s), '\t\n\rfoobar')
 
+
+    def testAdaption(self):
+        """
+        Test that an Inbox can be adapted to INavigableFragment so that it can
+        be displayed on a webpage.
+        """
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+        inbox = Inbox(store=s)
+        self.assertNotIdentical(INavigableFragment(inbox, None), None)
+
+
     def testUnreadMessageCount(self):
         s = Store()
 
         for i in xrange(13):
-            Message(store=s, read=False, spam=False, receivedWhen=Time())
+            m = Message(store=s, read=False, spam=False, receivedWhen=Time())
         for i in xrange(6):
             Message(store=s, read=True, spam=False, receivedWhen=Time())
 
@@ -34,8 +152,8 @@ class InboxTestCase(TestCase):
         # most of the interesting methods with them
 
         # we're in the "Inbox" view
-
-        inboxScreen = INavigableFragment(Inbox(store=s))
+        inbox = Inbox(store=s)
+        inboxScreen = InboxScreen(inbox)
         self.assertEqual(inboxScreen.getUnreadMessageCount(), 13)
         s.findFirst(Message, Message.read == True).read = False
         self.assertEqual(inboxScreen.getUnreadMessageCount(), 14)
@@ -82,7 +200,7 @@ class InboxTestCase(TestCase):
             Message(store=s, read=False, spam=False, archived=True, receivedWhen=Time())
 
         PrivateApplication(store=s).installOn(s)
-        inboxScreen = INavigableFragment(Inbox(store=s))
+        inboxScreen = InboxScreen(Inbox(store=s))
         self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
 
         def assertCountsAre(**d):
@@ -117,7 +235,7 @@ class InboxTestCase(TestCase):
     def testViewSwitching(self):
         s = Store()
         PrivateApplication(store=s).installOn(s)
-        inboxScreen = INavigableFragment(Inbox(store=s))
+        inboxScreen = InboxScreen(Inbox(store=s))
 
         for view in ('Inbox', 'All', 'Spam', 'Trash', 'Sent'):
             inboxScreen.changeView(view)
