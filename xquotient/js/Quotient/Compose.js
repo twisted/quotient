@@ -32,17 +32,6 @@ Quotient.Compose.Controller.methods(
     function __init__(self, node, inline, allPeople) {
         Quotient.Compose.Controller.upcall(self, "__init__", node);
 
-        var cc = self.firstNodeByAttribute("name", "cc");
-        if(0 < cc.value.length) {
-            self.toggleCCForm(
-                self.firstNodeByAttribute("class", "cc-link"));
-        }
-
-        self.fileList = self.firstNodeByAttribute("class", "file-list");
-        if(0 < self.fileList.getElementsByTagName("li").length) {
-            self.toggleFilesForm();
-        }
-
         if(inline) {
             self.firstNodeByAttribute("class", "cancel-link").style.display = "";
         }
@@ -53,7 +42,8 @@ Quotient.Compose.Controller.methods(
         self.draftNotification = self.nodeByAttribute("class", "draft-notification");
         self.completions = self.nodeByAttribute("class", "address-completions");
 
-        self.attachDialog = self.nodeByAttribute("class", "attach-dialog");
+        self.attachContainer = self.nodeByAttribute("class", "attach-container");
+        self.optsContainer = self.nodeByAttribute("class", "options-container");
         self.autoSaveInterval = 30000; /* 30 seconds */
         self.inboxURL = self.nodeByAttribute("class", "inbox-link").href;
 
@@ -66,49 +56,6 @@ Quotient.Compose.Controller.methods(
 
     function cancel(self) {
         self.widgetParent.hideInlineWidget();
-    },
-
-    function toggleFilesForm(self) {
-        if(!self.filesForm) {
-            self.filesForm = self.firstNodeByAttribute("class", "files-form");
-        }
-        if(self.filesForm.style.display == "none") {
-            self.filesForm.style.display = "";
-        } else {
-            self.filesForm.style.display = "none";
-        }
-    },
-
-    function toggleCCForm(self, node) {
-        if(!self.ccForm) {
-            self.ccForm = self.firstNodeByAttribute("class", "cc-form");
-        }
-        if(self.ccForm.style.display == "none") {
-            self.ccForm.style.display = "";
-            node.firstChild.nodeValue = "- Cc";
-        } else {
-            self.ccForm.style.display = "none";
-            node.firstChild.nodeValue = "+ Cc";
-        }
-    },
-
-    function toggleAttachDialog(self) {
-        if(self.attachDialog.style.display == "none") {
-            self.attachDialog.style.display = "";
-            document.body.appendChild(
-                MochiKit.DOM.DIV({"id": "attach-dialog-bg"}));
-            if(self.attachDialog.style.left == "") {
-                var elemSize = Divmod.Runtime.theRuntime.getElementSize(self.attachDialog);
-                self.attachDialog.style.display = "none";
-                var pageSize = Divmod.Runtime.theRuntime.getPageSize();
-                self.attachDialog.style.left = (pageSize.w/2 - elemSize.w/2) + "px";
-                self.attachDialog.style.top  = (pageSize.h/2 - elemSize.h/2) + "px"
-                self.attachDialog.style.display = "";
-            }
-        } else {
-            self.attachDialog.style.display = "none";
-            document.body.removeChild(document.getElementById("attach-dialog-bg"));
-        }
     },
 
     function saveDraft(self, userInitiated) {
@@ -155,8 +102,9 @@ Quotient.Compose.Controller.methods(
     },
 
     function makeFileInputs(self) {
+        var fl = self.nodeByAttribute("class", "file-list");
         var uploaded = self.nodeByAttribute("class", "uploaded-files");
-        var lis = self.fileList.getElementsByTagName("li");
+        var lis = fl.getElementsByTagName("li");
         var span;
         for(var i = 0; i < lis.length; i++) {
             span = lis[i].getElementsByTagName("span")[0];
@@ -175,20 +123,15 @@ Quotient.Compose.Controller.methods(
     function gotFileData(self, d) {
         self.nodeByAttribute("class", "upload-notification").style.visibility = "hidden";
 
-        var lis = self.fileList.getElementsByTagName("li");
-
-        if(0 == lis.length) {
-            self.toggleFilesForm();
-        }
-
-        self.fileList.appendChild(MochiKit.DOM.LI(null, [d["name"],
+        var flist = self.nodeByAttribute("class", "file-list");
+        flist.appendChild(MochiKit.DOM.LI(null, [d["name"],
             MochiKit.DOM.A({"style": "padding-left: 4px",
                             "href": "#",
                             "onclick": function() {
                                 self.removeFile(this);
                                 return false
                             }},
-                            "(remove)")]));
+                            "remove")]));
         self.nodeByAttribute("class", "uploaded-files").appendChild(
             MochiKit.DOM.INPUT({"type": "text",
                                 "name": "files",
@@ -196,21 +139,25 @@ Quotient.Compose.Controller.methods(
     },
 
     function removeFile(self, node) {
-        var fname = node.previousSibling.nodeValue,
-            lis = self.fileList.getElementsByTagName("li"),
-            uploaded = self.firstNodeByAttribute('class', 'uploaded-files');
-
-        self.fileList.removeChild(node.parentNode);
-        if(0 == lis.length) {
-            self.toggleFilesForm();
-        }
-
+        var fname = node.previousSibling.nodeValue;
+        node.parentNode.parentNode.removeChild(node.parentNode);
+        var uploaded = self.nodeByAttribute('class', 'uploaded-files');
         for(var i = 0; i < uploaded.childNodes.length; i++) {
             if(uploaded.childNodes[i].firstChild.nodeValue == fname) {
                 uploaded.removeChild(uploaded.childNodes[i]);
                 break;
             }
         }
+    },
+
+    function toggleAttachments(self, node) {
+        var attach = self.attachContainer;
+        attach.style.display = (attach.style.display == "none") ? "" : "none";
+    },
+
+    function toggleMoreOptions(self, node) {
+        var opts = self.optsContainer;
+        opts.style.display = (opts.style.display == "none") ? "" : "none";
     },
 
     function fitMessageBodyToPage(self) {

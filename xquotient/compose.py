@@ -19,7 +19,7 @@ from xmantissa import webnav, ixmantissa, people, liveform, prefs
 from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
-from xquotient import iquotient, mail, equotient, renderers, mimeutil
+from xquotient import iquotient, mail, equotient, webmail, mimeutil
 from xquotient.exmess import Message
 from xquotient.mimestorage import Header, Part
 
@@ -279,7 +279,7 @@ class FileCabinetPage(rend.Page):
 
 registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
 
-class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
+class ComposeFragment(liveform.LiveForm):
     implements(ixmantissa.INavigableFragment)
 
     fragmentName = 'compose'
@@ -418,7 +418,7 @@ class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
             'alternative',
             None,
             [MT.MIMEText(messageBody, 'plain', 'utf-8'),
-             MT.MIMEText(renderers.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
+             MT.MIMEText(webmail.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
 
         fileItems = []
         if files:

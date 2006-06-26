@@ -10,16 +10,6 @@ def textToRudimentaryHTML(text):
                     tags.body[
                         SpacePreservingStringRenderer(text).rend(None, None)]])
 
-class ButtonRenderingMixin:
-    _buttonPattern = None
-
-    def render_button(self, ctx, data):
-        if self._buttonPattern is None:
-            self._buttonPattern = inevow.IQ(getLoader('button')).patternGenerator('button')
-
-        # take the contents of the ctx.tag and stuff it inside the button pattern
-        return self._buttonPattern.fillSlots('content', ctx.tag.children)
-
 class SpacePreservingStringRenderer(object):
     implements(inevow.IRenderer)
 

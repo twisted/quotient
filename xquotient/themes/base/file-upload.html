@@ -1,7 +1,6 @@
 <html xmlns:nevow="http://nevow.com/ns/nevow/0.1">
   <head>
     <link rel="stylesheet" type="text/css" href="/Mantissa/mantissa.css" />
-    <link rel="stylesheet" type="text/css" href="/Quotient/static/quotient.css" />
     <script type="text/javascript">
       var compose = null;
       function getComposeInstance() {
@@ -34,11 +33,13 @@
     <span style="display: none" id="file-data"
       ><nevow:invisible nevow:render="lastFileData" /></span>
 
-    <center>
-      <form enctype="multipart/form-data" method="POST" onsubmit="notifyParent();" name="upload">
-        <input name="uploaddata" type="file" />
-        <input type="submit" name="upload" value="Upload" />
-      </form>
-    </center>
+    <form enctype="multipart/form-data" method="POST" onsubmit="notifyParent();" name="upload">
+      <table>
+        <tr>
+          <td><input name="uploaddata" type="file" /></td>
+          <td><input type="submit" name="upload" value="Upload" /></td>
+        </tr>
+      </table>
+    </form>
   </body>
 </html>

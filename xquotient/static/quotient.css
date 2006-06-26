@@ -1,72 +1,6 @@
 table.tdb > tbody > tr > td { cursor: pointer; }
 
-.cancel-link {
-    margin-right: 4px;
-}
-
-.attach-dialog {
-    position: absolute;
-    background-color: #FFFFFF;
-    border: 3px double #999999;
-    z-index: 99;
-}
-
-#attach-dialog-bg {
-    background-color: #000000;
-    opacity: .4;
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0px;
-    left: 0px;
-}
-
-.cc-link:visited, .cc-link:link {
-    color: #0099CC;
-}
-
-.attach-dialog > tbody > tr > td {
-    border-bottom: solid 1px #999999;
-}
-
-.attach-dialog-header {
-    padding: 4px;
-    font-size: 1.2em;
-}
-
-iframe.cabinet {
-    border: 0px;
-    height: 60px;
-    width: 400px;
-    margin-top: 4px;
-}
-
-.dialog-title {
-    font-size: 1.3em;
-    border-bottom: solid 1px #999999;
-    color: #999999;
-    padding: 4px;
-    margin-bottom: 4px;
-}
-
-ul.file-list, ul.file-list li {
-    margin-top: 0px;
-    margin-bottom: 0px;
-    padding: none;
-}
-
-.header-table .buttons {
-    margin: 4px 0px 0px 4px;
-}
-
-.menubar-separator {
-    width: 2px;
-    background: #7FCCE5 url(/Quotient/static/images/menubar-separator.png) top left repeat-y;
-    margin: 0px 8px 0px 8px;
-    height: 20px;
-}
-
-.quotient-menubar {
+.complexity-container {
     background-color: #7FCCE5;
     border-bottom: solid 1px #0099CC;
     width: 100%;
@@ -219,7 +153,7 @@ table.button {
 .button-content {
     font: bold 90% Helvetica, Arial, sans-serif;
     text-transform: uppercase;
-    background-color: #0099CC;
+    background-color: #4CB7DB;
 }
 
 .button-content > a:active {
@@ -443,7 +377,7 @@ table.button {
     background: #4ca1d8 url(/Mantissa/images/nav_bg.gif) top left repeat-x;
     text-shadow: 2px 2px 1px #2A7DB3;
     color: #FFFFFF;
-    padding: 2px 2px 0px 2px;
+    padding: 4px 2px 0px 2px;
     font-weight: bold;
 }
 
@@ -503,9 +437,12 @@ img.collapse-arrow {
 /* the header table */
 
 table.header-table {
+    margin-left: 4px;
+    margin-right: 4px;
+    border: solid 1px #CACACA;
+    border-top: none;
     width: 100%;
-    background-color: #CCEBF5;
-    border: solid 1px #7FCCE5;
+    border-right: none;
 }
 
 .header-table-last-col {
@@ -514,13 +451,13 @@ table.header-table {
 
 .header-table-first-col {
     white-space: nowrap;
-    color: #666666;
-    font-weight: bold;
 }
 
 /* put a grey border around all other rows */
 table.header-table > tbody > tr > td {
-    padding: 1px 1px 8px 1px;
+    border-right: solid 1px #CACACA;
+    border-top: solid 1px #CACACA;
+    padding: 1px;
 }
 
 /* gallery stuff */
@@ -593,6 +530,7 @@ img.thumbnail { border: none; }
 }
 
 .message-body {
+    margin-left: 4px;
     font-family: monospace;
     font-size: 1.6em;
     padding-top: 2px;

@@ -539,8 +539,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _cacheContentTableGrid(self) {
-        self.inboxContent = self.firstNodeByAttribute("class", "inbox-content");
-        var contentTable = self.getFirstElementByTagNameShallow(self.inboxContent, "table");
+        var contentTable = self.getFirstElementByTagNameShallow(self.node, "table");
         var contentTableRows = self.getElementsByTagNameShallow(
                 self.getFirstElementByTagNameShallow(contentTable, "tbody"), "tr");
         var contentTableGrid = [];
@@ -760,7 +759,7 @@ Quotient.Mailbox.Controller.methods(
 
     function setInitialComplexity(self, complexityLevel) {
         if(1 < complexityLevel) {
-            var cc = self.firstWithClass(self.node, "complexity-icons");
+            var cc = self.firstWithClass(self.node, "complexity-container");
             self.setComplexity(complexityLevel,
                                 cc.getElementsByTagName("img")[3-complexityLevel],
                                 false);
@@ -1550,7 +1549,7 @@ Quotient.Mailbox.Controller.methods(
      * Hide the inbox controls and splat the given HTML ontop
      */
     function displayInlineWidget(self, html) {
-        self.inboxContent.style.display = "none";
+        self.contentTable.style.display = "none";
         if(!self.widgetContainer) {
             self.widgetContainer = self.firstWithClass(self.node, "widget-container");
         }
@@ -1563,7 +1562,7 @@ Quotient.Mailbox.Controller.methods(
      */
     function hideInlineWidget(self) {
         MochiKit.DOM.replaceChildNodes(self.widgetContainer);
-        self.inboxContent.style.display = "";
+        self.contentTable.style.display = "";
     },
 
     function setMessageCount(self, count) {
