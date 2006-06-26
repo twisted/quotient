@@ -17,7 +17,7 @@ from nevow import inevow
 
 from epsilon import cooperator
 
-from xquotient import equotient, webmail
+from xquotient import equotient, renderers
 
 MIME_DEPTH_MAX = 50
 RECEIVED_HEADER_LIMIT = 100
@@ -97,7 +97,7 @@ class HTMLPart(Part):
     def hasPlain(self):
         return False
 
-registerAdapter(webmail.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
+registerAdapter(renderers.HTMLPartRenderer, HTMLPart, inevow.IRenderer)
 
 class AttachmentPart(Part):
     alwaysInline = False
@@ -164,7 +164,7 @@ class Paragraph(Container):
         """
         raise NotImplementedError, 'implement in subclass'
 
-registerAdapter(webmail.ParagraphRenderer, Paragraph, inevow.IRenderer)
+registerAdapter(renderers.ParagraphRenderer, Paragraph, inevow.IRenderer)
 
 class FixedParagraph(Paragraph):
     """A fixed paragraph is already wrapped.
@@ -744,6 +744,7 @@ class MIMEMessageReceiver(object):
                 self.lineReceived(line)
                 yield None
         except:
+            raise
             self.file.abort()
             raise
         else:

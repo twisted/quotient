@@ -1,56 +1,23 @@
 
 import os
-from cStringIO import StringIO
-from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
 from twisted.trial import unittest
 from twisted.python import filepath
 
 from epsilon import extime
 
-from axiom import store, scheduler
+from axiom import store
 
-from xquotient import mail, mimepart
+from xquotient import mimepart
 from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
+from xquotient.test.partmaker import PartMaker
+from xquotient.test.util import MIMEReceiverMixin
 
 from xmantissa import ixmantissa
 
 def msg(s):
     return '\r\n'.join(s.splitlines())
-
-class PartMaker:
-    parent = None
-
-    def __init__(self, ctype, body, *children):
-        self.ctype = ctype
-        self.body = body
-        for c in children:
-            assert c.parent is None
-            c.parent = self
-        self.children = children
-
-    def _make(self):
-        (major, minor) = self.ctype.split('/')
-
-        if major == 'multipart':
-            p = MMP.MIMEMultipart(minor,
-                                  None,
-                                  list(c._make() for c in self.children))
-        elif major == 'text':
-            p = MT.MIMEText(self.body, minor)
-        elif major == 'image':
-            p = MI.MIMEImage(self.body, minor)
-        else:
-            assert False
-
-        return p
-
-    def make(self):
-        s = StringIO()
-        G.Generator(s).flatten(self._make())
-        s.seek(0)
-        return s.read()
 
 class MessageTestMixin:
     trivialMessage = msg("""\
@@ -239,15 +206,7 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
 
 
 
-class PersistenceTestCase(unittest.TestCase, MessageTestMixin):
-    def setUpMailStuff(self):
-        dbdir = self.mktemp()
-        s = store.Store(dbdir)
-        scheduler.Scheduler(store=s).installOn(s)
-        da = mail.DeliveryAgent(store=s)
-        da.installOn(s)
-        return da.createMIMEReceiver(u"test://" + dbdir)
-
+class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin):
     def _messageTest(self, source, assertMethod):
         mr = self.setUpMailStuff()
         msg = mr.feedStringNow(source)
