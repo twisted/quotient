@@ -1,7 +1,40 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
-  nevow:render="liveFragment">
+  nevow:render="liveFragment"
+  style="border-top: solid 1px #0099CC;">
+
+  <table class="attach-dialog" cellpadding="0" cellspacing="0" style="display: none">
+    <tbody>
+      <tr>
+        <td>
+          <div class="attach-dialog-header">
+            Attach Files
+          </div>
+        </td>
+        <td align="right">
+          <a href="#" onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
+            <img src="/Quotient/static/images/close.png" border="0" />
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <div class="upload-file-container" style="clear: both">
+            <nevow:invisible nevow:render="fileCabinet" />
+          </div>
+          <span class="upload-notification" style="visibility: hidden">Uploading...</span>
+          <li nevow:pattern="attachment"
+            ><nevow:slot name="name" /> <a href="#"
+              onclick="Quotient.Compose.Controller.get(this).removeFile(this); return false">(remove)</a>
+            <span class="attachment-id" style="display: none"><nevow:slot name="id" /></span>
+          </li>
+          <div class="uploaded-files" style="display: none" />
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
   <nevow:invisible nevow:render="compose">
-    <iframe nevow:pattern="cabinet-iframe" style="border: 0px; height: 60px; width: 100%; overflow: visible">
+    <iframe nevow:pattern="cabinet-iframe" class="cabinet">
       <nevow:attr name="src"><nevow:slot name="src" /></nevow:attr>
     </iframe>
     <input type="checkbox" name="draft" style="display: none" />
@@ -9,117 +42,99 @@
     <a class="inbox-link" style="display: none">
       <nevow:attr name="href"><nevow:invisible nevow:render="inboxLink" /></nevow:attr>
     </a>
-    <table>
-      <tr>
-        <td>
-          <table>
-            <tr valign="bottom">
-              <td width="100%">
-                <a href="#"
-                  class="cancel-link" style="display: none"
-                  onclick="Quotient.Compose.Controller.get(this).cancel(); return false"
-                  >[Cancel]</a>
-                <div class="draft-notification" style="height: 2em"/>
-              </td>
-              <td align="right" style="white-space: nowrap">
-                <button onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false">
-                  Save Draft
-                </button>
-                <button onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
-                  Send
-                </button>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <table class="header-table" cellspacing="0">
-            <tbody>
-              <tr valign="top">
-                <td class="header-table-first-col">To</td>
-                <td class="header-table-last-col">
-                  <textarea
-                    name="toAddress"
-                    onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
-                    oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
-                    class="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
-              </tr>
-              <tr>
-                <td class="header-table-first-col">Subject</td>
-                <td class="header-table-last-col">
-                  <input type="text" name="subject" style="width: 98%"
-                    ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input></td>
-              </tr>
-              <tr valign="top">
-                <td class="header-table-first-col">
-                  <a href="#"
-                    onclick="Quotient.Compose.Controller.get(this).toggleAttachments(this); return false">
-                    Attachments</a>
+    <center>
+      <table>
+        <tr>
+          <td style="width: 100%">
+            <table style="width: 100%">
+              <tr valign="bottom">
+                <td colspan="2" width="100%">
+                  <div class="draft-notification" style="height: 1.5em" />
                 </td>
-                <td class="header-table-last-col" style="white-space: nowrap"
-                  ><div class="attach-container" style="display: none">
-                    <div class="upload-file-container">
-                      <nevow:invisible nevow:render="fileCabinet" />
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table class="header-table" cellspacing="0">
+              <tbody>
+                <tr valign="center">
+                  <td colspan="2">
+                    <div class="buttons">
+                      <div style="float: right">
+                        <a href="#"
+                          class="cancel-link" style="display: none"
+                          onclick="Quotient.Compose.Controller.get(this).cancel(); return false">
+                          <img src="/Quotient/static/images/close-inline-compose.png" border="0" />
+                        </a>
+                      </div>
+                      <nevow:invisible nevow:render="button">
+                        <a href="#" onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
+                          Send
+                        </a>
+                      </nevow:invisible>
+                      <nevow:invisible nevow:render="button">
+                        <a href="#" onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false;">
+                          Save Draft
+                        </a>
+                      </nevow:invisible>
+                      <a href="#" onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
+                        <img border="0" src="/Quotient/static/images/attach-button.png" />
+                        <span style="color: #0099CC">Attach</span>
+                      </a>
                     </div>
-                    <span class="upload-notification" style="visibility: hidden">Uploading...</span>
+                  </td>
+                </tr>
+                <tr valign="top">
+                  <td class="header-table-first-col">
+                    To:<br />
+                    <a href="#" class="cc-link"
+                      onclick="Quotient.Compose.Controller.get(this).toggleCCForm(this); return false">
+                      + Cc
+                    </a>
+                  </td>
+                  <td class="header-table-last-col">
+                    <textarea
+                      name="toAddress"
+                      onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
+                      oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
+                      class="compose-to-address" style="width: 98%" rows="1"><nevow:slot name="to" /></textarea></td>
+                </tr>
+                <tr class="cc-form" style="display: none">
+                  <td class="header-table-first-col">Cc:</td>
+                  <td class="header-table-last-col">
+                    <input type="text" name="cc" style="width: 98%">
+                      <nevow:attr name="value"><nevow:slot name="cc" /></nevow:attr>
+                    </input>
+                    <input type="hidden" name="bcc" />
+                  </td>
+                </tr>
+                <tr>
+                  <td class="header-table-first-col">Subject:</td>
+                  <td class="header-table-last-col">
+                    <input type="text" name="subject" style="width: 98%"
+                      ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input></td>
+                </tr>
+                <tr class="files-form" style="display: none">
+                  <td class="header-table-first-col">Files:</td>
+                  <td class="header-table-last-col">
                     <ul class="file-list">
                       <nevow:slot name="attachments" />
                     </ul>
-                    <li nevow:pattern="attachment"
-                      ><nevow:slot name="name" /> <a href="#"
-                        onclick="Quotient.Compose.Controller.get(this).removeFile(this); return false">remove</a>
-                      <span class="attachment-id" style="display: none"><nevow:slot name="id" /></span>
-                    </li>
-                    <div class="uploaded-files" style="display: none" />
-                  </div>
-                </td>
-              </tr>
-              <tr valign="top">
-                <td class="header-table-first-col" align="center"
-                  ><a href="#"
-                    onclick="Quotient.Compose.Controller.get(this).toggleMoreOptions(this); return false"
-                    >Add CC</a></td>
-                <td class="header-table-last-col">
-                  <table class="options-container" style="display: none; width: 100%">
-                    <tr>
-                      <td>CC:</td>
-                      <td style="width: 100%">
-                        <input type="text" name="cc" style="width: 80%">
-                          <nevow:attr name="value"><nevow:slot name="cc" /></nevow:attr>
-                        </input>
-                        <input style="display: none" type="text" name="bcc" />
-                      </td>
-                    </tr>
-                    <!--
-                    <tr>
-                      <td>BCC:</td><td style="width: 100%"><input type="text" name="bcc" style="width: 80%" /></td>
-                    </tr>
-                    -->
-                  </table>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <textarea name="messageBody" class="message-body" cols="80" rows="10"
-            ><nevow:slot name="body" /></textarea>
-        </td>
-      </tr>
-      <tr>
-        <td align="right">
-          <button onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false">
-            Save Draft
-          </button>
-          <button onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
-            Send
-          </button>
-        </td>
-      </tr>
-    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <textarea name="messageBody" class="message-body" cols="80" rows="10"
+              ><nevow:slot name="body" /></textarea>
+          </td>
+        </tr>
+      </table>
+    </center>
   </nevow:invisible>
 </div>

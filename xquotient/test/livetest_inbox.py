@@ -17,6 +17,7 @@ from xmantissa.people import Organizer, Person, EmailAddress
 
 from xquotient.inbox import Inbox
 from xquotient.exmess import Message
+from xquotient.compose import Composer
 from xquotient.quotientapp import QuotientPreferenceCollection
 
 class _Part(Item):
@@ -95,6 +96,7 @@ class InboxTestCase(testcase.TestCase):
 
         inbox = Inbox(store=s)
         inbox.installOn(s)
+        Composer(store=s).installOn(s)
 
         inboxFrag = ixmantissa.INavigableFragment(inbox)
 
@@ -146,6 +148,7 @@ class BatchActionsTestCase(testcase.TestCase):
 
         inbox = Inbox(store=s)
         inbox.installOn(s)
+        Composer(store=s).installOn(s)
 
         inboxFrag = ixmantissa.INavigableFragment(inbox)
 

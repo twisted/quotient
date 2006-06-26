@@ -19,7 +19,7 @@ from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message
-from xquotient import mimepart, equotient, compose
+from xquotient import mimepart, equotient, compose, renderers
 from xquotient.qpeople import AddPersonFragment
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
@@ -154,7 +154,7 @@ class Inbox(Item, InstallableMixin):
     def action_train(self, message, spam):
         message.train(spam)
 
-class InboxScreen(athena.LiveFragment):
+class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
     implements(ixmantissa.INavigableFragment)
 
     fragmentName = 'inbox'
@@ -292,6 +292,10 @@ class InboxScreen(athena.LiveFragment):
     def render_messageDetail(self, ctx, data):
         return self._currentAsFragment()
 
+    def render_composeLink(self, ctx, data):
+        return ctx.tag.fillSlots('href', self.translator.linkTo(
+                                            self.store.findUnique(compose.Composer).storeID))
+
 
     def render_spamState(self, ctx, data):
         if self.currentMessage is None:
@@ -351,11 +355,6 @@ class InboxScreen(athena.LiveFragment):
         """
         return list(self.original.catalog.tagNames())
 
-
-    def render_button(self, ctx, data):
-        # take the contents of the ctx.tag and stuff it inside the button pattern
-        return inevow.IQ(self.docFactory).onePattern('button').fillSlots(
-                    'content', ctx.tag.children)
 
     def render_viewPane(self, ctx, data):
         attrs = ctx.tag.attributes
@@ -552,7 +551,7 @@ class InboxScreen(athena.LiveFragment):
         return self.original.store.query(Message, self._getBaseComparison(), **k)
 
     def _squish(self, thing):
-        # replacing &nbsp with &#160 in webmail.SpacePreservingStringRenderer
+        # replacing &nbsp with &#160 in renderers.SpacePreservingStringRenderer
         # fixed all issues with calling setNodeContent on flattened message
         # details for all messages in the test pool.  but there might be
         # other things that will break also.
