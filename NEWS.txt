@@ -1,3 +1,6 @@
+0.1.4 (2006-06-26):
+  - Initial mailbox rendering and scrolling through messages has been sped up.
+
 0.1.3 (2006-06-22):
   - UI fixes: #1199, #1151, #1201, #1189
 
