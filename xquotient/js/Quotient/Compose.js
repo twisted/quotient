@@ -296,8 +296,19 @@ Quotient.Compose.Controller.methods(
         self.emptyAndHideAddressCompletions();
     },
 
+    /**
+     * For a pair C{nameaddr} containing [displayName, emailAddress], return something
+     * of the form '"displayName" <emailAddress>'.  If displayName is the empty
+     * string, return '<emailAddress>'.
+     */
     function reconstituteAddress(self, nameaddr) {
-        return '"' + nameaddr[0] + '" <' + nameaddr[1] + '>';
+        var addr;
+        if(0 < nameaddr[0].length) {
+            addr = '"' + nameaddr[0] + '" ';
+        } else {
+            addr = "";
+        }
+        return addr + '<' + nameaddr[1] + '>';
     },
 
     function completeCurrentAddr(self, addresses) {
@@ -312,9 +323,19 @@ Quotient.Compose.Controller.methods(
         if(lastAddress.length == 0)
             return;
 
+        /**
+         * Given an email address C{addr}, and a pair containing [displayName,
+         * emailAddress], return a boolean indicating whether emailAddress or
+         * any of the words in displayName is a prefix of C{addr}
+         */
         function nameOrAddressStartswith(addr, nameaddr) {
-            return Quotient.Common.Util.startswith(addr, nameaddr[0])
-                        || Quotient.Common.Util.startswith(addr, nameaddr[1]);
+            var strings = nameaddr[0].split(/\s+/).concat(nameaddr);
+            for(var i = 0; i < strings.length; i++) {
+                if(Quotient.Common.Util.startswith(addr, strings[i])) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         var completions = MochiKit.Base.filter(
@@ -343,6 +364,7 @@ Quotient.Compose.Controller.methods(
             self.completions.style.left = Quotient.Common.Util.findPosX(input) + "px";
             self.highlightFirstAddrCompletion();
         }
+        return completions;
     },
 
     function setAttachment(self, input) {

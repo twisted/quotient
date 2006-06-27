@@ -332,15 +332,18 @@ class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
         self.callable(**coerced)
 
     def getPeople(self):
+        """
+        @return: a sequence of pairs (name, email) for each Person in the store of
+                 my L{Composer}, where name is the person's display name, and email
+                 is their email address.  omits people without a display name or
+                 email address
+        """
         peeps = []
         for person in self.original.store.query(people.Person):
             email = person.getEmailAddress()
             if email is None:
                 email = u''
-            if person.name is None:
-                name = u''
-            else:
-                name = person.name
+            name = person.getDisplayName()
             if name or email:
                 peeps.append((name, email))
         return peeps

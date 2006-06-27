@@ -1,5 +1,6 @@
 // import Nevow.Athena.Test
 // import Quotient.Mailbox
+// import Quotient.Compose
 
 Quotient.Test.TestableMailboxSubclass = Quotient.Mailbox.Controller.subclass('TestableMailboxSubclass');
 Quotient.Test.TestableMailboxSubclass.methods(
@@ -440,4 +441,87 @@ Quotient.Test.BatchActionsTestCase.methods(
             function() {
                 checkSubjects([]);
         });
+    });
+
+Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
+Quotient.Test.ComposeController.methods(
+    function saveDraft(self, userInitiated) {
+        return;
+    });
+
+Quotient.Test.ComposeTestCase = Nevow.Athena.Test.TestCase.subclass('ComposeTestCase');
+Quotient.Test.ComposeTestCase.methods(
+    function run(self) {
+        /* get the ComposeController */
+        var controller = Quotient.Test.ComposeController.get(
+                            Nevow.Athena.NodeByAttribute(
+                                self.node.parentNode,
+                                "athena:class",
+                                "Quotient.Test.ComposeController"));
+
+        var richAssertEquals = function(x, y, msg) {
+            self.assertEquals(MochiKit.Base.compare(x, y), 0, msg || (x + " != " + y));
+        }
+
+        /* these are the pairs of [displayName, emailAddress] that we expect
+         * the controller to have received from getPeople() */
+
+        var moe     = ["Moe Aboulkheir", "maboulkheir@divmod.com"];
+        var tobias  = ["Tobias Knight", "localpart@domain"];
+        var madonna = ["Madonna", "madonna@divmod.com"];
+        var kilroy  = ["", "kilroy@foo"];
+
+        /**
+         * For an emailAddress C{addr} (or part of one), assert that the list of
+         * possible completions returned by ComposeController.completeCurrentAddr()
+         * matches exactly the list of lists C{completions}, where each element
+         * is a pair containing [displayName, emailAddress]
+         */
+        var assertCompletionsAre = function(addr, completions) {
+            var _completions = controller.completeCurrentAddr(addr);
+            richAssertEquals(_completions, completions,
+                             "completions for " +
+                             addr +
+                             " are " +
+                             _completions.toSource() +
+                             " instead of " +
+                             completions.toSource());
+        }
+
+        /* map email address prefixes to lists of expected completions */
+        var completionResults = {
+            "m": [moe, madonna],
+            "a": [moe],
+            "ma": [moe, madonna],
+            "maboulkheir@divmod.com": [moe],
+            "Moe Aboulkheir": [moe],
+            "AB": [moe],
+            "k": [tobias, kilroy],
+            "KnigHT": [tobias],
+            "T": [tobias],
+            "l": [tobias],
+            "localpart@": [tobias]
+        };
+
+        /* check they match up */
+        for(var k in completionResults) {
+            assertCompletionsAre(k, completionResults[k]);
+        }
+
+        /* map each [displayName, emailAddress] pair to the result
+         * we expect from ComposeController.reconstituteAddress(),
+         * when passed the pair */
+        var reconstitutedAddresses = [
+            [moe, '"Moe Aboulkheir" <maboulkheir@divmod.com>'],
+            [tobias, '"Tobias Knight" <localpart@domain>'],
+            [madonna, '"Madonna" <madonna@divmod.com>'],
+            [kilroy, '<kilroy@foo>']
+        ];
+
+        /* check they match up */
+        for(var i = 0; i < reconstitutedAddresses.length; i++) {
+            self.assertEquals(
+                controller.reconstituteAddress(reconstitutedAddresses[i][0]),
+                reconstitutedAddresses[i][1]);
+        }
     });
