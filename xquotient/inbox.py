@@ -293,8 +293,16 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         return self._currentAsFragment()
 
     def render_composeLink(self, ctx, data):
-        return ctx.tag.fillSlots('href', self.translator.linkTo(
-                                            self.store.findUnique(compose.Composer).storeID))
+        """
+        If L{compose.Composer} is installed in our store,
+        then render a link to it, otherwise don't
+        """
+        composer = self.store.findUnique(compose.Composer, default=None)
+        if composer is not None:
+            return inevow.IQ(self.docFactory).onePattern(
+                        'compose-link').fillSlots(
+                            'href', self.translator.linkTo(compose.storeID))
+        return ''
 
 
     def render_spamState(self, ctx, data):

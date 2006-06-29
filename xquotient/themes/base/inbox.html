@@ -7,6 +7,13 @@
     <h1>Loading...</h1>
   </div>
 
+  <a nevow:pattern="compose-link">
+    <nevow:attr name="href"><nevow:slot name="href" /></nevow:attr>
+    <span style="color: #0099CC">
+      Compose
+    </span>
+  </a>
+
   <div style="position: static" class="widget-container" />
 
   <div nevow:pattern="last-message" class="last-message">
@@ -95,12 +102,7 @@
             <div class="menubar-separator" />
           </td>
           <td>
-            <a nevow:render="composeLink">
-              <nevow:attr name="href"><nevow:slot name="href" /></nevow:attr>
-              <span style="color: #0099CC">
-                Compose
-              </span>
-            </a>
+            <nevow:invisible nevow:render="composeLink" />
           </td>
         </tr>
       </table>
