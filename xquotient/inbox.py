@@ -301,7 +301,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         if composer is not None:
             return inevow.IQ(self.docFactory).onePattern(
                         'compose-link').fillSlots(
-                            'href', self.translator.linkTo(compose.storeID))
+                            'href', self.translator.linkTo(composer.storeID))
         return ''
 
 
