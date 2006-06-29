@@ -269,3 +269,41 @@ class InboxTestCase(TestCase):
         task = inbox.action_defer(message, 365, 0, 0)
         message.deleteFromStore()
         self.assertEquals(s.count(UndeferTask), 0)
+
+    def testLookahead(self):
+        """
+        Test that the one message lookahead feature of the inbox
+        works in the right direction (from newest message to oldest).
+        We test this in two places: after instantiating InboxScreen,
+        where the currentMessage and nextMessage attributes are initially
+        set, and after calling InboxScreen.selectMessage(), which changes
+        both attributes
+        """
+
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+
+        msgs = list(Message(store=s,
+                            subject=unicode(str(i)),
+                            spam=False,
+                            receivedWhen=Time(),
+                            sentWhen=Time(),
+                            impl=None) for i in xrange(5))
+        msgs.reverse()
+        inboxScreen = InboxScreen(Inbox(store=s))
+
+        def assertMsgSubjectsAre(s1, s2):
+            self.assertEquals(inboxScreen.currentMessage.subject, s1)
+            self.assertEquals(inboxScreen.nextMessage.subject, s2)
+
+        # '4' is the newest message
+        assertMsgSubjectsAre('4', '3')
+        inboxScreen.selectMessage(msgs[1])
+        assertMsgSubjectsAre('3', '2')
+        inboxScreen.selectMessage(msgs[2])
+        assertMsgSubjectsAre('2', '1')
+        inboxScreen.selectMessage(msgs[3])
+        assertMsgSubjectsAre('1', '0')
+        inboxScreen.selectMessage(msgs[4])
+        self.assertEquals(inboxScreen.currentMessage.subject, '0')
+        self.failIf(inboxScreen.nextMessage)

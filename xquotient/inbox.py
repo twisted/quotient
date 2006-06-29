@@ -217,7 +217,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self.currentMessage = self.getLastMessage()
         if self.currentMessage is not None:
             self.currentMessage.read = True
-            self.nextMessage = self.getMessageAfter(self.currentMessage)
+            self.nextMessage = self.getMessageBefore(self.currentMessage)
         else:
             self.nextMessage = None
 
@@ -478,10 +478,18 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
 
     setComplexity = transacted(setComplexity)
 
+    def selectMessage(self, message):
+        """
+        Set C{message} as the current message.  Also cache the message that
+        will be displayed next, which is going to be the message received
+        immediately before C{message}.
+        """
+        self.currentMessage = message
+        message.read = True
+        self.nextMessage = self.getMessageBefore(message)
+
     def fastForward(self, webID):
-        self.currentMessage = self.translator.fromWebID(webID)
-        self.currentMessage.read = True
-        self.nextMessage = self.getMessageAfter(self.currentMessage)
+        self.selectMessage(self.translator.fromWebID(webID))
         return self._current()
 
     fastForward = transacted(fastForward)
