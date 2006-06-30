@@ -27,6 +27,9 @@ class Message(object):
 
 def main():
     s = store.Store("spam.axiom")
+    # DSPAM requires a Store with a parent, since the parent has the global
+    # training state.
+    s.parent = s
 
     # xquotient.dspam requires an account name to work at all.
     account = userbase.LoginAccount(store=s)
@@ -39,6 +42,9 @@ def main():
                          protocol=userbase.ANY_PROTOCOL)
 
     classifier = spam.Filter(store=s)
+    # Don't install it because there's no MessageSource: it won't install,
+    # but it works well enough like this for the benchmark.
+    classifier.installedOn = s
     dspam = spam.DSPAMFilter(store=s).installOn(classifier)
 
     def process():
