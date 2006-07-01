@@ -52,7 +52,7 @@ class POP3Up(item.Item, item.InstallableMixin):
 
     def activate(self):
         self.messageList = None
-        self.deletions = None
+        self.deletions = set()
 
 
     def installOn(self, other):
@@ -63,7 +63,7 @@ class POP3Up(item.Item, item.InstallableMixin):
     def getMessageList(self):
         # XXX could be made more incremental by screwing with login, making it
         # return a deferred
-        if self.messageList == None:
+        if self.messageList is None:
             # load it
             oldMessages = list(self.store.query(
                 Message,
@@ -71,21 +71,24 @@ class POP3Up(item.Item, item.InstallableMixin):
                                MessageInfo.localPop3Deleted == False),
                 sort=Message.storeID.asc))
             newMessages = list(self.store.query(
-                Message, Message.storeID.notOneOf(self.store.query(MessageInfo).getColumn('message', raw=True)),
+                Message,
+                Message.storeID.notOneOf(
+                        self.store.query(MessageInfo).getColumn('message',
+                                                                raw=True)),
                 sort=Message.storeID.asc))
             for message in newMessages:
                 MessageInfo(store=self.store,
                             localPop3Deleted=False,
-                            localPop3UID = os.urandom(16).encode('hex'),
+                            localPop3UID=os.urandom(16).encode('hex'),
                             message=message)
-            self.messageList = list(self.store.query(MessageInfo))
-            self.deletions = []
+            self.messageList = list(self.store.query(
+                    MessageInfo,
+                    MessageInfo.localPop3Deleted == False))
         return self.messageList
     getMessageList = item.transacted(getMessageList)
 
+
     def listMessages(self, index=None):
-        """
-        """
         if index is None:
             return [self.messageSize(idx) for idx in
                     xrange(len(self.getMessageList()))]
@@ -94,32 +97,52 @@ class POP3Up(item.Item, item.InstallableMixin):
 
 
     def _getMessageImpl(self, index):
-        return self.getMessageList()[index].message.impl
+        msgList = self.getMessageList()
+        try:
+            msg = msgList[index]
+        except IndexError:
+            raise ValueError(index)
+        else:
+            return msg
+
 
     def messageSize(self, index):
         if index in self.deletions:
             return 0
-        i = self._getMessageImpl(index)
+        i = self._getMessageImpl(index).message.impl
         return i.bodyOffset + (i.bodyLength or 0)
 
+
     def deleteMessage(self, index):
-        self.deletions.append(index)
+        if index in self.deletions:
+            raise ValueError(index)
+        self._getMessageImpl(index)
+        self.deletions.add(index)
+
 
     def getMessage(self, index):
         if index in self.deletions:
-            raise Exception("Deleted message retrieved.")
-        return self._getMessageImpl(index).source.open()
+            raise ValueError(index)
+        return self._getMessageImpl(index).message.impl.source.open()
+
 
     def getUidl(self, index):
-        return self.getMessageList()[index].localPop3UID
+        if index in self.deletions:
+            raise ValueError(index)
+        return self._getMessageImpl(index).localPop3UID
+
 
     def sync(self):
         ml = self.getMessageList()
         for delidx in self.deletions:
             ml[delidx].localPop3Deleted = True
         self.messageList = None
-        self.deletions = []
+        self.deletions = set()
         self.getMessageList()
+
+
+    def undeleteMessages(self):
+        self.deletions = set()
 
 
 
