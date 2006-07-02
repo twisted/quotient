@@ -7,6 +7,8 @@ from twisted.python.components import registerAdapter
 
 from nevow import tags as T, inevow, athena
 from nevow.flat import flatten
+from nevow.page import renderer
+from nevow.athena import expose
 
 from epsilon.extime import Time
 
@@ -154,7 +156,15 @@ class Inbox(Item, InstallableMixin):
     def action_train(self, message, spam):
         message.train(spam)
 
-class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
+class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
+    """
+    Renderer for boxes for of email.
+
+    @ivar store: The L{axiom.store.Store} containing the state this instance
+    renders.
+
+    @ivar inbox: The L{Inbox} which serves as the model for this view.
+    """
     implements(ixmantissa.INavigableFragment)
 
     fragmentName = 'inbox'
@@ -175,35 +185,8 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
 
     translator = None
 
-    iface = allowedMethods = dict(deleteCurrentMessage=True,
-                                  deleteMessageGroup=True,
-                                  deleteMessageBatch=True,
-
-                                  archiveCurrentMessage=True,
-                                  archiveMessageGroup=True,
-                                  archiveMessageBatch=True,
-
-                                  deferCurrentMessage=True,
-                                  replyToCurrentMessage=True,
-                                  forwardCurrentMessage=True,
-
-                                  trainCurrentMessage=True,
-                                  trainMessageGroup=True,
-                                  trainMessageBatch=True,
-
-                                  getMessageCount=True,
-
-                                  fastForward=True,
-
-                                  viewByTag=True,
-                                  viewByAccount=True,
-                                  viewByMailType=True,
-                                  viewByPerson=True,
-
-                                  setComplexity=True)
-
     def __init__(self, inbox):
-        athena.LiveFragment.__init__(self, inbox)
+        athena.LiveElement.__init__(self)
         self.translator = ixmantissa.IWebTranslator(inbox.store)
         self.store = inbox.store
         self.inbox = inbox
@@ -211,7 +194,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self._resetCurrentMessage()
 
     def getInitialArguments(self):
-        return (self.getMessageCount(), self.original.uiComplexity)
+        return (self.getMessageCount(), self.inbox.uiComplexity)
 
     def _resetCurrentMessage(self):
         self.currentMessage = self.getLastMessage()
@@ -226,7 +209,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         """
         Retrieve the message which was received before all other messages.
         """
-        return self.original.store.findFirst(
+        return self.inbox.store.findFirst(
             Message,
             self._getBaseComparison(),
             sort=Message.receivedWhen.ascending)
@@ -236,7 +219,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         """
         Retrieve the message which was received after all other messages.
         """
-        return self.original.store.findFirst(
+        return self.inbox.store.findFirst(
             Message,
             self._getBaseComparison(),
             sort=Message.receivedWhen.descending)
@@ -251,10 +234,10 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         sort = Message.receivedWhen.desc
         comparison = attributes.AND(self._getBaseComparison(),
                                     Message.receivedWhen < whichMessage.receivedWhen)
-        return self.original.store.findFirst(Message,
-                                             comparison,
-                                             default=None,
-                                             sort=sort)
+        return self.inbox.store.findFirst(Message,
+                                          comparison,
+                                          default=None,
+                                          sort=sort)
 
 
     def getMessageAfter(self, whichMessage):
@@ -266,10 +249,10 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         sort = Message.receivedWhen.asc
         comparison = attributes.AND(self._getBaseComparison(),
                                     Message.receivedWhen > whichMessage.receivedWhen)
-        return self.original.store.findFirst(Message,
-                                             comparison,
-                                             default=None,
-                                             sort=sort)
+        return self.inbox.store.findFirst(Message,
+                                          comparison,
+                                          default=None,
+                                          sort=sort)
 
 
     def _currentAsFragment(self):
@@ -289,10 +272,12 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
                 }
         return {}
 
-    def render_messageDetail(self, ctx, data):
+    def messageDetail(self, request, tag):
         return self._currentAsFragment()
+    renderer(messageDetail)
 
-    def render_composeLink(self, ctx, data):
+
+    def composeLink(self, ctx, data):
         """
         If L{compose.Composer} is installed in our store,
         then render a link to it, otherwise don't
@@ -303,11 +288,12 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
                         'compose-link').fillSlots(
                             'href', self.translator.linkTo(composer.storeID))
         return ''
+    renderer(composeLink)
 
 
-    def render_spamState(self, ctx, data):
+    def spamState(self, request, tag):
         if self.currentMessage is None:
-            return ctx.tag['????']
+            return tag['????']
         if self.currentMessage.trained:
             confidence = 'definitely'
         else:
@@ -316,17 +302,19 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
             modifier = ''
         else:
             modifier = 'not'
-        return ctx.tag[confidence + ' ' + modifier]
+        return tag[confidence + ' ' + modifier]
+    renderer(spamState)
 
 
-    def render_addPersonFragment(self, ctx, data):
+    def addPersonFragment(self, request, tag):
         # the person form is a fair amount of html,
         # so we'll only include it once
 
-        self.addPersonFragment = AddPersonFragment(self.original)
+        self.addPersonFragment = AddPersonFragment(self.inbox)
         self.addPersonFragment.setFragmentParent(self)
         self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
         return self.addPersonFragment
+    renderer(addPersonFragment)
 
     def _getScrolltableComparison(self):
         if self.currentMessage is not None:
@@ -336,8 +324,8 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
 
         return self._getBaseComparison(beforeTime)
 
-    def render_scroller(self, ctx, data):
-        f = ScrollingFragment(self.original.store,
+    def scroller(self, request, tag):
+        f = ScrollingFragment(self.inbox.store,
                               Message,
                               self._getScrolltableComparison(),
                               (Message.senderDisplay,
@@ -355,27 +343,29 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         f.docFactory = getLoader(f.fragmentName)
         self.scrollingFragment = f
         return f
+    renderer(scroller)
 
 
     def getTags(self):
         """
         Return a list of unique tag names as unicode strings.
         """
-        return list(self.original.catalog.tagNames())
+        return list(self.inbox.catalog.tagNames())
 
 
-    def render_viewPane(self, ctx, data):
-        attrs = ctx.tag.attributes
+    def viewPane(self, request, tag):
+        attrs = tag.attributes
         return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
                              {'name': attrs['name'],
                               'renderer': T.directive(attrs['renderer'])})
+    renderer(viewPane)
 
-    def render_personChooser(self, ctx, data):
+    def personChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('personChooser')
         option = inevow.IQ(select).patternGenerator('personChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedPersonChoice')
 
-        for person in [None] + list(self.original.store.query(people.Person)):
+        for person in [None] + list(self.inbox.store.query(people.Person)):
             if person == self.viewingByPerson:
                 p = selectedOption
             else:
@@ -393,16 +383,17 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
 
             select[opt]
         return select
+    renderer(personChooser)
 
     def getUnreadMessageCount(self):
         """
         @return: number of unread messages in current view
         """
-        return self.original.store.count(Message,
-                                         attributes.AND(self._getBaseComparison(),
-                                                        Message.read == False))
+        return self.inbox.store.count(Message,
+                                      attributes.AND(self._getBaseComparison(),
+                                                     Message.read == False))
 
-    def render_mailViewChooser(self, ctx, data):
+    def mailViewChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
@@ -421,10 +412,11 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
             select[p().fillSlots(
                         'mailViewName', view).fillSlots(
                         'count', count)]
-
         return select
+    renderer(mailViewChooser)
 
-    def render_tagChooser(self, ctx, data):
+
+    def tagChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('tagChooser')
         option = inevow.IQ(select).patternGenerator('tagChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedTagChoice')
@@ -436,11 +428,13 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
             opt = p().fillSlots('tagName', tag or 'All')
             select[opt]
         return select
+    renderer(tagChooser)
+
 
     def _accountNames(self):
-        return self.original.store.query(Message).getColumn("source").distinct()
+        return self.inbox.store.query(Message).getColumn("source").distinct()
 
-    def render_accountChooser(self, ctx, data):
+    def accountChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('accountChooser')
         option = inevow.IQ(select).patternGenerator('accountChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedAccountChoice')
@@ -452,6 +446,8 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
             opt = p().fillSlots('accountName', acc or 'All')
             select[opt]
         return select
+    renderer(accountChooser)
+
 
     def _nextMessagePreview(self):
         if self.currentMessage is None:
@@ -465,8 +461,10 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
                                   subject=m.subject,
                                   date=m.sentWhen.asHumanly()))
 
-    def render_nextMessagePreview(self, ctx, data):
+    def nextMessagePreview(self, request, tag):
         return self._nextMessagePreview()
+    renderer(nextMessagePreview)
+
 
     def head(self):
         return None
@@ -474,7 +472,8 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
     # remote methods
 
     def setComplexity(self, n):
-        self.original.uiComplexity = n
+        self.inbox.uiComplexity = n
+    expose(setComplexity)
 
     setComplexity = transacted(setComplexity)
 
@@ -491,6 +490,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
     def fastForward(self, webID):
         self.selectMessage(self.translator.fromWebID(webID))
         return self._current()
+    expose(fastForward)
 
     fastForward = transacted(fastForward)
 
@@ -525,6 +525,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
+    expose(viewByPerson)
 
     viewByPerson = transacted(viewByPerson)
 
@@ -533,6 +534,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
+    expose(viewByTag)
 
     viewByTag = transacted(viewByTag)
 
@@ -541,6 +543,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
+    expose(viewByAccount)
 
     viewByAccount = transacted(viewByAccount)
 
@@ -555,16 +558,16 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         self._resetCurrentMessage()
         self._resetScrollQuery()
         return (self.getMessageCount(), self._current(), self.mailViewCounts())
+    expose(viewByMailType)
 
     viewByMailType = transacted(viewByMailType)
 
     def getMessageCount(self):
-        return self.original.store.count(Message, self._getBaseComparison())
-
-    getMessageCount = transacted(getMessageCount)
+        return self.inbox.store.count(Message, self._getBaseComparison())
+    expose(getMessageCount)
 
     def getMessages(self, **k):
-        return self.original.store.query(Message, self._getBaseComparison(), **k)
+        return self.inbox.store.query(Message, self._getBaseComparison(), **k)
 
     def _squish(self, thing):
         # replacing &nbsp with &#160 in renderers.SpacePreservingStringRenderer
@@ -609,18 +612,18 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         for webID in webIDs:
             action(self.translator.fromWebID(webID), *args)
 
-    archiveCurrentMessage = makeSingleAction('archive')
-    deleteCurrentMessage  = makeSingleAction('delete')
-    deferCurrentMessage   = makeSingleAction('defer')
-    trainCurrentMessage   = makeSingleAction('train')
+    archiveCurrentMessage = expose(makeSingleAction('archive'))
+    deleteCurrentMessage  = expose(makeSingleAction('delete'))
+    deferCurrentMessage   = expose(makeSingleAction('defer'))
+    trainCurrentMessage   = expose(makeSingleAction('train'))
 
-    archiveMessageGroup = makeGroupAction('archive')
-    deleteMessageGroup  = makeGroupAction('delete')
-    trainMessageGroup   = makeGroupAction('train')
+    archiveMessageGroup = expose(makeGroupAction('archive'))
+    deleteMessageGroup  = expose(makeGroupAction('delete'))
+    trainMessageGroup   = expose(makeGroupAction('train'))
 
-    archiveMessageBatch = makeBatchAction('archive')
-    deleteMessageBatch  = makeBatchAction('delete')
-    trainMessageBatch   = makeBatchAction('train')
+    archiveMessageBatch = expose(makeBatchAction('archive'))
+    deleteMessageBatch  = expose(makeBatchAction('delete'))
+    trainMessageBatch   = expose(makeBatchAction('train'))
 
     def _getComparisonForBatchType(self, batchType):
         comp = self._getBaseComparison()
@@ -665,7 +668,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         return list(self.store.query(Message, comp))
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
-        composer = self.original.store.findUnique(compose.Composer)
+        composer = self.inbox.store.findUnique(compose.Composer)
         cf = compose.ComposeFragment(composer,
                                      toAddress=toAddress,
                                      subject=subject,
@@ -695,6 +698,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
         return self._composeSomething(replyTo(curmsg),
                                       reSubject(curmsg),
                                       '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
+    expose(replyToCurrentMessage)
 
     def forwardCurrentMessage(self, advance):
         curmsg = self.currentMessage
@@ -713,6 +717,7 @@ class InboxScreen(athena.LiveFragment, renderers.ButtonRenderingMixin):
                                       reSubject(curmsg, 'Fwd: '),
                                       '\n\n' + '\n> '.join(reply),
                                       self.currentMessageDetail.attachmentParts)
+    expose(forwardCurrentMessage)
 
     def _getBaseComparison(self, beforeTime=None):
         if beforeTime is None:

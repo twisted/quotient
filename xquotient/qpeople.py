@@ -2,6 +2,7 @@ from zope.interface import implements
 
 from nevow import rend, inevow, tags
 from nevow.flat import flatten
+from nevow.athena import expose
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -39,7 +40,6 @@ def makePersonExtracts(store, person):
 class AddPersonFragment(people.AddPersonFragment):
     jsClass = 'Quotient.Common.AddPerson'
 
-    iface = allowedMethods = dict(getPersonHTML=True)
     lastPerson = None
 
     def makePerson(self, nickname):
@@ -57,6 +57,7 @@ class AddPersonFragment(people.AddPersonFragment):
         assert self.lastPerson is not None
         personFrag = people.PersonFragment(self.lastPerson)
         return unicode(flatten(personFrag), 'utf-8')
+    expose(getPersonHTML)
 
 
 class CorrespondentExtractor(Item, InstallableMixin):

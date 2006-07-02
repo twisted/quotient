@@ -4,10 +4,12 @@ from os import path
 import pytz, zipfile
 
 from zope.interface import implements
+
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 
 from nevow import rend, inevow, athena, static
+from nevow.athena import expose
 
 from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
@@ -332,9 +334,6 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     live = 'athena'
     jsClass = 'Quotient.Mailbox.MessageDetail'
 
-    iface = allowedMethods = dict(getMessageSource=True,
-                                  modifyTags=True)
-
     printing = False
     _partsByID = None
 
@@ -497,6 +496,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
             return unicode(source, charset, 'replace')
         except LookupError:
             return unicode(source, 'utf-8', 'replace')
+    expose(getMessageSource)
 
     def modifyTags(self, tagsToAdd, tagsToDelete):
         """
@@ -516,6 +516,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                                     attributes.AND(
                                         Tag.object == self.original,
                                         Tag.name == t)).deleteFromStore()
+    expose(modifyTags)
 
 
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)

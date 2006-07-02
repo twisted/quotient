@@ -9,6 +9,7 @@ from twisted.names import client
 from twisted.internet import error, defer, reactor
 
 from nevow import inevow, rend, json
+from nevow.athena import expose
 
 from epsilon import extime
 
@@ -279,15 +280,13 @@ class FileCabinetPage(rend.Page):
 
 registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
 
-class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
+class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin):
     implements(ixmantissa.INavigableFragment)
 
     fragmentName = 'compose'
     live = 'athena'
     jsClass = 'Quotient.Compose.Controller'
     title = ''
-
-    iface = allowedMethods = dict(getPeople=True, invoke=True)
 
     _savedDraft = None
 
@@ -330,6 +329,8 @@ class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
         # list of filenames of arbitrary length with the form
         coerced['files'] = formPostEmulator.get('files', ())
         self.callable(**coerced)
+    expose(invoke)
+
 
     def getPeople(self):
         """
@@ -347,6 +348,8 @@ class ComposeFragment(liveform.LiveForm, renderers.ButtonRenderingMixin):
             if name or email:
                 peeps.append((name, email))
         return peeps
+    expose(getPeople)
+
 
     def getInitialArguments(self):
         return (self.inline, self.getPeople())

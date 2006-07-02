@@ -1,8 +1,14 @@
+# -*- test-case-name: I DO NOT HAVE ANY UNIT TESTS OH NO OH NO OH NO -*-
+
+from itertools import imap
+
 from zope.interface import implements
-from nevow import rend, inevow, tags, stan, flat
+
+from nevow import inevow, rend, tags, stan, flat, page
+
 from xmantissa.publicresource import getLoader
 from xmantissa import ixmantissa
-from itertools import imap
+
 
 def textToRudimentaryHTML(text):
     return flat.flatten(
@@ -11,14 +17,23 @@ def textToRudimentaryHTML(text):
                         SpacePreservingStringRenderer(text).rend(None, None)]])
 
 class ButtonRenderingMixin:
+    """
+    Convenience mixin to render pretty buttons.
+    I can be mixed-in with a L{rend.Fragment} or a L{page.Element}
+    """
     _buttonPattern = None
 
-    def render_button(self, ctx, data):
+    def button(self, request, tag):
         if self._buttonPattern is None:
             self._buttonPattern = inevow.IQ(getLoader('button')).patternGenerator('button')
 
-        # take the contents of the ctx.tag and stuff it inside the button pattern
-        return self._buttonPattern.fillSlots('content', ctx.tag.children)
+        # take the contents of the tag and stuff it inside the button pattern
+        return self._buttonPattern.fillSlots('content', tag.children)
+    page.renderer(button)
+
+    def render_button(self, ctx, data):
+        return self.button(inevow.IRequest(ctx), ctx.tag)
+
 
 class SpacePreservingStringRenderer(object):
     implements(inevow.IRenderer)

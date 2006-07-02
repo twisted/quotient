@@ -5,7 +5,6 @@ from xmantissa.webtheme import getLoader
 
 class SenderPersonFragment(athena.LiveFragment):
     jsClass = 'Quotient.Common.SenderPerson'
-    iface = allowedMethods = dict(addPerson=True)
 
     def __init__(self, message):
         self.message = message

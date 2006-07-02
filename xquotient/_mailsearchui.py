@@ -1,7 +1,8 @@
 
 from zope.interface import implements
 
-from nevow import inevow, athena
+from nevow import inevow
+from nevow.page import renderer
 
 from axiom import attributes
 
@@ -10,7 +11,7 @@ from xmantissa import ixmantissa, scrolltable, search, webtheme
 from xquotient import exmess
 
 
-class SearchAggregatorFragment(webtheme.ThemedFragment):
+class SearchAggregatorFragment(webtheme.ThemedElement):
     implements(ixmantissa.INavigableFragment)
 
     jsClass = u'Mantissa.Search.Search'
@@ -28,7 +29,7 @@ class SearchAggregatorFragment(webtheme.ThemedFragment):
         return None
 
 
-    def render_search(self, ctx, data):
+    def search(self, ctx, data):
         f = scrolltable.ScrollingFragment(
             self.store,
             exmess.Message,
@@ -46,9 +47,4 @@ class SearchAggregatorFragment(webtheme.ThemedFragment):
         f.setFragmentParent(self)
         f.docFactory = webtheme.getLoader(f.fragmentName)
         return f
-
-        req = inevow.IRequest(ctx)
-        term = req.args.get('term', [None])[0]
-        if term is None:
-            return ''
-        return self.search(term)
+    renderer(search)

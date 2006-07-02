@@ -12,6 +12,7 @@ from twisted.protocols import policies
 
 from nevow import loaders, tags, athena
 from nevow.flat import flatten
+from nevow.athena import expose
 
 from epsilon import descriptor, extime
 
@@ -630,7 +631,6 @@ grabberTypes = {
 class GrabberConfigFragment(athena.LiveFragment):
     fragmentName = 'grabber-configuration'
     live = 'athena'
-    iface = allowedMethods = dict(getEditGrabberForm=True)
     jsClass = u'Quotient.Grabber.Controller'
     title = 'External Accounts'
 
@@ -697,6 +697,7 @@ class GrabberConfigFragment(athena.LiveFragment):
         grabber.grab()
         f.setFragmentParent(self)
         return unicode(flatten(f), 'utf-8')
+    expose(getEditGrabberForm)
 
     def editGrabber(self, grabber, password1, password2, ssl):
         if password1 != password2:
@@ -765,10 +766,10 @@ class LiveStatusFragment(athena.LiveFragment):
             self.statusChanged(pendingStatus)
 
 
-    allowedMethods = ['startObserving']
     def startObserving(self):
         self.removeObserver = self.status.addChangeObserver(self.statusChanged)
         return self.status.message
+    expose(startObserving)
 
 
 

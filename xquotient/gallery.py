@@ -4,6 +4,7 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 
 from nevow import rend, static, flat, athena, tags, inevow
+from nevow.athena import expose
 
 from axiom.item import Item, InstallableMixin
 from axiom import attributes
@@ -133,8 +134,6 @@ class GalleryScreen(athena.LiveFragment):
 
     organizer = None
 
-    iface = allowedMethods = dict(nextPage=True, prevPage=True, addPerson=True)
-
     itemsPerRow = 5
     rowsPerPage = 4
 
@@ -214,10 +213,12 @@ class GalleryScreen(athena.LiveFragment):
     def nextPage(self):
         self.tdm.nextPage()
         return map(self._flatten, (self._currentPage(), self._paginationLinks()))
+    expose(nextPage)
 
     def prevPage(self):
         self.tdm.prevPage()
         return map(self._flatten, (self._currentPage(), self._paginationLinks()))
+    expose(prevPage)
 
     def head(self):
         return None
