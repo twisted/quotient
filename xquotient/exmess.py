@@ -7,6 +7,7 @@ from zope.interface import implements
 
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
+from twisted.web import microdom
 
 from nevow import rend, inevow, athena, static
 from nevow.athena import expose
@@ -19,7 +20,7 @@ from xmantissa import ixmantissa, people, webapp
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, equotient, mimeutil
+from xquotient import gallery, equotient, mimeutil, scrubber
 from xquotient.actions import SenderPersonFragment
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -265,13 +266,21 @@ class ItemGrabber(rend.Page):
                 return (self, ())
         return rend.NotFound
 
+# somewhere there needs to be an IResource that can display
+# the standalone parts of a given message, like images,
+# scrubbed text/html parts and such.  this is that thing.
+
 class PartDisplayer(ItemGrabber):
     filename = None
 
     def renderHTTP(self, ctx):
         """
         Serve the content of the L{mimestorage.Part} retrieved
-        by L{ItemGrabber.locateChild}
+        by L{ItemGrabber.locateChild}.
+
+        If the content-type of the part is text/html, the body
+        will be scrubbed, unless the "noscrub" query parameter
+        is set in the request
         """
 
         request = inevow.IRequest(ctx)
@@ -282,14 +291,14 @@ class PartDisplayer(ItemGrabber):
 
         if ctype.startswith('text/'):
             content = part.getUnicodeBody().encode('utf-8')
+            if ctype.endswith('/html') and 'noscrub' not in request.args:
+                dom = microdom.parseString(content, beExtremelyLenient=True)
+                scrubber.scrub(dom)
+                return dom.toxml()[len('<?xml version="1.0"?>'):]
         else:
             content = part.getBody(decode=True)
 
         return content
-
-# somewhere there needs to be an IResource that can display
-# the standalone parts of a given message, like images,
-# scrubbed text/html parts and such.  this is that thing.
 
 class PrintableMessageResource(rend.Page):
     def __init__(self, message):
@@ -377,6 +386,11 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
             return ''
         return self.patterns['printable-link'].fillSlots(
                     'link', self.translator.linkTo(self.original.storeID) + '/printable')
+
+    def render_scrubbedDialog(self, ctx, data):
+        if 'text/html' in (p.type for p in self.messageParts):
+            return self.patterns['scrubbed-dialog']()
+        return ''
 
     def render_headerPanel(self, ctx, data):
         if self.organizer is not None:

@@ -6,7 +6,11 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text
 
-from xquotient.exmess import Message
+from nevow.test.test_rend import req
+from nevow import context
+
+from xmantissa.webapp import PrivateApplication
+from xquotient.exmess import Message, PartDisplayer
 
 class MockPart:
     def __init__(self, filename, body):
@@ -21,11 +25,20 @@ class PartItem(Item):
     typeName = 'xquotient_test_part_item'
     schemaVersion = 1
 
-    z = text()
+    contentType = text()
+    body = text()
 
     def walkAttachments(self):
         return (MockPart('foo.bar', 'XXX'),
                 MockPart('bar.baz', 'YYY'))
+
+    def getContentType(self):
+        assert self.contentType is not None
+        return self.contentType
+
+    def getUnicodeBody(self):
+        assert self.body is not None
+        return self.body
 
 class MessageTestCase(TestCase):
     def testDeletion(self):
@@ -45,3 +58,37 @@ class MessageTestCase(TestCase):
 
         self.assertEqual(zf.read('foo.bar'), 'XXX')
         self.assertEqual(zf.read('bar.baz'), 'YYY')
+
+class WebTestCase(TestCase):
+    def testPartDisplayerScrubs(self):
+        s = Store()
+
+        PrivateApplication(store=s).installOn(s)
+
+        innocuousHTML = u'<html><body>hi</body></html>'
+        part = PartItem(store=s,
+                        contentType=u'text/html',
+                        body=innocuousHTML)
+
+        pd = PartDisplayer(original=part)
+        pd.item = part
+
+        def render(resource, request=None):
+            if request is None:
+                request = req()
+            return pd.renderHTTP(
+                    context.PageContext(
+                        tag=pd, parent=context.RequestContext(
+                            tag=request)))
+
+        self.assertEquals(render(pd), innocuousHTML)
+
+        suspectHTML = u'<html><script>hi</script><body>hi</body></html>'
+        part.body = suspectHTML
+
+        res = render(pd)
+        self.failIf('<script>' in res)
+
+        myreq = req()
+        myreq.args = {'noscrub': 1}
+        self.assertEquals(render(pd, myreq), suspectHTML)

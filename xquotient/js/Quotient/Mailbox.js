@@ -16,6 +16,23 @@ Quotient.Mailbox.MessageDetail.methods(
     },
 
     /**
+     * Show the original, unscrubbed HTML for this message
+     */
+    function showOriginalHTML(self) {
+        var mbody = self.firstNodeByAttribute("class", "message-body"),
+            iframe = mbody.getElementsByTagName("iframe")[0];
+
+        if(iframe.src.match(/\?/)) {
+            iframe.src += "&noscrub=1";
+        } else {
+            iframe.src += "?noscrub=1";
+        }
+
+        var sdialog = self.firstNodeByAttribute("class", "scrubbed-dialog");
+        sdialog.parentNode.removeChild(sdialog);
+    },
+
+    /**
      * Open a window that contains a printable version of
      * the Message pointed to by the given link
      *

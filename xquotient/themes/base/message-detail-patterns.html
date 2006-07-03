@@ -1,5 +1,12 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
+  <div nevow:pattern="scrubbed-dialog" class="scrubbed-dialog">
+    <div>Message HTML has been modified for your safety.</div>
+    <a href="#"
+      onclick="Quotient.Mailbox.MessageDetail.get(this).showOriginalHTML(); return false"
+      >Show original HTML</a>.
+  </div>
+
   <div nevow:pattern="attachment-panel" class="attachment-panel">
     <span onclick="Quotient.Common.CollapsiblePane.toggle(this, '')"
       style="cursor: pointer">
