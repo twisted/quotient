@@ -106,6 +106,16 @@ class InboxTestCase(testcase.TestCase):
 
         return ctx.tag[inboxFrag]
 
+
+class InboxDOMHandlersTestCase(InboxTestCase):
+    jsClass = u'Quotient.Test.InboxDOMHandlersTestCase'
+
+    docFactory = loaders.stan(tags.div[
+                    tags.div(render=tags.directive('liveTest'))['InboxDOMHandlersTestCase'],
+                    tags.div(render=tags.directive('inbox'),
+                             style='visibility: hidden'),
+                    tags.div(id='mantissa-footer')])
+
 class BatchActionsTestCase(testcase.TestCase):
     jsClass = u'Quotient.Test.BatchActionsTestCase'
 

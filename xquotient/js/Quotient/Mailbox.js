@@ -1098,7 +1098,7 @@ Quotient.Mailbox.Controller.methods(
         self.selectFirstVisible(
                 document.forms["group-actions"].elements["group-action"]);
 
-        self._chooseViewParameter('viewByMailType', n, false);
+        return self._chooseViewParameter('viewByMailType', n, false);
     },
 
     /**

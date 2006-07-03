@@ -443,6 +443,83 @@ Quotient.Test.BatchActionsTestCase.methods(
         });
     });
 
+Quotient.Test.InboxDOMHandlersTestCase = Quotient.Test.MailboxTestBase.subclass(
+                                            'InboxDOMHandlersTestCase');
+
+Quotient.Test.InboxDOMHandlersTestCase.methods(
+    /**
+     * test inbox methods that are tied to the DOM
+     */
+
+    function doTests(self) {
+        var viewPaneContents = Nevow.Athena.NodesByAttribute(
+                                   self.mailbox.firstNodeByAttribute("class", "view-pane"),
+                                   "class", "view-pane-content"),
+            collapsiblePane, i, name, viewChoosersByName = {};
+
+        for(i = 0; i < viewPaneContents.length; i++) {
+            collapsiblePane = viewPaneContents[i];
+            name = Nevow.Athena.FirstNodeByAttribute(
+                        collapsiblePane, "class", "view-pane-name").firstChild.nodeValue;
+            viewChoosersByName[name] = Nevow.Athena.FirstNodeByAttribute(
+                                            collapsiblePane, "class", "pane-body");
+        }
+
+        /**
+         * @param category: the view category, e.g. "Mail", "People"
+         * @param choice: the view choice, e.g. "Inbox", "Joe"
+         * @param return: the option node that represents the specified choice
+         */
+        var optionNodeForViewChoice = function(category, choice) {
+            var opts = Nevow.Athena.NodesByAttribute(
+                            viewChoosersByName[category], "class", "opt-name");
+            for(i = 0; i < opts.length; i++) {
+                if(opts[i].firstChild.nodeValue == choice) {
+                    return opts[i].parentNode;
+                }
+            }
+        }
+
+        var makeViewChoice = function(mailboxf, category, choice) {
+            var D = mailboxf(optionNodeForViewChoice(category, choice));
+            return D.addCallback(
+                function() {
+                    return self.waitForScrollTableRefresh();
+                });
+        }
+
+        var makeMailViewChoice = function(choice) {
+            return makeViewChoice(
+                function(n) {
+                    return self.mailbox.chooseMailView(n);
+                }, "Mail", choice);
+        }
+        var makePersonChoice = function(choice) {
+            return makeViewChoice(
+                function(n) {
+                    return self.mailbox.choosePerson(n);
+                }, "People", choice);
+        }
+
+        self.assertSubjectsAre(["Message 2", "Message 1"]);
+
+        return makeMailViewChoice("All").addCallback(
+            function() {
+                self.assertSubjectsAre(["Archived Message 2",
+                                        "Archived Message 1",
+                                        "Message 2",
+                                        "Message 1"]);
+                return makePersonChoice("Bob");
+        }).addCallback(
+            function() {
+                self.assertSubjectsAre(["Archived Message 2", "Archived Message 1"]);
+                return makeMailViewChoice("Inbox");
+        }).addCallback(
+            function() {
+                self.assertSubjectsAre([]);
+        });
+    });
+
 Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
 Quotient.Test.ComposeController.methods(
     function saveDraft(self, userInitiated) {
