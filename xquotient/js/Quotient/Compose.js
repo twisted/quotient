@@ -172,7 +172,22 @@ Quotient.Compose.Controller.methods(
         self.nodeByAttribute("class", "upload-notification").style.visibility = "";
     },
 
+    /**
+     * Called after the iframe POST completes.  C{d} is a dictionary
+     * obtained from the server, containing information about the file
+     * we uploaded (currently a unique identifier and the filename)
+     *
+     * Using this information, we add a node representing the file to the
+     * user-visible attachment list, and add the unique identifier to the
+     * value of the hidden form field that indicates which files to attach
+     * to the message (this gets modified if the attachment is removed by
+     * the user before the message is sent, etc)
+     */
     function gotFileData(self, d) {
+        if(self.attachDialog.style.display != "none") {
+            self.toggleAttachDialog();
+        }
+
         self.nodeByAttribute("class", "upload-notification").style.visibility = "hidden";
 
         var lis = self.fileList.getElementsByTagName("li");
