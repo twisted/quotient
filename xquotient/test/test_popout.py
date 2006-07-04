@@ -4,25 +4,17 @@ from twisted.internet.defer import maybeDeferred, gatherResults
 from twisted.python.filepath import FilePath
 
 from axiom.store import Store
+from axiom.test.util import getPristineStore
 
 from xquotient.mail import DeliveryAgent
 from xquotient.popout import POP3Up
 
-_theBaseStorePath = None
-def getBaseStorePath(creator):
-    global _theBaseStorePath
-    if _theBaseStorePath is None:
-        s = creator()
-        _theBaseStorePath = s.dbdir
-        s.close()
-    return _theBaseStorePath
-
-
-def createStore(location, messageTexts):
+def createStore(testCase):
+    location = testCase.mktemp()
     s = Store(location)
     da = DeliveryAgent(store=s)
     da.installOn(s)
-    for msgText in messageTexts:
+    for msgText in testCase.messageTexts:
         receiver = da.createMIMEReceiver(u'test://' + location)
         receiver.feedStringNow(msgText)
     POP3Up(store=s).installOn(s)
@@ -49,12 +41,7 @@ class MailboxTestCase(TestCase):
         ]
 
     def setUp(self):
-        self.dbdir = self.mktemp()
-        basePath = getBaseStorePath(
-            lambda: createStore(self.mktemp(),
-                                self.messageTexts))
-        basePath.copyTo(FilePath(self.dbdir))
-        self.store = Store(self.dbdir)
+        self.store = getPristineStore(self, createStore)
         self.mailbox = self.store.findUnique(POP3Up)
 
 

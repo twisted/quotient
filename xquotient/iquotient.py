@@ -2,6 +2,25 @@
 
 from zope.interface import Interface
 
+class IMessageSender(Interface):
+    """
+    B{The} way to send messages from a Quotient account.  Accounts which can
+    send messages will have a powerup for this interface.  Adapt them to it
+    and call the L{sendMessage} method.
+    """
+    def sendMessage(toAddresses, message):
+        """
+        Attempt to send the given message to each of the indicated recipients.
+
+        @param toAddresses: A C{list} of C{unicode} strings representing
+        RFC2822 addresses (note: this interface will change at some point
+        and begin to require structured objects in this list, rather than
+        strings, in order to support forms of message delivery other than
+        SMTP).
+        @param message: The L{exmess.Message} to send.
+        """
+
+
 class IMIMEDelivery(Interface):
     def createMIMEReceiver(source):
         """Create an object to accept a MIME message.
@@ -13,7 +32,6 @@ class IMIMEDelivery(Interface):
 
         @rtype: L{twisted.mail.smtp.IMessage}
         """
-
 
 
 class IHamFilter(Interface):

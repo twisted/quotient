@@ -59,7 +59,6 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(webapp.PrivateApplication).installOn(avatar)
 
         avatar.findOrCreate(mail.DeliveryAgent).installOn(avatar)
-        avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
 
         avatar.findOrCreate(spam.Filter).installOn(avatar)
 

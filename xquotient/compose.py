@@ -14,13 +14,14 @@ from nevow.athena import expose
 from epsilon import extime
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
+from axiom.upgrade import registerUpgrader
 
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform, prefs
 from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
-from xquotient import iquotient, mail, equotient, renderers, mimeutil
+from xquotient import iquotient, equotient, renderers, mimeutil
 from xquotient.exmess import Message
 from xquotient.mimestorage import Header, Part
 
@@ -138,10 +139,10 @@ class _NeedsDelivery(item.Item):
 
 
 class Composer(item.Item, item.InstallableMixin):
-    implements(ixmantissa.INavigableElement)
+    implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     typeName = 'quotient_composer'
-    schemaVersion = 1
+    schemaVersion = 2
 
     installedOn = attributes.reference()
 
@@ -155,6 +156,7 @@ class Composer(item.Item, item.InstallableMixin):
     def installOn(self, other):
         super(Composer, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
+        other.powerUp(self, iquotient.IMessageSender)
 
 
     def getTabs(self):
@@ -213,6 +215,20 @@ class Composer(item.Item, item.InstallableMixin):
         print 'Z' * 50
 
 
+
+def upgradeCompose1to2(oldComposer):
+    """
+    Version 2 of the Composer powers up IMessageSender, which version 1 did
+    not.  Correct that here.
+    """
+    newComposer = oldComposer.upgradeVersion(
+        'quotient_composer', 1, 2,
+        installedOn=oldComposer.installedOn)
+    newComposer.installedOn.powerUp(
+        newComposer, iquotient.IMessageSender)
+    return newComposer
+
+registerUpgrader(upgradeCompose1to2, 'quotient_composer', 1, 2)
 class File(item.Item):
     typeName = 'quotient_file'
     schemaVersion = 1
@@ -535,7 +551,8 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
 
     def endow(self, ticket, avatar):
         avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
-        avatar.findOrCreate(mail.MailTransferAgent).installOn(avatar)
+        from xquotient.mail import MailDeliveryAgent
+        avatar.findOrCreate(MailDeliveryAgent).installOn(avatar)
         avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
         avatar.findOrCreate(Composer).installOn(avatar)
         avatar.findOrCreate(Drafts).installOn(avatar)
