@@ -60,6 +60,8 @@ class QuotientBenefactor(Item):
 
         avatar.findOrCreate(mail.DeliveryAgent).installOn(avatar)
 
+        avatar.findOrCreate(mail.MessageSource)
+
         avatar.findOrCreate(spam.Filter).installOn(avatar)
 
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)

@@ -388,8 +388,6 @@ class MailDeliveryAgent(item.Item, item.InstallableMixin):
     def installOn(self, other):
         super(MailDeliveryAgent, self).installOn(other)
         other.powerUp(self, smtp.IMessageDeliveryFactory)
-        scheduler.IScheduler(self.store).schedule(
-            self.store.findOrCreate(MessageSource), extime.Time())
 
 
     def getMessageDelivery(self):

@@ -193,7 +193,6 @@ class MailTests(unittest.TestCase):
         """
         account = self.login.accountByAddress(u'testuser', u'example.com')
         factory = smtp.IMessageDeliveryFactory(account)
-        print factory
         delivery = factory.getMessageDelivery()
         self.failUnless(smtp.IMessageDelivery.providedBy(delivery))
 

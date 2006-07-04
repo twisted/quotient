@@ -1,5 +1,9 @@
 from twisted.python import usage
-from xquotient import dspam
+
+try:
+    from xquotient import dspam
+except ImportError:
+    dspam = None
 
 from axiom.scripts import axiomatic
 
@@ -12,6 +16,7 @@ class SpamTrain(axiomatic.AxiomaticCommand):
                      ("ham", None, None, "A directory containing non-spam messages, one per file.")]
 
     def postOptions(self):
+        assert dspam is not None, "dspam is not available"
         if not (self['spam'] and self['ham']):
             raise usage.UsageError("Both a ham and a spam mailbox must be specified.")
         dspamDir = self.store.newFilePath('dspam').path
