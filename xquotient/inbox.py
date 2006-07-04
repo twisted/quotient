@@ -485,7 +485,10 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
         """
         self.currentMessage = message
         message.read = True
-        self.nextMessage = self.getMessageBefore(message)
+        next = self.getMessageBefore(message)
+        if next is None:
+            next = self.getMessageAfter(message)
+        self.nextMessage = next
 
     def fastForward(self, webID):
         self.selectMessage(self.translator.fromWebID(webID))
@@ -588,11 +591,10 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
 
     def _moveToNextMessage(self):
         previousMessage = self.currentMessage
-        self.currentMessage = self.nextMessage
+        currentMessage = self.nextMessage
 
-        if self.currentMessage is not None:
-            self.currentMessage.read = True
-            self.nextMessage = self.getMessageAfter(self.currentMessage)
+        if currentMessage is not None:
+            self.selectMessage(currentMessage)
         else:
             self.currentMessage = self.getMessageBefore(previousMessage)
             self.nextMessage = None

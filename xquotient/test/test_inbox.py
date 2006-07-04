@@ -10,6 +10,7 @@ from axiom.scheduler import Scheduler
 
 from xmantissa.ixmantissa import INavigableFragment
 from xmantissa.webapp import PrivateApplication
+from xmantissa.webtheme import getLoader
 
 from xquotient.exmess import Message
 from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, UndeferTask
@@ -270,6 +271,26 @@ class InboxTestCase(TestCase):
         message.deleteFromStore()
         self.assertEquals(s.count(UndeferTask), 0)
 
+    def _setUpInbox(self):
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+
+        msgs = list(Message(store=s,
+                            subject=unicode(str(i)),
+                            spam=False,
+                            receivedWhen=Time(),
+                            sentWhen=Time(),
+                            impl=None)
+                        for i in xrange(5))
+        msgs.reverse()
+
+        self.inboxScreen = InboxScreen(Inbox(store=s))
+        self.msgs = msgs
+
+    def assertMsgSubjectsAre(self, s1, s2):
+        self.assertEquals(self.inboxScreen.currentMessage.subject, s1)
+        self.assertEquals(self.inboxScreen.nextMessage.subject, s2)
+
     def testLookahead(self):
         """
         Test that the one message lookahead feature of the inbox
@@ -280,21 +301,10 @@ class InboxTestCase(TestCase):
         both attributes
         """
 
-        s = Store()
-        PrivateApplication(store=s).installOn(s)
-
-        msgs = list(Message(store=s,
-                            subject=unicode(str(i)),
-                            spam=False,
-                            receivedWhen=Time(),
-                            sentWhen=Time(),
-                            impl=None) for i in xrange(5))
-        msgs.reverse()
-        inboxScreen = InboxScreen(Inbox(store=s))
-
-        def assertMsgSubjectsAre(s1, s2):
-            self.assertEquals(inboxScreen.currentMessage.subject, s1)
-            self.assertEquals(inboxScreen.nextMessage.subject, s2)
+        self._setUpInbox()
+        assertMsgSubjectsAre = self.assertMsgSubjectsAre
+        msgs = self.msgs
+        inboxScreen =self.inboxScreen
 
         # '4' is the newest message
         assertMsgSubjectsAre('4', '3')
@@ -305,5 +315,64 @@ class InboxTestCase(TestCase):
         inboxScreen.selectMessage(msgs[3])
         assertMsgSubjectsAre('1', '0')
         inboxScreen.selectMessage(msgs[4])
+        assertMsgSubjectsAre('0', '1')
+
+    def testLookaheadWithActions(self):
+        """
+        Test that message lookahead is correct when the process
+        of moving from one message to the next is accomplished by
+        eliminating the current message from the active view (e.g.
+        by acting on it), rather than doing it explicitly with
+        selectMessage().  Do this all the way down, until there
+        are no messages left
+        """
+
+        self._setUpInbox()
+        assertMsgSubjectsAre = self.assertMsgSubjectsAre
+        inboxScreen = self.inboxScreen
+
+        # XXX this is a temporary hack.  ideally the methods
+        # we are calling would live on the model, and we wouldn't
+        # need to set up a bunch of rendering junk or whatever
+        # in order to archive a message and progress to the next
+        # message, but they don't, and it's a substantial refactoring.
+        # for now we'll kill the method that does all of the
+        # annoying things
+
+        inboxScreen._current = lambda: None
+
+        assertMsgSubjectsAre('4', '3')
+        inboxScreen.archiveCurrentMessage(advance=True)
+        assertMsgSubjectsAre('3', '2')
+        inboxScreen.archiveCurrentMessage(advance=True)
+        assertMsgSubjectsAre('2', '1')
+        inboxScreen.archiveCurrentMessage(advance=True)
+        assertMsgSubjectsAre('1', '0')
+        inboxScreen.archiveCurrentMessage(advance=True)
         self.assertEquals(inboxScreen.currentMessage.subject, '0')
-        self.failIf(inboxScreen.nextMessage)
+        self.failUnless(inboxScreen.nextMessage is None)
+        inboxScreen.archiveCurrentMessage(advance=True)
+        self.failUnless(inboxScreen.currentMessage is None)
+        self.failUnless(inboxScreen.nextMessage is None)
+
+    def testLookaheadWithActionsLastMessage(self):
+        """
+        Similar to L{testLookaheadWithActions}, but only
+        dismiss the penultimate message, asserting that
+        afterwards, the lookahead correctly points to the
+        pre-penultimate message
+        """
+
+        self._setUpInbox()
+        assertMsgSubjectsAre = self.assertMsgSubjectsAre
+        inboxScreen = self.inboxScreen
+
+        # XXX see comment in L{testLookaheadWithActions}
+
+        inboxScreen._current = lambda: None
+
+        assertMsgSubjectsAre('4', '3')
+        inboxScreen.selectMessage(self.msgs[3])
+        assertMsgSubjectsAre('1', '0')
+        inboxScreen.archiveCurrentMessage(advance=True)
+        assertMsgSubjectsAre('0', '2')
