@@ -14,13 +14,14 @@ from epsilon.extime import Time
 
 from axiom.item import Item, InstallableMixin, transacted
 from axiom import attributes, tags, iaxiom
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, webnav, people
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import ScrollingFragment
 
-from xquotient.exmess import Message
+from xquotient.exmess import Message, getMessageSources, addMessageSource
 from xquotient import mimepart, equotient, compose, renderers
 from xquotient.qpeople import AddPersonFragment
 
@@ -100,11 +101,13 @@ class UndeferTask(Item):
         self.message.read = False
         self.deleteFromStore()
 
+
+
 class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
-    schemaVersion = 1
+    schemaVersion = 2
 
     installedOn = attributes.reference()
 
@@ -155,6 +158,27 @@ class Inbox(Item, InstallableMixin):
 
     def action_train(self, message, spam):
         message.train(spam)
+
+
+
+def upgradeInbox1to2(oldInbox):
+    """
+    Create the extra state tracking items necessary for efficiently determining
+    distinct source addresses.
+    """
+    s = oldInbox.store
+    newInbox = oldInbox.upgradeVersion(
+        'quotient_inbox', 1, 2,
+        installedOn=oldInbox.installedOn,
+        uiComplexity=oldInbox.uiComplexity,
+        catalog=oldInbox.catalog)
+
+    for source in s.query(Message).getColumn("source").distinct():
+        addMessageSource(s, source)
+    return newInbox
+registerUpgrader(upgradeInbox1to2, 'quotient_inbox', 1, 2)
+
+
 
 class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
     """
@@ -432,7 +456,7 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
 
 
     def _accountNames(self):
-        return self.inbox.store.query(Message).getColumn("source").distinct()
+        return getMessageSources(self.inbox.store)
 
     def accountChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('accountChooser')
@@ -519,6 +543,21 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
             if truth:
                 return name
 
+
+    def _updatedViewState(self):
+        """
+        Retrieve state relevant to the view: the number of messages in the
+        current view, the current message body, and the number of messages in
+        the other views.  This is returned as a three-tuple.
+
+        The first two elements are always present but the third element may be
+        None.  This will be the case when it would be too expensive to compute.
+        """
+        return (self.getMessageCount(),
+                self._current(),
+                None) # self.mailViewCounts()
+
+
     def viewByPerson(self, webID):
         if webID is None:
             self.viewingByPerson = None
@@ -527,7 +566,7 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
 
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current(), self.mailViewCounts())
+        return self._updatedViewState()
     expose(viewByPerson)
 
     viewByPerson = transacted(viewByPerson)
@@ -536,7 +575,7 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
         self.viewingByTag = tag
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current(), self.mailViewCounts())
+        return self._updatedViewState()
     expose(viewByTag)
 
     viewByTag = transacted(viewByTag)
@@ -545,7 +584,7 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
         self.viewingByAccount = account
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current(), self.mailViewCounts())
+        return self._updatedViewState()
     expose(viewByAccount)
 
     viewByAccount = transacted(viewByAccount)
@@ -560,7 +599,7 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
         self.changeView(typ)
         self._resetCurrentMessage()
         self._resetScrollQuery()
-        return (self.getMessageCount(), self._current(), self.mailViewCounts())
+        return self._updatedViewState()
     expose(viewByMailType)
 
     viewByMailType = transacted(viewByMailType)

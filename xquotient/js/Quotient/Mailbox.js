@@ -994,7 +994,9 @@ Quotient.Mailbox.Controller.methods(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
                 self.setMessageContent(messageData[1], true);
-                self.updateMailViewCounts(messageData[2]);
+                if (messageData[2] != null) {
+                    self.updateMailViewCounts(messageData[2]);
+                }
                 self.scrollWidget.setViewportHeight(messageData[0]);
                 self.scrollWidget.emptyAndRefill();
                 self.scrollWidget._selectedRow = null;

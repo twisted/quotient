@@ -10,7 +10,38 @@ from nevow.test.test_rend import req
 from nevow import context
 
 from xmantissa.webapp import PrivateApplication
-from xquotient.exmess import Message, PartDisplayer
+from xquotient.exmess import Message, PartDisplayer, addMessageSource, getMessageSources
+
+
+class UtilityTestCase(TestCase):
+    """
+    Test various utilities associated with L{exmess.Message}.
+    """
+    def test_sourceTracking(self):
+        """
+        Test that message sources added with L{addMessageSource} can be
+        retrieved with L{getMessageSources} in alphabetical order.
+        """
+        s = Store()
+        addMessageSource(s, u"one")
+        addMessageSource(s, u"two")
+        addMessageSource(s, u"three")
+        self.assertEquals(
+            list(getMessageSources(s)),
+            [u"one", u"three", u"two"])
+
+
+    def test_distinctSources(self):
+        """
+        Test that any particular message source is only returned once from
+        L{getMessageSources}.
+        """
+        s = Store()
+        addMessageSource(s, u"a")
+        addMessageSource(s, u"a")
+        self.assertEquals(list(getMessageSources(s)), [u"a"])
+
+
 
 class MockPart:
     def __init__(self, filename, body):
@@ -20,6 +51,8 @@ class MockPart:
 
     def getBody(self, decode):
         return self.body
+
+
 
 class PartItem(Item):
     typeName = 'xquotient_test_part_item'
@@ -40,6 +73,8 @@ class PartItem(Item):
         assert self.body is not None
         return self.body
 
+
+
 class MessageTestCase(TestCase):
     def testDeletion(self):
         s = Store()
@@ -58,6 +93,8 @@ class MessageTestCase(TestCase):
 
         self.assertEqual(zf.read('foo.bar'), 'XXX')
         self.assertEqual(zf.read('bar.baz'), 'YYY')
+
+
 
 class WebTestCase(TestCase):
     def testPartDisplayerScrubs(self):

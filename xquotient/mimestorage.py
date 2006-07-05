@@ -501,7 +501,11 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         else:
             self.message.sender = self.message.senderDisplay = u'<No Sender>'
 
+        # XXX These next two things should really happen together, but that
+        # would be a lot harder. -exarkun
         self.message.source = self.source
+        exmess.addMessageSource(self.store, self.source)
+
         log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1, userstore=self.store)
         self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r

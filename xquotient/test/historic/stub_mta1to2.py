@@ -1,4 +1,4 @@
-# -*- test-case-name xquotient.test.test_historic.test_mta1to2 -*-
+# -*- test-case-name: xquotient.test.historic.test_mta1to2 -*-
 
 """
 Create stub database for upgrade of L{xquotient.mail.MailTransferAgent} from

@@ -60,6 +60,44 @@ class _TrainingInstruction(item.Item):
 _TrainingInstructionSource = batch.processor(_TrainingInstruction)
 
 
+
+class _DistinctMessageSourceValue(item.Item):
+    """
+    Stateful tracking of distinct values for L{Message.source}.
+    """
+
+    value = attributes.text(doc="""
+    The distinct value this item represents.
+    """, indexed=True)
+
+
+
+def addMessageSource(store, source):
+    """
+    Register a message source.  Distinct values passed to this function will be
+    available from the L{getMessageSources} function.
+
+    @type source: C{unicode}
+    @param source: A short string describing the origin of a message.  This is
+    typically a value from the L{Message.source} attribute.
+    """
+    store.findOrCreate(_DistinctMessageSourceValue, value=source)
+
+
+
+def getMessageSources(store):
+    """
+    Retrieve distinct message sources known by the given database.
+
+    @return: A L{axiom.store.ColumnQuery} sorted lexicographically ascending of
+    message sources.  No message source will appear more than once.
+    """
+    return store.query(
+        _DistinctMessageSourceValue,
+        sort=_DistinctMessageSourceValue.value.ascending).getColumn("value")
+
+
+
 # The big kahuna.  This, along with some kind of Person object, is the
 # core of Quotient.
 
@@ -72,6 +110,8 @@ class Message(item.Item):
     source = attributes.text(doc="""
     A short string describing the means by which this Message came to exist.
     For example, u'mailto:alice@example.com' or u'pop3://bob@example.net'.
+
+    If you set this, you must call L{addMessageSource}.
     """)
 
     sentWhen = attributes.timestamp()
@@ -130,6 +170,8 @@ class Message(item.Item):
     # Inbox view
     attributes.compoundIndex(trash, draft, deferred, outgoing, archived, spam, receivedWhen)
 
+    # Unread message count
+    attributes.compoundIndex(trash, draft, deferred, outgoing, archived, spam, read)
 
     def activate(self):
         self._prefs = None
