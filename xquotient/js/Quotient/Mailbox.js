@@ -891,6 +891,8 @@ Quotient.Mailbox.Controller.methods(
             self.hideAll(self._getContentTableColumn(0));
             self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
+            /* use the default font-size, because complexity 1
+               is the default complexity. */
             fontSize = "";
         } else if(c == 2) {
             self.hideAll(self._getContentTableColumn(0));
@@ -907,6 +909,10 @@ Quotient.Mailbox.Controller.methods(
             var messageBody = self.firstWithClass(self.messageDetail, "message-body");
             messageBody.style.fontSize = fontSize;
         } catch(e) {}
+
+        /* store this for next time we load a message
+           in this complexity level */
+        self.fontSize = fontSize;
     },
 
     /**
@@ -1795,15 +1801,21 @@ Quotient.Mailbox.Controller.methods(
 
         self.currentMessageData = currentMessageData;
 
-        Divmod.msg("setMessageContent(" + currentMessageData.toSource() + ")");
+        Divmod.msg("setMessageContent(" +
+                   currentMessageData.toSource() +
+                   ")");
 
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
 
         Divmod.Runtime.theRuntime.setNodeContent(
-            self.messageDetail, '<div xmlns="http://www.w3.org/1999/xhtml">' + currentMessageDisplay + '</div>');
+            self.messageDetail,
+            ('<div xmlns="http://www.w3.org/1999/xhtml">' +
+             currentMessageDisplay +
+             '</div>'));
 
         var modifier, spamConfidence;
+
         if (currentMessageData.trained) {
             spamConfidence = 'definitely';
         } else {
@@ -1815,24 +1827,43 @@ Quotient.Mailbox.Controller.methods(
             modifier = 'not';
         }
 
-
         if(!self.spamButton) {
-            self.spamButton = self.firstWithClass(self.messageActions[1], "spam-state");
+            self.spamButton = self.firstWithClass(
+                                self.messageActions[1],
+                                "spam-state");
         }
 
-        Divmod.Runtime.theRuntime.setNodeContent(self.spamButton,
-                                                 '<span xmlns="http://www.w3.org/1999/xhtml">' +
-                                                 spamConfidence + ' ' + modifier +
-                                                 '</span>');
+        Divmod.Runtime.theRuntime.setNodeContent(
+            self.spamButton,
+            ('<span xmlns="http://www.w3.org/1999/xhtml">' +
+             spamConfidence + ' ' + modifier +
+             '</span>'));
 
         if (nextMessagePreview != null) {
             if(!self.nextMessagePreview) {
                 self.nextMessagePreview = self.firstWithClass(
-                                            self.contentTableGrid[0][2], "next-message-preview");
+                                            self.contentTableGrid[0][2],
+                                            "next-message-preview");
             }
             /* so this is a message, not a compose fragment */
             Divmod.Runtime.theRuntime.setNodeContent(
-                self.nextMessagePreview, '<div xmlns="http://www.w3.org/1999/xhtml">' + nextMessagePreview + '</div>');
+                self.nextMessagePreview,
+                ('<div xmlns="http://www.w3.org/1999/xhtml">' +
+                 nextMessagePreview +
+                 '</div>'));
             self.highlightExtracts();
         }
+
+        /* if this is the "no more messages" pseudo-message,
+           then there won't be any message body */
+        try {
+            var messageBody = self.firstWithClass(
+                                self.messageDetail,
+                                "message-body");
+        } catch(e) {
+            return;
+        }
+        /* set the font size to the last value used in
+           _setComplexityVisibility() */
+        messageBody.style.fontSize = self.fontSize;
     })
