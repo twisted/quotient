@@ -1,3 +1,8 @@
+0.1.7 (2006-07-08):
+  - Fixed issue where switching messages in complexity 2 or 3 would reset the 
+    message body font size to the complexity 1 size.
+  - Fixed broken upgrader from last release.
+
 0.1.6 (2006-07-05):
   - UI for attachments has been improved.
   - HTML scrubbing and a "view original HTML" feature have been added.
