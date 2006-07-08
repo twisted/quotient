@@ -1,3 +1,15 @@
+0.1.6 (2006-07-05):
+  - UI for attachments has been improved.
+  - HTML scrubbing and a "view original HTML" feature have been added.
+  - SMTP relaying for authenticated users is now supported.
+  - Archiving the last message now loads the previous message properly.
+  - Message counts are now calculated much faster.
+  - Use Nevow's new Element class instead of Fragment.
+  
+0.1.5 (2006-06-29):
+  - Fixed a bug causing the displayed message to be different from the 
+    highlighted message in the scrolltable.
+
 0.1.4 (2006-06-26):
   - Initial mailbox rendering and scrolling through messages has been sped up.
 
