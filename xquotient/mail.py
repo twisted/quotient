@@ -294,7 +294,8 @@ def upgradeMailTransferAgent1to2(oldMTA):
     stores}.  Delete it from user stores and create a MailDelivery agent
     there, but leave it alone on the site store.
     """
-    if oldMTA.store.parent is None:
+    loginSystem = oldMTA.store.findUnique(userbase.LoginSystem, default=None)
+    if loginSystem is not None:
         newMTA = oldMTA.upgradeVersion(
             'mantissa_mta', 1, 2,
             messageCount=oldMTA.messageCount,
