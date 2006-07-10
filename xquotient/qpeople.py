@@ -50,13 +50,12 @@ class AddPersonFragment(people.AddPersonFragment):
 
     def getPersonHTML(self):
         # come up with a better way to identify people.
-        # i kind of hate that we have to do this at all, it's really, really ugly.
-        # once we have some kind of history thing set up, we should just
-        # reload the page instead of dousing ourselves with petrol
-        # and jumping through flaming hoops
+        # i kind of hate that we have to do this at all,
+        # it's really, really ugly.  once we have some
+        # kind of history thing set up, we should just
+        # reload the page.
         assert self.lastPerson is not None
-        personFrag = people.PersonFragment(self.lastPerson)
-        return unicode(flatten(personFrag), 'utf-8')
+        return people.PersonFragment(self.lastPerson)
     expose(getPersonHTML)
 
 

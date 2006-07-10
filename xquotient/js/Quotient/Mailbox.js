@@ -101,7 +101,9 @@ Quotient.Mailbox.MessageDetail.methods(
 
         if(0 < gotTags.length) {
             self.tagsDisplay.firstChild.nodeValue = gotTags.join(", ");
-            self.widgetParent.addTagsToViewSelector(tagsToAdd);
+            if(self.widgetParent) {
+                self.widgetParent.addTagsToViewSelector(tagsToAdd);
+            }
         } else {
             self.tagsDisplay.firstChild.nodeValue = "No Tags";
         }

@@ -23,7 +23,6 @@ from xmantissa.scrolltable import ScrollingFragment
 
 from xquotient.exmess import Message, getMessageSources, addMessageSource
 from xquotient import mimepart, equotient, compose, renderers
-from xquotient.qpeople import AddPersonFragment
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
 
@@ -329,16 +328,6 @@ class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
         return tag[confidence + ' ' + modifier]
     renderer(spamState)
 
-
-    def addPersonFragment(self, request, tag):
-        # the person form is a fair amount of html,
-        # so we'll only include it once
-
-        self.addPersonFragment = AddPersonFragment(self.inbox)
-        self.addPersonFragment.setFragmentParent(self)
-        self.addPersonFragment.docFactory = getLoader(self.addPersonFragment.fragmentName)
-        return self.addPersonFragment
-    renderer(addPersonFragment)
 
     def _getScrolltableComparison(self):
         if self.currentMessage is not None:

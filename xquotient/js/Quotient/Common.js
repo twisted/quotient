@@ -8,7 +8,7 @@ Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
  * @return: array of values that appear in a1 and not a2
  * @param a1: array with no duplicate elements
  * @param a2: array
- * 
+ *
  * difference([1,2,3], [1,4,6]) => [2,3]
  */
 Quotient.Common.Util.difference = function(a1, a2) {
@@ -117,7 +117,7 @@ Quotient.Common.SenderPerson.methods(
             parts["lastname"]  = split[1];
         } else if(name.match(/@/)) {
             parts["firstname"] = name.split(/@/, 2)[0];
-        } else { 
+        } else {
             parts["firstname"] = name;
         }
 
@@ -161,7 +161,7 @@ Quotient.Common.SenderPerson.methods(
             }
 
             e = _event.target;
-            if(e.tagName == "INPUT") {
+            if(e.tagName && e.tagName.toLowerCase() == "input") {
                 return true;
             }
             while(e && e.id != self.addPersonFragment.id) {

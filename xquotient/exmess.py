@@ -403,6 +403,13 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     def head(self):
         return None
 
+    def render_addPersonFragment(self, ctx, data):
+        from xquotient.qpeople import AddPersonFragment
+        frag = AddPersonFragment(self.original)
+        frag.setFragmentParent(self)
+        frag.docFactory = getLoader(frag.fragmentName)
+        return frag
+
     def render_tags(self, ctx, data):
         """
         @return: Sequence of tag names that have been assigned to the
