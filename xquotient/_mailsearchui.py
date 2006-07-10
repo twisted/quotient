@@ -39,11 +39,10 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
             (exmess.Message.senderDisplay,
              exmess.Message.subject,
              exmess.Message.receivedWhen,
-             exmess.Message.read,
-             exmess.Message.sentWhen,
-             exmess.Message.attachments),
+             exmess.Message.read),
             defaultSortColumn=exmess.Message.receivedWhen,
             defaultSortAscending=False)
+        f.jsClass = u'Quotient.Search.SearchResults'
         f.setFragmentParent(self)
         f.docFactory = webtheme.getLoader(f.fragmentName)
         return f
