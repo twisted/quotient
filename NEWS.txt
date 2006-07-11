@@ -1,3 +1,8 @@
+0.1.8 (2006-07-11):
+  - New design for message detail.
+  - Person-adding works from message detail now.
+  - Search UI made to look better.
+  
 0.1.7 (2006-07-08):
   - Fixed issue where switching messages in complexity 2 or 3 would reset the 
     message body font size to the complexity 1 size.
