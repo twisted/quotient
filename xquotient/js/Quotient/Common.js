@@ -194,8 +194,22 @@ Quotient.Common.SenderPerson.methods(
 
 Quotient.Common.CollapsiblePane = {};
 
-Quotient.Common.CollapsiblePane.toggle = function(element, prefix) {
-    var body = Nevow.Athena.FirstNodeByAttribute(element.parentNode, 'class', 'pane-body');
+/**
+ * Toggle the visibility of the collapsible pane whose expose arrow is
+ * C{element}.  If C{prefix} is provided, it will be prepended to the
+ * image filenames "outline-expanded.png" and "outline-collapsed.png"
+ * which are used to source the expose arrow image for the expanded
+ * and collapsed states.  C{parent} points to the closest element that
+ * contains both the expose arrow and the contents of the pane
+ */
+Quotient.Common.CollapsiblePane.toggle = function(element,
+                                                  prefix/*=''*/,
+                                                  parent/*=element.parentNode*/) {
+
+    var body = Nevow.Athena.FirstNodeByAttribute(
+                    parent || element.parentNode,
+                    'class',
+                    'pane-body');
     var img = null;
     if(typeof(prefix) == 'undefined') {
         prefix = '';

@@ -200,6 +200,11 @@
                           reply
                         </a>
                       </nevow:invisible>
+                      <nevow:invisible nevow:render="button">
+                        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).printable(); return false">
+                          print
+                        </a>
+                      </nevow:invisible>
                       <div style="height: 2px; clear: both">&#160;</div>
                       <form style="display: none" class="defer-form"
                         onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">

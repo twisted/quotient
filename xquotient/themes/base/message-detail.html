@@ -8,55 +8,53 @@
   </div>
 
   <div nevow:render="headerPanel" class="header-panel">
-    <table style="width: 100%">
-      <tr valign="top">
-        <td>
-          <div style="font-size: 1.3em; font-weight: bold"><nevow:slot name="subject" /></div>
-        </td>
-        <td align="right" style="white-space: nowrap">
-          <nevow:slot name="sent" />
-        </td>
-      </tr>
-    </table>
+    <div class="msg-detail-sent-date"><nevow:slot name="sent" /></div>
 
     <div class="sender-container">
       <nevow:slot name="sender" />
       <nevow:slot name="cc" />
     </div>
 
-    <div class="tags-container" style="clear: left">
-      <table>
-        <tr>
-          <td>
-            <b>Tags</b>:
-          </td>
-          <td>
-            <span class="tags-display-container"
-              ><span class="tags-display"
-                ><nevow:invisible nevow:render="tags" /></span>
-              (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).editTags(); return false">Edit</a>)
-            </span>
+    <table style="clear: both; width: 100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="msg-detail-field-name">Subject:</td>
+        <td class="msg-subject msg-detail-field-body"><nevow:slot name="subject" /></td>
+      </tr>
+      <tr>
+        <td class="msg-detail-field-name">To:</td>
+        <td class="msg-detail-field-body"><nevow:slot name="recipient" /></td>
+      </tr>
+      <tr>
+        <td class="msg-detail-field-name">Tags:</td>
+        <td class="tags-container">
+          <span class="tags-display-container"
+            ><span class="tags-display"
+              ><nevow:invisible nevow:render="tags" /></span>
+            (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).editTags(); return false">Edit</a>)
+          </span>
 
-            <form style="display: none;" class="edit-tags-container"
-              onsubmit="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">
-              <input class="add-tags-dialog-text-input" type="text" name="tags" size="38" />
-              <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">Save</a>
-              <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
-            </form>
-          </td>
-        </tr>
-      </table>
-    </div>
-    <nevow:invisible nevow:render="attachmentPanel" />
-    <div style="clear: both">&#160;</div>
+          <form style="display: none" class="edit-tags-container"
+            onsubmit="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">
+            <input class="add-tags-dialog-text-input" type="text" name="tags" size="38" />
+            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">Save</a>
+            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
+          </form>
+        </td>
+      </tr>
+      <nevow:invisible nevow:render="attachmentPanel" />
+    </table>
+
     <nevow:invisible nevow:render="scrubbedDialog" />
   </div>
 
   <div class="message-body" nevow:render="messageBody">
     <nevow:slot name="paragraphs" />
   </div>
+
   <nevow:invisible nevow:render="imagePanel" />
+
   <div class="message-source-container">
     <nevow:invisible nevow:render="messageSourceLink" />
   </div>
+
 </div>

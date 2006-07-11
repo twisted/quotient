@@ -4,6 +4,31 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     margin-right: 4px;
 }
 
+.msg-detail-sent-date {
+    padding-right: 4px;
+    float: right;
+}
+
+.msg-detail-field-name {
+    color: #CCCCCC;
+    font-weight: bold;
+    padding-right: 6px;
+    text-align: right;
+    font-size: 1.2em;
+}
+
+.msg-subject {
+    font-weight: bold;
+}
+
+.msg-detail-field-body, .tags-container {
+    white-space: nowrap;
+}
+
+.msg-detail-field-body {
+    width: 100%;
+}
+
 .attach-dialog {
     position: absolute;
     background-color: #FFFFFF;
@@ -125,7 +150,7 @@ ul.file-list, ul.file-list li {
 }
 
 .header-panel {
-    margin-bottom: 14px;
+    margin-bottom: 6px;
     border-bottom: solid 1px #CACACA;
 }
 
@@ -141,11 +166,8 @@ ul.file-list, ul.file-list li {
 }
 
 .sender-container {
-    background-color: #FFFFFF;
-    padding: 4px;
     margin: 4px;
     float: left;
-    border: solid 2px #ECF0DA;
 }
 
 .loading {
@@ -596,6 +618,7 @@ img.thumbnail { border: none; }
     font-family: monospace;
     font-size: 1.6em;
     padding-top: 2px;
+    padding-right: 6px;
 }
 
 .attachment, .image-attachment {

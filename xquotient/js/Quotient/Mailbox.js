@@ -34,12 +34,12 @@ Quotient.Mailbox.MessageDetail.methods(
 
     /**
      * Open a window that contains a printable version of
-     * the Message pointed to by the given link
+     * the current message
      *
      * @param node: an <a>
      */
-    function printable(self, node) {
-        window.open(node.href);
+    function printable(self) {
+        window.open(self.firstNodeByAttribute("class", "printable-link").href);
     },
 
     /**
@@ -207,7 +207,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var data = [MochiKit.Base.filter(null, cells)];
         if(0 < rowData["attachments"]) {
-            data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.gif",
+            data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
                                         "style": "float: right; border: none"}));
         }
         return MochiKit.DOM.A(
@@ -1789,6 +1789,15 @@ Quotient.Mailbox.Controller.methods(
             messageBody.removeChild(elem);
             i += j;
         }
+    },
+
+    /** Fragment-boundary-crossing proxy for
+     * L{Quotient.Mailbox.MessageDetail.printable}
+     */
+    function printable(self) {
+        Quotient.Mailbox.MessageDetail.get(
+            self.firstWithClass(
+                self.messageDetail, "message-detail-fragment")).printable();
     },
 
     /**
