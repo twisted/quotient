@@ -133,11 +133,15 @@ class MessageList(rend.Fragment):
                 patt = msgpatt
             else:
                 patt = newpatt
+            if not m.subject or m.subject.isspace():
+                subject = '<no subject>'
+            else:
+                subject = m.subject
 
             url = wt.linkTo(m.storeID)
             content.append(dictFillSlots(patt,
                                          dict(sender=link(url, sender),
-                                              subject=link(url, m.subject),
+                                              subject=link(url, subject),
                                               date=link(url, m.receivedWhen.asHumanly()))))
 
         if 0 < len(content):

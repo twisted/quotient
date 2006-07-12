@@ -3,19 +3,21 @@ from twisted.python.filepath import FilePath
 
 from epsilon.extime import Time
 
-from nevow import loaders, tags, athena, context
+from nevow import loaders, tags, athena, context, rend
 from nevow.test.test_rend import req as makeRequest
 
 from axiom.store import Store
 
 from xmantissa.webapp import PrivateApplication
 from xmantissa.webtheme import getLoader
+from xmantissa.people import Person, EmailAddress
 
 from xquotient.exmess import Message, MessageDetail
 from xquotient.inbox import Inbox, InboxScreen
 from xquotient.compose import Composer
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
+from xquotient.qpeople import MessageList, MessageLister
 
 
 def makeMessage(receiver, parts, impl):
@@ -107,14 +109,17 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
     def renderLivePage(self, res, topLevelContext=context.WebContext):
         """
-        Render the given resource.  Return a Defered which fires when it has
+        Render the given resource.  Return a Deferred which fires when it has
         rendered.
         """
-
-        D = res.renderHTTP(
-                  topLevelContext(
-                      tag=res, parent=context.RequestContext(tag=makeRequest())))
+        D = self.renderPage(res, topLevelContext)
         return D.addCallback(lambda x: (res._messageDeliverer.close(), x)[1])
+
+
+    def renderPage(self, res, topLevelContext=context.WebContext):
+        return res.renderHTTP(
+                    topLevelContext(
+                        tag=res, parent=context.RequestContext(tag=makeRequest())))
 
 
     def test_messageRendering(self):
@@ -147,3 +152,25 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         return self.renderLivePage(
                     self.wrapFragment(
                         InboxScreen(inbox)))
+
+    def test_peopleMessageListRendering(self):
+        mlister = MessageLister(store=self.store)
+        mlister.installOn(self.store)
+
+        p = Person(store=self.store,
+                   name=u'Bob')
+
+        EmailAddress(store=self.store,
+                     person=p,
+                     address=u'bob@internet')
+
+        for i in xrange(5):
+            Message(store=self.store,
+                    subject=unicode(str(i)),
+                    receivedWhen=Time(),
+                    spam=False,
+                    sender=u'bob@internet')
+
+
+        self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
+        return self.renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
