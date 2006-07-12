@@ -6,11 +6,98 @@
 
 Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
                                                 'Quotient.Compose.DraftListScrollingWidget');
+function getScrollerWidth() {
+    var scr = null;
+    var inn = null;
+    var wNoScroll = 0;
+    var wScroll = 0;
+
+    // Outer scrolling div
+    scr = document.createElement('div');
+    scr.style.position = 'absolute';
+    scr.style.top = '-1000px';
+    scr.style.left = '-1000px';
+    scr.style.width = '100px';
+    scr.style.height = '50px';
+    // Start with no scrollbar
+    scr.style.overflow = 'hidden';
+
+    // Inner content div
+    inn = document.createElement('div');
+    inn.style.width = '100%';
+    inn.style.height = '200px';
+
+    // Put the inner div in the scrolling div
+    scr.appendChild(inn);
+    // Append the scrolling div to the doc
+    document.body.appendChild(scr);
+
+    // Width of the inner div sans scrollbar
+    wNoScroll = inn.offsetWidth;
+    // Add the scrollbar
+    scr.style.overflow = 'auto';
+    // Width of the inner div width scrollbar
+    wScroll = inn.offsetWidth;
+
+    // Remove the scrolling div from the doc
+    document.body.removeChild(
+        document.body.lastChild);
+
+    // Pixel width of the scroller
+    return (wNoScroll - wScroll);
+}
 
 Quotient.Compose.DraftListScrollingWidget.methods(
     function __init__(self, node) {
         self.columnAliases = {"sentWhen": "Date"};
+        self.columnWidths = {"recipient": "70%",
+                             "sentWhen": "10%",
+                             "subject": "20%"};
         Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node);
+    },
+
+    function cellWidth(self, k) {
+        var rowdata = {};
+        rowdata[k] = "";
+        var cell = self.makeCellElement(k, rowdata);
+        self._scrollContent.appendChild(cell);
+        var w = cell.clientWidth - 16;
+        self._scrollContent.removeChild(cell);
+        return w;
+    },
+
+    function proportionalToFixed(self, widths) {
+        var stretchcol, width;
+        var result = {}, total = 0,
+            innerWidth = self._scrollViewport.clientWidth;
+
+        for(var k in widths) {
+            width = widths[k];
+            if(width == "100%") {
+                stretchcol = k;
+            } else if(width.slice(width.length-1) != "%") {
+                total += result[k] = parseInt(width);
+            } else {
+                total += result[k] = self.cellWidth(k); /* Math.floor((parseInt(width) / 100) * innerWidth); */
+            }
+        }
+        if(stretchcol) {
+            result[stretchcol] = innerWidth - total;
+        }
+        for(k in result) {
+            result[k] = result[k] + "px";
+        }
+        return result;
+    },
+
+    function setProportionalWidth(self, colnames) {
+        self.columnWidths = self.proportionalToFixed(self.columnWidths);
+    },
+
+    function _createRowHeaders(self, columnNames) {
+        self.setProportionalWidth(columnNames);
+        Quotient.Compose.DraftListScrollingWidget.upcall(
+            self, "_createRowHeaders", columnNames);
     },
 
     function massageColumnValue(self, columnName, columnType, columnValue) {
