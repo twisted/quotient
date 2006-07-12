@@ -231,7 +231,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
         var ALL_WHITESPACE = /^\s*$/;
         if(name == "subject" && ALL_WHITESPACE.test(res)) {
-            res = "<Empty Subject>";
+            res = "<no subject>";
         }
         return res;
     },
