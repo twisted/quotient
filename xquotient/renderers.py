@@ -26,9 +26,12 @@ class ButtonRenderingMixin:
     def button(self, request, tag):
         if self._buttonPattern is None:
             self._buttonPattern = inevow.IQ(getLoader('button')).patternGenerator('button')
+        # take the contents of the tag and stuff it inside the button pattern,
+        # and copy over any attributes
 
-        # take the contents of the tag and stuff it inside the button pattern
-        return self._buttonPattern.fillSlots('content', tag.children)
+        button = self._buttonPattern()
+        button.attributes.update(tag.attributes)
+        return button.fillSlots('content', tag.children)
     page.renderer(button)
 
     def render_button(self, ctx, data):

@@ -136,10 +136,10 @@
                           </select>
                         </td>
                         <td>
-                          <nevow:invisible nevow:render="button">
-                            <a href="#"
-                              onclick="Quotient.Mailbox.Controller.get(this).changeBatchSelection(); return false"
-                              class="selection-perform">select</a>
+                          <nevow:invisible nevow:render="button"
+                            onclick="Quotient.Mailbox.Controller.get(this).changeBatchSelection(); return false"
+                            href="#">
+                            select
                           </nevow:invisible>
                         </td>
                       </tr>
@@ -167,17 +167,17 @@
                       <!-- button renderer will place the contents of the tag inside the
                       "content" slot of an instance of the "button" template pattern -->
                       <span class="archive-button">
-                        <nevow:invisible nevow:render="button">
-                          <a href="#" onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false">
-                            archive
-                          </a>
+                        <nevow:invisible nevow:render="button"
+                          onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
+                          href="#">
+                          archive
                         </nevow:invisible>
                       </span>
                       <span class="delete-button">
-                        <nevow:invisible nevow:render="button">
-                          <a href="#" onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false">
-                            delete
-                          </a>
+                        <nevow:invisible nevow:render="button"
+                          onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false"
+                          href="#">
+                          delete
                         </nevow:invisible>
                       </span>
                       <span class="defer-button">
@@ -190,20 +190,20 @@
                           <option>other...</option>
                         </select>
                       </span>
-                      <nevow:invisible nevow:render="button">
-                        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false">
-                          forward
-                        </a>
+                      <nevow:invisible nevow:render="button"
+                        onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
+                        href="#">
+                        forward
                       </nevow:invisible>
-                      <nevow:invisible nevow:render="button">
-                        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false">
-                          reply
-                        </a>
+                      <nevow:invisible nevow:render="button"
+                        onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
+                        href="#">
+                        reply
                       </nevow:invisible>
-                      <nevow:invisible nevow:render="button">
-                        <a href="#" onclick="Quotient.Mailbox.Controller.get(this).printable(); return false">
-                          print
-                        </a>
+                      <nevow:invisible nevow:render="button"
+                        onclick="Quotient.Mailbox.Controller.get(this).printable(); return false"
+                        href="#">
+                        print
                       </nevow:invisible>
                       <div style="height: 2px; clear: both">&#160;</div>
                       <form style="display: none" class="defer-form"
@@ -271,11 +271,12 @@
                       <option value="train-spam">Train Spam</option>
                     </select>
                   </td>
-                  <td>
-                    <nevow:invisible nevow:render="button">
-                      <a style="opacity: .3; cursor: default" href="#"
-                        onclick="return false" class="group-action-perform"
-                        >perform</a>
+                  <td class="group-action-perform">
+                    <nevow:invisible nevow:render="button"
+                      style="opacity: 0.3; cursor: default"
+                      onclick="return false"
+                      href="#">
+                      perform
                     </nevow:invisible>
                   </td>
                 </tr>
@@ -285,13 +286,15 @@
           <td class="right-block-footer">
             <div class="message-actions" style="visibility: hidden; padding-top: 4px">
               <span class="train-spam-button">
-                <nevow:invisible nevow:render="button">
-                  <a href="#"><athena:handler event="onclick" handler="trainSpam" />This Is Spam</a>
+                <nevow:invisible nevow:render="button" href="#">
+                  <athena:handler event="onclick" handler="trainSpam" />
+                  This Is Spam
                 </nevow:invisible>
               </span>
               <span class="train-ham-button" style="display: none">
-                <nevow:invisible nevow:render="button">
-                  <a href="#"><athena:handler event="onclick" handler="trainHam" />Not Spam</a>
+                <nevow:invisible nevow:render="button" href="#">
+                  <athena:handler event="onclick" handler="trainHam" />
+                  Not Spam
                 </nevow:invisible>
               </span>
               <div style="float: right; margin-right: 2px">

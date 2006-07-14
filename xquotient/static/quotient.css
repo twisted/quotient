@@ -204,6 +204,10 @@ select.defer, table.button {
     margin-right: 4px;
 }
 
+a.button-container:link, a.button-container:visited, a.button-container:active {
+    color: #FFFFFF;
+}
+
 table.button {
     table-layout: fixed;
 }
