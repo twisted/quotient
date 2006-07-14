@@ -115,7 +115,7 @@ class ParagraphRenderer:
                     p.fillSlots('quote-class', qc)
                     yield p
                 else:
-                    yield c
+                    yield SpacePreservingStringRenderer(c)
 
         self.pattern.fillSlots('content', walkParagraph(self.paragraph))
         return self.pattern

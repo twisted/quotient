@@ -58,3 +58,10 @@ class RenderersTestCase(TestCase):
             self.assertEqual(div.firstChild().nodeValue.strip(), str(i + 1))
 
         self.assertEqual(i, 3)
+
+    def testParagraphRendererPreservesWhitespace(self):
+        self.assertEqual(
+            renderPlainFragment(
+                renderers.ParagraphRenderer(
+                    mimepart.FixedParagraph.fromString('  foo'))).strip(),
+            '&#160; foo')
