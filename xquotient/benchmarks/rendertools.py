@@ -4,12 +4,19 @@
 Simpler Nevow-related rendering helpers for Quotient benchmarks.
 """
 
+from nevow.rend import Page
 from nevow.athena import LivePage
 from nevow.loaders import stan
 from nevow.testutil import FakeRequest
 from nevow.context import WovenContext
 from nevow.inevow import IRequest
 
+
+def _makeContext():
+    request = FakeRequest()
+    context = WovenContext()
+    context.remember(request, IRequest)
+    return (request, context)
 
 def render(fragment):
     """
@@ -26,9 +33,17 @@ def render(fragment):
     """
     page = LivePage(docFactory=stan(fragment))
     fragment.setFragmentParent(page)
-    request = FakeRequest()
-    context = WovenContext()
-    context.remember(request, IRequest)
+    (request, context) = _makeContext()
     page.renderHTTP(context)
     page.action_close(context)
+    return request.v
+
+def renderPlainFragment(fragment):
+    """
+    same as L{render}, but expects an L{nevow.rend.Fragment} or any
+    other L{nevow.inevow.IRenderer}
+    """
+    page = Page(docFactory=stan(fragment))
+    (request, context) = _makeContext()
+    page.renderHTTP(context)
     return request.v

@@ -41,7 +41,7 @@
     onclick="Quotient.Mailbox.MessageDetail.get(this).printable(this); return false"
     ><nevow:attr name="href"><nevow:slot name="link" /></nevow:attr></a>
 
-  <nevow:invisible nevow:render="paragraph">
+  <nevow:invisible nevow:pattern="paragraphs">
     <div class="text-paragraph" nevow:pattern="paragraph">
       <nevow:attr name="class"><nevow:slot name="quote-class" /></nevow:attr>
       <nevow:slot name="content" />

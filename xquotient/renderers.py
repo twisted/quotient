@@ -1,6 +1,6 @@
-# -*- test-case-name: I DO NOT HAVE ANY UNIT TESTS OH NO OH NO OH NO -*-
+# -*- test-case-name: xquotient.test.test_renderers -*-
 
-from itertools import imap
+from itertools import imap, cycle
 
 from zope.interface import implements
 
@@ -76,9 +76,7 @@ class SpacePreservingStringRenderer(object):
 
     intersperse = staticmethod(intersperse)
 
-quoteClasses = ('quote-one', 'quote-two', 'quote-three')
-
-class ParagraphRenderer(rend.Fragment):
+class ParagraphRenderer:
     """
     slot content: filled with the content of this paragraph.
 
@@ -91,33 +89,33 @@ class ParagraphRenderer(rend.Fragment):
         slot color: The CSS color to use for this paragraph, pulled
             from the quoteColors list.
     """
+    implements(inevow.IRenderer)
+    quoteClasses = ('quote-one', 'quote-two', 'quote-three')
 
-    def __init__(self, original):
-        rend.Fragment.__init__(self, original,
-                                getLoader('message-detail-patterns'))
+    def __init__(self, paragraph):
+        self.paragraph = paragraph
+        self.pattern = inevow.IQ(getLoader('message-detail-patterns')).onePattern('paragraphs')
 
-    def render_paragraph(self, context, data):
-        def render_children(context, data):
-            paraPattern = inevow.IQ(context).patternGenerator('paragraph')
+    def rend(self, ctx, data):
+        paragraphPattern = inevow.IQ(self.pattern).patternGenerator('paragraph')
+        quoteClass = cycle(self.quoteClasses).next
 
-            for child in self.original.children:
-                if isinstance(child, (str, unicode)):
-                    yield SpacePreservingStringRenderer(child)
-                elif isinstance(child, stan.Tag): # argh
-                    yield child
-                else:
-                    if hasattr(child, 'depth') and 0 < child.depth:
-                        qc = quoteClasses[child.depth % len(quoteClasses)]
+        def walkParagraph(paragraph):
+            for c in paragraph.children:
+                if hasattr(c, 'depth'):
+                    if 0 < c.depth:
+                        qc = quoteClass()
                     else:
                         qc = 'no-quote'
+                    p = paragraphPattern()
+                    p.fillSlots('content', walkParagraph(c))
+                    p.fillSlots('quote-class', qc)
+                    yield p
+                else:
+                    yield c
 
-                    childPara = paraPattern()
-                    childPara.fillSlots('content', ParagraphRenderer(child))
-                    childPara.fillSlots('quote-class', qc)
-                    yield childPara
-
-        context.fillSlots('content', render_children)
-        return context.tag
+        self.pattern.fillSlots('content', walkParagraph(self.paragraph))
+        return self.pattern
 
 class HTMLPartRenderer(object):
     implements(inevow.IRenderer)
