@@ -57,9 +57,10 @@ Quotient.Compose.Controller.methods(
         self.autoSaveInterval = 30000; /* 30 seconds */
         self.inboxURL = self.nodeByAttribute("class", "inbox-link").href;
 
-        setTimeout(function() {
-            self.saveDraft(false);
-        }, self.autoSaveInterval);
+        setTimeout(
+            function() {
+                self.saveDraft(false);
+            }, self.autoSaveInterval);
 
         self.makeFileInputs();
     },
@@ -126,24 +127,27 @@ Quotient.Compose.Controller.methods(
         var e = self.nodeByAttribute("name", "draft");
         e.checked = true;
         self.submit().addCallback(
-            function(ign) {
+            function(shouldLoop) {
                 var time = (new Date()).toTimeString();
                 showDialog("Draft saved at " + time.substr(0, time.indexOf(' ')), true);
-                if(!userInitiated) {
-                    setTimeout(function() {
-                        self.saveDraft(false)
-                    }, self.autoSaveInterval);
+                if(!userInitiated && shouldLoop) {
+                    setTimeout(
+                        function() {
+                            self.saveDraft(false);
+                        }, self.autoSaveInterval);
                 }
-                return ign;
             });
         e.checked = false;
     },
 
     function submit(self) {
-        var savingADraft = self.nodeByAttribute("name", "draft").checked;
+        self.savingADraft = self.nodeByAttribute("name", "draft").checked;
         var D = Quotient.Compose.Controller.upcall(self, "submit");
-        if(savingADraft) {
-            return D;
+        if(self.savingADraft) {
+            return D.addCallback(
+                function(ign) {
+                    return true;
+                });
         }
         return D.addCallback(function(ign) {
             if(self.inline) {
@@ -151,6 +155,7 @@ Quotient.Compose.Controller.methods(
             } else {
                 document.location = self.inboxURL;
             }
+            return false;
         });
     },
 
@@ -413,9 +418,14 @@ Quotient.Compose.Controller.methods(
              "onchange": self._makeHandler("setAttachment(this)")}));
     },
 
-    function submitSuccess(self, result) {},
+    function showProgressMessage(self) {
+        if(!self.savingADraft) {
+            return Quotient.Compose.Controller.upcall(self, "showProgressMessage");
+        }
+    },
 
-    function submitFailure(self, err) {
-        alert(err);
-        alert('CRAP');
+    function submitSuccess(self, result) {
+        if(!self.savingADraft) {
+            return Quotient.Compose.Controller.upcall(self, "submitSuccess", result);
+        }
     });
