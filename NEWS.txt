@@ -1,3 +1,14 @@
+0.1.9 (2006-07-14):
+  - Messages with no subject now display as "<no subject>" instead of
+    "<Empty Subject>" or blank.
+  - Message-draft-saving code no longer continues to execute after compose
+    is dismissed.
+  - Users are now notified as a message is sent.
+  - A bug has been fixed in rendering messages with many levels of nested
+    quotes.
+  - Action buttons are now clickable anywhere on their surface and not just 
+    the text.
+
 0.1.8 (2006-07-11):
   - New design for message detail.
   - Person-adding works from message detail now.
