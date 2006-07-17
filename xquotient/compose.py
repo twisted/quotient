@@ -179,7 +179,12 @@ class Composer(item.Item, item.InstallableMixin):
         from email import Parser as P, Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEMessage as MM
         import StringIO as S
 
-        bounceText = 'Your message bounced.'
+        bounceText = (
+            'Your message to %(recipient)s, subject "%(subject)s", '
+            'could not be delivered.')
+        bounceText %= {
+            'recipient': toAddress,
+            'subject': msg.impl.getHeader(u'subject')}
 
         s = S.StringIO()
         original = P.Parser().parse(msg.impl.source.open())
@@ -191,7 +196,7 @@ class Composer(item.Item, item.InstallableMixin):
              MT.MIMEText(log, 'plain'),
              MM.MIMEMessage(original)])
 
-        m['Subject'] = 'Unable to deliver message'
+        m['Subject'] = 'Unable to deliver message to ' + toAddress
         m['From'] = '<>'
         m['To'] = ''
 
