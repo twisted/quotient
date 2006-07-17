@@ -1,16 +1,8 @@
 from cStringIO import StringIO
 from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
-from axiom import store
-from axiom.userbase import LoginSystem
-
-from xmantissa.offering import installOffering
-
-from xmantissa.plugins.mailoff import (
-    plugin as quotientOffering, quotientBenefactorFactory)
-
-from xquotient.quotientapp import QuotientBenefactor
-from xquotient.mail import DeliveryAgent
+from axiom import store, scheduler
+from xquotient import mail
 
 class PartMaker:
     """
@@ -67,18 +59,9 @@ class MIMEReceiverMixin:
         return self.deliveryAgent.createMIMEReceiver(u'test://' + self.dbdir)
 
     def setUpMailStuff(self):
-        sitedir = self.mktemp()
-        s = store.Store(sitedir)
-        loginSystem = LoginSystem(store=s)
-        loginSystem.installOn(s)
-
-        account = loginSystem.addAccount(u'testuser', u'example.com', None)
-        substore = account.avatars.open()
-        self.dbdir = substore.dbdir.path
-
-        installOffering(s, quotientOffering, {})
-        benefactor = quotientBenefactorFactory.instantiate()
-        benefactor.endow(None, substore)
-
-        self.deliveryAgent = substore.findUnique(DeliveryAgent)
+        self.dbdir = self.mktemp()
+        s = store.Store(self.dbdir)
+        scheduler.Scheduler(store=s).installOn(s)
+        self.deliveryAgent = mail.DeliveryAgent(store=s)
+        self.deliveryAgent.installOn(s)
         return self.createMIMEReceiver()

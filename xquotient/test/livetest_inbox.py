@@ -11,7 +11,6 @@ from axiom import attributes
 from axiom.tags import Catalog
 
 from xmantissa import ixmantissa
-from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
@@ -47,7 +46,6 @@ class InboxTestCase(testcase.TestCase):
 
     def render_inbox(self, ctx, data):
         s = Store()
-        WebSite(store=s).installOn(s)
 
         c = Catalog(store=s)
 
@@ -129,7 +127,6 @@ class BatchActionsTestCase(testcase.TestCase):
 
     def render_inbox(self, ctx, data):
         s = Store()
-        WebSite(store=s).installOn(s)
 
         def makeMessage(subj, spam=False, date=None, sender=u'joe@divmod.com', read=False):
             if date is None:

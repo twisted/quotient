@@ -16,7 +16,7 @@ from axiom.item import Item, InstallableMixin, transacted
 from axiom import attributes, tags, iaxiom
 from axiom.upgrade import registerUpgrader
 
-from xmantissa import ixmantissa, webnav, people, webtheme
+from xmantissa import ixmantissa, webnav, people
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import ScrollingFragment
@@ -179,7 +179,7 @@ registerUpgrader(upgradeInbox1to2, 'quotient_inbox', 1, 2)
 
 
 
-class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
+class InboxScreen(athena.LiveElement, renderers.ButtonRenderingMixin):
     """
     Renderer for boxes for of email.
 

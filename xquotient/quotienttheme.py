@@ -2,10 +2,6 @@ from xmantissa import webtheme
 from nevow import tags
 
 class QuotientTheme(webtheme.XHTMLDirectoryTheme):
-    def head(self, req, website):
-        root = website.cleartextRoot(req.getHeader('host'))
-        static = root.child('Quotient').child('static')
-        return tags.link(
-            rel='stylesheet',
-            type='text/css',
-            href=static.child('quotient.css'))
+    def head(self):
+        return tags.link(href='/Quotient/static/quotient.css',
+                         rel='stylesheet', type='text/css')
