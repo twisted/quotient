@@ -1,3 +1,14 @@
+0.1.11 (2006-07-18):
+  - Spam group actions have been renamed and some message unread count bugs
+    have been fixed.
+  - 'axiomatic mail' has been added to configure the SMTP server; TLS/SSL
+    and SMTP auth are now available for sending mail.
+  - Inbox rendering has been simplified.
+
+0.1.10 (2006-07-17):
+  - Whitespace is now preserved properly in text/plain message parts.
+  - Bounce messages now contain more useful information.
+
 0.1.9 (2006-07-14):
   - Messages with no subject now display as "<no subject>" instead of
     "<Empty Subject>" or blank.
