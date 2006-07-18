@@ -89,6 +89,7 @@ ul.file-list, ul.file-list li {
     background: #7FCCE5 url(/Quotient/static/images/menubar-separator.png) top left repeat-y;
     margin: 0px 8px 0px 8px;
     height: 20px;
+    float: left;
 }
 
 .quotient-menubar {
@@ -104,6 +105,7 @@ ul.file-list, ul.file-list li {
 
 .complexity-icons {
     padding-left: 4px;
+    float: left;
 }
 
 .person-message-list {
@@ -140,9 +142,10 @@ ul.file-list, ul.file-list li {
     padding-left: 50px;
 }
 
-.inbox-corner {
+.corner-footer {
     position: relative;
     top: -6px;
+    line-height: 0px;
 }
 
 .tags-container {
@@ -256,6 +259,10 @@ table.button {
     color: #FFFFFF;
 }
 
+.scrolltable-cell {
+    width: 300px;
+}
+
 .scrolltable-header {
     border-left: solid 1px #7FCCE5;
     height: 30px;
@@ -326,6 +333,21 @@ table.button {
     clear: left;
 }
 
+.corner-spacer {
+    position: relative;
+    margin-left: 6px;
+    width: 100%;
+}
+
+.left-corner {
+    float: left;
+}
+
+.right-corner {
+    position: absolute;
+    right: 0px;
+}
+
 .rounded-corner-spacer {
     margin: 0px;
     padding: 0px;
@@ -379,6 +401,7 @@ table.button {
 }
 
 .view-pane-cell {
+    width: 200px;
     height: 100%;
     padding-bottom: 1px;
     border-top: solid 1px #7FCCE5;
