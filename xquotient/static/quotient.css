@@ -131,10 +131,6 @@ ul.file-list, ul.file-list li {
     overflow: hidden;
 }
 
-.inbox {
-    border-top: solid 1px #0099CC;
-}
-
 /* the content table and the table that contains the bottom corners
  * are both padded by 50px to the left so their left edges line up
  * with each-other and the end of the divmod menubar icon */
