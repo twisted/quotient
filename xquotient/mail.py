@@ -22,16 +22,15 @@ except ImportError:
 from zope.interface import implements
 
 from twisted.application import service
-from twisted.internet import defer, reactor
+from twisted.internet import protocol, defer, reactor
 from twisted.protocols import policies
 from twisted.python import failure
-from twisted.cred import portal, checkers
+from twisted.cred import portal, checkers, credentials
 from twisted.mail import smtp
 
-from epsilon import extime
 from epsilon import sslverify
 
-from axiom import item, attributes, userbase, scheduler, batch
+from axiom import item, attributes, userbase, batch
 from axiom.upgrade import registerUpgrader
 
 from xmantissa.stats import BandwidthMeasuringFactory
@@ -166,6 +165,32 @@ class DeliveryFactoryMixin(object):
 
 
 
+class ESMTPFactory(protocol.ServerFactory):
+    """
+    Protocol factory for enhanced SMTP server connections.  Creates server
+    protocol instances which know about CRAM-MD5 and TLS.
+    """
+    protocol = smtp.ESMTP
+
+    def __init__(self, portal, hostname, challengers, contextFactory):
+        self.portal = portal
+        self.hostname = hostname
+        self.challengers = challengers
+        self.contextFactory = contextFactory
+
+
+    def buildProtocol(self, addr):
+        p = self.protocol(
+            self.challengers,
+            self.contextFactory)
+        p.factory = self
+        p.portal = self.portal
+        if self.hostname is not None:
+            p.host = self.hostname
+        return p
+
+
+
 class MailTransferAgent(item.Item, item.InstallableMixin,
                         service.Service, DeliveryFactoryMixin):
     """
@@ -234,7 +259,18 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
         if SSL is None and self.securePortNumber is not None:
             raise MailConfigurationError(
                 "No SSL support: you need to install "
-                "OpenSSL to server SMTP/SSL")
+                "OpenSSL to serve SMTP/SSL")
+
+        if self.certificateFile is not None:
+            cert = sslverify.PrivateCertificate.loadPEM(
+                file(self.certificateFile).read())
+            certOpts = sslverify.OpenSSLCertificateOptions(
+                cert.privateKey.original,
+                cert.original,
+                requireCertificate=False,
+                method=SSL.SSLv23_METHOD)
+        else:
+            certOpts = None
 
         realm = portal.IRealm(self.installedOn, None)
         if realm is None:
@@ -250,10 +286,11 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
 
         self.portal = portal.Portal(
             realm, [chk, checkers.AllowAnonymousAccess()])
-        self.factory = smtp.SMTPFactory(self.portal)
-        self.factory.protocol = smtp.ESMTP
-        if self.domain is not None:
-            self.factory.domain = self.domain
+        self.factory = ESMTPFactory(
+            self.portal,
+            self.domain,
+            {'CRAM-MD5': credentials.CramMD5Credentials},
+            certOpts)
 
         if self.debug:
             self.factory = policies.TrafficLoggingFactory(self.factory, 'smtp')
@@ -263,15 +300,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
                 self.portNumber,
                 BandwidthMeasuringFactory(self.factory, 'smtp'))
 
-        if (self.securePortNumber is not None and
-            self.certificateFile is not None):
-            cert = sslverify.PrivateCertificate.loadPEM(
-                file(self.certificateFile).read())
-            certOpts = sslverify.OpenSSLCertificateOptions(
-                cert.privateKey.original,
-                cert.original,
-                requireCertificate=False,
-                method=SSL.SSLv23_METHOD)
+        if self.securePortNumber is not None and certOpts is not None:
             self.securePort = reactor.listenSSL(
                 self.securePortNumber,
                 BandwidthMeasuringFactory(self.factory, 'smtps'), certOpts)
@@ -327,7 +356,11 @@ class NullMessage(object):
         pass
 
 
-    def messageDone(self):
+    def eomReceived(self):
+        pass
+
+
+    def connectionLost(self):
         pass
 
 
@@ -366,15 +399,20 @@ class OutgoingMessageWrapper(object):
         return self.mimeReceiver.lineReceived(line)
 
 
-    def messageDone(self):
+    def eomReceived(self):
         """
         Pass completion notification through to the wrapped L{smtp.IMessage}
         and then send the resulting message using C{self.sender.sendMessage}.
         """
-        self.mimeReceiver.messageDone()
+        result = self.mimeReceiver.eomReceived()
         self.sender.sendMessage(
             self.recipients,
             self.mimeReceiver.message)
+        return result
+
+
+    def connectionLost(self):
+        return self.mimeReceiver.connectionLost()
 
 
 
@@ -396,9 +434,7 @@ class MailDeliveryAgent(item.Item, item.InstallableMixin):
         chk = checkers.ICredentialsChecker(self.store.parent)
         return AuthenticatedMessageDelivery(
             iquotient.IMIMEDelivery(self.store),
-            iquotient.IMessageSender(self.store),
-            portal.Portal(
-                realm, [chk, checkers.AllowAnonymousAccess()]))
+            iquotient.IMessageSender(self.store))
 
 
 
@@ -411,10 +447,13 @@ class AuthenticatedMessageDelivery(object):
     origin = None
     _recipientAddresses = None
 
-    def __init__(self, avatar, composer, portal):
+    def __init__(self, avatar, composer):
         self.avatar = avatar
         self.composer = composer
-        self.portal = portal
+
+
+    def receivedHeader(self, helo, origin, recipients):
+        return ""
 
 
     def validateFrom(self, helo, origin):

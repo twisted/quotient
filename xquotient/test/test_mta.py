@@ -407,7 +407,7 @@ class MailTests(unittest.TestCase):
             msg.lineReceived('Header: value')
             msg.lineReceived('')
             msg.lineReceived('Goodbye.')
-            msg.messageDone()
+            msg.eomReceived()
 
 
     def verify(self, recipientLocal, recipientDomain):
@@ -551,3 +551,24 @@ class MailTests(unittest.TestCase):
                 self.verifyOutgoing(sender, *addr.split(u'@'))
         d.addCallback(verifySends)
         return d
+
+
+    def test_authenticatedReceivedHeader(self):
+        """
+        Test that something at least minimally reasonable comes back from the
+        receivedHeader method of L{AuthenticatedMessageDelivery}.
+        """
+        avatar = self.login.accountByAddress(u'testuser', u'localhost')
+        composer = IMessageSender(avatar)
+
+        delivery = mail.AuthenticatedMessageDelivery(composer.store, composer)
+        header = delivery.receivedHeader(
+            ("example.com", "192.168.123.45"),
+            smtp.Address("testuser@localhost"),
+            [smtp.User("recip@example.net", None, None, None),
+             smtp.User("admin@example.org", None, None, None)])
+
+        self.failUnless(
+            isinstance(header, str),
+            "Got %r instead of a string" % (header,))
+
