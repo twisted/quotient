@@ -33,6 +33,17 @@ Quotient.Test.MailboxTestBase.methods(
         return self.mailbox.pendingDeferred;
     },
 
+    /**
+     * Figure out the number of unread messages in the view C{view}
+     * @param view: string
+     * @return: integer
+     */
+    function unreadCountForView(self, view) {
+        return parseInt(Nevow.Athena.NodeByAttribute(
+                                self.mailbox.mailViewNodes[view],
+                                "class", "count").firstChild.nodeValue);
+    },
+
     function waitForScrollTableRefresh(self) {
         var d = new Divmod.Defer.Deferred();
         var pendingRowSelection = self.mailbox.scrollWidget._pendingRowSelection;
@@ -96,22 +107,16 @@ Quotient.Test.MailboxTestBase.methods(
 Quotient.Test.InboxTestCase = Quotient.Test.MailboxTestBase.subclass('InboxTestCase');
 Quotient.Test.InboxTestCase.methods(
     function doTests(self) {
-        var unreadCountsPerView = function(view) {
-            return parseInt(Nevow.Athena.NodeByAttribute(
-                                    self.mailbox.mailViewNodes[view],
-                                    "class", "count").firstChild.nodeValue);
-        }
-
         /* inbox would have two messages, but it's the initial view,
            so the first message will have been marked read already */
 
-        self.assertEquals(unreadCountsPerView("Inbox"), 1);
-        self.assertEquals(unreadCountsPerView("Spam"), 1);
+        self.assertEquals(self.unreadCountForView("Inbox"), 1);
+        self.assertEquals(self.unreadCountForView("Spam"), 1);
 
         /* similarly, this would have 4, but one of them has been read */
 
-        self.assertEquals(unreadCountsPerView("All"), 3);
-        self.assertEquals(unreadCountsPerView("Sent"), 0);
+        self.assertEquals(self.unreadCountForView("All"), 3);
+        self.assertEquals(self.unreadCountForView("Sent"), 0);
 
         var rows = self.collectRows();
 
@@ -601,4 +606,55 @@ Quotient.Test.ComposeTestCase.methods(
                 controller.reconstituteAddress(reconstitutedAddresses[i][0]),
                 reconstitutedAddresses[i][1]);
         }
+    });
+
+Quotient.Test.GroupActionsTestCase = Quotient.Test.MailboxTestBase.subclass('GroupActionsTestCase');
+Quotient.Test.GroupActionsTestCase.methods(
+    function doTests(self) {
+        var sw = self.mailbox.scrollWidget;
+        var groupSelect = function(i) {
+            var row = sw._rows[i][1];
+            var img = Nevow.Athena.FirstNodeByAttribute(
+                        row, "src", "/Quotient/static/images/checkbox-off.gif");
+            sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
+        }
+
+        var assertUnreadCountsAre = function(d) {
+            var count, views = ["Inbox", "Trash", "Sent", "All", "Spam"];
+            for(var i = 0; i < views.length; i++) {
+                if(!(views[i] in d)) {
+                    count = 0;
+                } else {
+                    count = d[views[i]];
+                }
+                self.assertEquals(self.unreadCountForView(views[i]), count);
+            }
+        }
+
+        assertUnreadCountsAre({Inbox: 9, All: 9});
+
+        /* select the first three messages */
+        groupSelect(0);
+        groupSelect(1);
+        groupSelect(2);
+
+        /* archive the first one */
+        return self.mailbox.touch("archive", true).addCallback(
+            function() {
+                /* #1 got read when it was loaded into the message
+                   detail after #0 was dismissed */
+                assertUnreadCountsAre({Inbox: 8, All: 8});
+
+                /* act on the group selection, checking the code
+                   is smart enough not to explode when it finds
+                   that one of the rows it wants to act on is missing */
+                return self.mailbox.touchSelectedGroup("archive", true);
+        }).addCallback(
+            function() {
+                /* #2 is gone from the inbox, and #3 was loaded
+                   into the message detail, making 6 unread.
+                   7 for the inbox because #2 was the only unread
+                   message that got moved there */
+                assertUnreadCountsAre({Inbox: 6, All: 7});
+        });
     });

@@ -685,7 +685,7 @@ Quotient.Mailbox.Controller.methods(
                 var affectedUnreadCount = data[2];
 
                 self.adjustProgressBar(affectedCount);
-                self.decrementActiveMailViewCount(affectedUnreadCount);
+                self.adjustCounts(remoteArgs, affectedUnreadCount);
 
                 self._batchSelection = null;
                 self._changeGroupActionAvailability(false);
@@ -730,6 +730,27 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Decrement the unread message count that is displayed next
+     * to the name of the view called C{viewName} C{byHowMuch}
+     *
+     * @param viewName: string
+     * @param byHowMuch: number
+     * @return: undefined
+     */
+    function decrementMailViewCount(self, viewName, byHowMuch) {
+        var decrementNodeValue = function(node) {
+            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - byHowMuch;
+        }
+
+        var cnode = self.firstWithClass(self.mailViewNodes[viewName], "count");
+        decrementNodeValue(cnode);
+
+        if(viewName == "Inbox") {
+            decrementNodeValue(self.firstWithClass(self.mailViewNodes["All"], "count"));
+        }
+    },
+
+    /**
      * Decrement the unread message count that is displayed next to
      * the name of the currently active view in the view selector.
      *
@@ -740,17 +761,7 @@ Quotient.Mailbox.Controller.methods(
             byHowMuch = 1;
         }
 
-        var decrementNodeValue = function(node) {
-            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - byHowMuch;
-        }
-
-        var cnode = self.firstWithClass(
-                            self.mailViewNodes[self._viewingByView], "count");
-        decrementNodeValue(cnode);
-
-        if(self._viewingByView == "Inbox") {
-            decrementNodeValue(self.firstWithClass(self.mailViewNodes["All"], "count"));
-        }
+        self.decrementMailViewCount(self._viewingByView, byHowMuch);
     },
 
     /**
@@ -1383,7 +1394,7 @@ Quotient.Mailbox.Controller.methods(
             }
         }
 
-        self.doTouch(remoteArgs, isProgress, 1, 0);
+        return self.doTouch(remoteArgs, isProgress, 1, 0);
     },
 
     /**
@@ -1415,11 +1426,16 @@ Quotient.Mailbox.Controller.methods(
 
         var affectedUnreadCount = 0;
         if(isDestructive) {
-            var rowData;
+            var rowData, offset;
             /* FIXME optimize.  selectedGroup can be a mapping of
                webIDs to column dictionaries or something */
             for(var i in selgroup) {
-                rowData = sw._rows[sw.findRowOffset(selgroup[i])][0];
+                offset = sw.findRowOffset(selgroup[i]);
+                if(offset == null) {
+                    delete selgroup[i];
+                    continue;
+                }
+                rowData = sw._rows[offset][0];
                 if(!rowData["read"]) {
                     affectedUnreadCount++;
                 }
@@ -1462,6 +1478,52 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Adjust the unread message counts.  Typically called after
+     * performing a destructive action.  Takes into account the
+     * destination of a set of messages by looking at the current
+     * view and the action that was performed.
+     *
+     * @param args: array of arguments passed to callRemote() to
+     *              initiate the action server-side.  typically
+     *              something like ["archiveCurrentMessage"] or
+     *              ["trainMessageGroup", true]
+     * @param affectedUnreadCount: number of unread messages
+     *                             affected by the action.
+     * @return: undefined
+     */
+    function adjustCounts(self, args, affectedUnreadCount) {
+        if(affectedUnreadCount == 0) {
+            return;
+        }
+
+        var suffixes = ["CurrentMessage", "MessageGroup", "MessageBatch"];
+        var action = args[0];
+        for(var i = 0; i < suffixes.length; i++) {
+            if(action.substr(-suffixes[i].length) == suffixes[i]) {
+                action = action.substr(0, action.length-suffixes[i].length);
+                break;
+            }
+        }
+        self.decrementActiveMailViewCount(affectedUnreadCount);
+
+        var addTo;
+
+        if(action == "archive") {
+            addTo = "All";
+        } else if(action == "train") {
+            if(args[args.length-1]) {
+                addTo = "Spam";
+            } else {
+                addTo = "Inbox";
+            }
+        } else {
+            return;
+        }
+
+        self.decrementMailViewCount(addTo, -affectedUnreadCount);
+    },
+
+    /**
      * Call a remote method and handle it's result, which is expected
      * to be a new set of message-related UI state.  This is typically
      * done when acting on a message.
@@ -1479,19 +1541,17 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.style.opacity = .2;
         return self.callRemote.apply(self, remoteArgs).addCallback(
             function(nextMessage) {
-                self._cbTouched(nextMessage, isProgress, touchingHowMany, touchingHowManyUnread);
-            });
-    },
+                self.messageDetail.style.opacity = 1;
 
-    function _cbTouched(self, nextMessage, isProgress, touchingHowMany, touchingHowManyUnread) {
-        self.messageDetail.style.opacity = 1;
-        if(isProgress) {
-            self.setMessageContent(nextMessage);
-            self.adjustProgressBar(touchingHowMany);
-            self.decrementActiveMailViewCount(touchingHowManyUnread);
-        } else if(nextMessage) {
-            self.displayInlineWidget(nextMessage);
-        }
+                self.adjustProgressBar(touchingHowMany);
+                self.adjustCounts(remoteArgs, touchingHowManyUnread);
+
+                if(isProgress) {
+                    self.setMessageContent(nextMessage);
+                } else if(nextMessage) {
+                    self.displayInlineWidget(nextMessage);
+                }
+            });
     },
 
     /**

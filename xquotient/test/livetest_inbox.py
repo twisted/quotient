@@ -131,20 +131,6 @@ class BatchActionsTestCase(testcase.TestCase):
         s = Store()
         WebSite(store=s).installOn(s)
 
-        def makeMessage(subj, spam=False, date=None, sender=u'joe@divmod.com', read=False):
-            if date is None:
-                date = Time()
-
-            m = Message(store=s,
-                        sender=sender,
-                        subject=subj,
-                        receivedWhen=date,
-                        sentWhen=date,
-                        spam=spam,
-                        impl=_Part(store=s),
-                        archived=False,
-                        read=read)
-
         PrivateApplication(store=s).installOn(s)
         QuotientPreferenceCollection(store=s).installOn(s)
         o = Organizer(store=s)
@@ -170,3 +156,19 @@ class BatchActionsTestCase(testcase.TestCase):
         inboxFrag.docFactory = getLoader(inboxFrag.fragmentName)
 
         return ctx.tag[inboxFrag]
+
+class GroupActionsTestCase(BatchActionsTestCase):
+    """
+    Tests for group actions!  A group action is an action that
+    is performed on a user-defined collection of messages, as
+    opposed to a batch action, which operates on a logical set
+    of messages, like "all unread"
+    """
+
+    jsClass = u'Quotient.Test.GroupActionsTestCase'
+
+    docFactory = loaders.stan(tags.div[
+                    tags.div(render=tags.directive('liveTest'))['GroupActionsTestCase'],
+                    tags.div(render=tags.directive('inbox'),
+                             style='visibility: hidden'),
+                    tags.div(id='mantissa-footer')])
