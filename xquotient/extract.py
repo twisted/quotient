@@ -22,6 +22,7 @@ from xquotient.exmess import Message
 def extractImages(message):
     imageSet = None
     for attachment in message.walkAttachments():
+        print attachment.type
         if attachment.type.startswith('image/'):
             thumbdir = message.store.newDirectory('thumbnails')
             if not thumbdir.exists():
@@ -39,6 +40,7 @@ def extractImages(message):
                 imageSet = ImageSet(store=message.store,
                                     message=message)
 
+            print 'making', message.store
             Image(part=attachment.part,
                   thumbnailPath=thumbf,
                   message=message,
@@ -215,6 +217,7 @@ class ExtractPowerup(Item, InstallableMixin):
         self.store.findUnique(mail.MessageSource).addReliableListener(self)
 
     def processItem(self, message):
+        print 'PROCESSING', message
         extractImages(message)
 
         for et in extractTypes.itervalues():
