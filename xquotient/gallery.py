@@ -42,7 +42,7 @@ class ImageSetRenderer:
         prefixURL = '/' + self.imageSet.store.findUnique(ThumbnailDisplayer).prefixURL + '/'
         toWebID = ixmantissa.IWebTranslator(self.imageSet.store).toWebID
 
-        return (tags.img(src=prefixURL + toWebID(img), width='20%', height='20%')
+        return (tags.img(src=prefixURL + toWebID(img))
                     for img in self.imageSet.getImages())
 
 class ImageSet(Item):
