@@ -44,9 +44,13 @@ class AddPersonFragment(people.AddPersonFragment):
 
     def makePerson(self, nickname):
         person = super(AddPersonFragment, self).makePerson(nickname)
-        makePersonExtracts(self.original.store, person)
         self.lastPerson = person
         return person
+
+    def addPerson(self, *a, **k):
+        result = super(AddPersonFragment, self).addPerson(*a, **k)
+        makePersonExtracts(self.original.store, self.lastPerson)
+        return result
 
     def getPersonHTML(self):
         # come up with a better way to identify people.
