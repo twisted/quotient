@@ -505,7 +505,9 @@ Quotient.Mailbox.Controller.methods(
                                     node, "class", "content-table");
             var cornerFooter = self.getElementsByTagNameShallow(
                                     contentTable.parentNode, "div")[1];
-            contentTable.style.paddingRight = cornerFooter.style.paddingRight = width + "px";
+            var rightCorner = self.firstWithClass(cornerFooter, "right-corner");
+            contentTable.style.paddingRight = width + "px";
+            rightCorner.style.right = width + "px";
         }
 
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
@@ -824,7 +826,7 @@ Quotient.Mailbox.Controller.methods(
             var footer = document.getElementById("mantissa-footer");
             var blockFooter = self.firstNodeByAttribute("class", "right-block-footer");
             self.blockFooterHeight = getHeight(blockFooter);
-            self.totalFooterHeight = self.blockFooterHeight + getHeight(footer);
+            self.totalFooterHeight = self.blockFooterHeight + getHeight(footer) + 5;
         }
 
         self.scrollWidget.resized(self);
