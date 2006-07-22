@@ -140,7 +140,7 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     person = attributes.reference()
 
-    type = u'URL'
+    type = u'Link'
 
     regex = re.compile(ur'(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]',
                        re.UNICODE | re.IGNORECASE)
