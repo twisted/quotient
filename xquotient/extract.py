@@ -56,10 +56,10 @@ class ExtractRenderer:
         (l, middle, r) = self.extract.inContext()
         return tags.div(class_='extract-container')[
                     tags.pre[
-                        l,
+                        l.lstrip(),
                         tags.span(class_='extract-text')[
                             tags.span[middle]],
-                        r]]
+                        r.rstrip()]]
 
 # the idea with extraction is that we only store an extract
 # once per sender.  so if you import the last 5 years worth
