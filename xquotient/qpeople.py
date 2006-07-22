@@ -30,7 +30,7 @@ def makePersonExtracts(store, person):
 
     for etyp in extract.extractTypes.itervalues():
         for e in queryMessageSenderPerson(etyp):
-            person.registerExtract(e)
+            person.registerExtract(e, etyp.type)
             e.person = person
 
     for imageSet in queryMessageSenderPerson(gallery.ImageSet):
