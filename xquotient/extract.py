@@ -122,6 +122,7 @@ class SimpleExtractMixin(object):
                 self.asStan(),
                 text[end:end+chars])
 
+
 def registerExtractUpgrader1to2(itemClass):
     registerUpgrader(lambda old: old.deleteFromStore(), itemClass.typeName, 1, 2)
 
