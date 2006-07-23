@@ -11,6 +11,8 @@ from axiom.upgrade import registerUpgrader
 from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import dictFillSlots
+from xmantissa.tdb import TabularDataModel
+from xmantissa.tdbview import TabularDataView, ColumnViewBase, DateColumnView
 
 from xquotient import extract, mail, exmess, equotient, mimeutil, gallery
 
@@ -106,51 +108,27 @@ class PersonFragmentColumn(UnsortableColumn):
     def getType(self):
         return TYPE_FRAGMENT
 
-class MessageList(rend.Fragment):
+class MessageList(TabularDataView):
     implements(ixmantissa.IPersonFragment)
     title = 'Messages'
 
     def __init__(self, messageLister, person):
-        self.messageLister = messageLister
-        self.person = person
-        rend.Fragment.__init__(self, docFactory=getLoader('person-messages'))
+        tdm = TabularDataModel(
+                person.store,
+                exmess.Message,
+                (exmess.Message.sender, exmess.Message.subject, exmess.Message.sentWhen),
+                attributes.AND(
+                    exmess.Message.sender == people.EmailAddress.address,
+                    people.EmailAddress.person == person),
+                itemsPerPage=5,
+                defaultSortColumn='sentWhen',
+                defaultSortAscending=False)
 
-    def render_messages(self, *junk):
-        iq = inevow.IQ(self.docFactory)
-        msgpatt = iq.patternGenerator('message')
-        newpatt = iq.patternGenerator('unread-message')
-        content = []
-        addresses = set(self.person.store.query(
-                            people.EmailAddress,
-                            people.EmailAddress.person == self.person).getColumn('address'))
-
-        wt = ixmantissa.IWebTranslator(self.person.store)
-        link = lambda href, text: tags.a(href=href, style='display: block')[text]
-
-        displayName = self.person.getDisplayName()
-        for m in self.messageLister.mostRecentMessages(self.person):
-            if m.sender in addresses:
-                sender = displayName
-            else:
-                sender = 'Me'
-            if m.read:
-                patt = msgpatt
-            else:
-                patt = newpatt
-            if not m.subject or m.subject.isspace():
-                subject = '<no subject>'
-            else:
-                subject = m.subject
-
-            url = wt.linkTo(m.storeID)
-            content.append(dictFillSlots(patt,
-                                         dict(sender=link(url, sender),
-                                              subject=link(url, subject),
-                                              date=link(url, m.receivedWhen.asHumanly()))))
-
-        if 0 < len(content):
-            return iq.onePattern('messages').fillSlots('messages', content)
-        return iq.onePattern('no-messages')
+        TabularDataView.__init__(self, tdm, (ColumnViewBase('sender'),
+                                             ColumnViewBase('subject'),
+                                             DateColumnView(
+                                                 'sentWhen', displayName='Date')))
+        self.docFactory = getLoader(self.fragmentName)
 
 class ExcerptColumn(AttributeColumn):
     def extractValue(self, model, item):
