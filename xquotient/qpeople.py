@@ -1,6 +1,5 @@
 from zope.interface import implements
 
-from nevow import rend, inevow, tags
 from nevow.flat import flatten
 from nevow.athena import expose
 
@@ -10,7 +9,6 @@ from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
-from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.tdb import TabularDataModel
 from xmantissa.tdbview import TabularDataView, ColumnViewBase, DateColumnView
 
@@ -108,6 +106,7 @@ class PersonFragmentColumn(UnsortableColumn):
     def getType(self):
         return TYPE_FRAGMENT
 
+
 class MessageList(TabularDataView):
     implements(ixmantissa.IPersonFragment)
     title = 'Messages'
@@ -124,9 +123,17 @@ class MessageList(TabularDataView):
                 defaultSortColumn='sentWhen',
                 defaultSortAscending=False)
 
-        TabularDataView.__init__(self, tdm, (ColumnViewBase('subject'),
-                                             DateColumnView(
-                                                 'sentWhen', displayName='Date')))
+        wt = ixmantissa.IWebTranslator(person.store)
+
+        subjectCol = ColumnViewBase('subject')
+        dateCol = DateColumnView('sentWhen', displayName='Date')
+
+        def onclick(idx, item, value):
+            return 'document.location = %r' % (wt.linkTo(item.storeID))
+
+        subjectCol.onclick = dateCol.onclick = onclick
+
+        TabularDataView.__init__(self, tdm, (subjectCol, dateCol))
         self.docFactory = getLoader(self.fragmentName)
 
 class ExcerptColumn(AttributeColumn):
