@@ -116,7 +116,7 @@ class MessageList(TabularDataView):
         tdm = TabularDataModel(
                 person.store,
                 exmess.Message,
-                (exmess.Message.sender, exmess.Message.subject, exmess.Message.sentWhen),
+                (exmess.Message.subject, exmess.Message.sentWhen),
                 attributes.AND(
                     exmess.Message.sender == people.EmailAddress.address,
                     people.EmailAddress.person == person),
@@ -124,8 +124,7 @@ class MessageList(TabularDataView):
                 defaultSortColumn='sentWhen',
                 defaultSortAscending=False)
 
-        TabularDataView.__init__(self, tdm, (ColumnViewBase('sender'),
-                                             ColumnViewBase('subject'),
+        TabularDataView.__init__(self, tdm, (ColumnViewBase('subject'),
                                              DateColumnView(
                                                  'sentWhen', displayName='Date')))
         self.docFactory = getLoader(self.fragmentName)
