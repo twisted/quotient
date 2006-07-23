@@ -140,8 +140,6 @@ class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     person = attributes.reference()
 
-    type = u'Link'
-
     regex = re.compile(ur'(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]',
                        re.UNICODE | re.IGNORECASE)
 
@@ -165,8 +163,6 @@ class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
     timestamp = attributes.timestamp()
 
     person = attributes.reference()
-
-    type = u'Phone Number'
 
     regex = re.compile(ur'%(area)s%(body)s%(extn)s' % dict(area=r'(?:(?:\(?\d{3}\)?[-.\s]?|\d{3}[-.\s]))?',
                                                            body=r'\d{3}[-.\s]\d{4}',
@@ -194,8 +190,6 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     person = attributes.reference()
 
-    type = u'Email Address'
-
     regex = re.compile(ur'[\w\-\.]+@(?:[a-z0-9-]+\.)+[a-z]+',
                        re.UNICODE | re.IGNORECASE)
 
@@ -210,9 +204,9 @@ class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 registerAdapter(ExtractRenderer, EmailAddressExtract, IRenderer)
 registerExtractUpgrader1to2(EmailAddressExtract)
 
-extractTypes = {'url': URLExtract,
-                'phone number': PhoneNumberExtract,
-                'email address': EmailAddressExtract}
+extractTypes = {u'Links': URLExtract,
+                u'Phone Numbers': PhoneNumberExtract,
+                u'Email Addresses': EmailAddressExtract}
 
 
 class ExtractPowerup(Item, InstallableMixin):

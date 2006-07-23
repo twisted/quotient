@@ -30,13 +30,13 @@ def makePersonExtracts(store, person):
                                     exmess.Message.sender == people.EmailAddress.address,
                                     people.EmailAddress.person == person))
 
-    for etyp in extract.extractTypes.itervalues():
+    for (etypename, etyp) in extract.extractTypes.iteritems():
         for e in queryMessageSenderPerson(etyp):
-            person.registerExtract(e, etyp.type)
+            person.registerExtract(e, etypename)
             e.person = person
 
     for imageSet in queryMessageSenderPerson(gallery.ImageSet):
-        person.registerExtract(imageSet)
+        person.registerExtract(imageSet, u'Images')
         imageSet.person = person
 
 class AddPersonFragment(people.AddPersonFragment):
