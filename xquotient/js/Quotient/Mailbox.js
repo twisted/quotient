@@ -6,6 +6,11 @@
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 Quotient.Mailbox.MessageDetail.methods(
+    function __init__(self, node) {
+        Quotient.Mailbox.MessageDetail.upcall(self, "__init__", node);
+        initLightbox(node);
+    },
+
     function messageSource(self) {
         self.callRemote("getMessageSource").addCallback(
             function(source) {
