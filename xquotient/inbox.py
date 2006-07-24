@@ -200,6 +200,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     inSentView = False
     inSpamView = False
     inDeferredView = False
+    inExpectingResponseView = False
     currentMessage = None
 
     viewingByTag = None
@@ -365,7 +366,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         """
         return list(self.inbox.catalog.tagNames())
 
-
     def viewPane(self, request, tag):
         attrs = tag.attributes
         return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
@@ -411,7 +411,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = ['All', 'Trash', 'Sent', 'Spam', 'Deferred', 'Inbox']
+        views = ['All', 'Trash', 'Sent', 'Expecting Response', 'Spam', 'Deferred', 'Inbox']
         counts = self.mailViewCounts()
         counts = sorted(counts.iteritems(), key=lambda (v, c): views.index(v))
 
@@ -516,7 +516,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     def mailViewCounts(self):
         counts = {}
         curview = self.getCurrentViewName()
-        for v in (u'Trash', u'Sent', u'Spam', u'All', u'Deferred', u'Inbox'):
+        for v in (u'Trash', u'Sent', u'Spam', u'All', u'Deferred', u'Inbox', u'Expecting Response'):
             self.changeView(v)
             counts[v] = self.getUnreadMessageCount()
         self.changeView(curview)
@@ -528,6 +528,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                               (self.inSentView, 'Sent'),
                               (self.inSpamView, 'Spam'),
                               (self.inDeferredView, 'Deferred'),
+                              (self.inExpectingResponseView, 'Expecting Response'),
                               (True, 'Inbox')):
             if truth:
                 return name
@@ -579,8 +580,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     viewByAccount = transacted(viewByAccount)
 
     def changeView(self, typ):
-        self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = self.inDeferredView = False
-        attr = 'in' + typ + 'View'
+        self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = self.inDeferredView = self.inExpectingResponseView = False
+        attr = 'in' + typ.replace(' ', '') + 'View'
         if hasattr(self, attr):
             setattr(self, attr, True)
 
@@ -758,13 +759,15 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             Message.draft == False,
             Message.deferred == self.inDeferredView]
 
+        print self.inSentView or self.inExpectingResponseView
+
         if not self.inTrashView:
-            comparison.append(Message.outgoing == self.inSentView)
+            comparison.append(Message.outgoing == (self.inSentView or self.inExpectingResponseView))
 
         if not (self.inAllView or self.inTrashView or self.inSpamView):
             comparison.append(Message.archived == False)
 
-        if not (self.inSentView or self.inTrashView):
+        if not (self.inSentView or self.inTrashView or self.inExpectingResponseView):
             # Note - Message.spam defaults to None, and inSpamView will
             # always be either True or False.  This means messages which
             # haven't been processed by the spam filtering system will never
@@ -779,6 +782,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             # less irrelevant.
             comparison.append(Message.spam == self.inSpamView)
 
+        if self.inExpectingResponseView:
+            comparison.extend((
+                tags.Tag.object == Message.storeID,
+                tags.Tag.name == u'expecting-response'))
 
         if self.viewingByTag is not None:
             comparison.extend((

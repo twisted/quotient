@@ -1115,6 +1115,8 @@ Quotient.Mailbox.Controller.methods(
                        hide: [train_ham]},
             Sent:     {show: [delete_],
                        hide: [train_ham, train_spam, archive, defer]},
+            "Expecting Response": {show: [delete_],
+                                   hide: [train_ham, train_spam, archive, defer]},
             Trash:    {show: [],
                        hide: [train_ham, train_spam, archive, defer, delete_]},
             Deferred: {show: [],
