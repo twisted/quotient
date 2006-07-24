@@ -564,8 +564,13 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
             pattern = self.patterns['phone-extract-prompt']
             name = self.person.getDisplayName()
             for number in numbers.getColumn('text'):
-                yield dictFillSlots(pattern, dict(number=number,
-                                                  name=name))
+                if self.person.store.findFirst(people.PhoneNumber,
+                                               attributes.AND(
+                                                   people.PhoneNumber.person == self.person,
+                                                   people.PhoneNumber.number == number),
+                                               default=None) is None:
+                    yield dictFillSlots(pattern, dict(number=number,
+                                                    name=name))
 
     def addPhoneNumber(self, number):
         people.PhoneNumber(store=self.person.store,
