@@ -235,11 +235,13 @@ function hideLightbox()
 // The function also inserts html markup at the top of the page which will be used as a
 // container for the overlay pattern and the inline image.
 //
-function initLightbox()
+function initLightbox(n)
 {
 
+    n = n || document;
+
 	if (!document.getElementsByTagName){ return; }
-	var anchors = document.getElementsByTagName("a");
+	var anchors = n.getElementsByTagName("a");
 
 	// loop through all anchor tags
 	for (var i=0; i<anchors.length; i++){
