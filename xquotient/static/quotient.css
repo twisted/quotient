@@ -4,6 +4,10 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     margin-right: 4px;
 }
 
+*[onclick]:hover, a:hover {
+    text-decoration: underline;
+}
+
 .phone-extract-prompt {
     margin-top: 4px;
     padding: 2px;
