@@ -9,7 +9,7 @@ from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 from twisted.web import microdom
 
-from nevow import rend, inevow, athena, static
+from nevow import rend, inevow, athena, static, flat
 from nevow.athena import expose
 
 from axiom.tags import Catalog, Tag
@@ -554,8 +554,10 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
 
-    def render_extractPrompts(self, ctx, data):
+    def _getExtractPrompts(self):
         from xquotient.extract import PhoneNumberExtract as PNE
+        if self.organizer is not None:
+            self.person = self.organizer.personByEmailAddress(self.original.sender)
         if self.person is not None:
             numbers = self.person.store.query(PNE,
                             attributes.AND(
@@ -571,12 +573,17 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                                                default=None) is None:
                     yield dictFillSlots(pattern, dict(number=number,
                                                     name=name))
+    def getExtractPrompts(self):
+        return unicode(flat.flatten(self._getExtractPrompts()), 'utf-8')
+    expose(getExtractPrompts)
+
+    def render_extractPrompts(self, ctx, data):
+        return self._getExtractPrompts()
 
     def addPhoneNumber(self, number):
         people.PhoneNumber(store=self.person.store,
                            person=self.person,
                            number=number)
-
     expose(addPhoneNumber)
 
     def getMessageSource(self):

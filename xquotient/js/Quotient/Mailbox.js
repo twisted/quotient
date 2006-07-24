@@ -25,6 +25,15 @@ Quotient.Mailbox.MessageDetail.methods(
             });
     },
 
+    function personAdded(self) {
+        self.callRemote("getExtractPrompts").addCallback(
+            function(html) {
+                Divmod.Runtime.theRuntime.setNodeContent(
+                    self.firstNodeByAttribute("class", "extract-prompts"),
+                    '<div xmlns="http://www.w3.org/1999/xhtml">' + html + '</div>');
+            });
+    },
+
     /**
      * Show the original, unscrubbed HTML for this message
      */

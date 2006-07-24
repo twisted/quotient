@@ -96,6 +96,8 @@ Quotient.Common.AddPerson.methods(
                     e.parentNode.innerHTML = HTML;
                 }
             }
+            /* XXX */
+            self.widgetParent.personAdded();
         });
     });
 
