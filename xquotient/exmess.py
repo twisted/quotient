@@ -397,6 +397,10 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         self.translator = ixmantissa.IWebTranslator(original.store)
         # temporary measure, until we can express this dependency less weirdly
         self.organizer = original.store.findUnique(people.Organizer, default=None)
+        if self.organizer is not None:
+            self.person = self.organizer.personByEmailAddress(original.sender)
+        else:
+            self.person = None
 
         self.children = {'attachments.zip': ZippedAttachmentResource(original)}
 
@@ -444,9 +448,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     def render_headerPanel(self, ctx, data):
         if self.organizer is not None:
             personStan = SenderPersonFragment(self.original)
-            p = self.organizer.personByEmailAddress(self.original.sender)
-            if p is not None:
-                personStan = people.PersonFragment(p, self.original.sender)
+            if self.person is not None:
+                personStan = people.PersonFragment(self.person, self.original.sender)
             personStan.page = self.page
         else:
             personStan = self.original.sender
@@ -550,6 +553,26 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                 paragraphs.append(renderable)
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
+
+    def render_extractPrompts(self, ctx, data):
+        from xquotient.extract import PhoneNumberExtract as PNE
+        if self.person is not None:
+            numbers = self.person.store.query(PNE,
+                            attributes.AND(
+                                PNE.message == self.original,
+                                PNE.person == self.person))
+            pattern = self.patterns['phone-extract-prompt']
+            name = self.person.getDisplayName()
+            for number in numbers.getColumn('text'):
+                yield dictFillSlots(pattern, dict(number=number,
+                                                  name=name))
+
+    def addPhoneNumber(self, number):
+        people.PhoneNumber(store=self.person.store,
+                           person=self.person,
+                           number=number)
+
+    expose(addPhoneNumber)
 
     def getMessageSource(self):
         source = self.original.impl.source.getContent()

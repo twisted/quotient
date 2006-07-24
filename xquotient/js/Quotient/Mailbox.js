@@ -15,6 +15,16 @@ Quotient.Mailbox.MessageDetail.methods(
         });
     },
 
+    function addPhoneNumber(self, node) {
+        var numberNode = Nevow.Athena.FirstNodeByAttribute(node, "class", "phone-number");
+        var number = numberNode.firstChild.nodeValue;
+        self.callRemote("addPhoneNumber", number).addCallback(
+            function() {
+                var prompt = node.parentNode;
+                prompt.parentNode.removeChild(prompt);
+            });
+    },
+
     /**
      * Show the original, unscrubbed HTML for this message
      */

@@ -4,6 +4,16 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     margin-right: 4px;
 }
 
+.phone-extract-prompt {
+    background-color: yellow;
+    margin-top: 4px;
+    padding: 2px;
+}
+
+.phone-extract-prompt .phone-number {
+    font-style: italic;
+}
+
 .msg-detail-sent-date {
     padding-right: 4px;
     float: right;

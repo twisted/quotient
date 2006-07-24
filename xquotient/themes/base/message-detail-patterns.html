@@ -1,5 +1,11 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
+  <div nevow:pattern="phone-extract-prompt" class="phone-extract-prompt">
+    <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).addPhoneNumber(this); return false"
+      >Add <span class="phone-number"><nevow:slot name="number" /></span> as a phone number for <nevow:slot name="name" />
+    </a>
+  </div>
+
   <div nevow:pattern="scrubbed-dialog" class="scrubbed-dialog">
     <div>Message HTML has been modified for your safety.</div>
     <a href="#"
