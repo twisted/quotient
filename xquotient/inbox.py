@@ -759,8 +759,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             Message.draft == False,
             Message.deferred == self.inDeferredView]
 
-        print self.inSentView or self.inExpectingResponseView
-
         if not self.inTrashView:
             comparison.append(Message.outgoing == (self.inSentView or self.inExpectingResponseView))
 
