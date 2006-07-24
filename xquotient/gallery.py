@@ -40,10 +40,16 @@ class ImageSetRenderer:
 
     def rend(self, *junk):
         prefixURL = '/' + self.imageSet.store.findUnique(ThumbnailDisplayer).prefixURL + '/'
-        toWebID = ixmantissa.IWebTranslator(self.imageSet.store).toWebID
+        translator = ixmantissa.IWebTranslator(self.imageSet.store)
+        toWebID = translator.toWebID
 
-        return (tags.img(src=prefixURL + toWebID(img))
-                    for img in self.imageSet.getImages())
+        for img in self.imageSet.getImages():
+            url = (translator.linkTo(img.message.storeID)
+                    + '/attachments/'
+                    + toWebID(img.part)
+                    + '/' + img.part.getFilename())
+            yield tags.a(href=url, rel='lightbox')[
+                    tags.img(src=prefixURL + toWebID(img), border='0')]
 
 class ImageSet(Item):
     message = attributes.reference()
