@@ -1,7 +1,7 @@
 // import Quotient
 // import Quotient.Common
 // import Mantissa.People
-// import LightBox
+// import Quotient.LightBox
 // import Mantissa.ScrollTable
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
