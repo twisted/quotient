@@ -14,6 +14,7 @@ from nevow.athena import expose
 from epsilon import extime
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
+from axiom.tags import Catalog
 from axiom.upgrade import registerUpgrader
 
 from xmantissa.fragmentutils import dictFillSlots
@@ -332,6 +333,9 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                            coercer=unicode),
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
+                                           coercer=bool),
+                        liveform.Parameter(name='expectingResponse',
+                                           type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
         self.toAddress = toAddress
         self.subject = subject
@@ -430,7 +434,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
     def head(self):
         return None
 
-    def createMessage(self, toAddress, subject, messageBody, cc, bcc, files):
+    def createMessage(self, toAddress, subject, messageBody, cc, bcc, files, expectingResponse):
         from email import (Generator as G, MIMEBase as MB,
                            MIMEMultipart as MMP, MIMEText as MT,
                            Header as MH, Charset as MC, Utils as EU)
@@ -504,18 +508,21 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         return msg
 
     _mxCalc = None
-    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files):
+    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files, expectingResponse):
         # overwrite the previous draft of this message with another draft
-        self._saveDraft(toAddress, subject, messageBody, cc, bcc, files)
+        self._saveDraft(toAddress, subject, messageBody, cc, bcc, files, expectingResponse)
 
         addresses = [toAddress]
         if cc:
             addresses.append(cc)
 
+        msg = self._savedDraft.message
         # except we are going to send this draft
-        self.original.sendMessage(addresses, self._savedDraft.message)
+        self.original.sendMessage(addresses, msg)
         # and then make it not a draft anymore
-        self._savedDraft.message.draft = False
+        msg.draft = False
+        if expectingResponse:
+            self.original.store.findOrCreate(Catalog).tag(msg, u'expecting-response')
 
         # once the user has sent a message, we'll consider all subsequent
         # drafts in the lifetime of this fragment as being drafts of a
@@ -523,8 +530,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         self._savedDraft.deleteFromStore()
         self._savedDraft = None
 
-    def _saveDraft(self, toAddress, subject, messageBody, cc, bcc, files):
-        msg = self.createMessage(toAddress, subject, messageBody, cc, bcc, files)
+    def _saveDraft(self, toAddress, subject, messageBody, cc, bcc, files, expectingResponse):
+        msg = self.createMessage(toAddress, subject, messageBody, cc, bcc, files, expectingResponse)
         msg.draft = True
 
         if self._savedDraft is not None:
@@ -539,12 +546,12 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             self._savedDraft = Draft(store=self.original.store, message=msg)
 
 
-    def _sendOrSave(self, toAddress, subject, messageBody, cc, bcc, files, draft):
+    def _sendOrSave(self, toAddress, subject, messageBody, cc, bcc, files, draft, expectingResponse):
         if draft:
             f = self._saveDraft
         else:
             f = self._sendMail
-        return f(toAddress, subject, messageBody, cc, bcc, files)
+        return f(toAddress, subject, messageBody, cc, bcc, files, expectingResponse)
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
