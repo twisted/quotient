@@ -26,12 +26,13 @@ from twisted.internet import protocol, defer, reactor
 from twisted.protocols import policies
 from twisted.python import failure
 from twisted.cred import portal, checkers, credentials
-from twisted.mail import smtp
+from twisted.mail import smtp, imap4
 
 from epsilon import sslverify
 
 from axiom import item, attributes, userbase, batch
 from axiom.upgrade import registerUpgrader
+from axiom.errors import MissingDomainPart
 
 from xmantissa.stats import BandwidthMeasuringFactory
 
@@ -165,12 +166,32 @@ class DeliveryFactoryMixin(object):
 
 
 
+class QuotientESMTP(smtp.ESMTP):
+    """
+    Trivial customization of the basic ESMTP server: when this server
+    notices a login which fails with L{axiom.errors.MissingDomainPart} it
+    reports a special error message to the user suggesting they add a domain
+    to their username.
+    """
+    def _ebAuthenticated(self, err):
+        if err.check(MissingDomainPart):
+            self.challenge = None
+            self.sendCode(
+                535,
+                'Authentication failure [Username without domain name '
+                '(ie "yourname" instead of "yourname@yourdomain") not '
+                'allowed; try with a domain name.]')
+        else:
+            return smtp.ESMTP._ebAuthenticated(self, err)
+
+
+
 class ESMTPFactory(protocol.ServerFactory):
     """
     Protocol factory for enhanced SMTP server connections.  Creates server
     protocol instances which know about CRAM-MD5 and TLS.
     """
-    protocol = smtp.ESMTP
+    protocol = QuotientESMTP
 
     def __init__(self, portal, hostname, challengers, contextFactory):
         self.portal = portal
@@ -289,7 +310,9 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
         self.factory = ESMTPFactory(
             self.portal,
             self.domain,
-            {'CRAM-MD5': credentials.CramMD5Credentials},
+            {'CRAM-MD5': credentials.CramMD5Credentials,
+             'LOGIN': imap4.LOGINCredentials,
+             },
             certOpts)
 
         if self.debug:

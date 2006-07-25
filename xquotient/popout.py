@@ -17,6 +17,7 @@ from xquotient.exmess import Message
 from epsilon import sslverify
 
 from axiom import item, attributes
+from axiom.errors import MissingDomainPart
 
 from twisted.mail import pop3
 
@@ -146,11 +147,28 @@ class POP3Up(item.Item, item.InstallableMixin):
 
 
 
+class QuotientPOP3(pop3.POP3):
+    """
+    Trivial customization of the basic POP3 server: when this server notices
+    a login which fails with L{axiom.errors.MissingDomainPart} it reports a
+    special error message to the user suggesting they add a domain to their
+    username.
+    """
+    def _ebMailbox(self, err):
+        if err.check(MissingDomainPart):
+            self.failResponse(
+                'Username without domain name (ie "yourname" instead of '
+                '"yourname@yourdomain") not allowed; try with a domain name.')
+        else:
+            return pop3.POP3._ebMailbox(self, err)
+
+
+
 class POP3ServerFactory(protocol.Factory):
 
     implements(pop3.IServerFactory)
 
-    protocol = pop3.POP3
+    protocol = QuotientPOP3
 
     def __init__(self, portal):
         self.portal = portal

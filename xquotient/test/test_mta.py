@@ -5,6 +5,11 @@ from twisted.trial import unittest
 from twisted.application import service
 from twisted.mail import smtp
 from twisted.internet.defer import gatherResults
+from twisted.internet import error
+from twisted.cred import portal, checkers
+from twisted.test.proto_helpers import StringTransport
+from twisted.internet.address import IPv4Address
+from twisted.python import failure
 
 from epsilon.scripts import certcreate
 
@@ -572,3 +577,46 @@ class MailTests(unittest.TestCase):
             isinstance(header, str),
             "Got %r instead of a string" % (header,))
 
+
+
+class ProtocolTestCase(unittest.TestCase):
+    def setUp(self):
+        """
+        Create a store with a LoginSystem and a portal wrapped around it.
+        """
+        self.store = store.Store()
+        userbase.LoginSystem(store=self.store).installOn(self.store)
+        realm = portal.IRealm(self.store)
+        checker = checkers.ICredentialsChecker(self.store)
+        self.portal = portal.Portal(realm, [checker])
+
+
+    def test_incompleteUsername(self):
+        """
+        Test that a login attempt using a username without a domain part
+        results in a customized authentication failure message which points
+        out that a domain part should be included in the username.
+        """
+        mta = mail.MailTransferAgent(
+            store=self.store, portNumber=None, securePortNumber=None)
+        mta.installOn(self.store)
+        mta.privilegedStartService()
+        factory = mta.factory
+        protocol = factory.buildProtocol(('192.168.1.1', 12345))
+        transport = StringTransport()
+        transport.getHost = lambda: IPv4Address('TCP', '192.168.1.1', 54321)
+        transport.getPeer = lambda: IPv4Address('TCP', '192.168.1.1', 12345)
+        protocol.makeConnection(transport)
+        protocol.dataReceived('EHLO example.net\r\n')
+        protocol.dataReceived('AUTH LOGIN\r\n')
+        protocol.dataReceived('testuser'.encode('base64') + '\r\n')
+        transport.clear()
+        protocol.dataReceived('password'.encode('base64') + '\r\n')
+        written = transport.value()
+        protocol.connectionLost(failure.Failure(error.ConnectionDone()))
+
+        self.assertEquals(
+            written,
+            '535 Authentication failure [Username without domain name (ie '
+            '"yourname" instead of "yourname@yourdomain") not allowed; try '
+            'with a domain name.]\r\n')

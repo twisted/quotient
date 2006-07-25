@@ -1,13 +1,18 @@
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import maybeDeferred, gatherResults
-from twisted.python.filepath import FilePath
+from twisted.python.failure import Failure
+from twisted.internet.error import ConnectionDone
+from twisted.cred.portal import IRealm, Portal
+from twisted.cred.checkers import ICredentialsChecker
+from twisted.test.proto_helpers import StringTransport
 
 from axiom.store import Store
+from axiom.userbase import LoginSystem
 from axiom.test.util import getPristineStore
 
 from xquotient.mail import DeliveryAgent
-from xquotient.popout import POP3Up
+from xquotient.popout import POP3Up, POP3ServerFactory
 
 def createStore(testCase):
     location = testCase.mktemp()
@@ -223,3 +228,38 @@ class MailboxTestCase(TestCase):
             return d
         d.addCallback(undeleted)
         return d
+
+
+
+class ProtocolTestCase(TestCase):
+    def setUp(self):
+        """
+        Create a store with a LoginSystem and a portal wrapped around it.
+        """
+        store = Store()
+        LoginSystem(store=store).installOn(store)
+        realm = IRealm(store)
+        checker = ICredentialsChecker(store)
+        self.portal = Portal(realm, [checker])
+
+
+    def test_incompleteUsername(self):
+        """
+        Test that a login attempt using a username without a domain part
+        results in a customized authentication failure message which points
+        out that a domain part should be included in the username.
+        """
+        factory = POP3ServerFactory(self.portal)
+        protocol = factory.buildProtocol(('192.168.1.1', 12345))
+        transport = StringTransport()
+        protocol.makeConnection(transport)
+        protocol.dataReceived("USER testuser\r\n")
+        transport.clear()
+        protocol.dataReceived("PASS password\r\n")
+        written = transport.value()
+        protocol.connectionLost(Failure(ConnectionDone()))
+
+        self.assertEquals(
+            written,
+            '-ERR Username without domain name (ie "yourname" instead of '
+            '"yourname@yourdomain") not allowed; try with a domain name.\r\n')
