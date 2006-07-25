@@ -1605,7 +1605,7 @@ Quotient.Mailbox.Controller.methods(
      */
     function _changeGroupActionAvailability(self, available) {
         var form = document.forms["group-actions"];
-        var gap = self.getFirstNode(form, "group-action-perform");
+        var gap = self.getFirstNode(form.parentNode.parentNode, "group-action-perform");
         var select = form.elements["group-action"];
 
         if(available) {
