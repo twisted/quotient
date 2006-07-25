@@ -282,13 +282,11 @@ table.button {
     background-color: #D9F0F7;
 }
 
-.scrolltable-container {
-}
-
 .left-block-footer, .mid-block-footer, .right-block-footer {
     background-color: #D9F0F7;
     border-left: solid 1px #7FCCE5;
     border-bottom: solid 1px #7FCCE5;
+    border-top: solid 1px #7FCCE5;
 }
 
 .right-block-footer {
@@ -394,9 +392,7 @@ table.button {
 .view-pane {
     width: 200px;
     height: 100%;
-    border: solid 1px #7FCCE5;
-    border-right: none;
-    border-top: none;
+    border-left: solid 1px #7FCCE5;
     overflow: auto;
 }
 
@@ -651,6 +647,7 @@ img.thumbnail { border: none; }
     height: 100%;
     background-color: #FFFFFF;
     border: solid 1px #7FCCE5;
+    border-bottom: none;
 }
 
 .message-body {

@@ -147,7 +147,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.node.style.width = "300px";
         self._scrollViewport.style.maxHeight = "";
         self.node.style.border = "";
-        self.node.style.borderLeft = self.node.style.borderBottom = "solid 1px #7FCCE5";
+        self.node.style.borderLeft = "solid 1px #7FCCE5";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
         self.throbber = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
     },
@@ -856,7 +856,7 @@ Quotient.Mailbox.Controller.methods(
         self.viewPaneCell.style.height = scrollViewport.style.height;
 
         self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
-                                           self.ypos - 13 -
+                                           self.ypos - 14 -
                                            self.totalFooterHeight) + "px";
 
         if(initialResize) {
