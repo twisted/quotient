@@ -637,7 +637,7 @@ Quotient.Mailbox.Controller.methods(
 
     function adjustProgressBar(self, lessHowManyMessages) {
         if(self.progressBar) {
-            self.progressBar = self.firstWithClass(self.contentTableGrid[1][2],
+            self.progressBar = self.firstWithClass(self.contentTableGrid[2][2],
                                                    "progress-bar");
         }
         self.progressBar.style.borderRight = "solid 1px #6699CC";
@@ -1670,7 +1670,7 @@ Quotient.Mailbox.Controller.methods(
     function setProgressWidth(self) {
         if(!self.progressBar) {
             self.progressBar = self.firstWithClass(
-                                self.contentTableGrid[1][2], "progress-bar");
+                                self.contentTableGrid[2][2], "progress-bar");
             self.messageActions = self.nodesByAttribute("class", "message-actions");
         }
         var visibility;
@@ -1906,22 +1906,10 @@ Quotient.Mailbox.Controller.methods(
             modifier = 'not';
         }
 
-        if(!self.spamButton) {
-            self.spamButton = self.firstWithClass(
-                                self.messageActions[1],
-                                "spam-state");
-        }
-
-        Divmod.Runtime.theRuntime.setNodeContent(
-            self.spamButton,
-            ('<span xmlns="http://www.w3.org/1999/xhtml">' +
-             spamConfidence + ' ' + modifier +
-             '</span>'));
-
         if (nextMessagePreview != null) {
             if(!self.nextMessagePreview) {
                 self.nextMessagePreview = self.firstWithClass(
-                                            self.contentTableGrid[1][2],
+                                            self.contentTableGrid[2][2],
                                             "next-message-preview");
             }
             /* so this is a message, not a compose fragment */

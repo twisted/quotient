@@ -115,9 +115,23 @@
                     </tr>
                   </table>
                 </td>
-                <td style="width: 100%; visibility: hidden; padding-left: 6px; padding-top: 2px" class="message-actions">
+                <td style="visibility: hidden; padding-left: 6px; padding-top: 2px; width: 100%" class="message-actions">
                   <!-- button renderer will place the contents of the tag inside the
                   "content" slot of an instance of the "button" template pattern -->
+                  <div class="message-actions" style="visibility: hidden; float: right">
+                    <span class="train-spam-button">
+                      <nevow:invisible nevow:render="button" href="#">
+                        <athena:handler event="onclick" handler="trainSpam" />
+                        This Is Spam
+                      </nevow:invisible>
+                    </span>
+                    <span class="train-ham-button" style="display: none">
+                      <nevow:invisible nevow:render="button" href="#">
+                        <athena:handler event="onclick" handler="trainHam" />
+                        Not Spam
+                      </nevow:invisible>
+                    </span>
+                  </div>
                   <span class="archive-button">
                     <nevow:invisible nevow:render="button"
                       onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
@@ -204,17 +218,6 @@
             </div>
           </td>
           <td style="width: 100%">
-            <div class="masthead-content">
-              <div class="progress-meter">
-                <div class="progress-bar" />
-              </div>
-
-              <div class="next-message-preview">
-                <nevow:invisible nevow:render="nextMessagePreview" />
-              </div>
-
-              <div style="clear: both; height: 1px">&#160;</div>
-            </div>
             <div class="message-detail">
               <nevow:invisible nevow:render="messageDetail" />
             </div>
@@ -264,23 +267,16 @@
             </table>
           </td>
           <td class="right-block-footer">
-            <div class="message-actions" style="visibility: hidden; padding-top: 4px">
-              <span class="train-spam-button">
-                <nevow:invisible nevow:render="button" href="#">
-                  <athena:handler event="onclick" handler="trainSpam" />
-                  This Is Spam
-                </nevow:invisible>
-              </span>
-              <span class="train-ham-button" style="display: none">
-                <nevow:invisible nevow:render="button" href="#">
-                  <athena:handler event="onclick" handler="trainHam" />
-                  Not Spam
-                </nevow:invisible>
-              </span>
-              <div style="float: right; margin-right: 2px">
-                Spam: <span class="spam-state" nevow:render="spamState" />
+            <div class="masthead-content">
+              <div class="progress-meter">
+                <div class="progress-bar" />
               </div>
-              <div style="height: 2px; clear: both">&#160;</div>
+
+              <div class="next-message-preview">
+                <nevow:invisible nevow:render="nextMessagePreview" />
+              </div>
+
+              <div style="clear: both; height: 1px">&#160;</div>
             </div>
           </td>
         </tr>
