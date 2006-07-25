@@ -173,6 +173,17 @@ class Message(item.Item):
     # Unread message count
     attributes.compoundIndex(trash, draft, deferred, outgoing, archived, spam, read)
 
+    def stored(self):
+        """
+        Hook the occurrence of a message being added to a store and notify the
+        batch processor, if one exists, of the event so that it can schedule
+        itself to handle the new message, if necessary.
+        """
+        from xquotient.mail import MessageSource
+        source = self.store.findUnique(MessageSource, default=None)
+        if source is not None:
+            source.itemAdded()
+
     def activate(self):
         self._prefs = None
 
