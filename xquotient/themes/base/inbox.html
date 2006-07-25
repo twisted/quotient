@@ -223,7 +223,7 @@
         <tr>
           <td class="left-block-footer" style="display: none">&#160;</td>
           <td class="mid-block-footer" style="display: none">
-            <table align="center" style="table-layout: fixed">
+            <table align="center" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
                   <form name="batch-selection" style="display: inline">
@@ -235,7 +235,7 @@
                     </select>
                   </form>
                 </td>
-                <td>
+                <td style="padding-left: 2px">
                   <nevow:invisible nevow:render="button"
                     onclick="Quotient.Mailbox.Controller.get(this).changeBatchSelection(); return false"
                     href="#">
@@ -252,7 +252,7 @@
                     </select>
                   </form>
                 </td>
-                <td class="group-action-perform">
+                <td class="group-action-perform" style="padding-left: 2px">
                   <nevow:invisible nevow:render="button"
                     style="opacity: 0.3; cursor: default"
                     onclick="return false"
