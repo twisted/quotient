@@ -161,7 +161,7 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+        return [webnav.Tab('Email', self.storeID, 0.6, children=
                     [webnav.Tab('Compose', self.storeID, 0.1)],
                 authoritative=False)]
 
@@ -739,7 +739,7 @@ class Drafts(item.Item, item.InstallableMixin):
     installedOn = attributes.reference()
 
     def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+        return [webnav.Tab('Email', self.storeID, 0.6, children=
                     [webnav.Tab('Drafts', self.storeID, 0.0)],
                 authoritative=False)]
 

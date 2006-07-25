@@ -45,7 +45,7 @@ class FilteringPowerup(item.Item, item.InstallableMixin):
 
 
     def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.2, children=
+        return [webnav.Tab('Email', self.storeID, 0.2, children=
                     [webnav.Tab('Filtering', self.storeID, 0.1)],
                 authoritative=False)]
 

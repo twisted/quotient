@@ -106,6 +106,7 @@ ul.file-list, ul.file-list li {
 }
 
 .quotient-menubar {
+    border-top: solid 1px #0099CC;
     background-color: #7FCCE5;
     border-bottom: solid 1px #0099CC;
     width: 100%;

@@ -126,7 +126,7 @@ class Gallery(Item, InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
     def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+        return [webnav.Tab('Email', self.storeID, 0.6, children=
                     [webnav.Tab('Gallery', self.storeID, 0.0)],
                 authoritative=False)]
 
