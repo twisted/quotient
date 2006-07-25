@@ -275,7 +275,6 @@ table.button {
 
 .scrolltable-header {
     border-left: solid 1px #7FCCE5;
-    height: 30px;
     width: 100%;
 }
 
@@ -284,7 +283,6 @@ table.button {
 }
 
 .scrolltable-container {
-    border-top: solid 1px #7FCCE5;
 }
 
 .left-block-footer, .mid-block-footer, .right-block-footer {
@@ -414,7 +412,6 @@ table.button {
     width: 200px;
     height: 100%;
     padding-bottom: 1px;
-    border-top: solid 1px #7FCCE5;
 }
 
 .views-collapsible-pane {
@@ -486,6 +483,11 @@ table.button {
 
 .next-message > .next {
     color: #81B1E2;
+}
+
+.actions-row {
+    background-color: #CCEBF5;
+    border-bottom: solid 1px #7FCCE5;
 }
 
 .progress-meter, .message-actions {

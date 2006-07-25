@@ -171,7 +171,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self._scrollViewport.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
                                              wp.messageBlockYPos -
                                              wp.totalFooterHeight -
-                                             wp.scrollHeaderHeight -
                                              basePadding) + "px";
 
     },
@@ -556,15 +555,12 @@ Quotient.Mailbox.Controller.methods(
         self._viewingByView = 'Inbox';
         self.setupMailViewNodes();
 
-        self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
+        self.messageDetail = self.firstWithClass(self.contentTableGrid[1][2], "message-detail");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
 
-        var scrollHeader = self.firstWithClass(self.contentTableGrid[0][1], "scrolltable-header");
-        scrollHeader.parentNode.style.display = "";
-        self.scrollHeaderHeight = Divmod.Runtime.theRuntime.getElementSize(scrollHeader).h;
-        scrollHeader.parentNode.style.display = "none";
+        var scrollHeader = self.firstWithClass(self.contentTableGrid[0][0], "scrolltable-header");
         self.scrollHeader = scrollHeader;
         self.viewPaneCell = self.firstWithClass(self.contentTableGrid[1][0], "view-pane-cell");
 
@@ -641,7 +637,7 @@ Quotient.Mailbox.Controller.methods(
 
     function adjustProgressBar(self, lessHowManyMessages) {
         if(self.progressBar) {
-            self.progressBar = self.firstWithClass(self.contentTableGrid[0][2],
+            self.progressBar = self.firstWithClass(self.contentTableGrid[1][2],
                                                    "progress-bar");
         }
         self.progressBar.style.borderRight = "solid 1px #6699CC";
@@ -911,7 +907,9 @@ Quotient.Mailbox.Controller.methods(
 
     function _groupSetDisplay(self, nodes, display) {
         for(var i = 0; i < nodes.length; i++) {
-            nodes[i].style.display = display;
+            if(nodes[i]) {
+                nodes[i].style.display = display;
+            }
         }
     },
 
@@ -927,19 +925,22 @@ Quotient.Mailbox.Controller.methods(
         var fontSize;
 
         if(c == 1) {
-            self.hideAll(self._getContentTableColumn(0));
+            self.contentTableGrid[1][0].style.display = "none";
+            self.contentTableGrid[2][0].style.display = "none";
             self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
             /* use the default font-size, because complexity 1
                is the default complexity. */
             fontSize = "";
         } else if(c == 2) {
-            self.hideAll(self._getContentTableColumn(0));
+            self.contentTableGrid[1][0].style.display = "none";
+            self.contentTableGrid[2][0].style.display = "none";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             fontSize = "1.3em";
         } else if(c == 3) {
-            self.showAll(self._getContentTableColumn(0));
+            self.contentTableGrid[1][0].style.display = "";
+            self.contentTableGrid[2][0].style.display = "";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             fontSize = "1.3em";
@@ -1690,7 +1691,7 @@ Quotient.Mailbox.Controller.methods(
     function setProgressWidth(self) {
         if(!self.progressBar) {
             self.progressBar = self.firstWithClass(
-                                self.contentTableGrid[0][2], "progress-bar");
+                                self.contentTableGrid[1][2], "progress-bar");
             self.messageActions = self.nodesByAttribute("class", "message-actions");
         }
         var visibility;
@@ -1941,7 +1942,7 @@ Quotient.Mailbox.Controller.methods(
         if (nextMessagePreview != null) {
             if(!self.nextMessagePreview) {
                 self.nextMessagePreview = self.firstWithClass(
-                                            self.contentTableGrid[0][2],
+                                            self.contentTableGrid[1][2],
                                             "next-message-preview");
             }
             /* so this is a message, not a compose fragment */
