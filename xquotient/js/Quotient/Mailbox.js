@@ -554,7 +554,6 @@ Quotient.Mailbox.Controller.methods(
 
         self._viewingByView = 'Inbox';
         self.setupMailViewNodes();
-
         self.messageDetail = self.firstWithClass(self.contentTableGrid[1][2], "message-detail");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
@@ -563,6 +562,7 @@ Quotient.Mailbox.Controller.methods(
         var scrollHeader = self.firstWithClass(self.contentTableGrid[0][0], "scrolltable-header");
         self.scrollHeader = scrollHeader;
         self.viewPaneCell = self.firstWithClass(self.contentTableGrid[1][0], "view-pane-cell");
+        self.viewShortcutContainer = self.firstWithClass(self.scrollHeader, "view-shortcut-container");
 
         var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.node,
                                                            "athena:class",
@@ -811,22 +811,20 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function setInitialComplexity(self, complexityLevel) {
-        if(1 < complexityLevel) {
-            var cc = self.firstWithClass(self.node, "complexity-icons");
-            self.setComplexity(complexityLevel,
-                                cc.getElementsByTagName("img")[3-complexityLevel],
-                                false);
-            /* firefox goofs the table layout unless we make it
-                factor all three columns into it.  the user won't
-                actually see anything strange */
-            if(complexityLevel == 2) {
-                self._setComplexityVisibility(3);
-                /* two vanilla calls aren't enough, firefox won't
-                    update the viewport */
-                setTimeout(function() {
-                    self._setComplexityVisibility(2);
-                }, 1);
-            }
+        var cc = self.firstWithClass(self.node, "complexity-icons");
+        self.setComplexity(complexityLevel,
+                            cc.getElementsByTagName("img")[3-complexityLevel],
+                            false);
+        /* firefox goofs the table layout unless we make it
+            factor all three columns into it.  the user won't
+            actually see anything strange */
+        if(complexityLevel != 3) {
+            self._setComplexityVisibility(3);
+            /* two vanilla calls aren't enough, firefox won't
+                update the viewport */
+            setTimeout(function() {
+                self._setComplexityVisibility(complexityLevel);
+            }, 1);
         }
     },
 
@@ -923,12 +921,13 @@ Quotient.Mailbox.Controller.methods(
 
     function _setComplexityVisibility(self, c) {
         var fontSize;
-
         if(c == 1) {
             self.contentTableGrid[1][0].style.display = "none";
             self.contentTableGrid[2][0].style.display = "none";
             self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
+            self.scrollHeader.style.display = "";
+            self.viewShortcutContainer.style.display = "";
             /* use the default font-size, because complexity 1
                is the default complexity. */
             fontSize = "";
@@ -937,8 +936,10 @@ Quotient.Mailbox.Controller.methods(
             self.contentTableGrid[2][0].style.display = "none";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
+            self.viewShortcutContainer.style.display = "";
             fontSize = "1.3em";
         } else if(c == 3) {
+            self.viewShortcutContainer.style.display = "none";
             self.contentTableGrid[1][0].style.display = "";
             self.contentTableGrid[2][0].style.display = "";
             self.showAll(self._getContentTableColumn(1));
@@ -1193,10 +1194,7 @@ Quotient.Mailbox.Controller.methods(
         }
 
         if(!self.viewShortcuts) {
-            var viewShortcutContainer = self.firstWithClass(
-                                            self.scrollHeader,
-                                            "view-shortcut-container");
-            self.viewShortcuts = Nevow.Athena.NodesByAttribute(viewShortcutContainer,
+            self.viewShortcuts = Nevow.Athena.NodesByAttribute(self.viewShortcutContainer,
                                                                "class",
                                                                "view-shortcut");
             self.viewShortcuts.push(
