@@ -106,15 +106,11 @@
                   <table class="scrolltable-header">
                     <tr valign="bottom">
                       <td class="view-shortcut-container">
-                        <a class="selected-view-shortcut" href="#"
-                          onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                          >Inbox</a> |
-                        <a class="view-shortcut" href="#"
-                          onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                          >Sent</a> |
-                        <a class="view-shortcut" href="#"
-                          onclick="Quotient.Mailbox.Controller.get(this).viewShortcut(this); return false"
-                          >Spam</a>
+                        <select onchange="Quotient.Mailbox.Controller.get(this).viewShortcut(this)">
+                          <option value="Inbox">Inbox</option>
+                          <option value="Sent">Sent</option>
+                          <option value="Spam">Spam</option>
+                        </select>
                       </td>
                       <td style="padding-left: 6px">
                         <form name="batch-selection" style="display: inline">

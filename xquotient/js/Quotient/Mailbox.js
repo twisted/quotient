@@ -1193,22 +1193,12 @@ Quotient.Mailbox.Controller.methods(
             return;
         }
 
-        if(!self.viewShortcuts) {
-            self.viewShortcuts = Nevow.Athena.NodesByAttribute(self.viewShortcutContainer,
-                                                               "class",
-                                                               "view-shortcut");
-            self.viewShortcuts.push(
-                self.firstWithClass(
-                    viewShortcutContainer, "selected-view-shortcut"));
-        }
-
-        var shortcut;
-        for(var i = 0; i < self.viewShortcuts.length; i++) {
-            shortcut = self.viewShortcuts[i];
-            if(shortcut.firstChild.nodeValue == self._viewingByView) {
-                shortcut.className = "selected-view-shortcut";
-            } else {
-                shortcut.className = "view-shortcut";
+        var select = self.viewShortcutContainer.getElementsByTagName("select")[0];
+        var options = select.getElementsByTagName("option");
+        for(var i = 0; i < options.length; i++) {
+            if(options[i].value == self._viewingByView) {
+                select.selectedIndex = i;
+                break;
             }
         }
     },
@@ -1301,17 +1291,8 @@ Quotient.Mailbox.Controller.methods(
      * @param n: node
      */
     function viewShortcut(self, n) {
-        var type = n.firstChild.nodeValue;
+        var type = n.value;
         self._sendViewRequest('viewByMailType', type);
-
-        var e;
-        for(var i = 0; i < n.parentNode.childNodes.length; i++) {
-            e = n.parentNode.childNodes[i];
-            if(e.className == "selected-view-shortcut") {
-                e.className = "view-shortcut";
-            }
-        }
-        n.className = "selected-view-shortcut";
 
         /* if we haven't done this before */
         if(!self.viewOptions) {
