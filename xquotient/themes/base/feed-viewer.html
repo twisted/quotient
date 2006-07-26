@@ -1,0 +1,10 @@
+<nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
+  <tr class="body-row" nevow:pattern="body-row" style="display: none">
+    <td colspan="2" style="font-style: italic; white-space: normal">
+      <nevow:slot name="col-value" />
+    </td>
+  </tr>
+  <a nevow:pattern="toggle-desc" href="#"
+    onclick="Quotient.Common.FeedList.get(this).toggleDescriptionVisibility(this); return false"
+    ><img src="/Quotient/static/images/expand.png" border="0" /></a>
+</nevow:invisible>

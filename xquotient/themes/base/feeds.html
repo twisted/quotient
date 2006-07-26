@@ -1,0 +1,27 @@
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment" style="margin-top: 4px" class="feeds">
+  <nevow:invisible nevow:render="feedTDBs" />
+
+  <div nevow:pattern="feed">
+    <h3><nevow:slot name="name" /></h3>
+    <nevow:slot name="tdb" />
+  </div>
+
+  <table>
+    <tr>
+      <td>
+        URL:
+      </td>
+      <td>
+        <form onsubmit="Quotient.Common.Feeds.get(this).addFeed(this); return false">
+          <input style="width: 30ex" type="text" name="url" />
+          <input type="submit" value="Add" />
+        </form>
+      </td>
+      <td>
+        <img class="add-throbber" src="/Quotient/static/images/throbber.gif" style="visibility: hidden" />
+      </td>
+    </tr>
+  </table>
+
+</div>
+

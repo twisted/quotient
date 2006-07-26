@@ -17,6 +17,14 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     font-style: italic;
 }
 
+.feeds .tdb-control-panel {
+    white-space: nowrap;
+}
+
+.feeds .tdb {
+    width: 100%;
+}
+
 .msg-detail-sent-date {
     padding-right: 4px;
     float: right;

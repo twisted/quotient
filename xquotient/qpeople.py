@@ -2,19 +2,43 @@ from zope.interface import implements
 
 from nevow.flat import flatten
 from nevow.athena import expose
+from nevow import athena, stan, inevow, tags, rend
 
 from axiom.item import Item, InstallableMixin
-from axiom import attributes
+from axiom import attributes, scheduler
 from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.tdb import TabularDataModel
 from xmantissa.tdbview import TabularDataView, ColumnViewBase, DateColumnView
+from xmantissa import tdb, tdbview
+from xmantissa.fragmentutils import dictFillSlots, PatternDictionary
 
 from xquotient import extract, mail, exmess, equotient, mimeutil, gallery
+from xquotient.rss import Feed, FeedItem
 
 from xmantissa.scrolltable import UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
+
+class FeedBenefactor(Item):
+    implements(ixmantissa.IBenefactor)
+    endowed = attributes.integer(default=0)
+
+    def installOn(self, other):
+        other.powerUp(self, ixmantissa.IBenefactor)
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(FeedLister).installOn(avatar.findOrCreate(people.Organizer))
+        avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
+        self.endowed += 1
+
+    def deprive(self, ticket, avatar):
+        feedLister = avatar.findUnique(FeedLister)
+        avatar.findUnique(people.Organizer).powerDown(
+                                            feedLister, ixmantissa.IOrganizerPlugin)
+        feedLister.deleteFromStore()
+
+        self.endowed -= 1
 
 def makePersonExtracts(store, person):
     def queryMessageSenderPerson(typ):
@@ -143,9 +167,132 @@ class ExcerptColumn(AttributeColumn):
     def getType(self):
         return TYPE_FRAGMENT
 
+class DescriptionColumnView(tdbview.ColumnViewBase):
+    def stanFromValue(self, idx, item, value):
+        return stan.xml(item.description)
+
+class SubjectColumnView(tdbview.ColumnViewBase):
+    togglePattern = None
+    def stanFromValue(self, idx, item, value):
+        if self.togglePattern is None:
+            self.togglePattern = inevow.IQ(getLoader('feed-viewer')).patternGenerator('toggle-desc')
+        return tags.b[self.togglePattern(), stan.xml(value)]
+
+class DoubleRowTabularDataView(tdbview.TabularDataView):
+    """
+    alternate TDB view that places a specified column
+    on it's own row (giving two rows to each item in the
+    result set)
+    """
+    splitAttributeID = None
+    altRowPattern = None
+
+    def __init__(self, *a, **k):
+        super(DoubleRowTabularDataView, self).__init__(*a, **k)
+
+        for cview in self.columnViews:
+            if cview.attributeID == self.splitAttributeID:
+                self.splitColumn = cview
+                self.columnViews.remove(cview)
+                break
+
+    def constructRows(self, modelData):
+        columnRowPattern = self.patterns['row']
+        cellPattern = self.patterns['cell']
+
+        for (idx, row) in enumerate(modelData):
+            cells = []
+            for cview in self.columnViews:
+                if cview.attributeID == self.splitAttributeID:
+                    continue
+                value = row.get(cview.attributeID)
+                cellContents = cview.stanFromValue(
+                                idx, row['__item__'], value)
+                handler = cview.onclick(idx, row['__item__'], value)
+                cellStan = dictFillSlots(cellPattern,
+                                         {'value': cellContents,
+                                          'onclick': handler,
+                                          'class': cview.typeHint})
+                cells.append(cellStan)
+
+            yield dictFillSlots(columnRowPattern,
+                                {'cells': cells,
+                                 'class': 'tdb-row-%s' % (idx,)})
+
+            yield self.altRowPattern.fillSlots('col-value',
+                    self.splitColumn.stanFromValue(
+                        idx, row['__item__'], row.get(self.splitAttributeID)))
+
+class FeedViewer(DoubleRowTabularDataView):
+    def __init__(self, *a, **k):
+        self.altRowPattern = inevow.IQ(getLoader(
+                                'feed-viewer')).patternGenerator('body-row')
+        self.splitAttributeID = 'description'
+        super(FeedViewer, self).__init__(*a, **k)
+
+class FeedTitleColumnView(tdbview.ColumnViewBase):
+    def stanFromValue(self, idx, item, value):
+        return tags.a(href=item.feed.url)[item.feed.title]
 class SubjectColumn(AttributeColumn):
     def extractValue(self, model, item):
         return item.message.subject
+
+
+class FeedList(athena.LiveFragment):
+    implements(ixmantissa.IPersonFragment)
+    title = 'Feeds'
+    live = 'athena'
+    jsClass = 'Quotient.Common.Feeds'
+
+    def __init__(self, person):
+        self.person = person
+        rend.Fragment.__init__(self, person)
+        self.docFactory = getLoader('feeds')
+
+    def addFeed(self, url):
+        s = self.person.store
+        if s.findFirst(Feed,
+                       attributes.AND(
+                           Feed.author == self.person,
+                           Feed.url == url),
+                       default=None) is None:
+
+            f = Feed(store=s,
+                     author=self.person,
+                     url=url)
+
+            def doneFetching(n):
+                f # we want the feed to stay in memory
+                  # so it doesn't forget about us
+                if 0 < n:
+                    return self.tdv.replaceTable()
+
+            return f.notifyAfterFetch().addCallback(doneFetching)
+    expose(addFeed)
+
+    def render_feedTDBs(self, ctx, data):
+        patterns = PatternDictionary(self.docFactory)
+
+        tdm = tdb.TabularDataModel(
+                self.person.store,
+                FeedItem,
+                (FeedItem.subject, FeedItem.timestamp),
+                defaultSortAscending=False,
+                defaultSortColumn='timestamp',
+                itemsPerPage=5)
+
+        views = (FeedTitleColumnView('feed'),
+                 SubjectColumnView('subject'),
+                 tdbview.DateColumnView('timestamp'),
+                 DescriptionColumnView('description'))
+
+        tdv = FeedViewer(tdm, views)
+        tdv.setFragmentParent(self.page)
+        tdv.jsClass = 'Quotient.Common.FeedList'
+        tdv.docFactory = getLoader(tdv.fragmentName)
+        self.tdv = tdv
+
+        return tdv
 
 
 class MessageLister(Item, InstallableMixin):
@@ -183,6 +330,21 @@ class MessageLister(Item, InstallableMixin):
                                 sort=exmess.Message.receivedWhen.desc,
                                 limit=n)
 
+# this is a waste of an item
+class FeedLister(Item, InstallableMixin):
+    implements(ixmantissa.IOrganizerPlugin)
+
+    typeName = 'quotient_rss_lister_plugin'
+    schemaVersion = 1
+
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(FeedLister, self).installOn(other)
+        other.powerUp(self, ixmantissa.IOrganizerPlugin)
+
+    def personalize(self, person):
+        return FeedList(person)
 
 class ImageLister(Item):
     typeName = 'quotient_image_lister_plugin'

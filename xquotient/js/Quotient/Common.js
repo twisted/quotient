@@ -1,6 +1,7 @@
 /* this javascript file should be included by all quotient pages */
 // import Quotient
 // import Mantissa.People
+// import Mantissa.TDB
 
 Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
@@ -28,6 +29,62 @@ Quotient.Common.Util.difference = function(a1, a2) {
     }
     return diff;
 }
+
+Quotient.Common.FeedList = Mantissa.TDB.Controller.subclass('Quotient.Common.FeedList');
+Quotient.Common.FeedList.methods(
+    function toggleDescriptionVisibility(self, linkNode) {
+        linkNode.blur();
+
+        var row = linkNode;
+        while(row && (!row.tagName || row.tagName.toLowerCase() != "tr")) {
+            row = row.parentNode;
+        }
+        while(row && row.className != "body-row") {
+            row = row.nextSibling;
+        }
+        var imgNode = linkNode.getElementsByTagName("img")[0];
+        if(row.style.display == "none") {
+            row.style.display = "";
+            imgNode.src = imgNode.src.replace("expand", "collapse");
+        } else {
+            row.style.display = "none";
+            imgNode.src = imgNode.src.replace("collapse", "expand");
+        }
+    },
+
+    function replaceTable(self, result) {
+        var tdbTable = result[0];
+        var tdbState = result[1];
+        self._setTableContent(tdbTable);
+        self._setPageState.apply(self, tdbState);
+    });
+
+
+Quotient.Common.Feeds = Nevow.Athena.Widget.subclass('Quotient.Common.Feeds');
+Quotient.Common.Feeds.method(
+    function addFeed(self, form) {
+        if(!self.throbber) {
+           self.throbber = self.firstNodeByAttribute("class", "add-throbber");
+        }
+        self.throbber.style.visibility = "visible";
+        var d = self.callRemote('addFeed', form.url.value);
+        d.addCallback(
+            function(res) {
+                if(res) {
+                    if(!self.feedList) {
+                        self.feedList = Nevow.Athena.Widget.get(
+                                            self.firstNodeByAttribute(
+                                                "athena:class", "Quotient.Common.FeedList"));
+                    }
+                    self.feedList.replaceTable(res);
+                }
+            });
+        d.addErrback(alert);
+        d.addCallback(
+            function() {
+                self.throbber.style.visibility = "hidden";
+            });
+    });
 
 Quotient.Common.Util.findPosX = function(obj) {
     var curleft = 0;
