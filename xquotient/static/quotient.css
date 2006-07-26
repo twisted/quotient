@@ -4,6 +4,11 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     margin-right: 4px;
 }
 
+.detail-toggle {
+    font-size: .8em;
+    font-style: italic;
+}
+
 .msg-detail-sent-date {
     padding-right: 4px;
     float: right;
@@ -15,6 +20,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     padding-right: 6px;
     text-align: right;
     font-size: 1.2em;
+    white-space: nowrap;
 }
 
 .msg-subject {

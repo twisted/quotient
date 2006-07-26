@@ -6,6 +6,20 @@
 
 Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
 Quotient.Mailbox.MessageDetail.methods(
+    function __init__(self, node, showMoreDetail) {
+        Quotient.Mailbox.MessageDetail.upcall(self, "__init__", node);
+        if(showMoreDetail) {
+            self.toggleMoreDetail();
+        }
+    },
+
+    function _getMoreDetailNode(self) {
+        if(!self.moreDetailNode) {
+            self.moreDetailNode = self.firstNodeByAttribute("class", "detail-toggle");
+        }
+        return self.moreDetailNode;
+    },
+
     function messageSource(self) {
         self.callRemote("getMessageSource").addCallback(
             function(source) {
@@ -13,6 +27,48 @@ Quotient.Mailbox.MessageDetail.methods(
                     self.nodeByAttribute("class", "message-body"),
                     MochiKit.DOM.PRE(null, source));
         });
+    },
+
+    /**
+     * Toggle the visibility of the "more detail" panel, which contains
+     * some extra headers, or more precise values for headers that are
+     * summarized or approximated elsewhere.
+     *
+     * @param node: the toggle link node (if undefined, will locate in DOM)
+     * @return: undefined
+     */
+    function toggleMoreDetail(self, node) {
+        if(node == undefined) {
+            node = self._getMoreDetailNode();
+        }
+
+        node.blur();
+
+        if(node.firstChild.nodeValue == "More Detail") {
+            node.firstChild.nodeValue = "Less Detail";
+        } else {
+            node.firstChild.nodeValue = "More Detail";
+        }
+
+        if(!self.headerTable) {
+            self.headerTable = self.firstNodeByAttribute("class", "msg-header-table");
+        }
+
+        var visible;
+        var rows = self.headerTable.getElementsByTagName("tr");
+        for(var i = 0; i < rows.length; i++) {
+            if(rows[i].className == "detailed-row") {
+                if(rows[i].style.display == "none") {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+                if(visible == undefined) {
+                    visible = rows[i].style.display != "none";
+                }
+            }
+        }
+        return self.callRemote("persistMoreDetailSetting", visible);
     },
 
     /**

@@ -15,7 +15,6 @@ from xmantissa.people import Person, EmailAddress
 from xquotient.exmess import Message, MessageDetail
 from xquotient.inbox import Inbox, InboxScreen
 from xquotient.compose import Composer
-from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.qpeople import MessageList, MessageLister
 
@@ -52,7 +51,6 @@ def getBaseStorePath(messageParts):
         receiver = DBSetup('test_x').setUpMailStuff()
         store = receiver.store
         PrivateApplication(store=store).installOn(store)
-        QuotientPreferenceCollection(store=store).installOn(store)
         makeMessage(receiver, messageParts, None)
         store.close()
         _theBaseStorePath = store.dbdir

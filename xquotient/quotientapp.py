@@ -2,6 +2,7 @@ from zope.interface import implements
 
 from axiom.item import Item, InstallableMixin
 from axiom import iaxiom, attributes, scheduler
+from axiom.upgrade import registerAttributeCopyingUpgrader
 
 from xmantissa import website, webapp, ixmantissa, people, prefs
 from xmantissa import fulltext, search
@@ -162,19 +163,29 @@ class _ShowReadPreference(prefs.MultipleChoicePreference):
                                                   collection, desc,
                                                   valueToDisplay)
 
+class _ShowMoreDetailPreference(prefs.MultipleChoicePreference):
+    def __init__(self, value, collection):
+        valueToDisplay = {True: 'Yes', False: 'No'}
+        desc = 'Show "More Detail" panel in message detail by default'
+        super(_ShowMoreDetailPreference, self).__init__('showMoreDetail',
+                                                        value,
+                                                        'Show "More Detail"',
+                                                        collection,
+                                                        desc,
+                                                        valueToDisplay)
+
 class QuotientPreferenceCollection(Item, InstallableMixin):
     implements(ixmantissa.IPreferenceCollection)
 
     typeName = 'quotient_preference_collection'
-    schemaVersion = 1
+    schemaVersion = 2
 
     installedOn = attributes.reference()
 
     preferredMimeType = attributes.text(default=u'text/plain')
     preferredMessageDisplay = attributes.text(default=u'split')
     showRead = attributes.boolean(default=True)
-
-    _cachedPrefs = attributes.inmemory()
+    showMoreDetail = attributes.boolean(default=False)
 
     applicationName = 'Mail'
 
@@ -182,18 +193,17 @@ class QuotientPreferenceCollection(Item, InstallableMixin):
         super(QuotientPreferenceCollection, self).installOn(other)
         other.powerUp(self, ixmantissa.IPreferenceCollection)
 
-    def activate(self):
+    # IPreferenceCollection
+    def getPreferences(self):
         pmt = _PreferredMimeType(self.preferredMimeType, self)
         pmd = _PreferredMessageDisplay(self.preferredMessageDisplay, self)
         showRead = _ShowReadPreference(self.showRead, self)
+        showMoreDetail = _ShowMoreDetailPreference(self.showMoreDetail, self)
 
-        self._cachedPrefs = dict(preferredMimeType=pmt,
-                                 preferredMessageDisplay=pmd,
-                                 showRead=showRead)
-
-    # IPreferenceCollection
-    def getPreferences(self):
-        return self._cachedPrefs
+        return dict(preferredMimeType=pmt,
+                    preferredMessageDisplay=pmd,
+                    showRead=showRead,
+                    showMoreDetail=showMoreDetail)
 
     def setPreferenceValue(self, pref, value):
         # this ugliness is short lived
@@ -217,3 +227,5 @@ class QuotientPreferenceCollection(Item, InstallableMixin):
         if sections:
             return sections
         return None
+
+registerAttributeCopyingUpgrader(QuotientPreferenceCollection, 1, 2)

@@ -401,6 +401,11 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
     def __init__(self, original):
         self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
+        self.prefs = ixmantissa.IPreferenceAggregator(original.store)
+
+        from xquotient.quotientapp import QuotientPreferenceCollection
+        self.qprefs = original.store.findUnique(QuotientPreferenceCollection)
+
         athena.LiveFragment.__init__(self, original, getLoader('message-detail'))
 
         self.messageParts = list(original.walkMessage())
@@ -413,6 +418,9 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
     def head(self):
         return None
+
+    def getInitialArguments(self):
+        return (self.getMoreDetailSetting(),)
 
     def render_addPersonFragment(self, ctx, data):
         from xquotient.qpeople import AddPersonFragment
@@ -462,25 +470,35 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         else:
             personStan = self.original.sender
 
-        prefs = ixmantissa.IPreferenceAggregator(self.original.store)
-        tzinfo = pytz.timezone(prefs.getPreferenceValue('timezone'))
-        sentWhen = self.original.sentWhen.asHumanly(tzinfo)
+        tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone'))
+        sentWhen = self.original.sentWhen
+
+        sentWhenTerse = sentWhen.asHumanly(tzinfo)
+        sentWhenDetailed = sentWhen.asRFC2822(tzinfo)
+        receivedWhenDetailed = self.original.receivedWhen.asRFC2822(tzinfo)
 
         try:
             cc = self.original.impl.getHeader(u'cc')
         except equotient.NoSuchHeader:
-            cc = u''
+            ccDetailed = ''
         else:
-            addrs = mimeutil.parseEmailAddresses(cc, mimeEncoded=False)
-            cc = self.patterns['cc'].fillSlots(
-                'cc', ', '.join(e.anyDisplayName() for e in addrs))
+            ccDetailed = self.patterns['cc-detailed'].fillSlots('cc', cc)
+
+        sender = self.original.sender
+
+        senderDisplay = self.original.senderDisplay
+        if senderDisplay and not senderDisplay.isspace():
+            sender = '"%s" <%s>' % (senderDisplay, sender)
 
         return dictFillSlots(ctx.tag,
-                dict(sender=personStan,
-                     recipient=self.original.recipient,
-                     cc=cc,
-                     subject=self.original.subject,
-                     sent=sentWhen))
+                    {'sender-person': personStan,
+                     'sender': sender,
+                     'recipient': self.original.recipient,
+                     'cc-detailed': ccDetailed,
+                     'subject': self.original.subject,
+                     'sent': sentWhenTerse,
+                     'sent-detailed': sentWhenDetailed,
+                     'received-detailed': receivedWhenDetailed})
 
     def _childLink(self, webItem, item):
         return '/' + webItem.prefixURL + '/' + self.translator.toWebID(item)
@@ -561,6 +579,16 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                 paragraphs.append(renderable)
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
+
+    moreDetailPref = None
+
+    def getMoreDetailSetting(self):
+        return self.qprefs.showMoreDetail
+    expose(getMoreDetailSetting)
+
+    def persistMoreDetailSetting(self, value):
+        self.qprefs.showMoreDetail = value
+    expose(persistMoreDetailSetting)
 
     def getMessageSource(self):
         source = self.original.impl.source.getContent()

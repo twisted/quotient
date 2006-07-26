@@ -33,6 +33,11 @@
     CC: <nevow:slot name="cc" />
   </div>
 
+  <tr style="display: none" class="detailed-row" nevow:pattern="cc-detailed">
+    <td class="msg-detail-field-name">CC:</td>
+    <td class="mesg-detail-header-body"><nevow:slot name="cc" /></td>
+  </tr>
+
   <div nevow:pattern="message-source-link" align="right" style="clear: both">
     (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
   </div>

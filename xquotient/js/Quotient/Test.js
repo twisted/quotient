@@ -658,3 +658,115 @@ Quotient.Test.GroupActionsTestCase.methods(
                 assertUnreadCountsAre({Inbox: 6, All: 7});
         });
     });
+
+Quotient.Test.MsgDetailTestBase = Nevow.Athena.Test.TestCase.subclass('MsgDetailTestBase');
+Quotient.Test.MsgDetailTestBase.methods(
+    /**
+     * Assert that the msg detail header fields that belong
+     * inside the "More Detail" panel are visible or not
+     *
+     * @param visible: boolean
+     * @return: undefined
+     */
+    function assertMoreDetailVisibility(self, visible) {
+        var rows = Nevow.Athena.NodesByAttribute(
+                    self.node.parentNode, "class", "detailed-row");
+        if(rows.length == 0) {
+            self.fail("expected at least one 'More Detail' row");
+        }
+        for(var i = 0; i < rows.length; i++) {
+            self.assertEquals(rows[i].style.display != "none", visible);
+        }
+    },
+
+    function getMsgDetailWidget(self) {
+        if(!self.widget) {
+            self.widget = Quotient.Mailbox.MessageDetail.get(
+                            Nevow.Athena.NodeByAttribute(
+                                self.node.parentNode,
+                                "athena:class",
+                                "Quotient.Mailbox.MessageDetail"));
+        }
+        return self.widget;
+    },
+
+    /**
+     * Find out the current value of the C{showMoreDetail} setting
+     * @return: string
+     */
+     function getMoreDetailSetting(self) {
+        return self.getMsgDetailWidget().callRemote("getMoreDetailSetting");
+    },
+
+    /**
+     * Wrapper for the C{toggleMoreDetail} method on the
+     * L{Quotient.Mailbox.MessageDetail} widget that's associated with
+     * this test.
+     */
+    function toggleMoreDetail(self) {
+        return self.getMsgDetailWidget().toggleMoreDetail();
+    });
+
+/**
+ * Check that the message detail renders correctly
+ */
+Quotient.Test.MsgDetailTestCase = Quotient.Test.MsgDetailTestBase.subclass('MsgDetailTestCase');
+Quotient.Test.MsgDetailTestCase.methods(
+    function run(self) {
+        var hdrs = Nevow.Athena.FirstNodeByAttribute(
+                        self.node.parentNode, "class", "msg-header-table");
+        var fieldvalues = {};
+        var rows = hdrs.getElementsByTagName("tr");
+        var cols, fieldname;
+
+        for(var i = 0; i < rows.length; i++) {
+            cols = rows[i].getElementsByTagName("td");
+            if(cols.length < 2) {
+                continue;
+            }
+            fieldname = cols[0].firstChild.nodeValue;
+            fieldname = fieldname.toLowerCase().slice(0, -1);
+            fieldvalues[fieldname] = cols[1].firstChild.nodeValue;
+        }
+        var assertFieldsEqual = function(answers) {
+            for(var k in answers) {
+                self.assertEquals(fieldvalues[k], answers[k]);
+            }
+        }
+
+        assertFieldsEqual(
+            {from: "sender@host",
+             to: "recipient@host",
+             subject: "the subject",
+             sent: "Wed, 31 Dec 1969 19:00:00 -0500",
+             received: "Wed, 31 Dec 1969 19:00:01 -0500"});
+
+        return self.getMoreDetailSetting().addCallback(
+            function(moreDetail) {
+                self.assertEquals(moreDetail, false);
+                self.assertMoreDetailVisibility(false);
+                return self.toggleMoreDetail();
+        }).addCallback(
+            function() {
+                return self.getMoreDetailSetting();
+        }).addCallback(
+            function(moreDetail) {
+                self.assertEquals(moreDetail, true);
+                self.assertMoreDetailVisibility(true);
+                return self.toggleMoreDetail();
+        }).addCallback(
+            function() {
+                return self.getMoreDetailSetting();
+        }).addCallback(
+            function(moreDetail) {
+                self.assertEquals(moreDetail, false);
+                self.assertMoreDetailVisibility(false);
+        });
+    });
+
+Quotient.Test.MsgDetailInitArgsTestCase = Quotient.Test.MsgDetailTestBase.subclass(
+                                                'MsgDetailInitArgsTestCase');
+Quotient.Test.MsgDetailInitArgsTestCase.methods(
+    function run(self) {
+        self.assertMoreDetailVisibility(true);
+    });
