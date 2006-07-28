@@ -1,8 +1,14 @@
+
+import time
+
 from twisted.internet import reactor
 from twisted.trial import unittest
+
 from axiom import store, userbase
+
 from xquotient import spam
-import time
+from xquotient.mimestorage import MIMEMessageStorer
+
 
 MESSAGE = """Return-path: <cannataumaybe@lib.dote.hu>
 Envelope-to: washort@divmod.org
@@ -61,18 +67,6 @@ A u ppr h oval Manager
 """
 EMPTY_MESSAGE = ""
 
-class FakeMessage:
-    def __init__(self,msg):
-        self.impl = self
-        self.source = self
-        self.msg = msg
-        self.trained = False
-
-    def open(self):
-        return self
-    def read(self):
-        return self.msg
-
 class DSPAMTestCase(unittest.TestCase):
     def setUp(self):
         self.homedir = self.mktemp()
@@ -102,11 +96,19 @@ class DSPAMTestCase(unittest.TestCase):
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage, d, u"test", self, MESSAGE, True)
 
 
-class DSPAMFilterTestCase(unittest.TestCase):
+class MessageCreationMixin:
+    counter = 0
+    def _message(self):
+        self.counter += 1
+        return MIMEMessageStorer(
+            self.store, self.store.newFile(str(self.counter)), u'').feedStringNow(MESSAGE).message
+
+
+class DSPAMFilterTestCase(unittest.TestCase, MessageCreationMixin):
 
     def setUp(self):
         dbdir = self.mktemp()
-        s = store.Store(dbdir)
+        self.store = s = store.Store(dbdir)
         ls = userbase.LoginSystem(store=s)
         ls.installOn(s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
@@ -117,13 +119,13 @@ class DSPAMFilterTestCase(unittest.TestCase):
         self.df.installOn(self.f)
 
     def testMessageClassification(self):
-        self.f.processItem(FakeMessage(MESSAGE))
+        self.f.processItem(self._message())
 
     def testMessageTraining(self):
-        self.df.classify(FakeMessage(MESSAGE))
-        self.df.train(True, FakeMessage(MESSAGE))
+        self.df.classify(self._message())
+        self.df.train(True, self._message())
 
-class FilterTestCase(unittest.TestCase):
+class FilterTestCase(unittest.TestCase, MessageCreationMixin):
 
     def setUp(self):
         dbdir = self.mktemp()
@@ -138,15 +140,15 @@ class FilterTestCase(unittest.TestCase):
         """
         If there's no spam classifier installed, messages should still get processed OK
         """
-        m = FakeMessage(MESSAGE)
+        m = self._message()
         self.f.processItem(m)
         self.assertNotEqual(m.spam, None)
 
     def testGlobalMessageClassification(self):
-        m = FakeMessage(MESSAGE)
+        m = self._message()
         home = self.store.newFilePath("dspam").path
         d = dspam.startDSPAM("global", home)
-        dspam.testSpam(m, 'global', home, d, False)
+        dspam.testSpam(m.impl.source.open(), 'global', home, d, False)
         self.f.processItem(m)
 
 if spam.dspam is None:
