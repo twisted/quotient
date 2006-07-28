@@ -4,9 +4,13 @@
 
 Quotient.Test.TestableMailboxSubclass = Quotient.Mailbox.Controller.subclass('TestableMailboxSubclass');
 Quotient.Test.TestableMailboxSubclass.methods(
-    function __init__(self, node, cl) {
+    function __init__(self) {
+        var args = [];
+        for(var i = 1; i < arguments.length; i++) {
+            args.push(arguments[i]);
+        }
         self.pendingDeferred = new Divmod.Defer.Deferred();
-        Quotient.Test.TestableMailboxSubclass.upcall(self, "__init__", node, cl);
+        Quotient.Test.TestableMailboxSubclass.upcall.apply(self, [self, "__init__"].concat(args));
     },
 
     function finishedLoading(self) {

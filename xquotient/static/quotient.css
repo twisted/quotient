@@ -99,6 +99,7 @@ ul.file-list, ul.file-list li {
 }
 
 .quotient-menubar {
+    border-top: solid 1px #0099CC;
     background-color: #7FCCE5;
     border-bottom: solid 1px #0099CC;
     width: 100%;
@@ -161,7 +162,6 @@ ul.file-list, ul.file-list li {
 
 .view-pane-header {
     background-color: #D9F0F7;
-    border-left: solid 1px #7FCCE5;
 }
 
 .message-source-container {
@@ -266,8 +266,6 @@ table.button {
 }
 
 .scrolltable-header {
-    border-left: solid 1px #7FCCE5;
-    height: 30px;
     width: 100%;
 }
 
@@ -275,14 +273,11 @@ table.button {
     background-color: #D9F0F7;
 }
 
-.scrolltable-container {
-    border-top: solid 1px #7FCCE5;
-}
-
 .left-block-footer, .mid-block-footer, .right-block-footer {
     background-color: #D9F0F7;
     border-left: solid 1px #7FCCE5;
     border-bottom: solid 1px #7FCCE5;
+    border-top: solid 1px #7FCCE5;
 }
 
 .right-block-footer {
@@ -370,6 +365,7 @@ table.button {
     background-color: #D2E6FF;
     border: solid 1px #7FCCE5;
     border-top: none;
+    border-left: none;
     padding-top: 2px;
 }
 
@@ -388,9 +384,7 @@ table.button {
 .view-pane {
     width: 200px;
     height: 100%;
-    border: solid 1px #7FCCE5;
-    border-right: none;
-    border-top: none;
+    border-left: solid 1px #7FCCE5;
     overflow: auto;
 }
 
@@ -406,7 +400,6 @@ table.button {
     width: 200px;
     height: 100%;
     padding-bottom: 1px;
-    border-top: solid 1px #7FCCE5;
 }
 
 .views-collapsible-pane {
@@ -478,6 +471,12 @@ table.button {
 
 .next-message > .next {
     color: #81B1E2;
+}
+
+.actions-row {
+    background-color: #CCEBF5;
+    border-bottom: solid 1px #7FCCE5;
+    border-left: solid 1px #7FCCE5;
 }
 
 .progress-meter, .message-actions {
@@ -641,6 +640,8 @@ img.thumbnail { border: none; }
     height: 100%;
     background-color: #FFFFFF;
     border: solid 1px #7FCCE5;
+    border-top: none;
+    border-bottom: none;
 }
 
 .message-body {
