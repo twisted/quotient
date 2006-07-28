@@ -1,11 +1,11 @@
 from zope.interface import implements
 
 from axiom.item import Item, InstallableMixin
-from axiom import iaxiom, attributes, scheduler
+from axiom import attributes, scheduler
 from axiom.upgrade import registerAttributeCopyingUpgrader
 
 from xmantissa import website, webapp, ixmantissa, people, prefs
-from xmantissa import fulltext, search
+from xmantissa import fulltext
 
 from xquotient import inbox, mail, gallery, qpeople, extract, spam, _mailsearchui
 from xquotient.grabber import GrabberConfiguration
@@ -14,7 +14,7 @@ from xquotient.grabber import GrabberConfiguration
 INDEXER_TYPE = fulltext.PyLuceneIndexer
 
 
-class MessageSearchProvider(Item, InstallableMixin, search.SearchProviderMixin):
+class MessageSearchProvider(Item, InstallableMixin):
     """
     Wrapper around an ISearchProvider which will hand back search results
     wrapped in a fragment that knows about Messages.
@@ -37,9 +37,10 @@ class MessageSearchProvider(Item, InstallableMixin, search.SearchProviderMixin):
         raise NotImplementedError("No one should ever call count, I think.")
 
 
-    def wrapSearchResults(self, searchIdentifier):
-        return _mailsearchui.SearchAggregatorFragment(searchIdentifier, self.store)
-
+    def search(self, term, keywords, count, offset):
+        d = self.indexer.search(term, keywords, count, offset)
+        d.addCallback(_mailsearchui.SearchAggregatorFragment, self.store)
+        return d
 
 
 

@@ -257,13 +257,14 @@ class Message(item.Item):
                 in self.impl.getTypedParts('text/plain', 'text/rtf')]
 
 
-    def valueParts(self):
-        return []
-
-
     def keywordParts(self):
         return {u'subject': self.subject,
                 u'sender': self.sender}
+
+
+    def documentType(self):
+        # XXX Is this the best implementation of this method? -exarkun
+        return self.typeName
 
 item.declareLegacyItem(Message.typeName, 2,
                        dict(sender=attributes.text(),

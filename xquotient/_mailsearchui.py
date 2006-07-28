@@ -1,12 +1,9 @@
 
 from zope.interface import implements
 
-from nevow import inevow
 from nevow.page import renderer
 
-from axiom import attributes
-
-from xmantissa import ixmantissa, scrolltable, search, webtheme
+from xmantissa import ixmantissa, scrolltable, webtheme
 
 from xquotient import exmess
 
@@ -17,12 +14,12 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
     jsClass = u'Mantissa.Search.Search'
 
     fragmentName = 'search'
-    title = ''
 
-    def __init__(self, searchIdentifier, store):
+
+    def __init__(self, searchResults, store):
         super(SearchAggregatorFragment, self).__init__()
+        self.searchResults = searchResults
         self.store = store
-        self.searchIdentifier = searchIdentifier
 
 
     def head(self):
@@ -30,12 +27,9 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
 
 
     def search(self, ctx, data):
-        f = scrolltable.ScrollingFragment(
+        f = scrolltable.StoreIDSequenceScrollingFragment(
             self.store,
-            exmess.Message,
-            attributes.AND(
-                search.SearchResult.identifier == self.searchIdentifier,
-                search.SearchResult.indexedItem == exmess.Message.storeID),
+            self.searchResults,
             (exmess.Message.senderDisplay,
              exmess.Message.subject,
              exmess.Message.receivedWhen,
