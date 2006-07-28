@@ -770,36 +770,3 @@ Quotient.Test.MsgDetailInitArgsTestCase.methods(
     function run(self) {
         self.assertMoreDetailVisibility(true);
     });
-
-
-Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
-    'Quotient.Test.PostiniConfigurationTestCase');
-Quotient.Test.PostiniConfigurationTestCase.methods(
-    function run(self) {
-        /**
-         * Test that the postini configuration form is rendered with a checkbox
-         * and a text field and that the checkbox defaults to unchecked and the
-         * text field to "0.5".
-         */
-        var postiniConfig = self.childWidgets[0].childWidgets[0];
-        var usePostiniScore = postiniConfig.nodeByAttribute(
-            'name', 'usePostiniScore');
-        var postiniThreshhold = postiniConfig.nodeByAttribute(
-            'name', 'postiniThreshhold');
-
-        self.assertEquals(usePostiniScore.checked, false);
-        self.assertEquals(postiniThreshhold.value, '0.5');
-
-        /**
-         * Submit the form with different values and make sure they end up
-         * changed on the server.
-         */
-        usePostiniScore.checked = true;
-        postiniThreshhold.value = '5.0';
-
-        return postiniConfig.submit().addCallback(
-            function() {
-                return self.callRemote('checkConfiguration');
-            });
-    });
-

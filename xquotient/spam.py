@@ -1,12 +1,11 @@
-# -*- test-case-name: xquotient.test.test_spam -*-
 
-import cPickle, errno
-from decimal import Decimal
+import cPickle, errno, os
 
 from spambayes import hammie, classifier
 
 from zope.interface import implements
 
+from twisted.internet import reactor
 from twisted.python import log, components
 
 from nevow import athena
@@ -14,13 +13,10 @@ from nevow import athena
 from epsilon import cooperator
 
 from axiom import iaxiom, item, attributes, userbase
-from axiom.upgrade import registerAttributeCopyingUpgrader
 
-from xmantissa import ixmantissa, liveform
-from xmantissa.webtheme import ThemedFragment
+from xmantissa import ixmantissa
 
 from xquotient import mail, iquotient, exmess
-from xquotient.equotient import NoSuchHeader
 
 try:
     from xquotient import dspam
@@ -35,27 +31,13 @@ class Filter(item.Item, item.InstallableMixin):
     L{exmess.Message.spam} attribute according to their results.
 
     Items will power this up for L{iquotient.IHamFilter} to participate in the
-    spam/ham classification process.  Only one Filter is currently supported.
-    Future versions may expand on this and allow multiple filters to contribute
-    to the final decision.  These items will also receive training feedback
-    from the user, though they may choose to disregard it if they are not
-    trainable.
-
-    C{Filter} can also be configured to just look at Postini headers and make a
-    determination based on them.
+    spam/ham classification process.  Each will have an opportunity to
+    contribute to the overall score (currently a geometric average - this will
+    probably change when we figure out what a good aggregator is).  These items
+    will also receive training feedback from the user, though they may choose
+    to disregard it if they are not trainable.
     """
-    schemaVersion = 2
-
     installedOn = attributes.reference()
-
-    usePostiniScore = attributes.boolean(doc="""
-    Indicate whether or not to classify based on Postini headers.
-    """, default=False, allowNone=False)
-
-    postiniThreshhold = attributes.ieee754_double(doc="""
-    A C{float} between 0 and 100 indicating at what Postini level messages are
-    considered spam.
-    """, default=0.5)
 
     _filters = attributes.inmemory()
 
@@ -66,82 +48,23 @@ class Filter(item.Item, item.InstallableMixin):
 
 
     def processItem(self, item):
-        assert isinstance(item, (exmess._TrainingInstruction, exmess.Message))
-        if isinstance(item, exmess._TrainingInstruction):
-            self._train(item)
-        else:
-            self._classify(item)
-
-
-    def _filters(self):
-        return list(self.powerupsFor(iquotient.IHamFilter))
-
-
-    def _train(self, instruction):
-        for f in self._filters():
-            f.train(instruction.spam, instruction.message)
-        item.deleteFromStore()
-
-
-    def _parsePostiniHeader(self, s):
-        """
-        Postini spam headers look like this:
-        X-pstn-levels: (S:99.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )
-        X-pstn-levels: (S: 0.0901 R:95.9108 P:95.9108 M:99.5542 C:79.5348 )
-
-        S means "spam level".  Smaller is spammier.
-
-        R means ???
-        P means ???
-        M means ???
-        C means ???
-
-        @return: A mapping from 'R', 'P', 'M', 'C', and 'S' to the values
-        from the header, or None if the header could not be parsed.
-        """
-        s = s.strip()
-        if s[:1] == '(' and s[-1:] == ')':
-            parts = filter(None, s[1:-1].replace(':', ' ').split())
-            return dict((parts[i], Decimal(parts[i + 1]))
-                        for i
-                        in (0, 2, 4, 6, 8))
-        return None
-
-
-    def _classify(self, msg):
-        # Allow Postini to override anything we might determine, if the user
-        # has indicated that is desirable.
-        if msg.trained:
-            log.msg("Skipping classification of message already user-specified as " + (msg.spam and "spam" or "ham"))
-            return
-
-        if self.usePostiniScore:
-            try:
-                postiniHeader = msg.impl.getHeader('X-pstn-levels')
-            except NoSuchHeader:
-                pass
-            else:
-                postiniLevels = self._parsePostiniHeader(postiniHeader)
-                if postiniLevels is not None:
-                    postiniScore = postiniLevels['S']
-                    if float(postiniScore) < self.postiniThreshhold:
-                        msg.spam = True
-                        log.msg("Postini classified message as spam")
-                    else:
-                        msg.spam = False
-                        log.msg("Postini classified message as clean")
-                    return
-
-        _filters = self._filters()
+        _filters = list(self.powerupsFor(iquotient.IHamFilter))
         if len(_filters) > 1:
             raise NotImplementedError("multiple spam filters not yet supported")
-        if not _filters:
-            msg.spam = False # well, we can't say it _is_ spam
-            return
-
-        isSpam, score = _filters[0].classify(msg)
-        msg.spam = isSpam
-        log.msg("spam batch processor scored message at %0.2f: %r" % (score, msg.spam))
+        if isinstance(item, exmess._TrainingInstruction):
+            for f in _filters:
+                f.train(item.spam, item.message)
+            item.deleteFromStore()
+        elif not item.trained:
+            if not _filters:
+                item.spam = False # well, we can't say it _is_ spam
+                return
+            f = _filters[0]
+            isSpam, score = f.classify(item)
+            item.spam = isSpam
+            log.msg("spam batch processor scored message at %0.2f: %r" % (score, item.spam))
+        else:
+            log.msg("Skipping classification of message already user-specified as " + (item.spam and "spam" or "ham"))
 
 
     def reclassify(self):
@@ -182,65 +105,25 @@ class Filter(item.Item, item.InstallableMixin):
             self.reclassify()
         cooperator.iterateInReactor(go())
 
-registerAttributeCopyingUpgrader(Filter, 1, 2)
 
 
-class HamFilterFragment(ThemedFragment):
+class HamFilterFragment(athena.LiveFragment):
     fragmentName = 'ham-filter'
     title = 'Spam/Ham Filtering Configuration'
 
     jsClass = u'Quotient.Filter.HamConfiguration'
 
-
-    def __init__(self, filter, fragmentParent=None):
-        ThemedFragment.__init__(self, fragmentParent)
-        self.filter = filter
-
-
     def head(self):
         return ()
 
 
-    def configurePostini(self, usePostiniScore, postiniThreshhold):
-        """
-        @type usePostiniScore: C{bool}
-        @param usePostiniScore: A boolean indicating whether Postini headers
-        will be respected when classifying mail as ham or spam.
-
-        @type postiniThreshhold: C{float}
-        @param postiniThreshhold: The score at which to divide ham from spam,
-        with scores below this value being spam and scores above it being ham.
-        """
-        print 'Configuring postini', usePostiniScore, postiniThreshhold
-        self.filter.usePostiniScore = usePostiniScore
-        self.filter.postiniThreshhold = min(100, max(0, postiniThreshhold))
-
-
-    def render_postiniForm(self, ctx, data):
-        f = liveform.LiveForm(
-            self.configurePostini,
-            [liveform.Parameter('usePostiniScore',
-                                liveform.CHECKBOX_INPUT,
-                                bool,
-                                u'Classify messages based on Postini scores.',
-                                default=self.filter.usePostiniScore),
-             liveform.Parameter('postiniThreshhold',
-                                liveform.TEXT_INPUT,
-                                float,
-                                u'Score below which to consider messages spam.',
-                                default=self.filter.postiniThreshhold)],
-            description='Configure Postini')
-        f.setFragmentParent(self)
-        return ctx.tag[f]
-
-
     def retrain(self):
-        return iaxiom.IBatchService(self.filter.store).call(self.filter.retrain)
+        return iaxiom.IBatchService(self.original.store).call(self.original.retrain)
     athena.expose(retrain)
 
 
     def reclassify(self):
-        return iaxiom.IBatchService(self.filter.store).call(self.filter.reclassify)
+        return iaxiom.IBatchService(self.original.store).call(self.original.reclassify)
     athena.expose(reclassify)
 
 components.registerAdapter(HamFilterFragment, Filter, ixmantissa.INavigableFragment)
