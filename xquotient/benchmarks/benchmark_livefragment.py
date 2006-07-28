@@ -22,12 +22,13 @@ def renderOnce(fragmentClass):
     Create L{DEPTH} LiveFragments, each nested within the next, and then render
     the result.
     """
+    rname = fragmentClass.__name__[0].lower() + fragmentClass.__name__[1:]
     innerFragment = fragmentClass(
-        docFactory=stan(p(render=directive('liveFragment'))[
+        docFactory=stan(p(render=directive(rname))[
                 'Hello, world.']))
     for i in xrange(DEPTH - 1):
         outerFragment = fragmentClass(
-            docFactory=stan(p(render=directive('liveFragment'))[
+            docFactory=stan(p(render=directive(rname))[
                     innerFragment]))
         innerFragment.setFragmentParent(outerFragment)
         innerFragment = outerFragment
