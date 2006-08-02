@@ -137,18 +137,48 @@ class DelayedListMailbox(ListMailbox):
     """
     def __init__(self, *a, **kw):
         super(DelayedListMailbox, self).__init__(*a, **kw)
+        self.messageListDeferreds = []
         self.messageRequestDeferreds = []
 
 
-    def getMessage(self, index):
+    def deferredListMessages(self, index=None):
+        d = defer.Deferred()
+        self.messageListDeferreds.append(d)
+        d.addCallback(lambda ign: super(DelayedListMailbox, self).listMessages(index))
+        return d
+
+
+    def deferredGetMessage(self, index):
         d = defer.Deferred()
         self.messageRequestDeferreds.append(d)
         d.addCallback(lambda ign: super(DelayedListMailbox, self).getMessage(index))
         return d
 
 
+    def defer(self, what):
+        """
+        Replace the indicated method with one which returns a Deferred which
+        must be explicitly fired.  Return a list to which Deferreds which
+        need to be serviced are appended.
+        """
+        originals = {
+            'listMessages': 'listMessages',
+            'getMessage': 'getMessage'}
+        replacements = {
+            'listMessages': 'deferredListMessages',
+            'getMessage': 'deferredGetMessage'}
+        deferreds = {
+            'listMessages': self.messageListDeferreds,
+            'getMessage': self.messageRequestDeferreds}
+        setattr(self, originals[what], getattr(self, replacements[what]))
+        return deferreds[what]
+
+
 
 class POP3GrabberTestCase(unittest.TestCase):
+    testMessageStrings = ['First message', 'Second message', 'Last message']
+
+
     def setUp(self):
         self.client = TestPOP3Grabber()
         self.client.setCredentials('test_user', 'test_pass')
@@ -163,7 +193,7 @@ class POP3GrabberTestCase(unittest.TestCase):
 
     def testBasicGrabbing(self):
         self.server.portal = Portal(
-            ListMailbox(['First message', 'Second message', 'Last message']),
+            ListMailbox(self.testMessageStrings),
             lambda: None)
         c, s, pump = iosim.connectedServerAndClient(
             lambda: self.server,
@@ -234,21 +264,39 @@ class POP3GrabberTestCase(unittest.TestCase):
         self.assertEquals(lastEvent, u'stopped')
 
 
+    def _disconnectTest(self, mbox, blocked):
+        self.server.portal = Portal(mbox, lambda: None)
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda: self.server,
+            lambda: self.client)
+        pump.flush()
+        self.assertEquals(
+            len(blocked), 1,
+            "Expected a pending Deferred for listMessages, found %r" % (
+                blocked,))
+        s.transport.loseConnection()
+        pump.flush()
+        self.assertEquals(self.client.events[-1][0], 'stopped')
+
+
+    def test_lostConnectionDuringListing(self):
+        """
+        Make sure that if a connection drops while waiting for a listUID()
+        to complete, it is properly noticed, the right Deferreds errback,
+        and so forth.
+        """
+        mbox = DelayedListMailbox(self.testMessageStrings)
+        return self._disconnectTest(mbox, mbox.defer('listMessages'))
+
+
     def testLostConnectionDuringRetrieve(self):
         """
         Make sure that if a connection drops while waiting for a retrieve() to
         complete, it is properly noticed, the right Deferreds errback, and so
         forth.
         """
-        mbox = DelayedListMailbox(['First message', 'Second message', 'Last message'])
-        self.server.portal = Portal(mbox, lambda: None)
-        c, s, pump = iosim.connectedServerAndClient(
-            lambda : self.server,
-            lambda : self.client)
-        pump.flush()
-        s.transport.loseConnection()
-        pump.flush()
-        self.assertEquals(self.client.events[-1][0], 'stopped')
+        mbox = DelayedListMailbox(self.testMessageStrings)
+        return self._disconnectTest(mbox, mbox.defer('getMessage'))
 
 
     def testConnectionTimeout(self):
@@ -260,7 +308,7 @@ class POP3GrabberTestCase(unittest.TestCase):
         sched = []
         self.client.callLater = lambda n, f: sched.append((n, f))
 
-        mbox = DelayedListMailbox(['First message', 'Second message', 'Last message'])
+        mbox = DelayedListMailbox(self.testMessageStrings)
         self.server.portal = Portal(mbox, lambda: None)
         c, s, pump = iosim.connectedServerAndClient(
             lambda: self.server,

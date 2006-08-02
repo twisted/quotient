@@ -74,7 +74,7 @@ class Status(item.Item):
             try:
                 L(message)
             except:
-                log.err()
+                log.err(None, "Failure in status update")
 
 
 
@@ -296,7 +296,7 @@ class POP3Grabber(item.Item):
                 try:
                     self.grab()
                 except:
-                    log.err()
+                    log.err(None, "Failure in scheduled event")
         finally:
             # XXX This is not a good way for things to work.  Different, later.
             delay = datetime.timedelta(seconds=300)
@@ -386,7 +386,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
     def serverGreeting(self, status):
         def ebGrab(err):
-            log.err(err)
+            log.err(err, "Failure while grabbing")
             self.setStatus(u'Internal error: ' + unicode(err.getErrorMessage()))
             self.transport.loseConnection()
         return self._grab().addErrback(ebGrab)
@@ -414,7 +414,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             return
         except:
             f = failure.Failure()
-            log.err(f)
+            log.err(f, "Failure logging in")
             self.setStatus(
                 u'Login failed: internal error.',
                 False)
@@ -455,7 +455,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             return
         except:
             f = failure.Failure()
-            log.err(f)
+            log.err(f, "Failure retrieving UIDL")
             self.setStatus(unicode(f.getErrorMessage()), False)
             self.transport.loseConnection()
             return
@@ -495,14 +495,14 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                     self.transientFailure(f)
                     break
                 else:
-                    log.err(f)
+                    log.err(f, "Failure retrieving message")
             else:
                 try:
                     rece.eomReceived()
                 except:
                     # message could not be delivered.
                     f = failure.Failure()
-                    log.err(f)
+                    log.err(f, "Failure delivering message")
                     self.markFailure(uid, f)
                 else:
                     self.markSuccess(uid, rece.message)
@@ -516,7 +516,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             self.setStatus(u"idle")
         except:
             f = failure.Failure()
-            log.err(f)
+            log.err(f, "Failure quitting")
             self.setStatus(unicode(f.getErrorMessage()), False)
         else:
             self.setStatus(u"idle")
@@ -740,14 +740,6 @@ class LiveStatusFragment(athena.LiveFragment):
 
     def __init__(self, status):
         self.status = status
-
-
-    def _observerError(self, err):
-        log.err(err)
-        try:
-            self.removeObserver()
-        except ValueError:
-            pass
 
 
     def statusChanged(self, newStatus):
