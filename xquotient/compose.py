@@ -1,3 +1,4 @@
+# -*- test-case-name: xquotient.test.test_compose -*- 
 import datetime
 
 from zope.interface import implements
@@ -6,7 +7,7 @@ from twisted.python.components import registerAdapter
 from twisted.python import log
 from twisted.mail import smtp, relaymanager
 from twisted.names import client
-from twisted.internet import error, defer, reactor
+from twisted.internet import error, defer
 
 from nevow import inevow, rend, json
 from nevow.athena import expose
@@ -14,7 +15,7 @@ from nevow.athena import expose
 from epsilon import extime
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
-from axiom.upgrade import registerUpgrader
+from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
 
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform, prefs
@@ -25,11 +26,21 @@ from xquotient import iquotient, equotient, renderers, mimeutil
 from xquotient.exmess import Message
 from xquotient.mimestorage import Header, Part
 
-def _esmtpSendmail(username, password, smtphost, from_addr, to_addrs, msg):
+
+
+def _esmtpSendmail(username, password, smtphost, port, from_addr, to_addrs, 
+                   msg, reactor=None):
+    """
+    This should be the only function in this module that uses the reactor.
+    """
     d = defer.Deferred()
-    f = smtp.ESMTPSenderFactory(username, password, from_addr, to_addrs, msg, d, requireTransportSecurity=False)
-    reactor.connectTCP(smtphost, 25, f)
+    f = smtp.ESMTPSenderFactory(username, password, from_addr, to_addrs, msg,
+                                d, requireTransportSecurity=False)
+    if reactor is None:
+        from twisted.internet import reactor
+    reactor.connectTCP(smtphost, port, f)
     return d
+
 
 
 class _TransientError(Exception):
@@ -68,25 +79,35 @@ class _NeedsDelivery(item.Item):
         d.addCallback(gotMX)
         return d
 
-
     def sendmail(self):
+        """
+        Send this queued message.
+
+        @param fromAddress: An optional address to use in the SMTP
+            conversation.
+        """
         # XXX
         # Why aren't these self.compose.foo?  They probably should be.
         prefCollection = self.store.findUnique(ComposePreferenceCollection)
         if prefCollection.preferredSmarthost is not None:
+            fromAddress = prefCollection.smarthostAddress
+            if fromAddress is None:
+                fromAddress = self.composer.fromAddress
             return _esmtpSendmail(
                 prefCollection.smarthostUsername,
                 prefCollection.smarthostPassword,
                 prefCollection.preferredSmarthost,
-                self.composer.fromAddress,
+                prefCollection.smarthostPort,
+                fromAddress,
                 [self.toAddress],
                 self.message.impl.source.open())
         else:
             d = self.getMailExchange(mimeutil.EmailAddress(
-                                        self.toAddress, mimeEncoded=False).domain)
+                    self.toAddress, mimeEncoded=False).domain)
             def sendMail(mx):
                 host = str(mx.name)
-                log.msg(interface=iaxiom.IStatEvent, stat_messagesSent=1, userstore=self.store)
+                log.msg(interface=iaxiom.IStatEvent, stat_messagesSent=1,
+                        userstore=self.store)
                 return smtp.sendmail(
                     host,
                     self.composer.fromAddress,
@@ -98,6 +119,10 @@ class _NeedsDelivery(item.Item):
 
 
     def run(self):
+        """
+        Try to reliably deliver this message. If errors are
+        encountered, try harder.
+        """
         sch = iaxiom.IScheduler(self.store)
         if self.tries < len(self.RETRANS_TIMES):
             # Set things up to try again, if this attempt fails
@@ -166,6 +191,13 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def sendMessage(self, toAddresses, msg):
+        """
+        Send a message from this composer. 
+
+        @param toAddresses: List of email addresses (Which can be
+            coerced to L{smtp.Address}es).
+        @param msg: The L{exmess.Message} to send.
+        """
         msg.outgoing = True
         for toAddress in toAddresses:
             _NeedsDelivery(
@@ -311,7 +343,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
     _savedDraft = None
 
-    def __init__(self, original, toAddress='', subject='', messageBody='', attachments=(), inline=False):
+    def __init__(self, original, toAddress='', subject='', messageBody='',
+                 attachments=(), inline=False):
         self.original = original
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
@@ -468,11 +501,16 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
         # XXX XXX XXX
-        if self.original.fromAddress.endswith('.divmod.com'):
-            (localpart, domain) = self.original.fromAddress.split('@')
-            fromAddress = localpart + '@divmod.com'
+        prefCollection = self.original.store.findUnique(
+            ComposePreferenceCollection)
+        if prefCollection.preferredSmarthost is not None:
+            fromAddress = prefCollection.smarthostAddress
         else:
-            fromAddress = self.original.fromAddress
+            if self.original.fromAddress.endswith('.divmod.com'):
+                (localpart, domain) = self.original.fromAddress.split('@')
+                fromAddress = localpart + '@divmod.com'
+            else:
+                fromAddress = self.original.fromAddress
 
         m['From'] = encode(fromAddress)
         m['To'] = encode(toAddress)
@@ -659,8 +697,118 @@ class _SmarthostPasswordPreference(prefs.Preference):
 
 
 
+class _SmarthostPortPreference(prefs.Preference):
+    """
+    Represent the port number preference in the preferences page.
+
+    This class is full of meaningless boilerplate.
+    """
+
+    def __init__(self, value, collection):
+        """
+        Initialize this preference object with a default value and the
+        preference collection.
+        """
+        prefs.Preference.__init__(
+            self,
+            'smarthost-port', value,
+            'Smarthost port', collection,
+            'Port number to connect to the smarthost for SMTP sending.')
+
+
+    def choices(self):
+        """
+        Meaningless boilerplate.
+        """
+        return None
+
+
+    def displayToValue(self, display):
+        """
+        Meaningless boilerplate.
+        """
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        """
+        The default value is 25.
+        """
+        if value:
+            return value
+        return 25
+
+
+    def settable(self):
+        """
+        Meaningless boilerplate.
+        """
+        return True
+
+
+
+class _SmarthostAddressPreference(prefs.Preference):
+    """
+    Represent the from address preference in the preferences page.
+
+    This class is full of meaningless boilerplate.
+    """
+
+    def __init__(self, value, collection):
+        """
+        Initialize this preference object with a default value and the
+        preference collection.
+        """
+        prefs.Preference.__init__(
+            self,
+            'smarthost-address', value,
+            'Smarthost address', collection,
+            'The email address to send email as.')
+
+
+    def choices(self):
+        """
+        Meaningless boilerplate.
+        """
+        return None
+
+
+    def displayToValue(self, display):
+        """
+        Meaningless boilerplate.
+        """
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        """
+        Meaningless boilerplate.
+        """
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        """
+        Meaningless boilerplate.
+        """
+        return True
+
+
+
+
+
+
 class ComposePreferenceCollection(item.Item, item.InstallableMixin):
+
     implements(ixmantissa.IPreferenceCollection)
+
+    schemaVersion = 2
 
     installedOn = attributes.reference()
 
@@ -672,6 +820,12 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin):
     """)
     smarthostPassword = attributes.text(doc="""
     Password with which to authenticate to the smart host.
+    """)
+    smarthostPort = attributes.integer(doc="""
+    The port number which outbound messages will be delivered to.
+    """, default=25)
+    smarthostAddress = attributes.text(doc="""
+    The address which messages will be sent from.
     """)
 
     _cachedPrefs = attributes.inmemory()
@@ -688,7 +842,9 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin):
             return self._cachedPrefs
         except AttributeError:
             self._cachedPrefs = {
+                'smarthost-address': _SmarthostAddressPreference(self.smarthostAddress, self),
                 'smarthost-host': _SmarthostPreference(self.preferredSmarthost, self),
+                'smarthost-port': _SmarthostPortPreference(self.smarthostPort, self),
                 'smarthost-username': _SmarthostUsernamePreference(self.smarthostUsername, self),
                 'smarthost-password': _SmarthostPasswordPreference(self.smarthostPassword, self)
                 }
@@ -702,6 +858,11 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin):
             self.smarthostUsername = value
         elif pref.key == 'smarthost-password':
             self.smarthostPassword = value
+        elif pref.key == 'smarthost-port':
+            # Does the coercion belong *here*? -radix
+            self.smarthostPort = int(value) 
+        elif pref.key == 'smarthost-address':
+            self.smarthostAddress = value
         else:
             assert False, "Bogus preference input: %r %r" % (pref, value)
         setattr(pref, 'value', value)
@@ -709,6 +870,11 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin):
 
     def getSections(self):
         return None
+
+
+registerAttributeCopyingUpgrader(ComposePreferenceCollection, 1, 2)
+
+
 
 class Draft(item.Item):
     """
