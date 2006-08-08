@@ -8,6 +8,7 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 from twisted.python.util import sibpath
 from twisted.web import microdom
+from twisted.web.sux import ParseError
 
 from nevow import rend, inevow, athena, static
 from nevow.athena import expose
@@ -299,9 +300,10 @@ class Correspondent(item.Item):
 class ItemGrabber(rend.Page):
     item = None
 
-    def __init__(self, original):
-        self.wt = ixmantissa.IWebTranslator(original.store)
-        rend.Page.__init__(self, original)
+    def __init__(self, webTranslator):
+        rend.Page.__init__(self)
+        self.webTranslator = webTranslator
+
 
     def locateChild(self, ctx, segments):
         """
@@ -313,19 +315,43 @@ class ItemGrabber(rend.Page):
         """
         if len(segments) in (1, 2):
             itemWebID = segments[0]
-            itemStoreID = self.wt.linkFrom(itemWebID)
+            itemStoreID = self.webTranslator.linkFrom(itemWebID)
 
             if itemStoreID is not None:
-                self.item = self.original.store.getItemByID(itemStoreID)
+                self.item = self.webTranslator.store.getItemByID(itemStoreID)
                 return (self, ())
         return rend.NotFound
 
-# somewhere there needs to be an IResource that can display
-# the standalone parts of a given message, like images,
-# scrubbed text/html parts and such.  this is that thing.
 
 class PartDisplayer(ItemGrabber):
+    """
+    somewhere there needs to be an IResource that can display the standalone
+    parts of a given message, like images, scrubbed text/html parts and
+    such.  this is that thing.
+    """
     filename = None
+
+    unparsableHTML = 'Unparsable HTML.'
+
+    def scrubbedHTML(self, content):
+        """
+        Parse, scrub, and serialize the document represented by C{content}.
+
+        @type content: C{unicode}
+        @param content: a serialized document to scrub.
+
+        @rtype: C{str}
+        @return: a utf-8 string containing a transformed version of the
+        input document, with things like external image links removed.
+        """
+        try:
+            dom = microdom.parseString(content.encode('utf-8'), beExtremelyLenient=True)
+        except ParseError:
+            return None
+        else:
+            scrubber.scrub(dom)
+            return dom.toxml()[len('<?xml version="1.0"?>'):]
+
 
     def renderHTTP(self, ctx):
         """
@@ -336,7 +362,6 @@ class PartDisplayer(ItemGrabber):
         will be scrubbed, unless the "noscrub" query parameter
         is set in the request
         """
-
         request = inevow.IRequest(ctx)
         part = self.item
 
@@ -344,15 +369,17 @@ class PartDisplayer(ItemGrabber):
         request.setHeader('content-type', ctype)
 
         if ctype.startswith('text/'):
-            content = part.getUnicodeBody().encode('utf-8')
+            content = part.getUnicodeBody()
             if ctype.endswith('/html') and 'noscrub' not in request.args:
-                dom = microdom.parseString(content, beExtremelyLenient=True)
-                scrubber.scrub(dom)
-                return dom.toxml()[len('<?xml version="1.0"?>'):]
+                content = self.scrubbedHTML(content)
+                if content is None:
+                    return self.unparsableHTML
+                return content
         else:
             content = part.getBody(decode=True)
-
         return content
+
+
 
 class PrintableMessageResource(rend.Page):
     def __init__(self, message):
@@ -514,7 +541,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         return self._childLink(gallery.ThumbnailDisplayer, image)
 
     def child_attachments(self, ctx):
-        return PartDisplayer(self.original)
+        return PartDisplayer(ixmantissa.IWebTranslator(self.original.store))
 
     def child_printable(self, ctx):
         return PrintableMessageResource(self.original)

@@ -107,7 +107,7 @@ class WebTestCase(TestCase):
                         contentType=u'text/html',
                         body=innocuousHTML)
 
-        pd = PartDisplayer(original=part)
+        pd = PartDisplayer(None)
         pd.item = part
 
         def render(resource, request=None):

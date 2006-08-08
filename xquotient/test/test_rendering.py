@@ -12,7 +12,7 @@ from xmantissa.webapp import PrivateApplication
 from xmantissa.webtheme import getLoader
 from xmantissa.people import Person, EmailAddress
 
-from xquotient.exmess import Message, MessageDetail
+from xquotient.exmess import Message, MessageDetail, PartDisplayer
 from xquotient.inbox import Inbox, InboxScreen
 from xquotient.compose import Composer
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
@@ -172,3 +172,24 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
         return self.renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
+
+
+class PartTestCase(TestCase):
+    def setUp(self):
+        self.partDisplayer = PartDisplayer(None)
+
+
+    def test_scrubbingInvalidDocument(self):
+        """
+        Pass a completely malformed document to L{PartDisplay.scrubbedHTML}
+        and assert that it returns C{None} instead of raising an exception.
+        """
+        self.assertIdentical(None, self.partDisplayer.scrubbedHTML('<foo / bar>'))
+
+
+    def test_scrubbingSimpleDocument(self):
+        """
+        Pass a trivial document to L{PartDisplay.scrubbedHMTL} and make sure
+        it comes out the other side in-tact.
+        """
+        self.assertEquals('<div></div>', self.partDisplayer.scrubbedHTML('<div></div>'))
