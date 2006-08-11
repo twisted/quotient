@@ -203,12 +203,12 @@ Quotient.Test.InboxTestCase.methods(
             D.addCallback(self.makeViewSwitcher.apply(self, args[i]));
         }
 
-        D.addCallback(function() { self.testActionGroupStuff() });
+        D.addCallback(function() { self._testActionGroupStuff() });
 
         return D;
     },
 
-    function testActionGroupStuff(self) {
+    function _testActionGroupStuff(self) {
         var sw = self.mailbox.scrollWidget;
 
         var anyPredicate = function() {

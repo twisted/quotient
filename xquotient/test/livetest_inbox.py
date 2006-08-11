@@ -122,10 +122,10 @@ class BatchActionsTestCase(testcase.TestCase):
     jsClass = u'Quotient.Test.BatchActionsTestCase'
 
     docFactory = loaders.stan(tags.div[
-                    tags.div(render=tags.directive('liveTest'))['BatchActionsTestCase'],
-                    tags.div(render=tags.directive('inbox'),
-                             style='visibility: hidden'),
-                    tags.div(id='mantissa-footer')])
+            tags.div(render=tags.directive('liveTest'))[
+                tags.div(render=tags.directive('inbox'),
+                         style='visibility: hidden'),
+                tags.div(id='mantissa-footer')]])
 
     def render_inbox(self, ctx, data):
         s = Store()

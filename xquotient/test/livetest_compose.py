@@ -19,10 +19,10 @@ class ComposeTestCase(testcase.TestCase):
     jsClass = u'Quotient.Test.ComposeTestCase'
 
     docFactory = loaders.stan(tags.div[
-                    tags.div(render=tags.directive('liveTest'))['ComposeTestCase'],
-                    tags.div(render=tags.directive('composer'),
-                             style='visibility: hidden'),
-                    tags.div(id='mantissa-footer')])
+            tags.div(render=tags.directive('liveTest'))[
+                tags.div(render=tags.directive('composer'),
+                         style='visibility: hidden'),
+                tags.div(id='mantissa-footer')]])
 
     def render_composer(self, ctx, data):
         """
