@@ -4,6 +4,59 @@
 // import Fadomatic
 // import Mantissa.ScrollTable
 
+Quotient.Compose.FileUploadController = Divmod.Class.subclass('Quotient.Compose.FileUploadController');
+
+/**
+ * I am the controller for the file upload form, which gets loaded
+ * in a iframe inside the compose page
+ */
+Quotient.Compose.FileUploadController.methods(
+    /**
+     * @param iframeDocument: "document" in the namespace of the file upload iframe
+     * @param form: the file upload form element
+     */
+    function __init__(self, iframeDocument, form) {
+        self.form = form;
+        self.compose = Quotient.Compose.Controller.get(
+                        Nevow.Athena.NodeByAttribute(
+                               document.documentElement,
+                               "athena:class",
+                               "Quotient.Compose.Controller"));
+        self.iframeDocument = iframeDocument;
+    },
+
+    /**
+     * Tell our parent - the compose widget - that we're busy uploading a file
+     */
+    function notifyParent(self) {
+        self.compose.uploading();
+        self.iframeDocument.body.style.opacity = .1;
+        self.form.onsubmit = function() {
+            return false;
+        }
+    },
+
+    /**
+     * Called when our document loads.  Checks whether the document contains
+     * information about a completed upload, e.g. if the page load is the
+     * result of a form POST.
+     */
+    function checkForFileData(self) {
+        var fileData = self.iframeDocument.getElementById("file-data");
+        if(fileData.childNodes.length) {
+            self.compose.gotFileData(
+                eval("(" + fileData.firstChild.nodeValue + ")"));
+        }
+    },
+
+    /**
+     * Called when the value of our <input type="file"> changes value.
+     * Enables the upload button.
+     */
+    function fileInputChanged(self) {
+        self.form.elements.upload.disabled = false;
+    });
+
 Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
                                                 'Quotient.Compose.DraftListScrollingWidget');
 
