@@ -1,3 +1,14 @@
+0.1.12 (2006-08-14):
+  - The POP3 and SMTP servers give a more human-readable error message
+    when a username without a domain part is provided.
+  - The message detail now has a "More Detail" option.
+  - Postini headers are now recognized and users can choose to filter mail
+    based on them.
+  - The from-address used when sending mail through a smarthost can now be
+    set as a user preference, along with the port number of the smarthost.
+  - Attempting to display unparseable HTML now fails gracefully.
+  - The actions UI has been simplified.
+
 0.1.11 (2006-07-18):
   - Spam group actions have been renamed and some message unread count bugs
     have been fixed.
