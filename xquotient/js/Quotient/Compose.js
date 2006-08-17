@@ -149,12 +149,18 @@ Quotient.Compose.Controller.methods(
     function toggleAttachDialog(self) {
         if(self.attachDialog.style.display == "none") {
             self.attachDialog.style.display = "";
+
+            var pageSize = Divmod.Runtime.theRuntime.getPageSize();
+            var bg = MochiKit.DOM.DIV({"id": "attach-dialog-bg"});
+            bg.style.height = pageSize.h + "px";
+            bg.style.width = pageSize.w + "px";
+            document.body.appendChild(bg);
+
             document.body.appendChild(
                 MochiKit.DOM.DIV({"id": "attach-dialog-bg"}));
             if(self.attachDialog.style.left == "") {
                 var elemSize = Divmod.Runtime.theRuntime.getElementSize(self.attachDialog);
                 self.attachDialog.style.display = "none";
-                var pageSize = Divmod.Runtime.theRuntime.getPageSize();
                 self.attachDialog.style.left = (pageSize.w/2 - elemSize.w/2) + "px";
                 self.attachDialog.style.top  = (pageSize.h/2 - elemSize.h/2) + "px"
                 self.attachDialog.style.display = "";
@@ -171,9 +177,6 @@ Quotient.Compose.Controller.methods(
             MochiKit.DOM.replaceChildNodes(self.draftNotification, elem);
             if(fade) {
                 new Fadomatic(elem, 2).fadeOut();
-                setTimeout(function() {
-                    MochiKit.DOM.replaceChildNodes(self.draftNotification);
-                }, 1700);
             }
         }
         showDialog("Saving draft...");
@@ -292,32 +295,35 @@ Quotient.Compose.Controller.methods(
                          Quotient.Common.Util.findPosY(e) - 55 + "px";
     },
 
-    function addrAutocompleteKeyDown(self, event) {
-        var TAB = 9;
+    function addrAutocompleteKeyDown(self, node, event) {
+        var TAB = 9, ENTER = 13, UP = 38, DOWN = 40;
 
-        if(self.completions.style.display == "none")
-            return true;
+        if(event.keyCode < 32 ||
+            (event.keyCode >= 33 && event.keyCode <= 46) ||
+            (event.keyCode >= 112 && event.keyCode <= 123)) {
 
-        if(event.keyCode == event.DOM_VK_ENTER || event.keyCode == TAB) {
-            if(0 < self.completions.childNodes.length) {
-                self.appendAddrCompletionToList(self.selectedAddrCompletion());
+            if(self.completions.style.display == "none") {
+                return true;
             }
-            return self.dontBubbleEvent(event);
-        } else if(event.keyCode == event.DOM_VK_DOWN) {
-            self.shiftAddrCompletionHighlightDown();
-        } else if(event.keyCode == event.DOM_VK_UP) {
-            self.shiftAddrCompletionHighlightUp();
+            if(event.keyCode == ENTER || event.keyCode == TAB) {
+                if(0 < self.completions.childNodes.length) {
+                    self.appendAddrCompletionToList(self.selectedAddrCompletion());
+                }
+                return false;
+            } else if(event.keyCode == DOWN) {
+                self.shiftAddrCompletionHighlightDown();
+            } else if(event.keyCode == UP) {
+                self.shiftAddrCompletionHighlightUp();
+            } else {
+                self.emptyAndHideAddressCompletions();
+            }
         } else {
-            self.emptyAndHideAddressCompletions();
+            setTimeout(
+                function() {
+                    self.completeCurrentAddr(node.value);
+                }, 0);
         }
         return true;
-    },
-
-    function dontBubbleEvent(self, event) {
-        event.cancel = true;
-        event.returnValue = false;
-        event.preventDefault();
-        return false;
     },
 
     function shiftAddrCompletionHighlightDown(self) {

@@ -38,6 +38,23 @@ Quotient.Test.MailboxTestBase.methods(
     },
 
     /**
+     * Add row at index C{i} to the scrolltable's group selection
+     */
+    function groupSelect(self, i) {
+        var sw = self.mailbox.scrollWidget;
+        var row = sw._rows[i][1];
+        /* calling nodeByAttribute on the src attribute and passing
+           the relative URL won't work, because IE rewrites them as
+           absolute URLs in the DOM */
+        var img = row.getElementsByTagName("img")[0];
+        var segs = img.src.split('/');
+        if(segs[segs.length-1] != "checkbox-off.gif") {
+            throw new Error("expected 'off' checkbox");
+        }
+        sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
+    },
+
+    /**
      * Figure out the number of unread messages in the view C{view}
      * @param view: string
      * @return: integer
@@ -140,7 +157,7 @@ Quotient.Test.InboxTestCase.methods(
             rows[1]["date"]);
 
         var personChooser = Nevow.Athena.FirstNodeByAttribute(
-                                self.mailbox.contentTableGrid[1][0], "class", "person-chooser");
+                                self.mailbox.contentTableGrid[0][0], "class", "person-chooser");
         var personChoices = Nevow.Athena.NodesByAttribute(
                                 personChooser, "class", "list-option");
         var nameToPersonKey = {};
@@ -245,7 +262,7 @@ Quotient.Test.InboxTestCase.methods(
         richAssertEquals(sw.findPrevRow(sw._rows[3][1], anyPredicate, true), [sw._rows[2][1], 2]);
         self.assertEquals(sw.findPrevRow(sw._rows[0][1], anyPredicate, true), undefined);
 
-        var select = document.forms["group-actions"].elements["group-action"];
+        var select = self.mailbox.groupActionsForm.elements["group-action"];
 
         self.assertEquals(select.value, "archive");
 
@@ -253,26 +270,34 @@ Quotient.Test.InboxTestCase.methods(
         var nextAction = select.getElementsByTagName("option")[select.selectedIndex+1];
 
         /* hide the archive option */
-        self.mailbox.setDisplayForGroupActions("none", ["archive"]);
-        self.mailbox.selectFirstVisible(select);
+
+        var visibility = self.mailbox.createVisibilityMatrix();
+        var visible = visibility["Inbox"]["show"];
+        for(var i = 0; i < visible.length; i++) {
+            visible[i] = visible[i][0];
+        }
+
+        var minusView = function(view) {
+            var result = [];
+            for(var i = 0; i < visible.length; i++) {
+                if(view != visible[i]) {
+                    result.push(visible[i]);
+                }
+            }
+            return result;
+        }
+
+        self.mailbox.setGroupActions(minusView("archive"));
 
         self.assertEquals(select.value, nextAction.value);
 
-        self.mailbox.setDisplayForGroupActions("", ["archive"]);
-        self.mailbox.selectFirstVisible(select);
+        self.mailbox.setGroupActions(visible);
 
         self.assertEquals(select.value, "archive");
 
-        var groupSelect = function(i) {
-            var row = sw._rows[i][1];
-            var img = Nevow.Athena.FirstNodeByAttribute(
-                        row, "src", "/Quotient/static/images/checkbox-off.gif");
-            sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
-        }
-
         /* select the first and last messages */
-        groupSelect(0);
-        groupSelect(3);
+        self.groupSelect(0);
+        self.groupSelect(3);
 
         self.assertEquals(sw.findRowOffset(sw._selectedRow), 0);
 
@@ -569,9 +594,9 @@ Quotient.Test.ComposeTestCase.methods(
                              "completions for " +
                              addr +
                              " are " +
-                             _completions.toSource() +
+                             _completions +
                              " instead of " +
-                             completions.toSource());
+                             completions);
         }
 
         /* map email address prefixes to lists of expected completions */
@@ -616,12 +641,6 @@ Quotient.Test.GroupActionsTestCase = Quotient.Test.MailboxTestBase.subclass('Gro
 Quotient.Test.GroupActionsTestCase.methods(
     function doTests(self) {
         var sw = self.mailbox.scrollWidget;
-        var groupSelect = function(i) {
-            var row = sw._rows[i][1];
-            var img = Nevow.Athena.FirstNodeByAttribute(
-                        row, "src", "/Quotient/static/images/checkbox-off.gif");
-            sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
-        }
 
         var assertUnreadCountsAre = function(d) {
             var count, views = ["Inbox", "Trash", "Sent", "All", "Spam"];
@@ -638,9 +657,9 @@ Quotient.Test.GroupActionsTestCase.methods(
         assertUnreadCountsAre({Inbox: 9, All: 9});
 
         /* select the first three messages */
-        groupSelect(0);
-        groupSelect(1);
-        groupSelect(2);
+        self.groupSelect(0);
+        self.groupSelect(1);
+        self.groupSelect(2);
 
         /* archive the first one */
         return self.mailbox.touch("archive", true).addCallback(
@@ -657,7 +676,7 @@ Quotient.Test.GroupActionsTestCase.methods(
             function() {
                 /* #2 is gone from the inbox, and #3 was loaded
                    into the message detail, making 6 unread.
-                   7 for the inbox because #2 was the only unread
+                   7 for All because #2 was the only unread
                    message that got moved there */
                 assertUnreadCountsAre({Inbox: 6, All: 7});
         });

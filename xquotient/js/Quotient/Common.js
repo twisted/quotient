@@ -101,9 +101,8 @@ Quotient.Common.AddPerson.methods(
 
 Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass("Quotient.Common.SenderPerson");
 Quotient.Common.SenderPerson.methods(
-    function showAddPerson(self, node, event) {
+    function showAddPerson(self, event, node, eventTarget) {
         self.node = node;
-        self.body = document.getElementsByTagName("body")[0];
 
         var name = self.nodeByAttribute('class', 'sender-person-name').firstChild.nodeValue;
         var parts = new Object();
@@ -124,21 +123,31 @@ Quotient.Common.SenderPerson.methods(
         self.email = self.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
         parts["email"] = self.email;
 
-        self.addPersonFragment = MochiKit.DOM.getElement("add-person-fragment");
+        self.addPersonFragment = document.getElementById("add-person-fragment");
 
-        self.addPersonFragment.style.top = event.pageY + 'px';
-        self.addPersonFragment.style.left = event.pageX + 25 + 'px';
+        var coords = Divmod.Runtime.theRuntime.getEventCoords(event);
+        self.addPersonFragment.style.top = coords.y + 'px';
+        self.addPersonFragment.style.left = coords.x + 25 + 'px';
 
         self.form = self.addPersonFragment.getElementsByTagName("form")[0];
         self.submitFunction = function() { self.submitForm() };
 
-        self.form.addEventListener("submit", self.submitFunction, true);
+        self.originalSubmitHandler = self.form.onsubmit;
+        self.form.onsubmit = function() {
+            var liveform = Nevow.Athena.Widget.get(self.form);
+            liveform.submit().addCallback(
+                function() {
+                    self.submitForm();
+                });
+            return false;
+        }
 
         var inputs = Nevow.Athena.NodesByAttribute(self.addPersonFragment, 'type', 'text');
+        var firstnameInput;
 
         for(var i = 0; i < inputs.length; i++) {
-            if(inputs[i].name == "firstname") {
-                inputs[i].focus();
+            if(!firstnameInput && inputs[i].name == "firstname") {
+                firstnameInput = inputs[i];
             }
             if(inputs[i].name in parts) {
                 inputs[i].value = parts[inputs[i].name];
@@ -147,34 +156,18 @@ Quotient.Common.SenderPerson.methods(
             }
         }
 
-        self.eventTarget = event.target.parentNode;
+        setTimeout(
+            function() {
+                eventTarget.onclick = function() {
+                    document.body.onclick = null;
+                    self.hideAddPerson();
+                    return false;
+                }
+            }, 0);
 
-        self.eventTarget.onclick = function() {
-            self.body.onclick = null;
-            self.hideAddPerson();
-            return false
-        }
-
-        self.body.onclick = function(_event) {
-            if(event.target == _event.target) {
-                return false;
-            }
-
-            e = _event.target;
-            if(e.tagName && e.tagName.toLowerCase() == "input") {
-                return true;
-            }
-            while(e && e.id != self.addPersonFragment.id) {
-                e = e.parentNode;
-            }
-            if (e) {
-                return false;
-            }
-            self.hideAddPerson();
-            self.body.onclick = null;
-            return false;
-        }
-        MochiKit.DOM.showElement(self.addPersonFragment);
+        self.eventTarget = eventTarget;
+        self.addPersonFragment.style.display = "";
+        firstnameInput.focus();
     },
 
     function submitForm(self) {
@@ -184,10 +177,10 @@ Quotient.Common.SenderPerson.methods(
     },
 
     function hideAddPerson(self) {
-        MochiKit.DOM.hideElement(self.addPersonFragment);
-        self.form.removeEventListener("submit", self.submitFunction, true);
+        self.addPersonFragment.style.display = "none";
+        self.form.onsubmit = self.originalSubmitHandler;
         self.eventTarget.onclick = function(event) {
-            self.showAddPerson(self.node, event);
+            self.showAddPerson(event, self.node, self.eventTarget);
             return false;
         }
     });

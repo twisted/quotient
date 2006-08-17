@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from twisted.python.filepath import FilePath
+
 from nevow.livetrial import testcase
 from nevow import tags, loaders
 
@@ -10,12 +12,15 @@ from axiom.item import Item
 from axiom import attributes
 from axiom.tags import Catalog
 
+from nevow import tags
+
 from xmantissa import ixmantissa
 from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
 
+import xquotient
 from xquotient.inbox import Inbox
 from xquotient.exmess import Message
 from xquotient.compose import Composer
@@ -36,7 +41,14 @@ class _Part(Item):
 
 
 
-class InboxTestCase(testcase.TestCase):
+class InboxTestBase(testcase.TestCase):
+    def head(self):
+        return tags.style(type='text/css')[
+                FilePath(xquotient.__file__).parent().child(
+                    'static').child('quotient.css').getContent()]
+
+
+class InboxTestCase(InboxTestBase):
     jsClass = u'Quotient.Test.InboxTestCase'
 
     docFactory = loaders.stan(tags.div[
@@ -118,7 +130,7 @@ class InboxDOMHandlersTestCase(InboxTestCase):
                              style='visibility: hidden'),
                     tags.div(id='mantissa-footer')])
 
-class BatchActionsTestCase(testcase.TestCase):
+class BatchActionsTestCase(InboxTestBase):
     jsClass = u'Quotient.Test.BatchActionsTestCase'
 
     docFactory = loaders.stan(tags.div[

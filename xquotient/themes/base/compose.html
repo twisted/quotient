@@ -104,20 +104,22 @@
                           <img src="/Quotient/static/images/close-inline-compose.png" border="0" />
                         </a>
                       </div>
-                      <nevow:invisible nevow:render="button">
-                        <a href="#" onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
-                          Send
+                      <div class="send-save-attach-buttons" style="float: left">
+                        <nevow:invisible nevow:render="button">
+                          <a href="#" onclick="Quotient.Compose.Controller.get(this).submit(); return false;">
+                            Send
+                          </a>
+                        </nevow:invisible>
+                        <nevow:invisible nevow:render="button">
+                          <a href="#" onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false;">
+                            Save Draft
+                          </a>
+                        </nevow:invisible>
+                        <a style="float: left" href="#" onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
+                          <img border="0" src="/Quotient/static/images/attach-button.png" />
+                          <span style="color: #0099CC">Attach</span>
                         </a>
-                      </nevow:invisible>
-                      <nevow:invisible nevow:render="button">
-                        <a href="#" onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false;">
-                          Save Draft
-                        </a>
-                      </nevow:invisible>
-                      <a href="#" onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
-                        <img border="0" src="/Quotient/static/images/attach-button.png" />
-                        <span style="color: #0099CC">Attach</span>
-                      </a>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -132,9 +134,8 @@
                   <td class="header-table-last-col">
                     <textarea
                       name="toAddress"
-                      onkeypress="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(event)"
-                      oninput="Quotient.Compose.Controller.get(this).completeCurrentAddr(this.value)"
-                      class="compose-to-address" style="width: 98%" rows="1"><nevow:slot name="to" /></textarea></td>
+                      onkeydown="return Quotient.Compose.Controller.get(this).addrAutocompleteKeyDown(this, event)"
+                      class="compose-to-address" style="width: 98%" rows="2"><nevow:slot name="to" /></textarea></td>
                 </tr>
                 <tr class="cc-form" style="display: none">
                   <td class="header-table-first-col">Cc:</td>

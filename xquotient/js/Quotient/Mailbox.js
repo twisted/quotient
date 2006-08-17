@@ -114,10 +114,11 @@ Quotient.Mailbox.MessageDetail.methods(
         if(self.tagsDisplay.firstChild.nodeValue != "No Tags") {
             input.value = self.tagsDisplay.firstChild.nodeValue;
         }
-        input.focus();
-
         tdc.style.display = "none";
         self.editTagsContainer.style.display = "";
+
+        /* IE throws an exception if an invisible element receives focus */
+        input.focus();
     },
 
     function hideTagEditor(self) {
@@ -175,12 +176,26 @@ Quotient.Mailbox.ScrollingWidget.methods(
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
         self.selectedGroup = {};
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
-        self.node.style.width = "300px";
         self._scrollViewport.style.maxHeight = "";
-        self.node.style.border = "";
-        self.node.style.borderLeft = "solid 1px #7FCCE5";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
         self.throbber = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
+    },
+
+    /**
+     * The super implementation looks at clientHeight, and then at style.height
+     * if clientHeight doesn't make sense.  This is problematic because our
+     * scrolltable is often display: none, and while firefox returns 0 for
+     * the clientHeight of display: none elements, IE seems to return the
+     * height of the element before it was made invisible.
+     */
+    function getScrollViewportHeight(self) {
+        var height = parseInt(self._scrollViewport.style.height);
+        if(isNaN(height)) {
+            /* called too early, just give the page height.  at worst
+               we'll end up requesting 5 extra rows or whatever */
+            height = Divmod.Runtime.theRuntime.getPageSize().h;
+        }
+        return height;
     },
 
     function emptyAndRefill(self) {
@@ -188,7 +203,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.selectedGroup = {};
     },
 
-    function resized(self, wp) {
+    function getHeight(self, wp) {
         if(!wp) {
             wp = self.widgetParent;
         }
@@ -199,10 +214,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
          * FIXME: change all this code to use offsetHeight, not clientHeight
          */
         var basePadding = 14;
-        self._scrollViewport.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
-                                             wp.messageBlockYPos -
-                                             wp.totalFooterHeight -
-                                             basePadding) + "px";
+        return (Divmod.Runtime.theRuntime.getPageSize().h -
+                wp.messageBlockYPos -
+                wp.totalFooterHeight -
+                basePadding);
 
     },
 
@@ -226,9 +241,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
                      MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
                      MochiKit.DOM.DIV(null, "TEST!!!")]);
 
-        self._scrollContent.appendChild(r);
+        document.body.appendChild(r);
         var rowHeight = Divmod.Runtime.theRuntime.getElementSize(r).h;
-        self._scrollContent.removeChild(r);
+        document.body.removeChild(r);
 
         self._rowHeight = rowHeight;
     },
@@ -269,9 +284,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "href": "#",
              "style": style,
              "onclick": function(event) {
-                if(event.target.onclick && event.target != this) {
-                    return false;
-                }
                 /* don't select based on rowOffset because it'll change as rows are removed */
                 self._selectRow(this);
                 self.widgetParent.fastForward(rowData["__id__"]);
@@ -307,7 +319,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
                                              "border": 0,
                                              "onclick": function(event) {
                                                 self.groupSelectRow(rowData["__id__"], this);
-                                                event.target.blur();
+
+                                                this.blur();
+
+                                                if(!event) {
+                                                    event = window.event;
+                                                }
+                                                event.cancelBubble = true;
+                                                if(event.stopPropagation) {
+                                                    event.stopPropagation();
+                                                }
+
                                                 return false;
                                              }}), massage(colName)];
             if(rowData["everDeferred"]) {
@@ -545,9 +567,19 @@ Quotient.Mailbox.ScrollingWidget.methods(
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function __init__(self, node, messageCount, complexityLevel) {
-        MochiKit.DOM.addToCallStack(window, "onresize",
+        self.lastPageSize = Divmod.Runtime.theRuntime.getPageSize();
+        document.getElementById("mantissa-footer").style.display = "none";
+
+        MochiKit.DOM.addToCallStack(window, "onload",
             function() {
-                self.resized(false);
+                MochiKit.DOM.addToCallStack(window, "onresize",
+                    function() {
+                        var pageSize = Divmod.Runtime.theRuntime.getPageSize();
+                        if(pageSize.w != self.lastPageSize.w || pageSize.h != self.lastPageSize.h) {
+                            self.lastPageSize = pageSize;
+                            self.resized(false);
+                        }
+                    }, false);
             }, false);
 
         var search = document.getElementById("search-button");
@@ -555,13 +587,9 @@ Quotient.Mailbox.Controller.methods(
             /* if there aren't any search providers available,
              * then there won't be a search button */
             var width = Divmod.Runtime.theRuntime.getElementSize(search.parentNode).w;
-            var contentTable = Nevow.Athena.FirstNodeByAttribute(
-                                    node, "class", "content-table");
-            var cornerFooter = self.getElementsByTagNameShallow(
-                                    contentTable.parentNode, "div")[1];
-            var rightCorner = self.firstWithClass(cornerFooter, "right-corner");
-            contentTable.style.paddingRight = width + "px";
-            rightCorner.style.right = width + "px";
+            var contentTableContainer = Nevow.Athena.FirstNodeByAttribute(
+                                    node, "class", "content-table-container");
+            contentTableContainer.style.paddingRight = width + "px";
         }
 
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
@@ -585,15 +613,13 @@ Quotient.Mailbox.Controller.methods(
 
         self._viewingByView = 'Inbox';
         self.setupMailViewNodes();
-        self.messageDetail = self.firstWithClass(self.contentTableGrid[1][2], "message-detail");
+        self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
 
-        var scrollHeader = self.firstWithClass(self.contentTableGrid[0][0], "scrolltable-header");
-        self.scrollHeader = scrollHeader;
-        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[1][0], "view-pane-cell");
-        self.viewShortcutContainer = self.firstWithClass(self.scrollHeader, "view-shortcut-container");
+        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-cell");
+        self.viewShortcutSelect = self.firstWithClass(self.node, "view-shortcut-container");
 
         var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.node,
                                                            "athena:class",
@@ -601,7 +627,8 @@ Quotient.Mailbox.Controller.methods(
 
         self.scrollWidget = Nevow.Athena.Widget.get(scrollNode);
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
-        self.resized(true);
+        self.groupActionsForm = Nevow.Athena.FirstNodeByAttribute(
+                                    self.contentTableGrid[1][1], "name", "group-actions");
 
         self._selectAndFetchFirstRow();
 
@@ -612,13 +639,19 @@ Quotient.Mailbox.Controller.methods(
 
     function _cacheContentTableGrid(self) {
         self.inboxContent = self.firstNodeByAttribute("class", "inbox-content");
-        var contentTable = self.getFirstElementByTagNameShallow(self.inboxContent, "table");
-        var contentTableRows = self.getElementsByTagNameShallow(
-                self.getFirstElementByTagNameShallow(contentTable, "tbody"), "tr");
+        var firstByTagName = function(container, tagName) {
+            return self.getFirstElementByTagNameShallow(container, tagName);
+        }
+        var contentTableContainer = Divmod.Runtime.theRuntime.getElementsByTagNameShallow(
+                                        self.inboxContent, "div")[1];
+        var contentTable = firstByTagName(contentTableContainer, "table");
+        var contentTableRows = Divmod.Runtime.theRuntime.getElementsByTagNameShallow(
+                                    firstByTagName(contentTable, "tbody"), "tr");
         var contentTableGrid = [];
+
         for(var i = 0; i < contentTableRows.length; i++) {
             contentTableGrid.push(
-                self.getElementsByTagNameShallow(
+                Divmod.Runtime.theRuntime.getElementsByTagNameShallow(
                     contentTableRows[i], "td"));
         }
         self.contentTable = contentTable;
@@ -668,7 +701,7 @@ Quotient.Mailbox.Controller.methods(
 
     function adjustProgressBar(self, lessHowManyMessages) {
         if(self.progressBar) {
-            self.progressBar = self.firstWithClass(self.contentTableGrid[2][2],
+            self.progressBar = self.firstWithClass(self.contentTableGrid[1][2],
                                                    "progress-bar");
         }
         self.progressBar.style.borderRight = "solid 1px #6699CC";
@@ -755,18 +788,6 @@ Quotient.Mailbox.Controller.methods(
                 return D;
             });
     },
-    /**
-     * similar to document.getElementsByTagName(), except it only returns
-     * matching elements that are immediate children of C{node}
-     */
-    function getElementsByTagNameShallow(self, node, tagName) {
-        return MochiKit.Base.filter(
-            function(n) {
-                if(n.tagName && n.tagName.toLowerCase() == tagName) {
-                    return n;
-                }
-            }, node.childNodes);
-    },
 
     /**
      * similar to C{getElementsByTagNameShallow}, but returns the
@@ -836,8 +857,11 @@ Quotient.Mailbox.Controller.methods(
         setTimeout(function() {
             self.setScrollTablePosition("absolute");
             self.highlightExtracts();
-            self.setInitialComplexity(complexityLevel);
-            self.finishedLoading();
+            self.setInitialComplexity(complexityLevel).addCallback(
+                function() {
+                    self.finishedLoading();
+                    self.resized(true);
+                });
         }, 0);
     },
 
@@ -849,14 +873,18 @@ Quotient.Mailbox.Controller.methods(
         /* firefox goofs the table layout unless we make it
             factor all three columns into it.  the user won't
             actually see anything strange */
-        if(complexityLevel != 3) {
+        if(complexityLevel == 1) {
+            var D = Divmod.Defer.Deferred();
             self._setComplexityVisibility(3);
             /* two vanilla calls aren't enough, firefox won't
                 update the viewport */
             setTimeout(function() {
-                self._setComplexityVisibility(complexityLevel);
+                self._setComplexityVisibility(1);
+                D.callback(null);
             }, 1);
+            return D;
         }
+        return Divmod.Defer.succeed(null);
     },
 
     /**
@@ -872,47 +900,38 @@ Quotient.Mailbox.Controller.methods(
         }
 
         if(!self.totalFooterHeight) {
-            var footer = document.getElementById("mantissa-footer");
             var blockFooter = self.firstNodeByAttribute("class", "right-block-footer");
             self.blockFooterHeight = getHeight(blockFooter);
-            self.totalFooterHeight = self.blockFooterHeight + getHeight(footer) + 5;
+            self.totalFooterHeight = self.blockFooterHeight + 5;
         }
 
-        self.scrollWidget.resized(self);
-
-        var scrollViewport = self.scrollWidget._scrollViewport;
-        scrollViewport.style.height = (scrollViewport.style.height - self.blockFooterHeight) + "px";
-        self.viewPaneCell.style.height = scrollViewport.style.height;
+        var swHeight = self.scrollWidget.getHeight(self);
+        self.contentTableGrid[0][1].style.height = swHeight + "px";
+        self.scrollWidget._scrollViewport.style.height = swHeight + "px";
 
         self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
                                            self.ypos - 14 -
                                            self.totalFooterHeight) + "px";
 
-        if(initialResize) {
-            return;
+        setTimeout(
+            function() {
+                self.recalculateMsgDetailWidth(initialResize);
+            }, 0);
+    },
+
+    function recalculateMsgDetailWidth(self, initialResize) {
+        if(!self.initialResize) {
+            self.messageDetail.style.width = "100%";
         }
 
-        if(self.complexityLevel == undefined) {
-            self.complexityLevel = 1;
-        }
-        var complexityLevel = self.complexityLevel;
-        var newComplexityLevel = complexityLevel + 1;
-        if(newComplexityLevel == 4) {
-            newComplexityLevel = 1;
-        }
-        /* so this kind of sucks.  what happens is that changing the
-         * height of the elements in the middle row results in a bunch
-         * of whitespace underneath, because the y position of the
-         * bottom row isn't recalculated for some reason.  once the
-         * browser is jogged a little bit, it recalculates the position
-         * fine.  changing the complexity setting to something different,
-         * and then changing it back after a token delay seems to be the
-         * easiest way to do this */
+        document.body.style.overflow = "hidden";
+        self.messageDetail.style.overflow = "hidden";
 
-        self._setComplexityVisibility(newComplexityLevel);
-        setTimeout(function() {
-            self._setComplexityVisibility(complexityLevel)
-            }, 1);
+        self.messageDetail.style.width = Divmod.Runtime.theRuntime.getElementSize(
+                                            self.messageDetail).w + "px";
+
+        self.messageDetail.style.overflow = "auto";
+        document.body.style.overflow = "auto";
     },
 
     function finishedLoading(self) {
@@ -953,26 +972,25 @@ Quotient.Mailbox.Controller.methods(
     function _setComplexityVisibility(self, c) {
         var fontSize;
         if(c == 1) {
+            self.contentTableGrid[0][0].style.display = "none";
             self.contentTableGrid[1][0].style.display = "none";
-            self.contentTableGrid[2][0].style.display = "none";
             self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
-            self.scrollHeader.style.display = "";
-            self.viewShortcutContainer.style.display = "";
+            self.viewShortcutSelect.style.display = "";
             /* use the default font-size, because complexity 1
                is the default complexity. */
             fontSize = "";
         } else if(c == 2) {
+            self.contentTableGrid[0][0].style.display = "none";
             self.contentTableGrid[1][0].style.display = "none";
-            self.contentTableGrid[2][0].style.display = "none";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
-            self.viewShortcutContainer.style.display = "";
+            self.viewShortcutSelect.style.display = "";
             fontSize = "1.3em";
         } else if(c == 3) {
-            self.viewShortcutContainer.style.display = "none";
+            self.viewShortcutSelect.style.display = "none";
+            self.contentTableGrid[0][0].style.display = "";
             self.contentTableGrid[1][0].style.display = "";
-            self.contentTableGrid[2][0].style.display = "";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             fontSize = "1.3em";
@@ -1013,6 +1031,7 @@ Quotient.Mailbox.Controller.methods(
             self.complexityHover(node);
         }
         node.className = "selected-complexity-icon";
+        self.recalculateMsgDetailWidth(false);
     },
 
     function setViewsContainerDisplay(self, d) {
@@ -1027,7 +1046,6 @@ Quotient.Mailbox.Controller.methods(
         } else {
             d = "";
         }
-        self.scrollHeader.style.display = d;
     },
 
     function fastForward(self, toMessageID) {
@@ -1116,7 +1134,7 @@ Quotient.Mailbox.Controller.methods(
      * Add the given tags as options inside the "View By Tag" element
      */
     function addTagsToViewSelector(self, taglist) {
-        var tc = self.firstWithClass(self.contentTableGrid[1][0], "tag-chooser");
+        var tc = self.firstWithClass(self.contentTableGrid[0][0], "tag-chooser");
         var choices = tc.getElementsByTagName("span");
         var currentTags = [];
         for(var i = 0; i < choices.length; i++) {
@@ -1145,11 +1163,11 @@ Quotient.Mailbox.Controller.methods(
         var defer   = ["defer", true];
 
         return {
-            Spam:     {show: [train_ham, delete_],
+            Spam:     {show: [delete_, train_ham],
                        hide: [archive, defer, train_spam]},
-            All:      {show: [train_spam, delete_],
+            All:      {show: [delete_, train_spam],
                        hide: [archive, defer, train_ham]},
-            Inbox:    {show: [archive, defer, train_spam, delete_],
+            Inbox:    {show: [archive, defer, delete_, train_spam],
                        hide: [train_ham]},
             Sent:     {show: [delete_],
                        hide: [train_ham, train_spam, archive, defer]},
@@ -1189,26 +1207,9 @@ Quotient.Mailbox.Controller.methods(
                                      visibilityForThisView[k]);
         }
 
-        self.setDisplayForGroupActions("",     namesOnly("show"));
-        self.setDisplayForGroupActions("none", namesOnly("hide"));
-
-        self.selectFirstVisible(
-                document.forms["group-actions"].elements["group-action"]);
+        self.setGroupActions(namesOnly("show"));
 
         return self._chooseViewParameter('viewByMailType', n, false);
-    },
-
-    /**
-     * select the first visible <option> inside the given <select>
-     */
-    function selectFirstVisible(self, select) {
-        var opts = select.getElementsByTagName("option");
-        for(var i = 0; i < opts.length; i++) {
-            if(opts[i].style.display != "none") {
-                select.selectedIndex = i;
-                return;
-            }
-        }
     },
 
     /**
@@ -1222,11 +1223,10 @@ Quotient.Mailbox.Controller.methods(
             return;
         }
 
-        var select = self.viewShortcutContainer.getElementsByTagName("select")[0];
-        var options = select.getElementsByTagName("option");
+        var options = self.viewShortcutSelect.getElementsByTagName("option");
         for(var i = 0; i < options.length; i++) {
             if(options[i].value == self._viewingByView) {
-                select.selectedIndex = i;
+                self.viewShortcutSelect.selectedIndex = i;
                 break;
             }
         }
@@ -1262,30 +1262,37 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Similar to C{setDisplayForButtons}: apply display value C{display}
-     * to the <option> in the group actions <select> that corresponds to
-     * each action name in C{actionNames}
+     * Internet Explorer doesn't honour the "display" CSS property
+     * or the "disabled" attribute on <option> nodes, so each time
+     * the list of available actions needs to change, we'll just
+     * remove all of the nodes in the group action <select> and
+     * replace them with the ones that we know we need.
+     *
+     * @param: array of available action names.  (e.g. train-ham,
+     *         train-spam, delete, archive, defer)
+     * @return: undefined
      */
-    function setDisplayForGroupActions(self, display, actionNames) {
-        var action;
+    function setGroupActions(self, actionNames) {
+        var select = self.groupActionsForm.elements["group-action"];
+        while(0 < select.childNodes.length) {
+            select.removeChild(select.firstChild);
+        }
+        var nameToDisplay = {"train-ham": "Not Spam",
+                             "train-spam": "Is Spam",
+                             "delete": "Delete",
+                             "archive": "Archive",
+                             "defer": "Defer"};
         for(var i = 0; i < actionNames.length; i++) {
-            /* temporary hack, defer needs better UI, and the form
-               needs to go somewhere besides the message detail if
-               it's going to be a group action */
+            /* XXX hack.  we should be able to defer multiple msgs */
             if(actionNames[i] == "defer") {
                 continue;
             }
-            self.getGroupActionElement(actionNames[i]).style.display = display;
+            select.appendChild(
+                MochiKit.DOM.OPTION(
+                    {"value": actionNames[i]}, nameToDisplay[actionNames[i]]));
         }
     },
 
-    /*
-     Locate the element that corresponds to the given group action name
-     */
-    function getGroupActionElement(self, actionName) {
-        var select = document.forms["group-actions"].elements["group-action"];
-        return Nevow.Athena.FirstNodeByAttribute(select, "value", actionName);
-    },
 
     /**
      * Select a new account, the messages from which to display.  Adjust local
@@ -1327,7 +1334,7 @@ Quotient.Mailbox.Controller.methods(
         if(!self.viewOptions) {
             /* fetch the node that represents the main view chooser */
             var viewChooser = self.firstWithClass(
-                                self.contentTableGrid[1][0],
+                                self.contentTableGrid[0][0],
                                 "view-chooser"),
                 /* and all of the view option nodes inside it */
                 _viewOptions = Nevow.Athena.NodesByAttribute(
@@ -1351,7 +1358,7 @@ Quotient.Mailbox.Controller.methods(
 
     function setupMailViewNodes(self) {
         if(!self.mailViewBody) {
-            var mailViewPane = self.firstWithClass(self.contentTableGrid[1][0], "view-pane-content");
+            var mailViewPane = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-content");
             var mailViewBody = self.firstWithClass(mailViewPane, "pane-body");
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
@@ -1392,7 +1399,6 @@ Quotient.Mailbox.Controller.methods(
             }
             return;
         }
-
         sw._selectFirstRow();
     },
 
@@ -1536,7 +1542,7 @@ Quotient.Mailbox.Controller.methods(
         var suffixes = ["CurrentMessage", "MessageGroup", "MessageBatch"];
         var action = args[0];
         for(var i = 0; i < suffixes.length; i++) {
-            if(action.substr(-suffixes[i].length) == suffixes[i]) {
+            if(action.substr(action.length-suffixes[i].length) == suffixes[i]) {
                 action = action.substr(0, action.length-suffixes[i].length);
                 break;
             }
@@ -1620,8 +1626,8 @@ Quotient.Mailbox.Controller.methods(
      * on whether any messages are selected
      */
     function toggleGroupActions(self) {
-        var form = document.forms["group-actions"];
-        var currentlyEnabled = !form.elements["group-action"].hasAttribute("disabled");
+        var form = self.groupActionsForm;
+        var currentlyEnabled = !form.elements["group-action"].disabled;
         self._changeGroupActionAvailability(!currentlyEnabled);
     },
 
@@ -1633,7 +1639,7 @@ Quotient.Mailbox.Controller.methods(
      * @param available: boolean.  true = enable, false = disable
      */
     function _changeGroupActionAvailability(self, available) {
-        var form = document.forms["group-actions"];
+        var form = self.groupActionsForm;
         var gap = self.getFirstNode(form.parentNode.parentNode, "group-action-perform");
         var select = form.elements["group-action"];
 
@@ -1656,7 +1662,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function performSelectedGroupAction(self) {
-        var form = document.forms["group-actions"];
+        var form = self.groupActionsForm;
         var actionName = form.elements["group-action"].value;
 
         var args = [];
@@ -1699,7 +1705,7 @@ Quotient.Mailbox.Controller.methods(
     function setProgressWidth(self) {
         if(!self.progressBar) {
             self.progressBar = self.firstWithClass(
-                                self.contentTableGrid[2][2], "progress-bar");
+                                self.contentTableGrid[1][2], "progress-bar");
             self.messageActions = self.nodesByAttribute("class", "message-actions");
         }
         var visibility;
@@ -1910,7 +1916,7 @@ Quotient.Mailbox.Controller.methods(
         self.currentMessageData = currentMessageData;
 
         Divmod.msg("setMessageContent(" +
-                   currentMessageData.toSource() +
+                   currentMessageData +
                    ")");
 
         self.messageDetail.scrollTop = 0;
@@ -1938,7 +1944,7 @@ Quotient.Mailbox.Controller.methods(
         if (nextMessagePreview != null) {
             if(!self.nextMessagePreview) {
                 self.nextMessagePreview = self.firstWithClass(
-                                            self.contentTableGrid[2][2],
+                                            self.contentTableGrid[1][2],
                                             "next-message-preview");
             }
             /* so this is a message, not a compose fragment */

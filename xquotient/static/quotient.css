@@ -1,7 +1,38 @@
+.content-table-container {
+    padding-left: 50px;
+}
+
+.loading {
+    position: absolute;
+    width: 2000px;
+    height: 2000px;
+    background-color: #FFFFFF;
+    font-size: 3em;
+    z-index: 99;
+}
+
+.send-save-attach-buttons table.button {
+    float: left;
+    margin-right: 4px;
+}
+
 table.tdb > tbody > tr > td { cursor: pointer; }
 
 .cancel-link {
     margin-right: 4px;
+}
+
+.scrolltable-cell, .message-detail-cell {
+    border-left: solid 1px #7FCCE5;
+}
+
+.message-detail-cell {
+    width: 100%;
+    border-right: solid 1px #7FCCE5;
+}
+
+.scrolltable-container .scrolltable-widget-node {
+    border-width: 0px;
 }
 
 .detail-toggle {
@@ -45,8 +76,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 #attach-dialog-bg {
     background-color: #000000;
     opacity: .4;
-    width: 100%;
-    height: 100%;
+    filter: alpha(opacity=40);
     position: absolute;
     top: 0px;
     left: 0px;
@@ -83,7 +113,7 @@ iframe.cabinet {
 ul.file-list, ul.file-list li {
     margin-top: 0px;
     margin-bottom: 0px;
-    padding: none;
+    padding: 0px;
 }
 
 .header-table .buttons {
@@ -138,19 +168,6 @@ ul.file-list, ul.file-list li {
     overflow: hidden;
 }
 
-/* the content table and the table that contains the bottom corners
- * are both padded by 50px to the left so their left edges line up
- * with each-other and the end of the divmod menubar icon */
-.content-table, .corner-footer {
-    padding-left: 50px;
-}
-
-.corner-footer {
-    position: relative;
-    top: -6px;
-    line-height: 0px;
-}
-
 .tags-container {
     margin: 0px 2px 4px 2px;
 }
@@ -175,14 +192,6 @@ ul.file-list, ul.file-list li {
     float: left;
 }
 
-.loading {
-    position: fixed;
-    z-index: 99;
-    background-color: #FFFFFF;
-    height: 100%;
-    width: 100%;
-}
-
 .excerpt-column {
     clear: left;
     padding: 4px 8px 4px 9px;
@@ -200,29 +209,42 @@ img.complexity-icon:hover {
     vertical-align: middle;
 }
 
-img.corner {
-    vertical-align: top;
-}
-
-select.defer, table.button {
-    float: left;
-    margin-right: 4px;
-}
-
 a.button-container:link, a.button-container:visited, a.button-container:active {
     color: #FFFFFF;
 }
 
-table.button {
-    table-layout: fixed;
-}
-
 .button-row {
     line-height: 0px;
+    font-size: 0px;
 }
 
 .button-top-edge {
     background-image: url(/Quotient/static/images/button-top-edge.png);
+    background-position: bottom left;
+}
+
+.button-tl-corner, .button-tr-corner, .button-bl-corner, .button-br-corner {
+    width: 3px;
+    height: 3px;
+    background-repeat: no-repeat;
+}
+
+.button-tl-corner {
+    background-image: url(/Quotient/static/images/button-tl-corner.png);
+    background-position: top right;
+}
+
+.button-tr-corner {
+    background-image: url(/Quotient/static/images/button-tr-corner.png);
+}
+
+.button-bl-corner {
+    background-image: url(/Quotient/static/images/button-bl-corner.png);
+    background-position: top right;
+}
+
+.button-br-corner {
+    background-image: url(/Quotient/static/images/button-br-corner.png);
 }
 
 .button-top-edge, .button-bottom-edge {
@@ -236,6 +258,7 @@ table.button {
 
 .button-left-edge {
     background-image: url(/Quotient/static/images/button-left-edge.png);
+    background-position: top right;
 }
 
 .button-right-edge {
@@ -253,20 +276,12 @@ table.button {
     background-color: #0099CC;
 }
 
-.button-content > a:active {
+.button-content a:active {
     text-decoration: none;
 }
 
-.button-content > a:visited, .button-content > a:link {
+.button-content a:visited, .button-content a:link {
     color: #FFFFFF;
-}
-
-.scrolltable-cell {
-    width: 300px;
-}
-
-.scrolltable-header {
-    width: 100%;
 }
 
 .scrolltable-header-container {
@@ -286,6 +301,8 @@ table.button {
 
 .view-shortcut-container {
     white-space: nowrap;
+    float: left;
+    margin: 0px 4px 0px 2px;
 }
 
 .message-block {
@@ -337,12 +354,23 @@ table.button {
 }
 
 .left-corner {
+    position: relative;
+    top: -6px;
     float: left;
+    background-image: url(/Quotient/static/images/inbox-bl-corner.png);
 }
 
 .right-corner {
-    position: absolute;
-    right: 0px;
+    position: relative;
+    top: -6px;
+    float: right;
+    background-image: url(/Quotient/static/images/inbox-br-corner.png);
+}
+
+.left-corner, .right-corner {
+    font-size: 0px;
+    width: 6px;
+    height: 6px;
 }
 
 .rounded-corner-spacer {
@@ -384,7 +412,6 @@ table.button {
 .view-pane {
     width: 200px;
     height: 100%;
-    border-left: solid 1px #7FCCE5;
     overflow: auto;
 }
 
@@ -398,6 +425,8 @@ table.button {
 
 .view-pane-cell {
     width: 200px;
+    border-left: solid 1px #7FCCE5;
+    border-right: none;
     height: 100%;
     padding-bottom: 1px;
 }
@@ -410,20 +439,19 @@ table.button {
 }
 
 .list-option {
-    margin-top: 1px;
-    margin-bottom: 1px;
-}
-
-.list-option > span.opt-name, .selected-list-option > span.opt-name {
-    margin-left: 18px;
+    cursor: pointer;
 }
 
 .list-option, .selected-list-option {
     overflow: hidden;
+    width: 182px;
+    padding-left: 18px;
+    white-space: nowrap;
+    margin-top: 1px;
+    margin-bottom: 1px;
 }
 
 .list-option:hover {
-    cursor: pointer;
     text-decoration: underline;
 }
 
@@ -458,6 +486,9 @@ table.button {
     background-color: #6699CC;
     border: solid 1px #6699CC;
     margin-top: 2px;
+    height: 4px;
+    font-size: 0px;
+    width: 99%;
 }
 
 .next-message-preview {
@@ -465,21 +496,28 @@ table.button {
     margin-left: 4px;
     margin-bottom: 4px;
     background-color: #DCF0FF;
-    overflow: hidden;
     white-space: nowrap;
+    overflow: hidden;
+    width: 99%;
 }
 
 .next-message > .next {
     color: #81B1E2;
 }
 
-.actions-row {
+.message-actions table.button, select.defer {
+    float: left;
+    margin-right: 4px;
+}
+
+.message-actions-container {
     background-color: #CCEBF5;
     border-bottom: solid 1px #7FCCE5;
     border-left: solid 1px #7FCCE5;
+    padding: 2px 0px 2px 0px;
 }
 
-.progress-meter, .message-actions {
+.progress-meter {
     margin-left: 4px;
 }
 
@@ -639,9 +677,6 @@ img.thumbnail { border: none; }
     overflow: auto;
     height: 100%;
     background-color: #FFFFFF;
-    border: solid 1px #7FCCE5;
-    border-top: none;
-    border-bottom: none;
 }
 
 .message-body {
