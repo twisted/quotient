@@ -1,13 +1,14 @@
 from zope.interface import implements
 
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item, InstallableMixin, declareLegacyItem
 from axiom import attributes, scheduler
-from axiom.upgrade import registerAttributeCopyingUpgrader
+from axiom.upgrade import (registerAttributeCopyingUpgrader,
+                           registerUpgrader)
 
-from xmantissa import website, webapp, ixmantissa, people, prefs
-from xmantissa import fulltext
+from xmantissa import website, webapp, ixmantissa, people, prefs, webnav, fulltext
 
 from xquotient import inbox, mail, gallery, qpeople, extract, spam, _mailsearchui
+from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.grabber import GrabberConfiguration
 
 
@@ -67,6 +68,7 @@ class QuotientBenefactor(Item):
         avatar.findOrCreate(spam.Filter).installOn(avatar)
 
         avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
+        avatar.findOrCreate(MessageDisplayPreferenceCollection).installOn(avatar)
 
         avatar.findOrCreate(inbox.Inbox).installOn(avatar)
 
@@ -131,86 +133,24 @@ class IndexingBenefactor(Item):
 
 
 
-class _PreferredMimeType(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {u'text/html':'HTML', u'text/plain':'Text'}
-        desc = 'Your preferred format for display of email'
-
-        super(_PreferredMimeType, self).__init__('preferredMimeType',
-                                                 value,
-                                                 'Preferred Format',
-                                                 collection, desc,
-                                                 valueToDisplay)
-
-class _PreferredMessageDisplay(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {u'split':'Split Screen',u'full':'Full Screen'}
-        desc = 'Your preferred message detail value'
-
-        super(_PreferredMessageDisplay, self).__init__('preferredMessageDisplay',
-                                                       value,
-                                                       'Preferred Message Display',
-                                                       collection, desc,
-                                                       valueToDisplay)
-
-class _ShowReadPreference(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {True:'Yes', False:'No'}
-        desc = 'Show Read messages by default in Inbox View'
-
-        super(_ShowReadPreference, self).__init__('showRead',
-                                                  value,
-                                                  'Show Read Messages',
-                                                  collection, desc,
-                                                  valueToDisplay)
-
-class _ShowMoreDetailPreference(prefs.MultipleChoicePreference):
-    def __init__(self, value, collection):
-        valueToDisplay = {True: 'Yes', False: 'No'}
-        desc = 'Show "More Detail" panel in message detail by default'
-        super(_ShowMoreDetailPreference, self).__init__('showMoreDetail',
-                                                        value,
-                                                        'Show "More Detail"',
-                                                        collection,
-                                                        desc,
-                                                        valueToDisplay)
-
-class QuotientPreferenceCollection(Item, InstallableMixin):
+class QuotientPreferenceCollection(Item, InstallableMixin, prefs.PreferenceCollectionMixin):
+    """
+    The core Quotient L{xmantissa.ixmantissa.IPreferenceCollection}.  Doesn't
+    collect any preferences, but groups some quotient settings related fragments
+    """
     implements(ixmantissa.IPreferenceCollection)
 
     typeName = 'quotient_preference_collection'
-    schemaVersion = 2
+    schemaVersion = 3
 
     installedOn = attributes.reference()
-
-    preferredMimeType = attributes.text(default=u'text/plain')
-    preferredMessageDisplay = attributes.text(default=u'split')
-    showRead = attributes.boolean(default=True)
-    showMoreDetail = attributes.boolean(default=False)
-
-    applicationName = 'Mail'
 
     def installOn(self, other):
         super(QuotientPreferenceCollection, self).installOn(other)
         other.powerUp(self, ixmantissa.IPreferenceCollection)
 
-    # IPreferenceCollection
-    def getPreferences(self):
-        pmt = _PreferredMimeType(self.preferredMimeType, self)
-        pmd = _PreferredMessageDisplay(self.preferredMessageDisplay, self)
-        showRead = _ShowReadPreference(self.showRead, self)
-        showMoreDetail = _ShowMoreDetailPreference(self.showMoreDetail, self)
-
-        return dict(preferredMimeType=pmt,
-                    preferredMessageDisplay=pmd,
-                    showRead=showRead,
-                    showMoreDetail=showMoreDetail)
-
-    def setPreferenceValue(self, pref, value):
-        # this ugliness is short lived
-        assert hasattr(self, pref.key)
-        setattr(pref, 'value', value)
-        setattr(self, pref.key, value)
+    def getPreferenceParameters(self):
+        return ()
 
     def getSections(self):
         # XXX This is wrong because it is backwards.  This class cannot be
@@ -229,4 +169,30 @@ class QuotientPreferenceCollection(Item, InstallableMixin):
             return sections
         return None
 
+    def getTabs(self):
+        return (webnav.Tab('Mail', self.storeID, 0.0),)
+
 registerAttributeCopyingUpgrader(QuotientPreferenceCollection, 1, 2)
+
+declareLegacyItem(QuotientPreferenceCollection.typeName, 2,
+                  dict(installedOn=attributes.reference(),
+                       preferredMimeType=attributes.text(),
+                       preferredMessageDisplay=attributes.text(),
+                       showRead=attributes.boolean(),
+                       showMoreDetail=attributes.boolean()))
+
+def quotientPreferenceCollection2To3(old):
+    """
+    Remove the preference attributes of
+    L{xquotient.quotientapp.QuotientPreferenceCollection}, and install
+    a L{xquotient.exmess.MessageDisplayPreferenceCollection}, because
+    the attributes have either been moved there, or removed entirely
+    """
+    MessageDisplayPreferenceCollection(
+        store=old.store,
+        preferredFormat=old.preferredMimeType).installOn(old.store)
+
+    return old.upgradeVersion('quotient_preference_collection', 2, 3,
+                              installedOn=old.installedOn)
+
+registerUpgrader(quotientPreferenceCollection2To3, 'quotient_preference_collection', 2, 3)

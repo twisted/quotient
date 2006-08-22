@@ -632,7 +632,7 @@ class GrabberConfigFragment(athena.LiveFragment):
     fragmentName = 'grabber-configuration'
     live = 'athena'
     jsClass = u'Quotient.Grabber.Controller'
-    title = 'External Accounts'
+    title = 'Incoming'
 
     def head(self):
         return ()
@@ -643,19 +643,22 @@ class GrabberConfigFragment(athena.LiveFragment):
             [liveform.Parameter('domain',
                                 liveform.TEXT_INPUT,
                                 unicode,
+                                u'Domain',
                                 u'The domain which hosts the account.'),
              liveform.Parameter('username',
                                 liveform.TEXT_INPUT,
                                 unicode,
+                                u'Username',
                                 u'The username portion of the address from which to retrieve messages.'),
              liveform.Parameter('password1',
                                 liveform.PASSWORD_INPUT,
                                 unicode,
+                                u'Password',
                                 u'The password for the remote account.'),
              liveform.Parameter('password2',
                                 liveform.PASSWORD_INPUT,
                                 unicode,
-                                u'Repeat password'),
+                                u'Repeat Password'),
 #              liveform.Parameter('protocol',
 #                                 liveform.Choice(grabberTypes.keys()),
 #                                 lambda value: grabberTypes[value],
@@ -668,6 +671,7 @@ class GrabberConfigFragment(athena.LiveFragment):
              description='Add Grabber')
         f.jsClass = u'Quotient.Grabber.AddGrabberFormWidget'
         f.setFragmentParent(self)
+        f.docFactory = webtheme.getLoader('liveform-compact')
         return ctx.tag[f]
 
     wt = None
