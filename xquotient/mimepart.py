@@ -557,6 +557,9 @@ class MIMEPartParser(MIMEMessageParser):
         return np
 
 class MIMEPart(object):
+
+    bodyOffset = None
+
     def __init__(self, parent=None):
         self.parent = parent
         if parent is None:
@@ -697,7 +700,7 @@ class MIMEMessageReceiver(object):
     def messageDone(self):
         localNow = time.time()
         gmtDate = time.gmtime(localNow)
-        if not hasattr(self.parser.part, 'bodyOffset'):
+        if self.parser.part.bodyOffset is None:
             # This block for handling invalid, bodiless messages.
             self.parser.finishHeader()
             self.parser.part.bodyOffset = self.bytecount

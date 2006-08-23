@@ -236,6 +236,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin
             for att in msgitem.walkAttachments():
                 self.assertNotEquals(att.part.bodyLength, None)
         self._messageTest(messageWithEmbeddedMessage, checkAttachments)
+        self._messageTest(truncatedMultipartMessage, checkAttachments)
 
     def testPartIDs(self):
         mr = self.setUpMailStuff()
@@ -518,6 +519,44 @@ To UNSUBSCRIBE, email to debian-bugs-dist-request@lists.debian.org
 with a subject of "unsubscribe". Trouble? Contact listmaster@lists.debian.org
 
 """
+
+truncatedMultipartMessage = """
+Envelope-to: exarkun@twistedmatrix.com
+Received: from fuchsia.puzzling.org ([64.91.227.43])
+        by pyramid.twistedmatrix.com with esmtp (Exim 3.35 #1 (Debian))
+        id 1BEmL5-0007rB-00; Sat, 17 Apr 2004 03:42:19 -0600
+Received: from localhost (localhost [127.0.0.1])
+        by fuchsia.puzzling.org (Postfix) with ESMTP
+        id 26C44944B0; Sat, 17 Apr 2004 19:43:37 +1000 (EST)
+Received: from fuchsia.puzzling.org ([127.0.0.1])
+        by localhost (puzzling.org [127.0.0.1]) (amavisd-new, port 10024)
+        with ESMTP id 13403-06; Sat, 17 Apr 2004 19:43:36 +1000 (EST)
+Received: from c-24-130-52-47.we.client2.attbi.com (c-24-130-52-47.we.client2.attbi.com [24.130.52.47])
+        by fuchsia.puzzling.org (Postfix) with SMTP
+        id 2E804944AF; Sat, 17 Apr 2004 19:43:34 +1000 (EST)
+X-Message-Info: 7jzbcpjl6RND_LC_CHAR[1-3]QW/nxfFmfAbsNWUaxdMYK3HYc
+Received: from drizzle ([48.88.16.164])
+          by or32.bristle.hustle.destiny.lycos.com
+          (InterMail vV.3.82.07.75 370-87-2-53-7-536568126) with ESMTP
+          id <22087.MMNLA8509920.c9-mail.lessor.different.net.cable.rogers.com@oleander>
+          for <exarkun@twistedmatrix.com>; Sun, 18 Apr 2004 05:33:58 -0500
+Message-ID: <4670370065RND_LC_CHAR[1-5]12810o$60866140qt3$353j1pch3@backstop>
+Reply-To: "Estelle Graves" <mucosa@wmconnect.com>
+From: "Estelle Graves" <mucosa@wmconnect.com>
+To: <exarkun@twistedmatrix.com>
+Subject: Scare the banks away today..
+Date: Sun, 18 Apr 2004 06:39:58 -0400
+MIME-Version: 1.0 (produced by sportsmendelia 0.1)
+Content-Type: multipart/alternative;
+        boundary="--634550241884553"
+X-Virus-Scanned: by amavisd-new-20030616-p7 (Debian) at puzzling.org
+Status: RO
+
+----634550241884553
+Content-Type: text/html;
+        charset="iso-8[4
+""".strip()                     # This is important!  The message is different
+                                # when it has a trailing newline.
 
 class MessageTestCase(unittest.TestCase):
     """
