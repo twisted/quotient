@@ -141,8 +141,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
                 makeMessage(None, None, msg.impl)
         self.store.transact(deliverMessages)
 
-        inbox = Inbox(store=self.store)
-        inbox.installOn(self.store)
+        inbox = self.store.findUnique(Inbox)
 
         composer = Composer(store=self.store)
         composer.installOn(self.store)
