@@ -1,10 +1,19 @@
 from axiom.test.historic import stubloader
 
+from xmantissa.ixmantissa import IPreferenceAggregator
 from xquotient.quotientapp import QuotientPreferenceCollection
 
 class PrefsUpgradeTest(stubloader.StubbedTest):
     def testUpgrade(self):
         pc = self.store.findUnique(QuotientPreferenceCollection)
-        # in version 3, all the prefs have either moved to a different
-        # preference collection or been removed entirely, so there isn't
-        # much to test.
+
+        def assertPrefs(**k):
+            for (prefname, val) in k.iteritems():
+                self.assertEquals(getattr(pc, prefname), val)
+
+        assertPrefs(preferredMimeType='image/png',
+                    preferredMessageDisplay='invisible',
+                    showRead=False,
+                    showMoreDetail=False)
+
+

@@ -17,7 +17,7 @@ from axiom import iaxiom, item, attributes, userbase
 from axiom.upgrade import registerAttributeCopyingUpgrader
 
 from xmantissa import ixmantissa, liveform
-from xmantissa.webtheme import ThemedFragment, getLoader
+from xmantissa.webtheme import ThemedFragment
 
 from xquotient import mail, iquotient, exmess
 from xquotient.equotient import NoSuchHeader
@@ -187,7 +187,7 @@ registerAttributeCopyingUpgrader(Filter, 1, 2)
 
 class HamFilterFragment(ThemedFragment):
     fragmentName = 'ham-filter'
-    title = 'Spam Filtering'
+    title = 'Spam/Ham Filtering Configuration'
 
     jsClass = u'Quotient.Filter.HamConfiguration'
 
@@ -222,18 +222,15 @@ class HamFilterFragment(ThemedFragment):
             [liveform.Parameter('usePostiniScore',
                                 liveform.CHECKBOX_INPUT,
                                 bool,
-                                u'Use Postini Score',
                                 u'Classify messages based on Postini scores.',
                                 default=self.filter.usePostiniScore),
              liveform.Parameter('postiniThreshhold',
                                 liveform.TEXT_INPUT,
                                 float,
-                                u'Postini Threshold',
                                 u'Score below which to consider messages spam.',
                                 default=self.filter.postiniThreshhold)],
             description='Configure Postini')
         f.setFragmentParent(self)
-        f.docFactory = getLoader('liveform-compact')
         return ctx.tag[f]
 
 

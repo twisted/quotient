@@ -93,7 +93,7 @@ class InstallationTestCase(TestCase):
         Test signup with the compose benefactor (which
         depends on the top-most Quotient benefactor)
         """
-        self.createSignupAndSignup(getFactories('quotient', 'compose'))
+        self.createSignupAndSignup(getFactories('compose'))
 
     def testAll(self):
         """

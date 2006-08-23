@@ -1,4 +1,4 @@
-# -*- test-case-name: xquotient.test.test_compose -*-
+# -*- test-case-name: xquotient.test.test_compose -*- 
 import datetime
 
 from zope.interface import implements
@@ -28,7 +28,7 @@ from xquotient.mimestorage import Header, Part
 
 
 
-def _esmtpSendmail(username, password, smtphost, port, from_addr, to_addrs,
+def _esmtpSendmail(username, password, smtphost, port, from_addr, to_addrs, 
                    msg, reactor=None):
     """
     This should be the only function in this module that uses the reactor.
@@ -192,7 +192,7 @@ class Composer(item.Item, item.InstallableMixin):
 
     def sendMessage(self, toAddresses, msg):
         """
-        Send a message from this composer.
+        Send a message from this composer. 
 
         @param toAddresses: List of email addresses (Which can be
             coerced to L{smtp.Address}es).
@@ -266,7 +266,6 @@ def upgradeCompose1to2(oldComposer):
     return newComposer
 
 registerUpgrader(upgradeCompose1to2, 'quotient_composer', 1, 2)
-
 class File(item.Item):
     typeName = 'quotient_file'
     schemaVersion = 1
@@ -598,7 +597,6 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
         from xquotient.mail import MailDeliveryAgent
         avatar.findOrCreate(MailDeliveryAgent).installOn(avatar)
         avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
-
         avatar.findOrCreate(Composer).installOn(avatar)
         avatar.findOrCreate(Drafts).installOn(avatar)
 
@@ -608,11 +606,206 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
         avatar.findUnique(Drafts).deleteFromStore()
 
 
-class ComposePreferenceCollection(item.Item, item.InstallableMixin, prefs.PreferenceCollectionMixin):
+
+class _SmarthostPreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-host', value,
+            'Smart Host', collection,
+            'Hostname of an SMTP server to which all outgoing mail will be sent.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class _SmarthostUsernamePreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-username', value,
+            'Smarthost Username', collection,
+            'Username to use to log in to the smarthost.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class _SmarthostPasswordPreference(prefs.Preference):
+    def __init__(self, value, collection):
+        prefs.Preference.__init__(
+            self,
+            'smarthost-password', value,
+            'Smarthost password', collection,
+            'Password to use to log in to the smarthost.')
+
+
+    def choices(self):
+        return None
+
+
+    def displayToValue(self, display):
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        return True
+
+
+
+class _SmarthostPortPreference(prefs.Preference):
     """
-    L{xmantissa.ixmantissa.IPreferenceCollection} which collects preferences
-    that have something to do with compose or outgoing mail
+    Represent the port number preference in the preferences page.
+
+    This class is full of meaningless boilerplate.
     """
+
+    def __init__(self, value, collection):
+        """
+        Initialize this preference object with a default value and the
+        preference collection.
+        """
+        prefs.Preference.__init__(
+            self,
+            'smarthost-port', value,
+            'Smarthost port', collection,
+            'Port number to connect to the smarthost for SMTP sending.')
+
+
+    def choices(self):
+        """
+        Meaningless boilerplate.
+        """
+        return None
+
+
+    def displayToValue(self, display):
+        """
+        Meaningless boilerplate.
+        """
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        """
+        The default value is 25.
+        """
+        if value:
+            return value
+        return 25
+
+
+    def settable(self):
+        """
+        Meaningless boilerplate.
+        """
+        return True
+
+
+
+class _SmarthostAddressPreference(prefs.Preference):
+    """
+    Represent the from address preference in the preferences page.
+
+    This class is full of meaningless boilerplate.
+    """
+
+    def __init__(self, value, collection):
+        """
+        Initialize this preference object with a default value and the
+        preference collection.
+        """
+        prefs.Preference.__init__(
+            self,
+            'smarthost-address', value,
+            'Smarthost address', collection,
+            'The email address to send email as.')
+
+
+    def choices(self):
+        """
+        Meaningless boilerplate.
+        """
+        return None
+
+
+    def displayToValue(self, display):
+        """
+        Meaningless boilerplate.
+        """
+        if display:
+            return display
+        return None
+
+
+    def valueToDisplay(self, value):
+        """
+        Meaningless boilerplate.
+        """
+        if value:
+            return value
+        return ''
+
+
+    def settable(self):
+        """
+        Meaningless boilerplate.
+        """
+        return True
+
+
+
+
+
+
+class ComposePreferenceCollection(item.Item, item.InstallableMixin):
+
     implements(ixmantissa.IPreferenceCollection)
 
     schemaVersion = 2
@@ -635,39 +828,52 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin, prefs.Prefer
     The address which messages will be sent from.
     """)
 
+    _cachedPrefs = attributes.inmemory()
+
+    applicationName = 'Compose'
+
     def installOn(self, other):
         super(ComposePreferenceCollection, self).installOn(other)
         other.powerUp(self, ixmantissa.IPreferenceCollection)
 
 
-    def getPreferenceParameters(self):
-        cls = ComposePreferenceCollection
-        def makeParam(name, coercer=unicode, type=liveform.TEXT_INPUT):
-            attrname = 'smarthost' + name.title()
-            return liveform.Parameter(attrname, type, coercer, 'Smarthost ' + name.title(),
-                                      default=getattr(self, attrname) or '')
+    def getPreferences(self):
+        try:
+            return self._cachedPrefs
+        except AttributeError:
+            self._cachedPrefs = {
+                'smarthost-address': _SmarthostAddressPreference(self.smarthostAddress, self),
+                'smarthost-host': _SmarthostPreference(self.preferredSmarthost, self),
+                'smarthost-port': _SmarthostPortPreference(self.smarthostPort, self),
+                'smarthost-username': _SmarthostUsernamePreference(self.smarthostUsername, self),
+                'smarthost-password': _SmarthostPasswordPreference(self.smarthostPassword, self)
+                }
+            return self._cachedPrefs
 
-        return (liveform.Parameter(
-                   'preferredSmarthost',
-                   liveform.TEXT_INPUT,
-                   unicode,
-                   'Preferred Smarthost',
-                   default=self.preferredSmarthost or ''),
-                makeParam('username'),
-                makeParam('password', type=liveform.PASSWORD_INPUT),
-                makeParam('port', int),
-                makeParam('address'))
+
+    def setPreferenceValue(self, pref, value):
+        if pref.key == 'smarthost-host':
+            self.preferredSmarthost = value
+        elif pref.key == 'smarthost-username':
+            self.smarthostUsername = value
+        elif pref.key == 'smarthost-password':
+            self.smarthostPassword = value
+        elif pref.key == 'smarthost-port':
+            # Does the coercion belong *here*? -radix
+            self.smarthostPort = int(value) 
+        elif pref.key == 'smarthost-address':
+            self.smarthostAddress = value
+        else:
+            assert False, "Bogus preference input: %r %r" % (pref, value)
+        setattr(pref, 'value', value)
+
 
     def getSections(self):
         return None
 
-    def getTabs(self):
-        return (webnav.Tab('Mail', self.storeID, 0.0, children=(
-                    webnav.Tab('Outgoing', self.storeID, 0.0),),
-                    authoritative=False),)
-
 
 registerAttributeCopyingUpgrader(ComposePreferenceCollection, 1, 2)
+
 
 
 class Draft(item.Item):

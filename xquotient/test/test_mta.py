@@ -45,8 +45,10 @@ def createStore(testCase):
         login.installOn(s)
 
         benefactors = [
-            QuotientBenefactor(store=s),
-            ComposeBenefactor(store=s)]
+            # XXX This is pretty broken.  ComposeBenefactor is depended on by
+            # QuotientBenefactor.
+            ComposeBenefactor(store=s),
+            QuotientBenefactor(store=s)]
 
         for (localpart, domain, internal) in [
             ('testuser', 'localhost', True),

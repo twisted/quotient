@@ -12,9 +12,9 @@ from nevow.athena import expose
 
 from epsilon.extime import Time
 
-from axiom.item import Item, InstallableMixin, transacted, declareLegacyItem
+from axiom.item import Item, InstallableMixin, transacted
 from axiom import attributes, tags, iaxiom
-from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, webnav, people, webtheme
 from xmantissa.fragmentutils import dictFillSlots
@@ -106,7 +106,7 @@ class Inbox(Item, InstallableMixin):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
-    schemaVersion = 3
+    schemaVersion = 2
 
     installedOn = attributes.reference()
 
@@ -116,9 +116,6 @@ class Inbox(Item, InstallableMixin):
     # loaded (and so should be updated each time the user changes the setting)
     uiComplexity = attributes.integer(default=1)
 
-    # showMoreDetail is a boolean which indicates whether messages should be
-    # loaded with the "More Detail" pane expanded.
-    showMoreDetail = attributes.boolean(default=False)
 
     catalog = attributes.reference(doc="""
     A reference to an L{axiom.tags.Catalog} Item.  This will be used to
@@ -180,12 +177,6 @@ def upgradeInbox1to2(oldInbox):
     return newInbox
 registerUpgrader(upgradeInbox1to2, 'quotient_inbox', 1, 2)
 
-declareLegacyItem(Inbox.typeName, 2,
-                  dict(installedOn=attributes.reference(),
-                       uiComplexity=attributes.integer(),
-                       catalog=attributes.reference()))
-
-registerAttributeCopyingUpgrader(Inbox, 2, 3)
 
 
 class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):

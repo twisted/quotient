@@ -1,4 +1,5 @@
 # -*- test-case-name: xquotient.test -*-
+
 from os import path
 import pytz, zipfile
 
@@ -16,12 +17,11 @@ from axiom.tags import Catalog, Tag
 from axiom import item, attributes, batch
 from axiom.upgrade import registerAttributeCopyingUpgrader
 
-from xmantissa import ixmantissa, people, webapp, liveform, webnav
-from xmantissa.prefs import PreferenceCollectionMixin
+from xmantissa import ixmantissa, people, webapp
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, equotient, scrubber
+from xquotient import gallery, equotient, mimeutil, scrubber
 from xquotient.actions import SenderPersonFragment
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -288,36 +288,6 @@ item.declareLegacyItem(Message.typeName, 2,
 
 registerAttributeCopyingUpgrader(Message, 1, 2)
 registerAttributeCopyingUpgrader(Message, 2, 3)
-
-class MessageDisplayPreferenceCollection(item.Item, item.InstallableMixin, PreferenceCollectionMixin):
-    """
-    L{xmantissa.ixmantissa.IPreferenceCollection} which collects preferences
-    that affect the display/rendering of L{xquotient.exmess.Message}s
-    """
-    implements(ixmantissa.IPreferenceCollection)
-
-    installedOn = attributes.reference()
-    preferredFormat = attributes.text()
-
-    def installOn(self, other):
-        other.powerUp(self, ixmantissa.IPreferenceCollection, item.POWERUP_BEFORE)
-        super(MessageDisplayPreferenceCollection, self).installOn(other)
-
-    def getPreferenceParameters(self):
-        isTextPlain = self.preferredFormat == 'text/plain'
-        return (liveform.ChoiceParameter('preferredFormat',
-                                         (('Text', u'text/plain', isTextPlain),
-                                          ('HTML', u'text/html', not isTextPlain)),
-                                         'Preferred Format'),)
-
-    def getTabs(self):
-        return (webnav.Tab('Mail', self.storeID, 0.0, children=(
-                    webnav.Tab('Message Display', self.storeID, 0.0),),
-                    authoritative=False),)
-
-    def getSections(self):
-        return None
-
 
 class Correspondent(item.Item):
     typeName = 'quotient_correspondent'
@@ -638,17 +608,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
         return ctx.tag.fillSlots('paragraphs', paragraphs)
 
-    inbox = None
+    moreDetailPref = None
 
     def getMoreDetailSetting(self):
-        if self.inbox is None:
-            from xquotient.inbox import Inbox
-            self.inbox = self.original.store.findUnique(Inbox)
-        return self.inbox.showMoreDetail
+        return self.qprefs.showMoreDetail
     expose(getMoreDetailSetting)
 
     def persistMoreDetailSetting(self, value):
-        self.inbox.showMoreDetail = value
+        self.qprefs.showMoreDetail = value
     expose(persistMoreDetailSetting)
 
     def getMessageSource(self):

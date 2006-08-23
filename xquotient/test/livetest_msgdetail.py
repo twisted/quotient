@@ -12,7 +12,6 @@ from xmantissa.webapp import PrivateApplication
 
 from xquotient.exmess import Message, MessageDetail
 from xquotient.quotientapp import QuotientPreferenceCollection
-from xquotient.inbox import Inbox
 
 _headers = {'cc': u'cc@host'}
 
@@ -43,7 +42,6 @@ class MsgDetailTestCase(testcase.TestCase):
         s = Store()
         PrivateApplication(store=s).installOn(s)
         QuotientPreferenceCollection(store=s).installOn(s)
-        Inbox(store=s).installOn(s)
 
         return Message(store=s,
                        sender=u'sender@host',
@@ -73,5 +71,6 @@ class MsgDetailInitArgsTestCase(MsgDetailTestCase):
 
     def _setUpMsg(self):
         m = super(MsgDetailInitArgsTestCase, self)._setUpMsg()
-        m.store.findUnique(Inbox).showMoreDetail = True
+        m.store.findUnique(
+            QuotientPreferenceCollection).showMoreDetail = True
         return m

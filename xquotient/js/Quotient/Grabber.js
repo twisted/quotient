@@ -17,19 +17,6 @@ Quotient.Grabber.ScrollingWidget.methods(
 
         Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node);
         self._scrollViewport.style.height = '100px';
-        self.node.style.display = "none";
-    },
-
-    /**
-     * Hide our node if the last row fetch resulted in 0 rows.  Show it
-     * otherwise
-     */
-    function cbRowsFetched(self, count) {
-        if(count == 0) {
-            self.node.style.display = "none";
-        } else {
-            self.node.style.display = "";
-        }
     },
 
     function clickEventForAction(self, actionID, rowData) {
@@ -62,7 +49,7 @@ Quotient.Grabber.Controller.methods(
                 } catch(e) {}
 
                 if(!node) {
-                    node = MochiKit.DOM.DIV({"class": "edit-grabber-form"});
+                    node = MochiKit.DOM.DIV({"class": "edit-grabber-form"}); 
                     var cont = self.nodeByAttribute("class", "edit-grabber-form-container");
                     cont.appendChild(node);
                 }
