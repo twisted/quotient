@@ -1,3 +1,4 @@
+# -*- test-case-name: xquotient.test.test_theme -*-
 from xmantissa import webtheme
 from nevow import tags
 
