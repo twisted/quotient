@@ -523,10 +523,10 @@ Quotient.Test.InboxDOMHandlersTestCase.methods(
         }
 
         var makeMailViewChoice = function(choice) {
-            return makeViewChoice(
-                function(n) {
-                    return self.mailbox.chooseMailView(n);
-                }, "Mail", choice);
+            return self.mailbox.chooseMailView(choice).addCallback(
+                function() {
+                    return self.waitForScrollTableRefresh();
+                });
         }
         var makePersonChoice = function(choice) {
             return makeViewChoice(
