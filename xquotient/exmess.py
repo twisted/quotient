@@ -9,7 +9,7 @@ from twisted.python.util import sibpath
 from twisted.web import microdom
 from twisted.web.sux import ParseError
 
-from nevow import rend, inevow, athena, static
+from nevow import rend, inevow, athena, static, loaders, tags
 from nevow.athena import expose
 
 from axiom.tags import Catalog, Tag
@@ -359,9 +359,27 @@ class PartDisplayer(ItemGrabber):
     parts of a given message, like images, scrubbed text/html parts and
     such.  this is that thing.
     """
-    filename = None
+    docFactory = loaders.stan(tags.directive('content'))
 
+    filename = None
     unparsableHTML = 'Unparsable HTML.'
+
+    def _parseAndScrub(self, content, scrubberFunction):
+        """
+        Parse C{content}, apply C{scrubberFunction} to it, and return the
+        serialized result.
+
+        @param content: C{unicode}
+        @param scrubberFunction: function
+        """
+        try:
+            dom = microdom.parseString(content.encode('utf-8'), beExtremelyLenient=True)
+        except ParseError:
+            return None
+        else:
+            scrubberFunction(dom)
+            return dom.toxml()[len('<?xml version="1.0"?>'):]
+
 
     def scrubbedHTML(self, content):
         """
@@ -374,24 +392,18 @@ class PartDisplayer(ItemGrabber):
         @return: a utf-8 string containing a transformed version of the
         input document, with things like external image links removed.
         """
-        try:
-            dom = microdom.parseString(content.encode('utf-8'), beExtremelyLenient=True)
-        except ParseError:
-            return None
-        else:
-            scrubber.scrub(dom)
-            return dom.toxml()[len('<?xml version="1.0"?>'):]
+        return self._parseAndScrub(content, scrubber.scrub)
 
 
-    def renderHTTP(self, ctx):
+    def cidLinkScrubbedHTML(self, content):
         """
-        Serve the content of the L{mimestorage.Part} retrieved
-        by L{ItemGrabber.locateChild}.
-
-        If the content-type of the part is text/html, the body
-        will be scrubbed, unless the "noscrub" query parameter
-        is set in the request
+        The same as L{scrubbedHTML}, except remove only nodes which point
+        to CID URIs
         """
+        return self._parseAndScrub(content, scrubber.scrubCIDLinks)
+
+
+    def render_content(self, ctx, data):
         request = inevow.IRequest(ctx)
         part = self.item
 
@@ -400,15 +412,16 @@ class PartDisplayer(ItemGrabber):
 
         if ctype.startswith('text/'):
             content = part.getUnicodeBody()
-            if ctype.endswith('/html') and 'noscrub' not in request.args:
-                content = self.scrubbedHTML(content)
+            if ctype.endswith('/html'):
+                if 'noscrub' not in request.args:
+                    content = self.scrubbedHTML(content)
+                else:
+                    content = self.cidLinkScrubbedHTML(content)
                 if content is None:
-                    return self.unparsableHTML
-                return content
+                    content = self.unparsableHTML
         else:
             content = part.getBody(decode=True)
-        return content
-
+        return tags.xml(content)
 
 
 class PrintableMessageResource(rend.Page):
