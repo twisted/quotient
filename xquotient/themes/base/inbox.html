@@ -54,7 +54,8 @@
 
   <div nevow:pattern="mailViewChooser" class="view-chooser">
     <div nevow:pattern="mailViewChoice" class="list-option"
-      onclick="Quotient.Mailbox.Controller.get(this).chooseMailView(this); return false"
+      onclick="Quotient.Mailbox.Controller.get(this).chooseMailView(
+        this.firstChild.firstChild.nodeValue); return false"
       ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
       (<span class="count"><nevow:slot name="count" /></span>)</div>
     <div nevow:pattern="selectedMailViewChoice" class="selected-list-option"
@@ -99,7 +100,7 @@
     </div>
     <div class="content-table-container">
       <div class="message-actions-container">
-        <select class="view-shortcut-container" onchange="Quotient.Mailbox.Controller.get(this).viewShortcut(this)">
+        <select class="view-shortcut-container" onchange="Quotient.Mailbox.Controller.get(this).chooseMailView(this.value)">
           <option value="Inbox">Inbox</option>
           <option value="Sent">Sent</option>
           <option value="Spam">Spam</option>

@@ -1182,16 +1182,14 @@ Quotient.Mailbox.Controller.methods(
      * local state to indicate which random crap is being viewed and, if
      * necessary, ask the server for the messages to display.
      *
-     * @param n: The node which this input handler is attached to.
-     * @return: C{undefined}
+     * @param view: the name of the view to switch to
+     * @return: L{Deferred}, which will fire after view change is complete
      */
-    function chooseMailView(self, n) {
-        self.mailViewNode = n;
-
+    function chooseMailView(self, view) {
         self.disableGroupActions();
 
-        self._viewingByView = n.firstChild.firstChild.nodeValue;
-        self._selectListOption(n);
+        self._viewingByView = view;
+        self._selectListOption(self.mailViewNodes[view]);
         self._selectViewShortcut();
 
         if(!self.visibilityByView) {
@@ -1209,7 +1207,8 @@ Quotient.Mailbox.Controller.methods(
 
         self.setGroupActions(namesOnly("show"));
 
-        return self._chooseViewParameter('viewByMailType', n, false);
+        return self._chooseViewParameter(
+                    'viewByMailType', self.mailViewNodes[view], false);
     },
 
     /**
@@ -1319,41 +1318,6 @@ Quotient.Mailbox.Controller.methods(
         var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
         self._selectListOption(n);
         return self._chooseViewParameter('viewByPerson', null, true, keyn.firstChild.nodeValue);
-    },
-
-    /**
-     * Select the view shortcut whose label is C{n}.
-     * Also select the corresponding list-item in the main view selector
-     * @param n: node
-     */
-    function viewShortcut(self, n) {
-        var type = n.value;
-        self._sendViewRequest('viewByMailType', type);
-
-        /* if we haven't done this before */
-        if(!self.viewOptions) {
-            /* fetch the node that represents the main view chooser */
-            var viewChooser = self.firstWithClass(
-                                self.contentTableGrid[0][0],
-                                "view-chooser"),
-                /* and all of the view option nodes inside it */
-                _viewOptions = Nevow.Athena.NodesByAttribute(
-                                    viewChooser, "class", "opt-name"),
-                viewOptions = {};
-
-            /* for each view option node */
-            for(i = 0; i < _viewOptions.length; i++) {
-                /* associate the node's text with the <li> that contains it */
-                viewOptions[_viewOptions[i].firstChild.nodeValue] = _viewOptions[i].parentNode;
-            }
-            self.viewOptions = viewOptions;
-        }
-
-        /* and select the <li> that corresponds to whatever view
-         * shortcut we just selected, so the view list and view
-         * shortcut list don't get out of sync */
-        self._selectListOption(self.viewOptions[type]);
-        n.blur();
     },
 
     function setupMailViewNodes(self) {
