@@ -277,6 +277,9 @@ class FeedList(athena.LiveFragment):
                 self.person.store,
                 FeedItem,
                 (FeedItem.subject, FeedItem.timestamp),
+                attributes.AND(
+                    FeedItem.feed == Feed.storeID,
+                    Feed.author == self.person),
                 defaultSortAscending=False,
                 defaultSortColumn='timestamp',
                 itemsPerPage=5)
