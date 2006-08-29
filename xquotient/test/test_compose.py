@@ -43,7 +43,7 @@ class SmarthostCompositionTestMixin(object):
             )
         self.prefs.installOn(self.store)
 
-        self.composer = compose.Composer(store=self.store,
+        self.composer = compose.Composer(store=self.store, 
                                          fromAddress=u'radix@example.com')
         self.composer.installOn(self.store)
 
@@ -51,6 +51,7 @@ class SmarthostCompositionTestMixin(object):
     def _esmtpSendmail(self, *args, **kwargs):
         kwargs['reactor'] = self.reactor
         return self._originalSendmail(*args, **kwargs)
+        
 
     def tearDown(self):
         compose._esmtpSendmail = self._originalSendmail
@@ -65,7 +66,7 @@ class StubStoredMessageAndImplAndSource(item.Item):
 
     2. The 'impl' attribute of that message, typically a L{mimestore.Part}
 
-    3. The message file returned from the C{open} method of C{impl}.
+    3. The message file returned from the C{open} method of C{impl}. 
        XXX: This returns something that doesn't conform to the file protocol,
        but the code that triggers the usage of that protocol isn't triggered
        by the following tests.

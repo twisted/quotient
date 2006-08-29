@@ -713,15 +713,13 @@ class DraftsScreen(ScrollingFragment):
             defaultSortColumn=Message.sentWhen,
             defaultSortAscending=False)
 
-        self.composerURL = self.webTranslator.linkTo(
-                                self.webTranslator.store.findUnique(
-                                    Composer).storeID)
+        self.composerURL = self.wt.linkTo(self.wt.store.findUnique(Composer).storeID)
         self.docFactory = getLoader(self.fragmentName)
 
     def constructRows(self, items):
         rows = ScrollingFragment.constructRows(self, items)
         for (item, row) in zip(items, rows):
-            draft = self.store.findUnique(Draft, Draft.message==item)
+            draft = self.wt.store.findUnique(Draft, Draft.message==item)
             row['__id__'] = self.composerURL + u'?draft=' + self.wt.toWebID(draft)
         return rows
 
