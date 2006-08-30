@@ -975,3 +975,25 @@ Quotient.Test.PostiniConfigurationTestCase.methods(
             });
     });
 
+Quotient.Test.AddGrabberTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                        'Quotient.Test.AddGrabberTestCase');
+
+Quotient.Test.AddGrabberTestCase.methods(
+    function test_addGrabber(self) {
+        var form = Nevow.Athena.Widget.get(
+                        self.firstNodeByAttribute(
+                            'athena:class',
+                            'Quotient.Grabber.AddGrabberFormWidget'));
+        var inputs = form.gatherInputs();
+
+        inputs['domain'].value = 'foo.bar';
+        inputs['username'].value = 'foo';
+        inputs['password1'].value = 'foo';
+        inputs['password2'].value = 'zoo';
+
+        return form.submit().addErrback(
+            function() {
+                self.fail('AddGrabberFormWidget did not catch the submit error');
+            });
+    });
+

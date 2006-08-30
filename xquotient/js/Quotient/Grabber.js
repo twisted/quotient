@@ -43,15 +43,6 @@ Quotient.Grabber.ScrollingWidget.methods(
 
 Quotient.Grabber.Controller = Nevow.Athena.Widget.subclass('Quotient.Grabber.Controller');
 Quotient.Grabber.Controller.methods(
-    function loaded(self) {
-        var lognode = self.nodeByAttribute("class", "grabber-log");
-        Divmod.logger.addObserver(function(err) {
-            if(err.debug && err.channel == "liveform") {
-                lognode.appendChild(document.createTextNode(err.message))
-            }
-        });
-    },
-
     function loadEditForm(self, targetID) {
         var D = self.callRemote("getEditGrabberForm", targetID);
         D.addCallback(
@@ -102,12 +93,35 @@ Quotient.Grabber.StatusWidget.method(
 Quotient.Grabber.AddGrabberFormWidget = Mantissa.LiveForm.FormWidget.subclass(
                                                     'Quotient.Grabber.AddGrabberFormWidget');
 
-Quotient.Grabber.AddGrabberFormWidget.method(
+Quotient.Grabber.AddGrabberFormWidget.methods(
     function submitSuccess(self, result) {
+        self.emptyErrorNode();
         var sf = Nevow.Athena.NodeByAttribute(self.widgetParent.node,
                                               'athena:class',
                                               'Quotient.Grabber.ScrollingWidget');
 
         Quotient.Grabber.ScrollingWidget.get(sf).emptyAndRefill();
         return Quotient.Grabber.AddGrabberFormWidget.upcall(self, "submitSuccess", result);
+    },
+
+    /**
+     * Empty the node that contains error messages
+     */
+    function emptyErrorNode(self) {
+        if(self.errorNode && 0 < self.errorNode.childNodes.length) {
+            self.errorNode.removeChild(self.errorNode.firstChild);
+        }
+    },
+
+    /**
+     * Show an error message for Error C{err}
+     */
+    function submitFailure(self, err) {
+        if(!self.errorNode) {
+            self.errorNode = MochiKit.DOM.DIV({"class": "add-grabber-error"});
+            self.node.appendChild(self.errorNode);
+        }
+        self.emptyErrorNode();
+        self.errorNode.appendChild(
+            document.createTextNode("Error submitting form: " + err.error.message));
     });

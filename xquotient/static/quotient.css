@@ -2,6 +2,11 @@
     padding-left: 50px;
 }
 
+.add-grabber-error {
+    font-weight: bold;
+    color: red;
+}
+
 .loading {
     position: absolute;
     width: 2000px;
