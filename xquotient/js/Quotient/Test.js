@@ -1,558 +1,751 @@
 // import Nevow.Athena.Test
+
+// import Mantissa.Test
+
+// import Quotient.Throbber
+// import Quotient.Message
 // import Quotient.Mailbox
 // import Quotient.Compose
 
-Quotient.Test.TestableMailboxSubclass = Quotient.Mailbox.Controller.subclass('TestableMailboxSubclass');
-Quotient.Test.TestableMailboxSubclass.methods(
-    function __init__(self) {
-        var args = [];
-        for(var i = 1; i < arguments.length; i++) {
-            args.push(arguments[i]);
-        }
-        self.pendingDeferred = new Divmod.Defer.Deferred();
-        Quotient.Test.TestableMailboxSubclass.upcall.apply(self, [self, "__init__"].concat(args));
+Quotient.Test.ThrobberTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ThrobberTestCase');
+Quotient.Test.ThrobberTestCase.methods(
+    function setUp(self) {
+        self.throbberNode = document.createElement('div');
+        self.throbberNode.style.display = 'block';
+        self.node.appendChild(self.throbberNode);
+        self.throbber = Quotient.Throbber.Throbber(self.throbberNode);
     },
 
-    function finishedLoading(self) {
-        self.pendingDeferred.callback(null);
+    /**
+     * Test that the L{Throbber.startThrobbing} method sets the wrapped node's
+     * style so that it is visible.
+     */
+    function test_startThrobbing(self) {
+        self.setUp();
+
+        self.throbber.startThrobbing();
+        self.assertEqual(self.throbberNode.style.display, '');
+    },
+
+    /**
+     * Test that the L{Throbber.stopThrobbing} method sets the wrapped node's
+     * style so that it is invisible.
+     */
+    function test_stopThrobbing(self) {
+        self.setUp();
+
+        self.throbber.stopThrobbing();
+        self.assertEqual(self.throbberNode.style.display, 'none');
     });
 
-Quotient.Test.MailboxTestBase = Nevow.Athena.Test.TestCase.subclass('MailboxTestBase');
-Quotient.Test.MailboxTestBase.methods(
-    function run(self) {
-        self.mailbox = Quotient.Test.TestableMailboxSubclass.get(
-                                Nevow.Athena.NodeByAttribute(
-                                    self.node.parentNode,
-                                    "athena:class",
-                                    "Quotient.Test.TestableMailboxSubclass"));
 
-        self.mailbox.pendingDeferred.addCallback(
-            function() {
-                self.mailbox.scrollWidget._rowHeight = 1;
-                return self.mailbox.scrollWidget._getSomeRows().addCallback(
-                    function() {
-                        return self.doTests();
-                    });
-            });
-        return self.mailbox.pendingDeferred;
+/**
+ * Testable stand-in for the real throbber class.  Used by tests to assert that
+ * the throbber is manipulated properly.
+ */
+Quotient.Test.TestThrobber = Divmod.Class.subclass("Quotient.Test.TestThrobber");
+Quotient.Test.TestThrobber.methods(
+    function __init__(self) {
+        self.throbbing = false;
     },
 
+    function startThrobbing(self) {
+        self.throbbing = true;
+    },
+
+    function stopThrobbing(self) {
+        self.throbbing = false;
+    });
+
+
+Quotient.Test.ScrollTableTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ScrollTableTestCase');
+Quotient.Test.ScrollTableTestCase.methods(
     /**
-     * Add row at index C{i} to the scrolltable's group selection
+     * Find the ScrollWidget which is a child of this test and save it as a
+     * convenient attribute for test methods to use.
      */
-    function groupSelect(self, i) {
-        var sw = self.mailbox.scrollWidget;
-        var row = sw._rows[i][1];
-        /* calling nodeByAttribute on the src attribute and passing
-           the relative URL won't work, because IE rewrites them as
-           absolute URLs in the DOM */
-        var img = row.getElementsByTagName("img")[0];
-        var segs = img.src.split('/');
-        if(segs[segs.length-1] != "checkbox-off.gif") {
-            throw new Error("expected 'off' checkbox");
-        }
-        sw.groupSelectRow(sw._rows[i][0]["__id__"], img);
-    },
-
-    /**
-     * Figure out the number of unread messages in the view C{view}
-     * @param view: string
-     * @return: integer
-     */
-    function unreadCountForView(self, view) {
-        return parseInt(Nevow.Athena.NodeByAttribute(
-                                self.mailbox.mailViewNodes[view],
-                                "class", "count").firstChild.nodeValue);
-    },
-
-    function waitForScrollTableRefresh(self) {
-        var d = new Divmod.Defer.Deferred();
-        var pendingRowSelection = self.mailbox.scrollWidget._pendingRowSelection;
-        self.mailbox.scrollWidget._pendingRowSelection = function(count) {
-            pendingRowSelection && pendingRowSelection(count);
-            d.callback(null);
-        }
-        return d;
-    },
-
-    function switchView(self, viewf, viewn, f) {
-        if(!viewf) {
-            viewf = "viewByMailType";
-        }
-        return self.mailbox._sendViewRequest(viewf, viewn).addCallback(
-            function() {
-                return self.waitForScrollTableRefresh().addCallback(f);
-            });
-    },
-
-    function makeViewSwitcher(self, viewf, viewn, subjects, debugInfo) {
-        return function() {
-            return self.switchView(viewf, viewn,
-                function() {
-                    self.assertSubjectsAre(subjects, debugInfo);
-                });
-        }
-    },
-
-    function assertSubjectsAre(self, expSubjects, debugInfo) {
-        var gotSubjects = MochiKit.Base.map(
-                            MochiKit.Base.itemgetter("subject"),
-                            self.collectRows());
-
-        if(MochiKit.Base.compare(expSubjects, gotSubjects) != 0) {
-            var msg = expSubjects.toSource() + " != " + gotSubjects.toSource();
-            if(debugInfo != undefined) {
-                msg = debugInfo + ": " + msg;
+    function setUp(self) {
+        self.scrollWidget = null;
+        for (var i = 0; i < self.childWidgets.length; ++i) {
+            if (self.childWidgets[i] instanceof Quotient.Mailbox.ScrollingWidget) {
+                self.scrollWidget = self.childWidgets[i];
+                break;
             }
-            self.fail(msg);
         }
+        self.assertNotEqual(self.scrollWidget, null, "Could not find ScrollingWidget.")
     },
 
-    /* convert scrolltable rows into a list of dicts mapping
-        class names to node values, e.g. {"sender": "foo", "subject": "bar"}, etc. */
+    /**
+     * Test the custom date formatting method used by the Mailbox ScrollTable.
+     */
+    function test_formatDate(self) {
+        self.setUp();
 
+        var now;
+
+        /*
+         * August 21, 2006, 1:36:10 PM
+         */
+        var when = new Date(2006, 7, 21, 13, 36, 10);
+
+        /*
+         * August 21, 2006, 5:00 PM
+         */
+        now = new Date(2006, 7, 21, 17, 0, 0);
+        self.assertEqual(
+            self.scrollWidget.formatDate(when, now), '1:36 PM',
+            "Different hour context failed.");
+
+        /*
+         * August 22, 2006, 12:00 PM
+         */
+        now = new Date(2006, 7, 22, 12, 0, 0);
+        self.assertEqual(
+            self.scrollWidget.formatDate(when, now), 'Aug 21',
+            "Different day context failed.");
+
+        /*
+         * September 22, 2006, 12:00 PM
+         */
+        now = new Date(2006, 8, 22, 12, 0, 0);
+        self.assertEqual(
+            self.scrollWidget.formatDate(when, now), 'Aug 21',
+            "Different month context failed.");
+
+        /*
+         * January 12, 2007, 9:00 AM
+         */
+        now = new Date(2007, 1, 12, 9, 0, 0);
+        self.assertEqual(
+            self.scrollWidget.formatDate(when, now), '2006-08-21',
+            "Different year context failed.");
+    });
+
+
+Quotient.Test.ScrollingWidgetTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ScrollingWidgetTestCase');
+Quotient.Test.ScrollingWidgetTestCase.methods(
+    function setUp(self) {
+        var result = self.callRemote('getScrollingWidget', 5);
+        result.addCallback(function(widgetMarkup) {
+                return Mantissa.Test.addChildWidgetFromMarkup(
+                    self.node, widgetMarkup,
+                    'Quotient.Mailbox.ScrollingWidget');
+            });
+        result.addCallback(function(widget) {
+                self.scrollingWidget = widget;
+                self.node.appendChild(widget.node);
+                return widget.initializationDeferred;
+            });
+        return result;
+    },
+
+    /**
+     * Test that selecting the first message in a
+     * L{Quotient.Mailbox.ScrollingWidget} properly selects it and returns
+     * C{null} as the previously selected message webID.
+     */
+    function test_firstSelectWebID(self) {
+        return self.setUp().addCallback(function() {
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                var result = self.scrollingWidget._selectWebID(webID);
+                self.assertEqual(
+                    result, null,
+                    "Expected null as previously selected message ID.");
+            });
+    },
+
+    /**
+     * Test that selecting another message returns the message ID which was
+     * already selected.
+     */
+    function test_secondSelectWebID(self) {
+        return self.setUp().addCallback(function() {
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget._selectWebID(webID);
+                var otherWebID = self.scrollingWidget.model.getRowData(1).__id__;
+                var oldWebID = self.scrollingWidget._selectWebID(otherWebID);
+                self.assertEqual(
+                    oldWebID, webID,
+                    "Expected first message ID as previous message ID.");
+            });
+    },
+
+    /**
+     * Test that removing the selection by passing C{null} to C{_selectWebID}
+     * properly returns the previously selected message ID.
+     */
+    function test_unselectWebID(self) {
+        return self.setUp().addCallback(function() {
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget._selectWebID(webID);
+                var oldWebID = self.scrollingWidget._selectWebID(null);
+                self.assertEqual(
+                    oldWebID, webID,
+                    "Expected first message ID as previous message ID.");
+            });
+    },
+
+    /**
+     * Test that a row can be added to the group selection with
+     * L{ScrollingWidget.groupSelectRow} and that the proper state is returned
+     * for that row.
+     */
+    function test_groupSelectRow(self) {
+        return self.setUp().addCallback(function() {
+                /*
+                 * Test setup doesn't give the scrolling widget a parent which
+                 * can toggle group actions.  Clobber that method on our
+                 * instance so it doesn't explode.
+                 *
+                 * XXX This is terrible.  Find some way to remove it.
+                 */
+                self.scrollingWidget.enableGroupActions = function() {};
+
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                var state = self.scrollingWidget.groupSelectRow(webID);
+                self.assertEqual(state, "on");
+                self.failUnless(
+                    webID in self.scrollingWidget.selectedGroup,
+                    "Expected selected webID to be in the selected group.");
+            });
+    },
+
+    /**
+     * Test that a row can be removed from the group selection with
+     * L{ScrollingWidget.groupSelectRow} and that the proper state is returned
+     * for that row.
+     */
+    function test_groupUnselectRow(self) {
+        return self.setUp().addCallback(function() {
+                /*
+                 * Test setup doesn't give the scrolling widget a parent which
+                 * can toggle group actions.  Clobber that method on our
+                 * instance so it doesn't explode.
+                 *
+                 * XXX This is terrible.  Find some way to remove it.
+                 */
+                self.scrollingWidget.disableGroupActions = function() {};
+
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget.selectedGroup[webID] = null;
+                var state = self.scrollingWidget.groupSelectRow(webID);
+                self.assertEqual(state, "off");
+                self.failIf(
+                    webID in self.scrollingWidget.selectedGroup,
+                    "Expected selected webID not to be in the selected group.");
+            });
+    },
+
+    /**
+     * Test that group actions are enabled when the first row is added to the
+     * group selection.
+     */
+    function test_enableGroupActions(self) {
+        return self.setUp().addCallback(function() {
+                var enabled = false;
+                self.scrollingWidget.enableGroupActions = function enableGroupActions() {
+                    enabled = true;
+                };
+
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                var state = self.scrollingWidget.groupSelectRow(webID);
+                self.failUnless(enabled, "Adding row should have enabled group actions.");
+            });
+    },
+
+    /**
+     * Test that group actions are disabled when the last row is removed from
+     * the group selection.
+     */
+    function test_disableGroupActions(self) {
+        return self.setUp().addCallback(function() {
+                var disabled = false;
+                self.scrollingWidget.disableGroupActions = function disableGroupActions() {
+                    disabled = true;
+                };
+
+                var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget.selectedGroup[webID] = null;
+                var state = self.scrollingWidget.groupSelectRow(webID);
+                self.failUnless(disabled, "Removing row should have dsiabled group actions.");
+            });
+    }
+    );
+
+
+Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ControllerTestCase');
+Quotient.Test.ControllerTestCase.methods(
+    /**
+     * Utility method to extract data from display nodes and return it as an
+     * array of objects mapping column names to values.
+     */
     function collectRows(self) {
-        var rows = self.mailbox.scrollWidget.nodesByAttribute("class", "q-scroll-row");
+        var rows = self.controllerWidget.scrollWidget.nodesByAttribute(
+            "class", "q-scroll-row");
         var divs, j, row;
-        for(var i = 0; i < rows.length; i++) {
+        for (var i = 0; i < rows.length; i++) {
             divs = rows[i].getElementsByTagName("div");
             row = {};
-            for(j = 0; j < divs.length; j++) {
+            for (j = 0; j < divs.length; j++) {
                 row[divs[j].className] = divs[j].firstChild.nodeValue;
             }
             rows[i] = row;
         }
         return rows;
-    });
-
-Quotient.Test.InboxTestCase = Quotient.Test.MailboxTestBase.subclass('InboxTestCase');
-Quotient.Test.InboxTestCase.methods(
-    function doTests(self) {
-        /* inbox would have two messages, but it's the initial view,
-           so the first message will have been marked read already */
-
-        self.assertEquals(self.unreadCountForView("Inbox"), 1);
-        self.assertEquals(self.unreadCountForView("Spam"), 1);
-
-        /* similarly, this would have 4, but one of them has been read */
-
-        self.assertEquals(self.unreadCountForView("All"), 3);
-        self.assertEquals(self.unreadCountForView("Sent"), 0);
-
-        var rows = self.collectRows();
-
-        /* check message order and date formatting */
-        self.assertEquals(rows[0]["subject"], "Message 2");
-        self.assertEquals(rows[1]["subject"], "Message 1");
-
-        /*
-         * Months are zero-based instead of one-based.  Account for this by
-         * subtracting or adding a one.
-         */
-        var expectedDate = new Date(Date.UTC(1999, 11, 13));
-        self.assertEquals(
-            expectedDate.getFullYear() + "-" +
-            (expectedDate.getMonth() + 1) + "-" +
-            expectedDate.getDate(),
-            rows[1]["date"]);
-
-        var personChooser = Nevow.Athena.FirstNodeByAttribute(
-                                self.mailbox.contentTableGrid[0][0], "class", "person-chooser");
-        var personChoices = Nevow.Athena.NodesByAttribute(
-                                personChooser, "class", "list-option");
-        var nameToPersonKey = {};
-        var optName, personKey;
-
-        for(var i = 0; i < personChoices.length; i++) {
-            optName   = Nevow.Athena.FirstNodeByAttribute(personChoices[i], "class", "opt-name");
-            personKey = Nevow.Athena.FirstNodeByAttribute(personChoices[i], "class", "person-key");
-            nameToPersonKey[optName.firstChild.nodeValue] = personKey.firstChild.nodeValue;
-        }
-
-        var expectedPeople = ["Bob", "Joe"];
-        var gotPeople = MochiKit.Base.keys(nameToPersonKey).sort();
-
-        if(MochiKit.Base.compare(gotPeople, expectedPeople) != 0) {
-            self.fail(expectedPeople.toSource() + " != " + gotPeople.toSource());
-        }
-
-        var D = self.switchView(null, "Spam",
-            function() {
-                self.assertSubjectsAre(["SPAM SPAM SPAM"], "Spam view");
-            });
-
-        var archived = ["Archived Message 2", "Archived Message 1"];
-        var normal = ["Message 2", "Message 1"];
-        var bobs = archived;
-        var joes = normal;
-        var all = archived.concat(normal);
-
-        var args = [
-            [null, "Sent", [], "Sent View"],
-            [null, "All", all, "All view"],
-
-            ["viewByPerson", nameToPersonKey["Bob"], bobs, "All view, Viewing by Bob"],
-            ["viewByPerson", nameToPersonKey["Joe"], joes, "All view, Viewing By Joe"],
-
-            ["viewByPerson", null, all, "All view"],
-
-            [null, "Inbox", normal, "Inbox view"],
-
-            ["viewByPerson", nameToPersonKey["Joe"], joes, "Inbox view, Viewing By Joe"],
-            ["viewByPerson", nameToPersonKey["Bob"], [], "Inbox view, Viewing By Bob"],
-
-            ["viewByPerson", null, normal, "Inbox view"],
-
-            ["viewByTag", "Joe's Stuff", joes, "Inbox view, Viewing by tag \"Joe's Stuff\""],
-
-            ["viewByPerson", nameToPersonKey["Joe"], joes, "Inbox view, Viewing by Joe & tag \"Joe's Stuff\""],
-            ["viewByPerson", nameToPersonKey["Bob"], [], "Inbox view, Viewing by Bob & tag \"Joe's Stuff\""],
-
-            ["viewByTag", "Bob's Stuff", [], "Inbox view, Viewing by Bob & tag \"Bob's Stuff\""],
-
-            ["viewByMailType", "All", bobs, "All view, Viewing by Bob & tag \"Bob's Stuff\""],
-
-            ["viewByTag", null, bobs, "All View, Viewing by Bob"],
-
-            ["viewByPerson", null, all, "All View"]];
-
-        for(var i = 0; i < args.length; i++) {
-            D.addCallback(self.makeViewSwitcher.apply(self, args[i]));
-        }
-
-        D.addCallback(function() { self._testActionGroupStuff() });
-
-        return D;
     },
 
-    function _testActionGroupStuff(self) {
-        var sw = self.mailbox.scrollWidget;
-
-        var anyPredicate = function() {
-            return true;
-        }
-
-        for(var i = 0; i < 3; i++) {
-            self.assertEquals(sw.findNextRow(sw._rows[i][1], anyPredicate), sw._rows[i+1][1]);
-        }
-        self.assertEquals(sw.findNextRow(sw._rows[3][1], anyPredicate), undefined);
-
-        for(i = 3; 0 < i; i--) {
-            self.assertEquals(sw.findPrevRow(sw._rows[i][1], anyPredicate), sw._rows[i-1][1]);
-        }
-        self.assertEquals(sw.findPrevRow(sw._rows[0][1], anyPredicate), undefined);
-
-        var nonePredicate = function() {
-            return false;
-        }
-
-        self.assertEquals(sw.findNextRow(sw._rows[0][1], nonePredicate), undefined);
-        self.assertEquals(sw.findNextRow(sw._rows[3][1], nonePredicate), undefined);
-
-        self.assertEquals(sw.findPrevRow(sw._rows[3][1], nonePredicate), undefined);
-        self.assertEquals(sw.findPrevRow(sw._rows[0][1], nonePredicate), undefined);
-
-        var richAssertEquals = function(x, y) {
-            self.assertEquals(MochiKit.Base.compare(x, y), 0, x + " != " + y);
-        }
-
-        richAssertEquals(sw.findNextRow(sw._rows[0][1], anyPredicate, true), [sw._rows[1][1], 1]);
-        self.assertEquals(sw.findNextRow(sw._rows[3][1], anyPredicate, true), undefined);
-
-        richAssertEquals(sw.findPrevRow(sw._rows[3][1], anyPredicate, true), [sw._rows[2][1], 2]);
-        self.assertEquals(sw.findPrevRow(sw._rows[0][1], anyPredicate, true), undefined);
-
-        var select = self.mailbox.groupActionsForm.elements["group-action"];
-
-        self.assertEquals(select.value, "archive");
-
-        /* find out what appears right after 'archive' in the <select> */
-        var nextAction = select.getElementsByTagName("option")[select.selectedIndex+1];
-
-        /* hide the archive option */
-
-        var visibility = self.mailbox.createVisibilityMatrix();
-        var visible = visibility["Inbox"]["show"];
-        for(var i = 0; i < visible.length; i++) {
-            visible[i] = visible[i][0];
-        }
-
-        var minusView = function(view) {
-            var result = [];
-            for(var i = 0; i < visible.length; i++) {
-                if(view != visible[i]) {
-                    result.push(visible[i]);
-                }
-            }
-            return result;
-        }
-
-        self.mailbox.setGroupActions(minusView("archive"));
-
-        self.assertEquals(select.value, nextAction.value);
-
-        self.mailbox.setGroupActions(visible);
-
-        self.assertEquals(select.value, "archive");
-
-        /* select the first and last messages */
-        self.groupSelect(0);
-        self.groupSelect(3);
-
-        self.assertEquals(sw.findRowOffset(sw._selectedRow), 0);
-
-        var selectedIDs = MochiKit.Base.keys(sw.selectedGroup);
-        selectedIDs.sort();
-
-        var expectedIDs = [sw._rows[0][0]["__id__"], sw._rows[3][0]["__id__"]];
-        expectedIDs.sort();
-
-        richAssertEquals(selectedIDs, expectedIDs);
-
-        self.assertEquals(0, sw.findRowOffset(sw._rows[0][1]));
-        self.assertEquals(3, sw.findRowOffset(sw._rows[3][1]));
-
-        /* find out the webID of the second row, which is what should become
-           the active message once we get the first and third out of the way */
-        var nextActiveWebID = sw._rows[1][0]["__id__"];
-
-        /* declare 0 & 3 to be spam */
-        var D = self.mailbox.touchSelectedGroup("train", true, true);
-        return D.addCallback(
-            function() {
-                self.assertEquals(sw._rows[0][0]["__id__"], nextActiveWebID);
-            });
-    });
-
-Quotient.Test.BatchActionsTestCase = Quotient.Test.MailboxTestBase.subclass('BatchActionsTestCase');
-Quotient.Test.BatchActionsTestCase.methods(
-    function doTests(self) {
-        var sw = self.mailbox.scrollWidget;
-
-        var webIDToSubject = function(webID) {
-            return sw.findRowData(webID)["subject"];
-        }
-
-        self.assertEquals(sw._rows[0][0]["subject"], "Message #0");
-        self.assertEquals(sw._rows[0][0]["read"], true);
-
-        /* assert every row after the first is unread, and has the right subject */
-        for(var i = 1; i < sw._rows.length; i++) {
-            self.assertEquals(sw._rows[i][0]["read"], false);
-            self.assertEquals(sw._rows[i][0]["subject"], "Message #" + i);
-        }
-
-        var checkSubjects = function(indices) {
-            self.assertSubjectsAre(
-                MochiKit.Base.map(function(n) {
-                    return "Message #" + n;
-                }, indices));
-        }
-
-        /* select row #2 */
-        return self.mailbox.fastForward(sw._rows[2][0]["__id__"]).addCallback(
-            function() {
-                /* assert that it's now read */
-                self.assertEquals(sw._rows[2][0]["read"], true);
-
-                self.mailbox.changeBatchSelection("read");
-
-                return self.mailbox.touchBatch("archive", true);
-        }).addCallback(
-            function() {
-                var indices = [/* 0 is gone */ 1, /* 2 is gone */ 3, 4, 5, 6, 7, 8, 9];
-                checkSubjects(indices);
-
-                /* deleting #0 and #2 should load #1, which is now at index 0 */
-                self.assertEquals(sw._rows[0][0]["read"], true);
-
-                self.mailbox.changeBatchSelection("read");
-
-                return self.mailbox.touchBatch("delete", true).addCallback(
-                    function() {
-                        indices.shift();
-                        checkSubjects(indices);
-                    });
-        }).addCallback(
-            self.makeViewSwitcher(null, "Trash", ["Message #1"], "Trash view")
-        ).addCallback(
-            function() {
-                var D = self.mailbox._sendViewRequest("viewByMailType", "All");
-                return D.addCallback(
-                    function() {
-                        return self.waitForScrollTableRefresh();
-                    });
-        }).addCallback(
-            function() {
-                checkSubjects([0, /* #1 is missing (trash) */ 2, 3, 4, 5, 6, 7, 8, 9]);
-                var D = self.mailbox._sendViewRequest("viewByMailType", "Inbox");
-                return D.addCallback(
-                    function() {
-                        return self.waitForScrollTableRefresh();
-                    });
-        }).addCallback(
-            function() {
-                /* 0 = archived, 1 = trash, 2 = archived */
-                checkSubjects([3, 4, 5, 6, 7, 8, 9]);
-
-                /* now #3 (index 0) has been read */
-                self.assertEquals(sw._rows[0][0]["read"], true);
-
-                /* mark #5 (index 2) as read */
-                return self.mailbox.fastForward(sw._rows[2][0]["__id__"]);
-        }).addCallback(
-            function() {
-                self.assertEquals(sw._rows[2][0]["read"], true);
-
-                self.mailbox.changeBatchSelection("read");
-
-                var selectedMessages = MochiKit.Base.keys(sw.selectedGroup).length;
-                self.assertEquals(selectedMessages, 2, "selected message count is " +
-                                                       selectedMessages +
-                                                       " instead of 2");
-
-                /* let's include an unread message in the selection (#6) */
-                sw.selectedGroup[sw._rows[3][0]["__id__"]] = sw._rows[3][1];
-
-                var batchExceptions = self.mailbox.getBatchExceptions();
-                var included = batchExceptions[0];
-                var excluded = batchExceptions[1];
-
-                if(included.length != 1 || included[0] != sw._rows[3][0]["__id__"]) {
-                    self.fail("getBatchExceptions() included these subjects: " +
-                              MochiKit.Base.map(webIDToSubject, included) +
-                              " instead of only 'Message #6'");
-                }
-                self.assertEquals(excluded.length, 0,
-                                  "getBatchExceptions() excluded these subjects: " +
-                                  MochiKit.Base.map(webIDToSubject, excluded) +
-                                  " but it wasn't supposed to exclude any");
-
-                /* so #3 & #5 are read, and will be affected by the batch
-                 * action.  #6 is unread, but we manually selected it, so
-                 * it should also be affected */
-                return self.mailbox.touchBatch("train", true, /*spam=*/true);
-        }).addCallback(
-            self.makeViewSwitcher(null, "Spam", ["Message #3",
-                                                 "Message #5",
-                                                 "Message #6"], "Spam view")
-        ).addCallback(
-            self.makeViewSwitcher(null, "Inbox", ["Message #4",
-                                                  "Message #7",
-                                                  "Message #8",
-                                                  "Message #9"], "Inbox view")
-        ).addCallback(
-            function() {
-                self.assertEquals(sw._rows[0][0]["read"], true);
-
-                self.mailbox.changeBatchSelection("unread");
-
-                /* unselect the last message */
-                delete(sw.selectedGroup[sw._rows[3][0]["__id__"]]);
-
-                var batchExceptions = self.mailbox.getBatchExceptions();
-                var included = batchExceptions[0];
-                var excluded = batchExceptions[1];
-
-                self.assertEquals(included.length, 0,
-                                  "getBatchExceptions() included these subjects: " +
-                                  MochiKit.Base.map(webIDToSubject, included) +
-                                  " but it wasn't supposed to include any");
-
-                if(excluded.length != 1 || excluded[0] != sw._rows[3][0]["__id__"]) {
-                    self.fail("getBatchExceptions() excluded these subjects: " +
-                              MochiKit.Base.map(webIDToSubject, excluded) +
-                              " instead of only 'Message #9'");
-                }
-
-                return self.mailbox.touchBatch("delete", true);
-        }).addCallback(
-            function() {
-                checkSubjects([4, 9]);
-                self.mailbox.changeBatchSelection("all");
-                return self.mailbox.touchBatch("train", true, true);
-        }).addCallback(
-            function() {
-                checkSubjects([]);
-        });
-    });
-
-Quotient.Test.InboxDOMHandlersTestCase = Quotient.Test.MailboxTestBase.subclass(
-                                            'InboxDOMHandlersTestCase');
-
-Quotient.Test.InboxDOMHandlersTestCase.methods(
     /**
-     * test inbox methods that are tied to the DOM
+     * Retrieve a Controller Widget for an inbox from the server.
+     */
+    function setUp(self) {
+        var result = self.callRemote('getControllerWidget');
+        result.addCallback(function(widgetMarkup) {
+                return Mantissa.Test.addChildWidgetFromMarkup(
+                    self.node, widgetMarkup,
+                    'Quotient.Mailbox.Controller');
+            });
+        result.addCallback(function(widget) {
+                self.controllerWidget = widget;
+                self.node.appendChild(widget.node);
+                return self.controllerWidget.scrollWidget.initializationDeferred;
+            });
+        return result;
+    },
+
+    /**
+     * Test that the L{getPeople} method returns an Array of objects describing
+     * the people names visible.
+     */
+    function test_getPeople(self) {
+        var result = self.setUp();
+        result.addCallback(function(ignored) {
+                var people = self.controllerWidget.getPeople();
+                people.sort(function(a, b) {
+                        if (a.name < b.name) {
+                            return -1;
+                        } else if (a.name == b.name) {
+                            return 0;
+                        } else {
+                            return 1;
+                        }
+                    });
+                self.assertEqual(people.length, 2);
+
+                self.assertEqual(people[0].name, 'Alice');
+                self.assertEqual(people[1].name, 'Bob');
+
+                /*
+                 * Check that the keys are actually associated with these
+                 * people.
+                 */
+                var result = self.callRemote('personNamesByKeys',
+                                             people[0].key, people[1].key);
+                result.addCallback(function(names) {
+                        self.assertArraysEqual(names, ['Alice', 'Bob']);
+                    });
+                return result;
+
+            });
+        return result;
+    },
+
+    /**
+     * Test that the unread counts associated with various views are correct.
+     * The specific values used here are based on the initialization the server
+     * does.
+     */
+    function test_unreadCounts(self) {
+        return self.setUp().addCallback(function(ignored) {
+                /*
+                 * This is one instead of two since rendering the page marks
+                 * one of the unread messages as read.
+                 */
+                self.assertEqual(
+                    self.controllerWidget.unreadCountForView("Inbox"), 1);
+
+                self.assertEqual(
+                    self.controllerWidget.unreadCountForView("Spam"), 1);
+
+                /*
+                 * Three instead of four for the reason mentioned above.
+                 */
+                self.assertEqual(
+                    self.controllerWidget.unreadCountForView("All"), 1);
+
+                self.assertEqual(
+                    self.controllerWidget.unreadCountForView("Sent"), 0);
+            });
+    },
+
+    /**
+     * Test that the correct subjects show up in the view.
+     */
+    function test_subjects(self) {
+        var result = self.setUp();
+        result.addCallback(function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 2,
+                    "Should have been 2 rows in the initial inbox view.");
+
+                self.assertEquals(rows[0]["subject"], "2nd message");
+                self.assertEquals(rows[1]["subject"], "1st message");
+            });
+        return result;
+    },
+
+    /**
+     * Test that the correct dates show up in the view.
+     */
+    function test_dates(self) {
+        var result = self.setUp();
+        result.addCallback(function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 2,
+                    "Should have been 2 rows in the initial inbox view.");
+
+                /*
+                 * Account for timezone differences.
+                 */
+                var date = new Date(
+                    new Date(1999, 12, 13, 0, 0).valueOf() -
+                    new Date().getTimezoneOffset() * 100000).getDate();
+
+                self.assertEquals(rows[0]["date"], "1999-12-" + date);
+                self.assertEquals(rows[1]["date"], "1999-12-" + date);
+            });
+        return result;
+    },
+
+    /**
+     * Test that the correct list of people shows up in the chooser.
+     */
+    function test_people(self) {
+        var result = self.setUp();
+        result.addCallback(function(ignored) {
+                var nodesByClass = function nodesByClass(root, value) {
+                    return Divmod.Runtime.theRuntime.nodesByAttribute(
+                        root, 'class', value);
+                };
+                /*
+                 * Find the node which lets users select to view messages from
+                 * a particular person.
+                 */
+                var viewSelectionNode = self.controllerWidget.contentTableGrid[0][0];
+                var personChooser = nodesByClass(
+                    viewSelectionNode, "person-chooser")[0];
+
+                /*
+                 * Get the nodes with the names of the people in the chooser.
+                 */
+                var personChoices = nodesByClass(personChooser, "list-option");
+
+                /*
+                 * Get the names out of those nodes.
+                 */
+                var personNames = [];
+                var personNode = null;
+                for (var i = 0; i < personChoices.length; ++i) {
+                    personNode = nodesByClass(personChoices[i], "opt-name")[0];
+                    personNames.push(personNode.firstChild.nodeValue);
+                }
+
+                personNames.sort();
+                self.assertArraysEqual(personNames, ["Alice", "Bob"]);
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to the archive view.
+     */
+    function test_archiveView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.switchView('All');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 4,
+                    "Should have been 4 rows in the archive view.");
+
+                self.assertEqual(rows[0]["subject"], "4th message");
+                self.assertEqual(rows[1]["subject"], "3rd message");
+                self.assertEqual(rows[2]["subject"], "2nd message");
+                self.assertEqual(rows[3]["subject"], "1st message");
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to the spam view.
+     */
+    function test_spamView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.switchView('Spam');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 1,
+                    "Should have been 1 row in the spam view.");
+
+                self.assertEqual(rows[0]["subject"], "5th message");
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to the sent view.
+     */
+    function test_sentView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.switchView('Sent');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 1,
+                    "Should have been 1 row in the sent view.");
+
+                self.assertEqual(rows[0]["subject"], "6th message");
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to a view of messages from a particular person.
+     */
+    function test_personView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var people = self.controllerWidget.getPeople();
+
+                /*
+                 * I know the first one is Alice, but I'll make sure.
+                 */
+                self.assertEqual(people[0].name, 'Alice');
+
+                /*
+                 * Change to the all view, so that we see all messages instead
+                 * of just inbox messages.
+                 */
+                var result = self.controllerWidget.switchView('All');
+                result.addCallback(function(ignored) {
+                        /*
+                         * Next view only messages from Alice.
+                         */
+                        return self.controllerWidget._sendViewRequest(
+                            'viewByPerson', people[0].key);
+                    });
+
+                /*
+                 * Once that is done, assert that only Alice's messages show
+                 * up.
+                 */
+                result.addCallback(function(ignored) {
+                        var rows = self.collectRows();
+
+                        self.assertEquals(
+                            rows.length, 4, "Should have been 4 rows in Alice view.");
+
+                        self.assertEquals(rows[0]["subject"], "4th message");
+                        self.assertEquals(rows[1]["subject"], "3rd message");
+                        self.assertEquals(rows[2]["subject"], "2nd message");
+                        self.assertEquals(rows[3]["subject"], "1st message");
+                    });
+                return result;
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to a view of messages with a particular tag.
+     */
+    function test_tagView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Change to the view of messages with the foo tag.
+                 */
+                return self.controllerWidget._sendViewRequest(
+                    'viewByTag', 'foo');
+            });
+        /*
+         * Once the view is updated, test that only the message tagged "foo" is
+         * visible.
+         */
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEquals(
+                    rows.length, 1, "Should have been 1 row in the 'foo' tag view.");
+
+                self.assertEquals(rows[0]["subject"], "1st message");
+            });
+        return result;
+    },
+
+    /**
+     * Test that sending a view request starts the throbber throbbing and that
+     * when the request has been completed the throbber stops throbbing.
+     */
+    function test_throbberStates(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Hook the throbber.
+                 */
+                self.throbber = Quotient.Test.TestThrobber();
+                self.controllerWidget.scrollWidget.throbber = self.throbber;
+
+                var result = self.controllerWidget.switchView('All');
+
+                /*
+                 * Throbber should have been started by the view change.
+                 */
+                self.failUnless(
+                    self.throbber.throbbing,
+                    "Throbber should have been throbbing after view request.");
+
+                return result;
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * View has been changed, the throbber should have been stopped.
+                 */
+                self.failIf(
+                    self.throbber.throbbing,
+                    "Throbber should have been stopped after view change.");
+            });
+        return result;
+    },
+
+    /**
+     * Test that the first row of the initial view is selected after the widget
+     * loads.
+     */
+    function test_initialSelection(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.model.getRowData(0).__id__,
+                    "Expected first row to be selected.");
+            });
+        return result;
+    },
+
+    /**
+     * Test that the first row after a view change completes is selected.
+     */
+    function test_viewChangeSelection(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.switchView('All');
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.model.getRowData(0).__id__,
+                    "Expected first row to be selected after view change.");
+            });
+        return result;
+    }
+
+    /**
+     * XXX TODO
+     *
+     * - Test Controller.toggleGroupActions
+     * - Test Controller.disableGroupActions
+     * - Test Controller.touchSelectedGroup
+     * - Test Controller.changeBatchSelection
+     * - Test Controller.touchBatch
      */
 
-    function doTests(self) {
-        var viewPaneContents = Nevow.Athena.NodesByAttribute(
-                                   self.mailbox.firstNodeByAttribute("class", "view-pane"),
-                                   "class", "view-pane-content"),
-            collapsiblePane, i, name, viewChoosersByName = {};
+    );
 
-        for(i = 0; i < viewPaneContents.length; i++) {
-            collapsiblePane = viewPaneContents[i];
-            name = Nevow.Athena.FirstNodeByAttribute(
-                        collapsiblePane, "class", "view-pane-name").firstChild.nodeValue;
-            viewChoosersByName[name] = Nevow.Athena.FirstNodeByAttribute(
-                                            collapsiblePane, "class", "pane-body");
-        }
 
-        /**
-         * @param category: the view category, e.g. "Mail", "People"
-         * @param choice: the view choice, e.g. "Inbox", "Joe"
-         * @param return: the option node that represents the specified choice
-         */
-        var optionNodeForViewChoice = function(category, choice) {
-            var opts = Nevow.Athena.NodesByAttribute(
-                            viewChoosersByName[category], "class", "opt-name");
-            for(i = 0; i < opts.length; i++) {
-                if(opts[i].firstChild.nodeValue == choice) {
-                    return opts[i].parentNode;
-                }
-            }
-        }
+Quotient.Test.EmptyControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.EmptyControllerTestCase');
+Quotient.Test.EmptyControllerTestCase.methods(
+    /**
+     * Get an empty Controller widget and add it as a child to this test case's
+     * node.
+     */
+    function setUp(self) {
+        var result = self.callRemote('getEmptyControllerWidget');
+        result.addCallback(function(widgetMarkup) {
+                return Mantissa.Test.addChildWidgetFromMarkup(
+                    self.node, widgetMarkup,
+                    'Quotient.Mailbox.Controller');
+            });
+        result.addCallback(function(widget) {
+                self.controllerWidget = widget;
+                self.node.appendChild(widget.node);
+                return widget.initializationDeferred;
+            });
+        return result;
+    },
 
-        var makeViewChoice = function(mailboxf, category, choice) {
-            var D = mailboxf(optionNodeForViewChoice(category, choice));
-            return D.addCallback(
-                function() {
-                    return self.waitForScrollTableRefresh();
-                });
-        }
+    /**
+     * Test that loading an empty mailbox doesn't result in any errors, that no
+     * message is initially selected, etc.
+     */
+    function test_emptyLoad(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget._selectedRowID,
+                    null,
+                    "No rows exist, so none should have been selected.");
+            });
+        return result;
+    },
 
-        var makeMailViewChoice = function(choice) {
-            return self.mailbox.chooseMailView(choice).addCallback(
-                function() {
-                    return self.waitForScrollTableRefresh();
-                });
-        }
-        var makePersonChoice = function(choice) {
-            return makeViewChoice(
-                function(n) {
-                    return self.mailbox.choosePerson(n);
-                }, "People", choice);
-        }
-
-        self.assertSubjectsAre(["Message 2", "Message 1"]);
-
-        return makeMailViewChoice("All").addCallback(
-            function() {
-                self.assertSubjectsAre(["Archived Message 2",
-                                        "Archived Message 1",
-                                        "Message 2",
-                                        "Message 1"]);
-                return makePersonChoice("Bob");
-        }).addCallback(
-            function() {
-                self.assertSubjectsAre(["Archived Message 2", "Archived Message 1"]);
-                return makeMailViewChoice("Inbox");
-        }).addCallback(
-            function() {
-                self.assertSubjectsAre([]);
-        });
-    });
+    /**
+     * Test that switching to an empty view doesn't result in any errors, that
+     * no message is initially selected, etc.
+     */
+    function test_emptySwitch(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.switchView('All');
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget._selectedRowID,
+                    null,
+                    "No rows exist, so none should have been selected.");
+            });
+        return result;
+    }
+    );
 
 Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
 Quotient.Test.ComposeController.methods(
@@ -637,50 +830,6 @@ Quotient.Test.ComposeTestCase.methods(
         }
     });
 
-Quotient.Test.GroupActionsTestCase = Quotient.Test.MailboxTestBase.subclass('GroupActionsTestCase');
-Quotient.Test.GroupActionsTestCase.methods(
-    function doTests(self) {
-        var sw = self.mailbox.scrollWidget;
-
-        var assertUnreadCountsAre = function(d) {
-            var count, views = ["Inbox", "Trash", "Sent", "All", "Spam"];
-            for(var i = 0; i < views.length; i++) {
-                if(!(views[i] in d)) {
-                    count = 0;
-                } else {
-                    count = d[views[i]];
-                }
-                self.assertEquals(self.unreadCountForView(views[i]), count);
-            }
-        }
-
-        assertUnreadCountsAre({Inbox: 9, All: 9});
-
-        /* select the first three messages */
-        self.groupSelect(0);
-        self.groupSelect(1);
-        self.groupSelect(2);
-
-        /* archive the first one */
-        return self.mailbox.touch("archive", true).addCallback(
-            function() {
-                /* #1 got read when it was loaded into the message
-                   detail after #0 was dismissed */
-                assertUnreadCountsAre({Inbox: 8, All: 8});
-
-                /* act on the group selection, checking the code
-                   is smart enough not to explode when it finds
-                   that one of the rows it wants to act on is missing */
-                return self.mailbox.touchSelectedGroup("archive", true);
-        }).addCallback(
-            function() {
-                /* #2 is gone from the inbox, and #3 was loaded
-                   into the message detail, making 6 unread.
-                   7 for All because #2 was the only unread
-                   message that got moved there */
-                assertUnreadCountsAre({Inbox: 6, All: 7});
-        });
-    });
 
 Quotient.Test.MsgDetailTestBase = Nevow.Athena.Test.TestCase.subclass('MsgDetailTestBase');
 Quotient.Test.MsgDetailTestBase.methods(
@@ -704,11 +853,11 @@ Quotient.Test.MsgDetailTestBase.methods(
 
     function getMsgDetailWidget(self) {
         if(!self.widget) {
-            self.widget = Quotient.Mailbox.MessageDetail.get(
+            self.widget = Quotient.Message.MessageDetail.get(
                             Nevow.Athena.NodeByAttribute(
                                 self.node.parentNode,
                                 "athena:class",
-                                "Quotient.Mailbox.MessageDetail"));
+                                "Quotient.Message.MessageDetail"));
         }
         return self.widget;
     },
@@ -723,7 +872,7 @@ Quotient.Test.MsgDetailTestBase.methods(
 
     /**
      * Wrapper for the C{toggleMoreDetail} method on the
-     * L{Quotient.Mailbox.MessageDetail} widget that's associated with
+     * L{Quotient.Message.MessageDetail} widget that's associated with
      * this test.
      */
     function toggleMoreDetail(self) {

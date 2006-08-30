@@ -1,171 +1,11 @@
-// import Quotient
-// import Quotient.Common
+
 // import Mantissa.People
 // import Mantissa.ScrollTable
 
-Quotient.Mailbox.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Mailbox.MessageDetail");
-Quotient.Mailbox.MessageDetail.methods(
-    function __init__(self, node, showMoreDetail) {
-        Quotient.Mailbox.MessageDetail.upcall(self, "__init__", node);
-        if(showMoreDetail) {
-            self.toggleMoreDetail();
-        }
-    },
-
-    function _getMoreDetailNode(self) {
-        if(!self.moreDetailNode) {
-            self.moreDetailNode = self.firstNodeByAttribute("class", "detail-toggle");
-        }
-        return self.moreDetailNode;
-    },
-
-    function messageSource(self) {
-        self.callRemote("getMessageSource").addCallback(
-            function(source) {
-                MochiKit.DOM.replaceChildNodes(
-                    self.nodeByAttribute("class", "message-body"),
-                    MochiKit.DOM.PRE(null, source));
-        });
-    },
-
-    /**
-     * Toggle the visibility of the "more detail" panel, which contains
-     * some extra headers, or more precise values for headers that are
-     * summarized or approximated elsewhere.
-     *
-     * @param node: the toggle link node (if undefined, will locate in DOM)
-     * @return: undefined
-     */
-    function toggleMoreDetail(self, node) {
-        if(node == undefined) {
-            node = self._getMoreDetailNode();
-        }
-
-        node.blur();
-
-        if(node.firstChild.nodeValue == "More Detail") {
-            node.firstChild.nodeValue = "Less Detail";
-        } else {
-            node.firstChild.nodeValue = "More Detail";
-        }
-
-        if(!self.headerTable) {
-            self.headerTable = self.firstNodeByAttribute("class", "msg-header-table");
-        }
-
-        var visible;
-        var rows = self.headerTable.getElementsByTagName("tr");
-        for(var i = 0; i < rows.length; i++) {
-            if(rows[i].className == "detailed-row") {
-                if(rows[i].style.display == "none") {
-                    rows[i].style.display = "";
-                } else {
-                    rows[i].style.display = "none";
-                }
-                if(visible == undefined) {
-                    visible = rows[i].style.display != "none";
-                }
-            }
-        }
-        return self.callRemote("persistMoreDetailSetting", visible);
-    },
-
-    /**
-     * Show the original, unscrubbed HTML for this message
-     */
-    function showOriginalHTML(self) {
-        var mbody = self.firstNodeByAttribute("class", "message-body"),
-            iframe = mbody.getElementsByTagName("iframe")[0];
-
-        if(iframe.src.match(/\?/)) {
-            iframe.src += "&noscrub=1";
-        } else {
-            iframe.src += "?noscrub=1";
-        }
-
-        var sdialog = self.firstNodeByAttribute("class", "scrubbed-dialog");
-        sdialog.parentNode.removeChild(sdialog);
-    },
-
-    /**
-     * Open a window that contains a printable version of
-     * the current message
-     *
-     * @param node: an <a>
-     */
-    function printable(self) {
-        window.open(self.firstNodeByAttribute("class", "printable-link").href);
-    },
-
-    /**
-     * Present an element that contains an editable list of tags for my message
-     */
-    function editTags(self) {
-        if(!self.tagsDisplayContainer) {
-            var tagsContainer = self.firstNodeByAttribute("class", "tags-container");
-            self.tagsDisplayContainer = Nevow.Athena.FirstNodeByAttribute(
-                                            tagsContainer, "class", "tags-display-container");
-            self.tagsDisplay = self.tagsDisplayContainer.firstChild;
-            self.editTagsContainer = Nevow.Athena.FirstNodeByAttribute(
-                                        tagsContainer, "class", "edit-tags-container");
-        }
-        var tdc = self.tagsDisplayContainer;
-        var input = self.editTagsContainer.getElementsByTagName("input")[0];
-        if(self.tagsDisplay.firstChild.nodeValue != "No Tags") {
-            input.value = self.tagsDisplay.firstChild.nodeValue;
-        }
-        tdc.style.display = "none";
-        self.editTagsContainer.style.display = "";
-
-        /* IE throws an exception if an invisible element receives focus */
-        input.focus();
-    },
-
-    function hideTagEditor(self) {
-        self.editTagsContainer.style.display = "none";
-        self.tagsDisplayContainer.style.display = "";
-    },
-
-    /**
-     * Inspect the contents of the tag editor element and persist any
-     * changes that have occured (deleted tags, added tags)
-     */
-    function saveTags(self) {
-        var _gotTags = self.editTagsContainer.tags.value.split(/,\s*/);
-        var  gotTags = [];
-        var seen = {};
-        for(var i = 0; i < _gotTags.length; i++) {
-            if(0 < _gotTags[i].length && !(_gotTags[i] in seen)) {
-                seen[_gotTags[i]] = 1;
-                gotTags.push(_gotTags[i]);
-            }
-        }
-
-        var existingTags;
-        if(self.tagsDisplay.firstChild.nodeValue == "No Tags") {
-            existingTags = [];
-        } else {
-            existingTags = self.tagsDisplay.firstChild.nodeValue.split(/,\s*/);
-        }
-
-        var tagsToDelete = Quotient.Common.Util.difference(existingTags, gotTags);
-        var tagsToAdd = Quotient.Common.Util.difference(gotTags, existingTags);
-
-        if(tagsToAdd || tagsToDelete) {
-            self.callRemote("modifyTags", tagsToAdd, tagsToDelete);
-        }
-
-        if(0 < gotTags.length) {
-            self.tagsDisplay.firstChild.nodeValue = gotTags.join(", ");
-            if(self.widgetParent) {
-                self.widgetParent.addTagsToViewSelector(tagsToAdd);
-            }
-        } else {
-            self.tagsDisplay.firstChild.nodeValue = "No Tags";
-        }
-
-        self.hideTagEditor();
-    });
+// import Quotient
+// import Quotient.Common
+// import Quotient.Throbber
+// import Quotient.Message
 
 
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
@@ -178,97 +18,125 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
         self._scrollViewport.style.maxHeight = "";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
-        self.throbber = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
+        try {
+            self.throbberNode = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
+        } catch (err) {
+            self.throbberNode = document.createElement('span');
+        }
+        self.throbber = Quotient.Throbber.Throbber(self.throbberNode);
     },
 
     /**
-     * The super implementation looks at clientHeight, and then at style.height
-     * if clientHeight doesn't make sense.  This is problematic because our
-     * scrolltable is often display: none, and while firefox returns 0 for
-     * the clientHeight of display: none elements, IE seems to return the
-     * height of the element before it was made invisible.
+     * Override default row to add some divs with particular classes, since
+     * they will most likely change the height of our rows.
      */
-    function getScrollViewportHeight(self) {
-        var height = parseInt(self._scrollViewport.style.height);
-        if(isNaN(height)) {
-            /* called too early, just give the page height.  at worst
-               we'll end up requesting 5 extra rows or whatever */
-            height = Divmod.Runtime.theRuntime.getPageSize().h;
-        }
-        return height;
+    function _getRowGuineaPig(self) {
+        return MochiKit.DOM.DIV(
+            {"style": "visibility: hidden; font-weight: bold",
+             "class": "q-scroll-row"},
+            [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
+             MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
+             MochiKit.DOM.DIV(null, "TEST!!!")]);
     },
 
+
+    /**
+     * Extend the base behavior to reset the message selection group tracking
+     * object.
+     *
+     * XXX - The base scrolltable should really support selection, so all of
+     * the selection related features like this one should move over there.
+     */
     function emptyAndRefill(self) {
-        Quotient.Mailbox.ScrollingWidget.upcall(self, "emptyAndRefill");
         self.selectedGroup = {};
+        return Quotient.Mailbox.ScrollingWidget.upcall(self, 'emptyAndRefill');
     },
 
-    function getHeight(self, wp) {
-        if(!wp) {
-            wp = self.widgetParent;
-        }
-
-        /* This is the cumulative padding/margin for all elements whose
-         * heights we factor into the height calculation below.  clientHeight
-         * includes border but not padding or margin.
-         * FIXME: change all this code to use offsetHeight, not clientHeight
-         */
-        var basePadding = 14;
-        return (Divmod.Runtime.theRuntime.getPageSize().h -
-                wp.messageBlockYPos -
-                wp.totalFooterHeight -
-                basePadding);
-
-    },
-
-    function _createRowHeaders(self, columnNames) {
-        var columnOffsets = {};
-        for( var i = 0; i < columnNames.length; i++ ) {
-            if(self.skipColumn(columnNames[i])) {
-                continue;
-            }
-            columnOffsets[columnNames[i]] = i;
-        }
-        self._columnOffsets = columnOffsets;
-    },
-
+    /**
+     * Override this to do nothing because the Inbox cannot be sorted at all!
+     *
+     * XXX - Hey, wtf, why can't the inbox be sorted? -exarkun
+     */
     function setSortInfo(self, currentSortColumn, isAscendingNow) {},
 
-    function setRowHeight(self) {
-        var r = MochiKit.DOM.DIV({"style": "visibility: hidden; font-weight: bold",
-                                  "class": "q-scroll-row"},
-                    [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
-                     MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
-                     MochiKit.DOM.DIV(null, "TEST!!!")]);
-
-        document.body.appendChild(r);
-        var rowHeight = Divmod.Runtime.theRuntime.getElementSize(r).h;
-        document.body.removeChild(r);
-
-        self._rowHeight = rowHeight;
+    /**
+     * Override this to return an empty Array because the Inbox has no row
+     * headers.
+     */
+    function _createRowHeaders(self, columnNames) {
+        return [];
     },
 
-    function _selectRow(self, row) {
-        if(self._selectedRow) {
-            self._selectedRow.style.backgroundColor = '';
+    /*****************************************************\
+    |**         ISelectableScrollingWidget              **|
+    \*****************************************************/
+
+    /**
+     * Change the current message selection to the given webID.
+     *
+     * If a message was already selected, change its background color back to
+     * the unselected color.  Change the newly selected message's background
+     * color to the selected color.
+     *
+     * If C{webID} is C{null}, only unselect the currently selected message.
+     *
+     * @type webID: string
+     *
+     * @rtype: string
+     * @return: The webID of the previously selected message, or null if there
+     * was no previously selected message.
+     */
+    function _selectWebID(self, webID) {
+        var row;
+        var node, oldNode = null;
+        var oldSelectedRowID = null;
+
+        if (self._selectedRowID) {
+            oldSelectedRowID = self._selectedRowID;
+            oldNode = self.model.findRowData(self._selectedRowID).__node__;
+            oldNode.style.backgroundColor = '';
         }
 
-        if(row.style.fontWeight == "bold") {
+        if (webID == null) {
+            self._selectedRowID = null;
+            return oldSelectedRowID;
+        }
+
+        self._selectedRowID = webID;
+
+        row = self.model.findRowData(webID);
+        node = row.__node__;
+
+        row["read"] = true;
+
+        if (node.style.fontWeight == "bold") {
             self.widgetParent.decrementActiveMailViewCount();
         }
 
-        row.style.fontWeight = "";
-        row.style.backgroundColor = '#FFFFFF';
+        node.style.fontWeight = "";
+        node.style.backgroundColor = '#FFFFFF';
 
-        self._selectedRow = row;
-        var rowData = self._rows[self.findRowOffset(row)][0];
-        rowData["read"] = true;
+        return oldSelectedRowID;
     },
 
+    /**
+     * Call _selectWebID with the webID of the first row of data currently
+     * available.
+     *
+     * If there are no rows, no action will be taken.
+     */
     function _selectFirstRow(self) {
-        self._selectRow(self._rows[0][1]);
+        if (self.model.rowCount()) {
+            self._selectWebID(self.model.getRowData(0)['__id__']);
+        }
     },
 
+
+    /**
+     * Override row creation to provide a different style.
+     *
+     * XXX - should be template changes.
+     */
     function makeRowElement(self, rowOffset, rowData, cells) {
         var style = "border-top: solid 1px #FFFFFF; height: " + (self._rowHeight - 9) + "px";
         if(!rowData["read"]) {
@@ -285,12 +153,18 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "style": style,
              "onclick": function(event) {
                 /* don't select based on rowOffset because it'll change as rows are removed */
-                self._selectRow(this);
+                self._selectWebID(rowData["__id__"]);
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
             }}, data);
     },
 
+    /**
+     * Extend base behavior to recognize the subject column and replace empty
+     * subjects with a special string.
+     *
+     * XXX - Dynamic dispatch for column names or templates or something.
+     */
     function massageColumnValue(self, name, type, value) {
         var res = Quotient.Mailbox.ScrollingWidget.upcall(
                         self, "massageColumnValue", name, type, value);
@@ -302,6 +176,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
         return res;
     },
 
+    /**
+     * Override the base behavior to add a million and one special cases for
+     * things like the "ever deferred" boomerang or to change the name of the
+     * "receivedWhen" column to something totally unrelated like "sentWhen".
+     *
+     * XXX - Should just be template crap.
+     */
     function makeCellElement(self, colName, rowData) {
         if(colName == "receivedWhen") {
             colName = "sentWhen";
@@ -314,31 +195,33 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
-            var content = [MochiKit.DOM.IMG({"src": "/Quotient/static/images/checkbox-off.gif",
-                                             "class": "checkbox-image",
-                                             "border": 0,
-                                             "onclick": function(event) {
-                                                self.groupSelectRow(rowData["__id__"], this);
+            var content = [
+                MochiKit.DOM.IMG({
+                        "src": "/Quotient/static/images/checkbox-off.gif",
+                        "class": "checkbox-image",
+                        "border": 0,
+                        "onclick": function senderDisplayClicked(event) {
+                            self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
 
-                                                this.blur();
+                            this.blur();
 
-                                                if(!event) {
-                                                    event = window.event;
-                                                }
-                                                event.cancelBubble = true;
-                                                if(event.stopPropagation) {
-                                                    event.stopPropagation();
-                                                }
+                            if (!event) {
+                                event = window.event;
+                            }
+                            event.cancelBubble = true;
+                            if(event.stopPropagation) {
+                                event.stopPropagation();
+                            }
 
-                                                return false;
-                                             }}), massage(colName)];
-            if(rowData["everDeferred"]) {
+                            return false;
+                        }}), massage(colName)];
+
+            if (rowData["everDeferred"]) {
                 content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
                                   "border": "0"}));
             }
 
             return MochiKit.DOM.DIV(attrs, content);
-
         } else if(colName == "subject") {
             attrs["class"] = "subject";
         } else {
@@ -349,26 +232,56 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Add row with C{webID} to the group selection
+     * Toggle the membership of a row in the group selection set.
      */
-    function groupSelectRow(self, webID, checkboxImage) {
+    function groupSelectRow(self, webID) {
         var state;
         if(webID in self.selectedGroup) {
             delete self.selectedGroup[webID];
             state = "off";
         } else {
-            self.selectedGroup[webID] = checkboxImage.parentNode.parentNode;
+            self.selectedGroup[webID] = true;
             state = "on";
         }
 
         var selcount = MochiKit.Base.keys(self.selectedGroup).length;
         /* are we transitioning from 0->1 or 1->0? */
-        if(selcount == 0 || (selcount == 1 && state == "on")) {
-            self.widgetParent.toggleGroupActions();
+        if (selcount == 0 && state == "off") {
+            self.disableGroupActions();
+        } else if (selcount == 1 && state == "on") {
+            self.enableGroupActions();
         }
+        return state;
+    },
 
+    /**
+     * Enable the user-interface for performing actions on the selected group
+     * of messages.
+     *
+     * XXX Give the widget parent a real enable method.
+     */
+    function enableGroupActions(self) {
+        self.widgetParent.toggleGroupActions();
+    },
+
+    /**
+     * Disable the user-interface for performing actions on the selected group
+     * of messages.
+     *
+     * XXX Give the widget parent a real disable method.
+     */
+    function disableGroupActions(self) {
+        self.widgetParent.toggleGroupActions();
+    },
+
+    /**
+     * Toggle the membership of a row in the group selection set and update the
+     * checkbox image for that row.
+     */
+    function groupSelectRowAndUpdateCheckbox(self, webID, checkbox) {
+        var state = self.groupSelectRow(webID);
         var segs = checkboxImage.src.split("/");
-        segs[segs.length-1] = "checkbox-" + state + ".gif";
+        segs[segs.length - 1] = "checkbox-" + state + ".gif";
         checkboxImage.src = segs.join("/");
     },
 
@@ -398,30 +311,39 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
 
         var selected, row, webID, count=0;
-        for(var i = 0; i < self._rows.length; i++) {
-            row = self._rows[i];
+        for(var i = 0; i < self.model.rowCount(); i++) {
+            row = self.model.getRowData(i);
             if(row) {
-                webID = row[0]["__id__"];
+                webID = row.__id__;
                 selected = (webID in self.selectedGroup);
                 /* if we like this row */
-                if(predicate(row[0])) {
+                if(predicate(row)) {
                     /* and it's selection status isn't the desired one */
                     if(selected != selectRows) {
                         /* then change it */
-                        self.groupSelectRow(webID, getCheckbox(row[1]));
+                        self.groupSelectRowAndUpdateCheckbox(webID, getCheckbox(row.__node__));
                         count++;
                     }
                 /* if we don't like it, but it's in the target state */
                 } else if(selected == selectRows) {
                     /* then change it */
-                    self.groupSelectRow(webID, getCheckbox(row[1]));
+                    self.groupSelectRowAndUpdateCheckbox(webID, getCheckbox(row.__node__));
                 }
             }
         }
         return count;
     },
 
-    function formatDate(self, d) {
+    /**
+     * Override the base implementation to optionally use the specified second
+     * Date instance as a point of reference.
+     *
+     * XXX - Why isn't this just the base implementation?
+     */
+    function formatDate(self, when, /* optional */ now) {
+        if (now == undefined) {
+            now = new Date();
+        }
         function to12Hour(HH, MM) {
             var meridian;
             if(HH == 0) {
@@ -441,121 +363,82 @@ Quotient.Mailbox.ScrollingWidget.methods(
             return (n < 10) ? "0" + n : n;
         }
         function explode(d) {
-            return d.toString().split(/ /);
+            return [d.getFullYear(), d.getMonth(), d.getDate()];
         }
-        var parts = explode(d);
-        var todayParts = explode(new Date());
-        /* parts.slice(1,4) == [Month, Day, Year] */
-        if(parts.slice(1, 4) == todayParts.slice(1, 4)) {
-            /* it's today! */
-            return to12Hour(d.getHours(), d.getMinutes()); /* e.g. 12:15 PM */
+        function arraysEqual(a, b) {
+            if (a.length != b.length) {
+                return false;
+            }
+            for (var i = 0; i < a.length; ++i) {
+                if (a[i] != b[i]) {
+                    return false;
+                }
+            }
+            return true;
         }
-        if(parts[3] == todayParts[3]) {
-            /* it's this year */
-            return parts[1] + " " + parts[2]; /* e.g. Jan 12 */
+        var parts = explode(when);
+        var todayParts = explode(now);
+        if (arraysEqual(parts, todayParts)) {
+            /* it's today! Format it like "12:15 PM"
+             */
+            return to12Hour(when.getHours(), when.getMinutes());
         }
-        return [pad(d.getFullYear()),
-                pad(d.getMonth()+1),
-                pad(d.getDate())].join("-");
+        if (parts[0] == todayParts[0]) {
+            /* it's this year - format it like "Jan 12"
+             *
+             * XXX - Localization or whatever.
+             */
+            var monthNames = [
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            return monthNames[parts[1]] + " " + parts[2];
+        }
+        return [pad(when.getFullYear()),
+                pad(when.getMonth() + 1),
+                pad(when.getDate())].join("-");
     },
 
+    /**
+     * Override to hide any of the columns from which we're extracting row
+     * metadata.
+     */
     function skipColumn(self, name) {
-        /* don't display any of the columns from which we're extracting row metadata */
         return name == "read" || name == "sentWhen" || name == "attachments" || name == "everDeferred";
     },
 
     /**
      * Remove the given row from the scrolltable
-     * @param row: node
+     *
+     * @param webID: The web ID of the row to remove.
      */
-    function removeRow(self, row) {
-        row.parentNode.removeChild(row);
+    function removeWebID(self, webID) {
+        var result = self.model.removeRow(webID)
+        var index = result.index;
+        var row = result.row;
+        var node = row.__node__;
+
+        node.parentNode.removeChild(node);
         self.adjustViewportHeight(-1);
 
-        var _row, index = self.findRowOffset(row);
-        for(var i = index+1; i < self._rows.length; i++) {
-            if(self._rows[i]) {
-                _row = self._rows[i][1];
-                _row.style.top = (parseInt(_row.style.top) - self._rowHeight) + "px";
-            }
-        }
-
-        self._rows = self._rows.slice(0, index).concat(
-                            self._rows.slice(index+1, self._rows.length));
-    },
-
-    /**
-     * Find the offset at which the given row appears in the scrolltable
-     * @param row: node
-     */
-    function findRowOffset(self, row) {
-        for(var i = 0; i < self._rows.length; i++) {
-            if(self._rows[i] && self._rows[i][1] == row) {
-                return i;
+        for (var i = index; i < self.model.rowCount(); ++i) {
+            row = self.model.getRowData(i);
+            if (row != undefined) {
+                node = row.__node__;
+                node.style.top = (
+                    parseInt(node.style.top) - self._rowHeight) + "px";
             }
         }
     },
 
     /**
-     * Find the row data for the row with web id C{webID}
-     */
-    function findRowData(self, webID) {
-        for(var i = 0; i < self._rows.length; i++) {
-            if(self._rows[i] && self._rows[i][0]["__id__"] == webID) {
-                return self._rows[i][0];
-            }
-        }
-    },
-
-    /**
-     * Find the first row which appears after C{row} in the scrolltable and
-     * satisfies C{predicate}
+     * Override to update counts and do something else.
      *
-     * @param row: node
-     * @param predicate: function(rowIndex, rowData, rowNode) -> boolean
-     * @param wantOffset: boolean.  if true, the offset of the row will be returned
-     * @return: C{rowNode} for the first set of arguments that satisfies C{predicate},
-     *          or array of [C{rowNode}, C{rowOffset}] if C{wantOffset} is true
+     * XXX - This should be a callback on .scrolled()
+     * XXX - And counts should be managed in some completely different way
+     * XXX - And the _pendingRowSelection is just crazy, there should be a
+     * Deferred or something for whatever that is.
      */
-    function findNextRow(self, row, predicate, wantOffset) {
-        var args;
-        for(var i = self.findRowOffset(row)+1; i < self._rows.length; i++) {
-            if(self._rows[i]) {
-                args = [i].concat(self._rows[i]);
-                if(!predicate || predicate.apply(null, args)) {
-                    if(wantOffset) {
-                        return [args[2], i];
-                    }
-                    return args[2];
-                }
-            }
-        }
-    },
-
-    /**
-     * Same as L{findNextRow}, except returns the first row which appears before C{row}
-     */
-    function findPrevRow(self, row, predicate, wantOffset) {
-        var args;
-        for(var i = self.findRowOffset(row)-1; 0 <= i; i--) {
-            if(self._rows[i]) {
-                args = [i].concat(self._rows[i]);
-                if(!predicate || predicate.apply(null, args)) {
-                    if(wantOffset) {
-                        return [args[2], i];
-                    }
-                    return args[2];
-                }
-            }
-        }
-    },
-
-    function removeCurrentRow(self) {
-        self.removeRow(self._selectedRow);
-    },
-
     function cbRowsFetched(self, count) {
-        self.throbber.style.display = "none";
         if(self._pendingRowSelection) {
             self._pendingRowSelection(count);
             self._pendingRowSelection = null;
@@ -564,11 +447,28 @@ Quotient.Mailbox.ScrollingWidget.methods(
     });
 
 
+/**
+ * Run interference for a ScrollTable.
+ *
+ * @ivar contentTableGrid: An Array of the the major components of an inbox
+ * view.  The first element is an array with three elements: the td element for
+ * the view selection area, the td element for the scrolltable, and the td
+ * element for the message detail area.  The second element is also an array
+ * with three elements: the footer td elements which correspond to the three td
+ * elements in the first array.
+ */
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function __init__(self, node, messageCount, complexityLevel) {
         self.lastPageSize = Divmod.Runtime.theRuntime.getPageSize();
-        document.getElementById("mantissa-footer").style.display = "none";
+
+        /*
+         * Hide the footer for some reason I can't guess.
+         */
+        var footer = document.getElementById("mantissa-footer");
+        if (footer) {
+            footer.style.display = "none";
+        }
 
         MochiKit.DOM.addToCallStack(window, "onload",
             function() {
@@ -612,7 +512,9 @@ Quotient.Mailbox.Controller.methods(
          */
 
         self._viewingByView = 'Inbox';
+
         self.setupMailViewNodes();
+
         self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
@@ -626,15 +528,60 @@ Quotient.Mailbox.Controller.methods(
                                                            "Quotient.Mailbox.ScrollingWidget");
 
         self.scrollWidget = Nevow.Athena.Widget.get(scrollNode);
+
+        /*
+         * When the scroll widget is fully initialized, select the first row in
+         * it.
+         */
+        self.scrollWidget.initializationDeferred.addCallback(
+            function(passthrough) {
+                self.scrollWidget._selectFirstRow();
+                return passthrough;
+            });
+
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
         self.groupActionsForm = Nevow.Athena.FirstNodeByAttribute(
                                     self.contentTableGrid[1][1], "name", "group-actions");
 
-        self._selectAndFetchFirstRow();
-
         self.setMessageCount(messageCount);
 
         self.delayedLoad(complexityLevel);
+    },
+
+    /**
+     * Return the count of unread messages in the given view.
+     *
+     * @param view: One of "All", "Inbox", "Spam" or "Sent".
+     */
+    function unreadCountForView(self, view) {
+        var viewNode = self.mailViewNodes[view];
+        var count = Nevow.Athena.NodeByAttribute(viewNode, "class", "count");
+        return parseInt(count.firstChild.nodeValue);
+    },
+
+    /**
+     * @return: an array of objects with C{name} and C{key} properties bound to
+     * the name and unique server-side identifier for each person being
+     * displayed in the view selection chooser.
+     */
+    function getPeople(self) {
+        var people = [];
+        var personChooser = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            self.contentTableGrid[0][0], 'class', 'person-chooser');
+        var personChoices = Divmod.Runtime.theRuntime.nodesByAttribute(
+            personChooser, 'class', 'list-option');
+        var nameNode, keyNode;
+        var name, key;
+        for (var i = 0; i < personChoices.length; ++i) {
+            nameNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+                personChoices[i], 'class', 'opt-name');
+            keyNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+                personChoices[i], 'class', 'person-key');
+            name = nameNode.firstChild.nodeValue;
+            key = keyNode.firstChild.nodeValue;
+            people.push({name: name, key: key});
+        }
+        return people;
     },
 
     function _cacheContentTableGrid(self) {
@@ -719,7 +666,6 @@ Quotient.Mailbox.Controller.methods(
     function getBatchExceptions(self) {
         var row, webID,
             sw = self.scrollWidget,
-            rows = sw._rows,
             sel = self._batchSelection,
             pred = self._batchSelectionPredicates[sel],
             include = [],
@@ -732,19 +678,19 @@ Quotient.Mailbox.Controller.methods(
             }
         }
 
-        for(var i = 0; i < rows.length; i++) {
-            row = rows[i];
-            if(row) {
-                webID = row[0]["__id__"];
+        for(var i = 0; i < sw.model.rowCount(); i++) {
+            row = sw.model.getRowData(i);
+            if(row != undefined) {
+                webID = row["__id__"];
                 /* if it's selected */
-                if(webID in sw.selectedGroup) {
+                if (webID in sw.selectedGroup) {
                     /* and it doesn't fulfill the predicate */
-                    if(!pred(row[0])) {
+                    if (!pred(row)) {
                         /* then mark it for explicit inclusion */
                         include.push(webID);
                     }
                 /* or it's not selected and does fulfill the predicate */
-                } else if(pred(row[0])) {
+                } else if (pred(row)) {
                     /* then mark it for explicit exclusion */
                     exclude.push(webID);
                 }
@@ -775,16 +721,13 @@ Quotient.Mailbox.Controller.methods(
 
                 self._batchSelection = null;
                 self._changeGroupActionAvailability(false);
-                self.scrollWidget.emptyAndRefill();
+                var D = self.scrollWidget.emptyAndRefill();
 
-                var D = Divmod.Defer.Deferred();
-
-                self.scrollWidget._pendingRowSelection = function(count) {
-                    if(0 < count) {
+                D.addCallback(
+                    function(passthrough) {
                         self.scrollWidget._selectFirstRow();
-                    }
-                    D.callback(null);
-                }
+                        return passthrough;
+                    });
                 return D;
             });
     },
@@ -887,13 +830,28 @@ Quotient.Mailbox.Controller.methods(
         return Divmod.Defer.succeed(null);
     },
 
+
+    function getHeight(self) {
+        /* This is the cumulative padding/margin for all elements whose
+         * heights we factor into the height calculation below.  clientHeight
+         * includes border but not padding or margin.
+         * FIXME: change all this code to use offsetHeight, not clientHeight
+         */
+        var basePadding = 14;
+        return (Divmod.Runtime.theRuntime.getPageSize().h -
+                self.messageBlockYPos -
+                self.totalFooterHeight -
+                basePadding);
+
+    },
+
+
     /**
      * resize the inbox table and contents.
      * @param initialResize: is this the first/initial resize?
      *                       (if so, then our layout constraint jiggery-pokery
      *                        is not necessary)
      */
-
     function resized(self, initialResize) {
         var getHeight = function(node) {
             return Divmod.Runtime.theRuntime.getElementSize(node).h;
@@ -905,7 +863,7 @@ Quotient.Mailbox.Controller.methods(
             self.totalFooterHeight = self.blockFooterHeight + 5;
         }
 
-        var swHeight = self.scrollWidget.getHeight(self);
+        var swHeight = self.getHeight();
         self.contentTableGrid[0][1].style.height = swHeight + "px";
         self.scrollWidget._scrollViewport.style.height = swHeight + "px";
 
@@ -1052,10 +1010,24 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.style.opacity = .2;
         return self.callRemote("fastForward", toMessageID).addCallback(
             function(messageData) {
-                self.scrollWidget.findRowData(toMessageID)["read"] = true;
+                self.scrollWidget.model.findRowData(toMessageID)["read"] = true;
                 self.messageDetail.style.opacity = 1;
                 self.setMessageContent(messageData, true);
             });
+    },
+
+
+    /**
+     * Change the set of messages currently being viewed.
+     *
+     * @param viewName: A short string identifying the new set of messages to
+     * view.  For example, C{"All"} or C{"Spam"}.
+     *
+     * @return: A Deferred which fires when the view has been updated and the
+     * new messages have been retrieved and displayed.
+     */
+    function switchView(self, viewName) {
+        return self._sendViewRequest('viewByMailType', viewName);
     },
 
     /**
@@ -1084,7 +1056,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _sendViewRequest(self, viewFunction, value) {
-        self.scrollWidget.throbber.style.display = "";
+        self.scrollWidget.throbber.startThrobbing();
 
         return self.callRemote(viewFunction, value).addCallback(
             function(messageData) {
@@ -1094,13 +1066,32 @@ Quotient.Mailbox.Controller.methods(
                     self.updateMailViewCounts(messageData[2]);
                 }
                 self.scrollWidget.setViewportHeight(messageData[0]);
-                self.scrollWidget.emptyAndRefill();
-                self.scrollWidget._selectedRow = null;
+                self.scrollWidget._selectWebID(null);
+                var newMessagesDisplayed = self.scrollWidget.emptyAndRefill();
+
+                /*
+                 * XXX - This can just be a callback on newMessagesDisplayed, I
+                 * think. -exarkun
+                 */
                 self.scrollWidget._pendingRowSelection = function(count) {
                     if(0 < count) {
                         self._selectAndFetchFirstRow(false);
                     }
                 }
+                newMessagesDisplayed.addBoth(
+                    function(passthrough) {
+                        /*
+                         * Select the first message now being displayed.
+                         */
+                        self.scrollWidget._selectFirstRow();
+
+                        /*
+                         * Stop the throbber since we're basically done now.
+                         */
+                        self.scrollWidget.throbber.stopThrobbing();
+                        return passthrough;
+                    });
+                return newMessagesDisplayed;
             });
     },
 
@@ -1344,8 +1335,8 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var sw = self.scrollWidget;
-        if(sw._rows.length == 0) {
-            if(requestMoreRowsIfNeeded) {
+        if (!sw.model.rowCount()) {
+            if (requestMoreRowsIfNeeded) {
                 /* free up some space */
                 sw._scrollViewport.scrollTop += sw._rowHeight * 3;
                 sw.scrolled();
@@ -1390,15 +1381,22 @@ Quotient.Mailbox.Controller.methods(
         for(var i = 3; i < arguments.length; i++) {
             remoteArgs.push(arguments[i]);
         }
-        var next = self.scrollWidget.findNextRow(self.scrollWidget._selectedRow)
-                    || self.scrollWidget.findPrevRow(self.scrollWidget._selectedRow);
+        var nextID = self.scrollWidget.model.findNextRow(self.scrollWidget._selectedRowID)
+            || self.scrollWidget.model.findPrevRow(self.scrollWidget._selectedRowID);
 
-        if (isProgress) {
-            self.scrollWidget.removeCurrentRow();
-            if(next && next.tagName) {
-                self.scrollWidget._selectRow(next);
-                self.scrollWidget.scrolled();
+        if (isProgress && nextID != undefined) {
+            /*
+             * Select the new row before destroying the old one, since
+             * destroying the old one leaves us with an invalid webID as our
+             * remembered selected row.  Maybe _selectWebID just handle errors
+             * from the lookup function when trying to mutate its old row, but
+             * I'll do that later.
+             */
+            var oldWebID = self.scrollWidget._selectWebID(nextID);
+            if (oldWebID != null) {
+                self.scrollWidget.removeWebID(oldWebID);
             }
+            self.scrollWidget.scrolled();
         }
 
         return self.doTouch(remoteArgs, isProgress, 1, 0);
@@ -1427,22 +1425,23 @@ Quotient.Mailbox.Controller.methods(
         var sw = self.scrollWidget;
         var selgroup = sw.selectedGroup;
         var webIDs = MochiKit.Base.keys(selgroup);
-        var selectedRowOffset = sw.findRowOffset(sw._selectedRow);
-        var selectedRowID = sw._rows[selectedRowOffset][0]["__id__"];
-        var next, isProgress = isDestructive;
+        var selectedRowOffset = sw.model.findIndex(sw._selectedRowID);
+        var selectedRowID = sw._selectedRowID;
+        var isProgress = isDestructive;
+        var nextMessageID = null;
 
         var affectedUnreadCount = 0;
         if(isDestructive) {
             var rowData, offset;
             /* FIXME optimize.  selectedGroup can be a mapping of
                webIDs to column dictionaries or something */
-            for(var i in selgroup) {
-                offset = sw.findRowOffset(selgroup[i]);
+            for(var webID in selgroup) {
+                offset = sw.model.findIndex(webID);
                 if(offset == null) {
-                    delete selgroup[i];
+                    delete selgroup[webID];
                     continue;
                 }
-                rowData = sw._rows[offset][0];
+                rowData = sw.model.getRowData(offset);
                 if(!rowData["read"]) {
                     affectedUnreadCount++;
                 }
@@ -1453,26 +1452,21 @@ Quotient.Mailbox.Controller.methods(
                 var predicate = function(rowOffset, rowData, rowElement) {
                                     return !(rowData["__id__"] in selgroup);
                                 }
-                next = sw.findNextRow(sw._selectedRow, predicate, true)
-                        || sw.findPrevRow(sw._selectedRow, predicate, true);
+                nextMessageID = sw.model.findNextRow(sw._selectedRowID, predicate, false)
+                    || sw.model.findPrevRow(sw._selectedRowID, predicate, false);
             /* if it isn't, then we aren't going to progress */
             } else {
                 isProgress = false;
             }
         }
 
-        var nextMessageID = null;
-        if(next) {
-            nextMessageID = sw._rows[next[1]][0]["__id__"];
-        }
-
         if(isDestructive) {
             for(var k in selgroup) {
-                sw.removeRow(selgroup[k]);
+                sw.removeWebID(k);
             }
             self.disableGroupActions();
-            if(next && next[0].tagName) {
-                sw._selectRow(next[0]);
+            if(nextMessageID != undefined) {
+                sw._selectWebID(nextMessageID);
                 sw.scrolled();
             }
         }
@@ -1859,10 +1853,10 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /** Fragment-boundary-crossing proxy for
-     * L{Quotient.Mailbox.MessageDetail.printable}
+     * L{Quotient.Message.MessageDetail.printable}
      */
     function printable(self) {
-        Quotient.Mailbox.MessageDetail.get(
+        Quotient.Message.MessageDetail.get(
             self.firstWithClass(
                 self.messageDetail, "message-detail-fragment")).printable();
     },

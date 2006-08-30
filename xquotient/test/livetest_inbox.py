@@ -1,9 +1,7 @@
-from datetime import datetime
-
-from twisted.python.filepath import FilePath
+from datetime import datetime, timedelta
 
 from nevow.livetrial import testcase
-from nevow import tags, loaders
+from nevow.athena import expose
 
 from epsilon.extime import Time
 
@@ -12,19 +10,56 @@ from axiom.item import Item
 from axiom import attributes
 from axiom.tags import Catalog
 
-from nevow import tags
-
-from xmantissa import ixmantissa
 from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
+from xmantissa.scrolltable import SequenceScrollingFragment
+from xmantissa.test.livetest_scrolltable import ScrollElement
 
-import xquotient
-from xquotient.inbox import Inbox
+from xquotient.inbox import Inbox, InboxScreen
 from xquotient.exmess import Message
 from xquotient.compose import Composer
 from xquotient.quotientapp import QuotientPreferenceCollection
+
+
+class ThrobberTestCase(testcase.TestCase):
+    """
+    Tests for the inbox activity indicator.
+    """
+    jsClass = u'Quotient.Test.ThrobberTestCase'
+
+
+
+class ScrollingWidgetTestCase(testcase.TestCase):
+    """
+    More tests for the inbox-specific ScrollingWidget subclass.
+    """
+    jsClass = u'Quotient.Test.ScrollingWidgetTestCase'
+
+    def getScrollingWidget(self, howManyElements=0):
+        store = Store()
+        elements = [ScrollElement(store=store) for n in xrange(howManyElements)]
+        columns = [ScrollElement.column]
+        f = SequenceScrollingFragment(store, elements, columns)
+        f.jsClass = u'Quotient.Mailbox.ScrollingWidget'
+        f.docFactory = getLoader(f.fragmentName)
+        f.setFragmentParent(self)
+        return f
+    expose(getScrollingWidget)
+
+
+
+class ScrollTableTestCase(ScrollingWidgetTestCase):
+    """
+    Tests for the inbox-specific ScrollingWidget subclass.
+    """
+    jsClass = u'Quotient.Test.ScrollTableTestCase'
+
+    def getWidgetDocument(self):
+        return self.getScrollingWidget()
+
+
 
 class _Part(Item):
     typeName = 'mock_part_item'
@@ -41,146 +76,139 @@ class _Part(Item):
 
 
 
-class InboxTestBase(testcase.TestCase):
-    def head(self):
-        return tags.style(type='text/css')[
-                FilePath(xquotient.__file__).parent().child(
-                    'static').child('quotient.css').getContent()]
-
-
-class InboxTestCase(InboxTestBase):
-    jsClass = u'Quotient.Test.InboxTestCase'
-
-    docFactory = loaders.stan(tags.div[
-                    tags.div(render=tags.directive('liveTest'))['InboxTestCase'],
-                    tags.div(render=tags.directive('inbox'),
-                             style='visibility: hidden'),
-                    tags.div(id='mantissa-footer')])
-
-    def render_inbox(self, ctx, data):
+class _ControllerMixin:
+    def getInbox(self):
+        """
+        Return a newly created Inbox, in a newly created Store which has all of
+        the Inbox dependencies (you know this function is broken because it is
+        more than C{return Inbox(store=Store())}
+        """
         s = Store()
+        Catalog(store=s)
         WebSite(store=s).installOn(s)
-
-        c = Catalog(store=s)
-
-        def makeMessage(subj, spam=False, date=None, archived=False, sender=u'joe@divmod.com', tags=()):
-            if date is None:
-                date = Time()
-
-            m = Message(store=s,
-                        sender=sender,
-                        subject=subj,
-                        receivedWhen=date,
-                        sentWhen=date,
-                        spam=spam,
-                        impl=_Part(store=s),
-                        archived=archived,
-                        read=False)
-
-            for t in tags:
-                c.tag(m, t)
-
-        makeMessage(u'Message 1', date=Time.fromDatetime(datetime(1999, 12, 13)), tags=(u"Joe's Stuff",))
-        makeMessage(u'Message 2', tags=(u"Joe's Stuff",))
-        makeMessage(u'SPAM SPAM SPAM', spam=True)
-
         PrivateApplication(store=s).installOn(s)
         QuotientPreferenceCollection(store=s).installOn(s)
-        o = Organizer(store=s)
-        o.installOn(s)
-
-        def makePerson(name, address):
-            EmailAddress(store=s,
-                         person=Person(store=s, organizer=o, name=name),
-                         address=address)
-
-        makePerson(u'Joe', u'joe@divmod.com')
-
-        makeMessage(u'Archived Message 1',
-                    archived=True,
-                    sender=u'bob@divmod.com',
-                    tags=(u"Bob's Stuff", u'Archived'))
-
-        makeMessage(u'Archived Message 2',
-                    archived=True,
-                    sender=u'bob@divmod.com',
-                    tags=(u"Bob's Stuff", u'Archived'))
-
-        makePerson(u'Bob', u'bob@divmod.com')
-
+        Composer(store=s).installOn(s)
+        Organizer(store=s).installOn(s)
         inbox = Inbox(store=s)
         inbox.installOn(s)
-        Composer(store=s).installOn(s)
-
-        inboxFrag = ixmantissa.INavigableFragment(inbox)
-
-        inboxFrag.jsClass = 'Quotient.Test.TestableMailboxSubclass'
-        inboxFrag.setFragmentParent(self)
-        inboxFrag.docFactory = getLoader(inboxFrag.fragmentName)
-
-        return ctx.tag[inboxFrag]
+        return inbox
 
 
-class InboxDOMHandlersTestCase(InboxTestCase):
-    jsClass = u'Quotient.Test.InboxDOMHandlersTestCase'
 
-    docFactory = loaders.stan(tags.div[
-                    tags.div(render=tags.directive('liveTest'))['InboxDOMHandlersTestCase'],
-                    tags.div(render=tags.directive('inbox'),
-                             style='visibility: hidden'),
-                    tags.div(id='mantissa-footer')])
+class ControllerTestCase(testcase.TestCase, _ControllerMixin):
+    jsClass = u'Quotient.Test.ControllerTestCase'
 
-class BatchActionsTestCase(InboxTestBase):
-    jsClass = u'Quotient.Test.BatchActionsTestCase'
+    aliceEmail = u'alice@example.com'
+    bobEmail = u'bob@example.com'
 
-    docFactory = loaders.stan(tags.div[
-            tags.div(render=tags.directive('liveTest'))[
-                tags.div(render=tags.directive('inbox'),
-                         style='visibility: hidden'),
-                tags.div(id='mantissa-footer')]])
+    sent = Time.fromDatetime(datetime(1999, 12, 13))
 
-    def render_inbox(self, ctx, data):
-        s = Store()
-        WebSite(store=s).installOn(s)
+    def getControllerWidget(self):
+        """
+        Retrieve the Controller widget for a mailbox in a particular
+        configuration.
 
-        PrivateApplication(store=s).installOn(s)
-        QuotientPreferenceCollection(store=s).installOn(s)
-        o = Organizer(store=s)
-        o.installOn(s)
+        The particulars of the email in this configuration are::
 
-        for i in xrange(10):
-            Message(store=s,
-                    sender=u'joe@divmod.com',
-                    subject=u'Message #' + str(9 - i),
-                    receivedWhen=Time(),
-                    sentWhen=Time(),
-                    spam=False,
-                    impl=_Part(store=s))
+            There are 5 messages total.
 
-        inbox = Inbox(store=s)
-        inbox.installOn(s)
-        Composer(store=s).installOn(s)
+            The inbox contains 2 unread messages.
 
-        inboxFrag = ixmantissa.INavigableFragment(inbox)
+            The archive contains 2 read messages.
 
-        inboxFrag.jsClass = 'Quotient.Test.TestableMailboxSubclass'
-        inboxFrag.setFragmentParent(self)
-        inboxFrag.docFactory = getLoader(inboxFrag.fragmentName)
+            The spam folder contains 1 unread message.
 
-        return ctx.tag[inboxFrag]
+            The sent folter contains 1 read message.
 
-class GroupActionsTestCase(BatchActionsTestCase):
-    """
-    Tests for group actions!  A group action is an action that
-    is performed on a user-defined collection of messages, as
-    opposed to a batch action, which operates on a logical set
-    of messages, like "all unread"
-    """
+        There are also some people.  They are::
 
-    jsClass = u'Quotient.Test.GroupActionsTestCase'
+            Alice - alice@example.com
 
-    docFactory = loaders.stan(tags.div[
-                    tags.div(render=tags.directive('liveTest'))['GroupActionsTestCase'],
-                    tags.div(render=tags.directive('inbox'),
-                             style='visibility: hidden'),
-                    tags.div(id='mantissa-footer')])
+            Bob - bob@example.com
+
+        The 1st message in the inbox is tagged "foo".
+        The 2nd message in the inbox is tagged "bar".
+        """
+        inbox = self.getInbox()
+        organizer = inbox.store.findUnique(Organizer)
+        application = inbox.store.findUnique(PrivateApplication)
+        catalog = inbox.store.findUnique(Catalog)
+
+        offset = timedelta(seconds=30)
+
+        impl = _Part(store=inbox.store)
+
+        # Inbox messages
+        m = Message(store=inbox.store, sender=self.aliceEmail,
+                    subject=u'1st message', receivedWhen=self.sent,
+                    sentWhen=self.sent, spam=False, archived=False,
+                    read=False, impl=impl)
+        catalog.tag(m, u"foo")
+
+        m = Message(store=inbox.store, sender=self.aliceEmail,
+                    subject=u'2nd message', receivedWhen=self.sent + offset,
+                    sentWhen=self.sent, spam=False, archived=False,
+                    read=False, impl=impl)
+        catalog.tag(m, u"bar")
+
+        # Archive messages
+        Message(store=inbox.store, sender=self.aliceEmail, subject=u'3rd message',
+                receivedWhen=self.sent + offset * 2, sentWhen=self.sent,
+                spam=False, archived=True, read=True, impl=impl)
+
+        Message(store=inbox.store, sender=self.aliceEmail, subject=u'4th message',
+                receivedWhen=self.sent + offset * 3, sentWhen=self.sent,
+                spam=False, archived=True, read=True, impl=impl)
+
+        # Spam message
+        Message(store=inbox.store, sender=self.bobEmail, subject=u'5th message',
+                receivedWhen=self.sent + offset * 4, sentWhen=self.sent,
+                spam=True, archived=False, read=False, impl=impl)
+
+        # Sent message
+        Message(store=inbox.store, sender=self.bobEmail, subject=u'6th message',
+                receivedWhen=self.sent + offset * 5, sentWhen=self.sent,
+                spam=False, archived=False, read=True, outgoing=True,
+                impl=impl)
+
+        # Alice
+        alice = Person(store=inbox.store, organizer=organizer, name=u"Alice")
+        EmailAddress(store=inbox.store, person=alice, address=self.aliceEmail)
+
+        # Bob
+        bob = Person(store=inbox.store, organizer=organizer, name=u"Bob")
+        EmailAddress(store=inbox.store, person=bob, address=self.bobEmail)
+
+        self.names = {
+            application.toWebID(alice): u'Alice',
+            application.toWebID(bob): u'Bob'}
+
+        fragment = InboxScreen(inbox)
+        fragment.setFragmentParent(self)
+        return fragment
+    expose(getControllerWidget)
+
+
+    def personNamesByKeys(self, *keys):
+        """
+        Return the names of the people with the given webIDs.
+        """
+        return [self.names[k] for k in keys]
+    expose(personNamesByKeys)
+
+
+
+class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
+    jsClass = u'Quotient.Test.EmptyControllerTestCase'
+
+    def getEmptyControllerWidget(self):
+        """
+        Retrieve the Controller widget for a mailbox with no messages in it.
+        """
+        inbox = self.getInbox()
+        fragment = InboxScreen(inbox)
+        fragment.setFragmentParent(self)
+        return fragment
+    expose(getEmptyControllerWidget)
+

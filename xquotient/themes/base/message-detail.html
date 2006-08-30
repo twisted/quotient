@@ -42,21 +42,21 @@
           <span class="tags-display-container"
             ><span class="tags-display"
               ><nevow:invisible nevow:render="tags" /></span>
-            (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).editTags(); return false">Edit</a>)
+            (<a href="#" onclick="Quotient.Message.MessageDetail.get(this).editTags(); return false">Edit</a>)
           </span>
 
           <form style="display: none" class="edit-tags-container"
-            onsubmit="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">
+            onsubmit="Quotient.Message.MessageDetail.get(this).saveTags(); return false">
             <input class="add-tags-dialog-text-input" type="text" name="tags" size="38" />
-            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).saveTags(); return false">Save</a>
-            <a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
+            <a href="#" onclick="Quotient.Message.MessageDetail.get(this).saveTags(); return false">Save</a>
+            <a href="#" onclick="Quotient.Message.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
           </form>
         </td>
       </tr>
       <tr>
         <td class="msg-detail-field-name" colspan="2" style="text-align: left">
           <a href="#" class="detail-toggle"
-            onclick="Quotient.Mailbox.MessageDetail.get(this).toggleMoreDetail(this); return false"
+            onclick="Quotient.Message.MessageDetail.get(this).toggleMoreDetail(this); return false"
             >More Detail</a>
         </td>
       </tr>

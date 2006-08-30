@@ -3,7 +3,7 @@
   <div nevow:pattern="scrubbed-dialog" class="scrubbed-dialog">
     <div>Message HTML has been modified for your safety.</div>
     <a href="#"
-      onclick="Quotient.Mailbox.MessageDetail.get(this).showOriginalHTML(); return false"
+      onclick="Quotient.Message.MessageDetail.get(this).showOriginalHTML(); return false"
       >Show original HTML</a>.
   </div>
 
@@ -39,11 +39,11 @@
   </tr>
 
   <div nevow:pattern="message-source-link" align="right" style="clear: both">
-    (<a href="#" onclick="Quotient.Mailbox.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
+    (<a href="#" onclick="Quotient.Message.MessageDetail.get(this).messageSource(); return false">Message Source</a>)
   </div>
 
   <a class="printable-link" nevow:pattern="printable-link" style="display: none"
-    onclick="Quotient.Mailbox.MessageDetail.get(this).printable(this); return false"
+    onclick="Quotient.Message.MessageDetail.get(this).printable(this); return false"
     ><nevow:attr name="href"><nevow:slot name="link" /></nevow:attr></a>
 
   <nevow:invisible nevow:pattern="paragraphs">
