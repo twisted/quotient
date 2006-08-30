@@ -412,6 +412,9 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                 False)
             self.transport.loseConnection()
             return
+        except (error.ConnectionDone, error.ConnectionLost):
+            self.setStatus(u"Connection lost", False)
+            return
         except:
             f = failure.Failure()
             log.err(f, "Failure logging in")
@@ -451,7 +454,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         try:
             d.getResult()
         except (error.ConnectionDone, error.ConnectionLost):
-            self.setStatus(unicode(u"Connection lost"), False)
+            self.setStatus(u"Connection lost", False)
             return
         except:
             f = failure.Failure()

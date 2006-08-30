@@ -6,6 +6,8 @@ from twisted.internet import defer, error
 from twisted.mail import pop3
 from twisted.cred import error as ecred
 
+from twisted.test.proto_helpers import StringTransport
+
 from epsilon import structlike, extime
 
 from epsilon.test import iosim
@@ -92,6 +94,17 @@ class Portal(structlike.record('avatar logout')):
 class NoPortal:
     def login(self, credentials, mind, interface):
         return defer.fail(ecred.UnauthorizedLogin())
+
+
+class DelayedPortal(object):
+    def __init__(self):
+        self.loginAttempts = []
+
+
+    def login(self, credentials, mind, interface):
+        result = defer.Deferred()
+        self.loginAttempts.append((result, credentials, mind, interface))
+        return result
 
 
 
@@ -262,6 +275,25 @@ class POP3GrabberTestCase(unittest.TestCase):
 
         self.assertEquals(status, u'Login aborted: server not secure.')
         self.assertEquals(lastEvent, u'stopped')
+
+
+    def test_lostConnectionDuringLogin(self):
+        """
+        Make sure that if a connection drops while logging in, it is
+        properly noticed and the status is updated correctly.
+        """
+        self.server.portal = DelayedPortal()
+        c, s, pump = iosim.connectedServerAndClient(
+            lambda: self.server,
+            lambda: self.client)
+        pump.flush()
+
+        # Should have been one login attempt
+        ([loginDeferred, credentials, mind, interface],) = self.server.portal.loginAttempts
+
+        s.transport.loseConnection()
+        pump.flush()
+        self.assertEquals(self.client.events[-1][0], 'stopped')
 
 
     def _disconnectTest(self, mbox, blocked):
