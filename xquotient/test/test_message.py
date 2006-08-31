@@ -6,7 +6,7 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text
 
-from nevow.test.test_rend import req
+from nevow.test.test_rend import deferredRender, req as makeRequest
 from nevow import context
 
 from xmantissa.webapp import PrivateApplication
@@ -97,35 +97,58 @@ class MessageTestCase(TestCase):
 
 
 class WebTestCase(TestCase):
-    def testPartDisplayerScrubs(self):
-        s = Store()
+    def _testPartDisplayerScrubbing(self, input, scrub=True):
+        """
+        Set up a store, a PartItem with a body of C{input},
+        pass it to the PartDisplayer, render it, and return
+        a deferred that'll fire with the string result of
+        the rendering.
 
+        @param scrub: if False, the noscrub URL arg will
+                      be added to the PartDisplayer request
+        """
+        s = Store()
         PrivateApplication(store=s).installOn(s)
 
-        innocuousHTML = u'<html><body>hi</body></html>'
         part = PartItem(store=s,
                         contentType=u'text/html',
-                        body=innocuousHTML)
+                        body=input)
 
         pd = PartDisplayer(None)
         pd.item = part
 
-        def render(resource, request=None):
-            if request is None:
-                request = req()
-            return pd.renderHTTP(
-                    context.PageContext(
-                        tag=pd, parent=context.RequestContext(
-                            tag=request)))
+        req = makeRequest()
+        if not scrub:
+            req.args = {'noscrub': True}
 
-        self.assertEquals(render(pd), innocuousHTML)
+        return deferredRender(pd, req)
 
-        suspectHTML = u'<html><script>hi</script><body>hi</body></html>'
-        part.body = suspectHTML
+    def testPartDisplayerScrubbingDoesntAlterInnocuousHTML(self):
+        """
+        Test that PartDisplayer/scrubber doesn't alter HTML
+        that doesn't contain anything suspicious
+        """
+        innocuousHTML = u'<html><body>hi</body></html>'
+        D = self._testPartDisplayerScrubbing(innocuousHTML)
+        D.addCallback(lambda s: self.assertEqual(s, innocuousHTML))
+        return D
 
-        res = render(pd)
-        self.failIf('<script>' in res)
+    suspectHTML = u'<html><script>hi</script><body>hi</body></html>'
 
-        myreq = req()
-        myreq.args = {'noscrub': 1}
-        self.assertEquals(render(pd, myreq), suspectHTML)
+    def testPartDisplayerScrubs(self):
+        """
+        Test that the PartDisplayer/scrubber alters HTML that
+        contains suspicious stuff
+        """
+        D = self._testPartDisplayerScrubbing(self.suspectHTML)
+        D.addCallback(lambda s: self.failIf('<script>' in s))
+        return D
+
+    def testPartDisplayerObservesNoScrubArg(self):
+        """
+        Test that the PartDisplayer doesn't alter suspicious HTML
+        if it's told not to use the scrubber
+        """
+        D = self._testPartDisplayerScrubbing(self.suspectHTML, scrub=False)
+        D.addCallback(lambda s: self.assertEqual(s, self.suspectHTML))
+        return D

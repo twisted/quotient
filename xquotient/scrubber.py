@@ -1,3 +1,4 @@
+# -*- test-case-name: xquotient.test.test_scrubber -*-
 # Copyright 2005 Divmod, Inc.  See LICENSE file for details
 
 """
@@ -53,6 +54,7 @@ class Scrubber(object):
         'label': []
         }
 
+    _linkAttributes = ('src', 'href')
 
     def iternode(self, n):
         """
@@ -95,8 +97,23 @@ class Scrubber(object):
         img.clean = True
         return node
 
+    def _filterCIDLink(self, node):
+        for attr in self._linkAttributes:
+            if (attr in node.attributes
+                    and node.attributes[attr][:4].lower() == 'cid:'):
+                return True
 
-    def scrub(self, node):
+    def scrubCIDLinks(self, node):
+        """
+        Remove all nodes with links that point to CID URIs
+
+        For reasons of convenience, this mutates its input
+        """
+        for e in self.iternode(node):
+            if self._filterCIDLink(e):
+                e.parentNode.removeChild(e)
+
+    def scrub(self, node, filterCIDLinks=True):
         """
         Remove all potentially harmful elements from the node and
         return a wrapper node.
@@ -122,6 +139,12 @@ class Scrubber(object):
                 # If I have manually exploded this node, just forget about it.
                 continue
             ennl = e.nodeName.lower()
+
+            if filterCIDLinks and self._filterCIDLink(e):
+                # we could replace these with a marker element, like we do
+                # with dangerous tags, but i'm not sure there is a reason to
+                e.parentNode.removeChild(e)
+
             if ennl in self._goodHtml:
                 handler = getattr(self, '_handle_' + ennl, None)
                 if handler is not None:
@@ -146,3 +169,4 @@ class Scrubber(object):
         return body.node
 
 scrub = Scrubber().scrub
+scrubCIDLinks = Scrubber().scrubCIDLinks
