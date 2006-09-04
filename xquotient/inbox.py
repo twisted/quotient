@@ -377,9 +377,18 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     def viewPane(self, request, tag):
         attrs = tag.attributes
-        return dictFillSlots(inevow.IQ(self.docFactory).onePattern('view-pane'),
+
+        iq = inevow.IQ(self.docFactory)
+        if 'open' in attrs:
+            paneBodyPattern = 'open-pane-body'
+        else:
+            paneBodyPattern = 'pane-body'
+        paneBodyPattern = iq.onePattern(paneBodyPattern)
+
+        return dictFillSlots(iq.onePattern('view-pane'),
                              {'name': attrs['name'],
-                              'renderer': T.directive(attrs['renderer'])})
+                              'pane-body': paneBodyPattern.fillSlots(
+                                             'renderer', T.directive(attrs['renderer']))})
     renderer(viewPane)
 
     def personChooser(self, request, tag):
@@ -420,7 +429,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = ['All', 'Trash', 'Sent', 'Spam', 'Deferred', 'Inbox']
+        views = ['Inbox', 'All', 'Deferred', 'Sent', 'Spam', 'Trash']
         counts = self.mailViewCounts()
         counts = sorted(counts.iteritems(), key=lambda (v, c): views.index(v))
 

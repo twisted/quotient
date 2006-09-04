@@ -63,16 +63,23 @@
       (<span class="count"><nevow:slot name="count" /></span>)</div>
   </div>
 
+  <div class="pane-body" nevow:pattern="pane-body"
+    style="position: absolute; top: -1000px; left: -1000px;">
+    <nevow:slot name="renderer" />
+  </div>
+
+  <div class="pane-body" nevow:pattern="open-pane-body"
+    style="top: -1000px; left: -1000px;">
+    <nevow:slot name="renderer" />
+  </div>
+
   <div nevow:pattern="view-pane" class="view-pane-content">
     <div class="views-collapsible-pane"
       onclick="Quotient.Common.CollapsiblePane.toggle(this, 'views-'); return false">
       <img class="collapse-arrow" src="/Quotient/static/images/views-outline-collapsed.png" />
       <span class="view-pane-name"><nevow:slot name="name" /></span>
     </div>
-    <div class="pane-body"
-      style="position: absolute; top: -1000px; left: -1000px;">
-      <nevow:slot name="renderer" />
-    </div>
+    <nevow:slot name="pane-body" />
   </div>
 
   <div class="inbox-content">
@@ -102,8 +109,11 @@
       <div class="message-actions-container">
         <select class="view-shortcut-container" onchange="Quotient.Mailbox.Controller.get(this).chooseMailView(this.value)">
           <option value="Inbox">Inbox</option>
+          <option value="All">All</option>
+          <option value="Deferred">Deferred</option>
           <option value="Sent">Sent</option>
           <option value="Spam">Spam</option>
+          <option value="Trash">Trash</option>
         </select>
         <div class="message-actions" style="visibility: hidden; margin-left: 2px">
           <!-- button renderer will place the contents of the tag inside the
@@ -197,7 +207,7 @@
             <td class="view-pane-cell" style="display: none">
               <div class="view-pane-container">
                 <div class="view-pane">
-                  <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" />
+                  <nevow:invisible nevow:render="viewPane" name="Mail" renderer="mailViewChooser" open="open" />
                   <nevow:invisible nevow:render="viewPane" name="People" renderer="personChooser" />
                   <nevow:invisible nevow:render="viewPane" name="Tags" renderer="tagChooser" />
                   <nevow:invisible nevow:render="viewPane" name="Accounts" renderer="accountChooser" />
