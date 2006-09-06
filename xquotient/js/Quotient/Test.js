@@ -1058,3 +1058,45 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
         self.assertEquals(dlgnode.style.display, "");
         self.assertEquals(dlgnode.style.position, "absolute");
     });
+
+Quotient.Test.DraftsTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                    'Quotient.Test.DraftsTestCase');
+
+/**
+ * Tests for xquotient.compose.DraftsScreen
+ */
+Quotient.Test.DraftsTestCase.methods(
+    /**
+     * Get a handle on the drafts scrolltable, and return
+     * a deferred that'll fire when it's done initializing
+     */
+    function setUp(self) {
+        if(!self.scroller) {
+            self.scroller = Nevow.Athena.Widget.get(
+                                self.firstNodeByAttribute(
+                                    "athena:class",
+                                    "Quotient.Compose.DraftListScrollingWidget"));
+        }
+        return self.scroller.initializationDeferred;
+    },
+
+    /**
+     * Basic test, just make sure the scrolltable can initialize
+     */
+    function test_initialization(self) {
+        return self.setUp();
+    },
+
+    /**
+     * Assert that the rows in the drafts scrolltable have subjects
+     * that match those of the items created by our python counterpart
+     */
+    function test_rows(self) {
+        return self.setUp().addCallback(
+            function() {
+                for(var i = 4; i <= 0; i--) {
+                    self.assertEquals(
+                        parseInt(self.scroller.model.getRowData(i).subject), i);
+                }
+            });
+    });

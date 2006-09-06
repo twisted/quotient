@@ -14,7 +14,7 @@ from xmantissa.people import Person, EmailAddress
 
 from xquotient.exmess import Message, MessageDetail, PartDisplayer
 from xquotient.inbox import Inbox, InboxScreen
-from xquotient.compose import Composer
+from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.qpeople import MessageList, MessageLister
 
@@ -143,7 +143,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
         inbox = self.store.findUnique(Inbox)
 
-        composer = Composer(store=self.store)
+        composer = compose.Composer(store=self.store)
         composer.installOn(self.store)
 
         return self.renderLivePage(
@@ -171,6 +171,23 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
         return self.renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
+
+    def test_draftsRendering(self):
+        """
+        Test that L{xquotient.compose.DraftsScreen} renders without error.
+        """
+        for i in xrange(5):
+            compose.Draft(store=self.store,
+                          message=Message(store=self.store,
+                                          draft=True,
+                                          spam=False,
+                                          subject=u'Foo'))
+
+        compose.Composer(store=self.store)
+        drafts = compose.Drafts(store=self.store)
+        return self.renderLivePage(
+                    self.wrapFragment(
+                        compose.DraftsScreen(drafts)))
 
 
 class PartTestCase(TestCase):
