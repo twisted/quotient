@@ -1027,3 +1027,34 @@ Quotient.Test.GrabberListTestCase.methods(
             });
         return D;
     });
+
+Quotient.Test.ShowNodeAsDialogTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                            'Quotient.Test.ShowNodeAsDialogTestCase');
+
+Quotient.Test.ShowNodeAsDialogTestCase.methods(
+    function test_showNodeAsDialog(self) {
+        /* get the original node */
+        var node = self.firstNodeByAttribute(
+                        "class",
+                        "ShowNodeAsDialogTestCase-dialog");
+        /* show it as a dialog */
+        Quotient.Common.Util.showNodeAsDialog(node);
+
+        var getElements = function() {
+            return Nevow.Athena.NodesByAttribute(
+                    document.body,
+                    "class",
+                    "ShowNodeAsDialogTestCase-dialog");
+        }
+
+        /* get all elements with the same class name as our node */
+        var nodes = getElements();
+
+        /* should be two - the original and the cloned dialog */
+        self.assertEquals(nodes.length, 2);
+        var orignode = nodes[0], dlgnode = nodes[1];
+
+        self.assertEquals(orignode.style.display, "none");
+        self.assertEquals(dlgnode.style.display, "");
+        self.assertEquals(dlgnode.style.position, "absolute");
+    });
