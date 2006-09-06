@@ -997,3 +997,33 @@ Quotient.Test.AddGrabberTestCase.methods(
             });
     });
 
+Quotient.Test.GrabberListTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                        'Quotient.Test.GrabberListTestCase');
+
+Quotient.Test.GrabberListTestCase.methods(
+    /**
+     * Test that the grabber list is initially visible when
+     * we have one grabber, and that it becomes invisible when
+     * we delete the grabber
+     */
+    function test_visibility(self) {
+        var scrollerNode = self.firstNodeByAttribute(
+                            "class", "scrolltable-widget-node");
+
+        /* there is one grabber.  make sure the table is visible */
+        self.assertEquals(scrollerNode.style.display, "");
+
+        var D = self.callRemote("deleteGrabber");
+        D.addCallback(
+            function() {
+                /* grabber has been deleted.  reload scrolltable */
+                D = Nevow.Athena.Widget.get(scrollerNode).emptyAndRefill();
+                D.addCallback(
+                    function() {
+                        /* make sure it isn't visible */
+                        self.assertEquals(scrollerNode.style.display, "none");
+                    });
+                return D;
+            });
+        return D;
+    });

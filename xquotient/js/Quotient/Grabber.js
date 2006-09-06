@@ -18,18 +18,35 @@ Quotient.Grabber.ScrollingWidget.methods(
         Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node);
         self._scrollViewport.style.height = '100px';
         self.node.style.display = "none";
+        self.initializationDeferred.addCallback(
+            function() {
+                self.reevaluateVisibility();
+            });
     },
 
     /**
-     * Hide our node if the last row fetch resulted in 0 rows.  Show it
-     * otherwise
+     * Change the visibility of our node depending on our row count.
+     *  If 0 < row count, then show, otherwise hide
      */
-    function cbRowsFetched(self, count) {
-        if(count == 0) {
-            self.node.style.display = "none";
-        } else {
+    function reevaluateVisibility(self) {
+        if(0 < self.model.rowCount()) {
             self.node.style.display = "";
+        } else {
+            self.node.style.display = "none";
         }
+    },
+
+    /**
+     * Override Mantissa.ScrollTable.ScrollingWidget.emptyAndRefill and add a
+     * callback that fiddles our visibility depending on how many rows were
+     * fetched
+     */
+    function emptyAndRefill(self) {
+        var D = Quotient.Grabber.ScrollingWidget.upcall(self, "emptyAndRefill");
+        return D.addCallback(
+            function() {
+                self.reevaluateVisibility();
+            });
     },
 
     function clickEventForAction(self, actionID, rowData) {

@@ -1,4 +1,5 @@
 from nevow.livetrial.testcase import TestCase
+from nevow.athena import expose
 
 from axiom.store import Store
 
@@ -23,3 +24,32 @@ class AddGrabberTestCase(TestCase):
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
+
+class GrabberListTestCase(TestCase):
+    """
+    Tests for the grabber list/scrolltable
+    """
+
+    jsClass = 'Quotient.Test.GrabberListTestCase'
+
+    def getWidgetDocument(self):
+        s = Store()
+
+        grabberConfig = grabber.GrabberConfiguration(store=s)
+        grabberConfig.installOn(s)
+
+        self.grabber = grabber.POP3Grabber(
+                            store=s,
+                            config=grabberConfig,
+                            username=u'foo',
+                            domain=u'bar',
+                            password=u'baz')
+
+        f = grabber.GrabberConfigFragment(grabberConfig)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+
+    def deleteGrabber(self):
+        self.grabber.deleteFromStore()
+    expose(deleteGrabber)
