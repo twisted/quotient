@@ -1,6 +1,6 @@
+
 // import Mantissa.LiveForm
 // import Quotient
-// import Quotient.Common
 
 Quotient.Filter.RuleWidget = Mantissa.LiveForm.FormWidget.subclass("Quotient.Filter.RuleWidget");
 Quotient.Filter.RuleWidget.methods(
@@ -18,14 +18,6 @@ Quotient.Filter.HamConfiguration.methods(
             self.node.appendChild(document.createTextNode('Error: ' + err.description));
         });
         return false;
-    },
-
-    /**
-     * Show help text
-     */
-    function showHelpText(self) {
-        var htnode = self.firstNodeByAttribute("class", "spam-filter-help-text");
-        Quotient.Common.Util.showNodeAsDialog(htnode);
     },
 
     function reclassify(self) {

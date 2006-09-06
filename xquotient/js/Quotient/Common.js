@@ -1,48 +1,8 @@
 /* this javascript file should be included by all quotient pages */
 // import Quotient
 // import Mantissa.People
-// import MochiKit.DOM
 
 Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
-
-/**
- * Show C{node} as a dialog - center it vertically and horizontally, grey
- * out the rest of the document, and hide it when the user clicks anywhere
- */
-Quotient.Common.Util.showNodeAsDialog = function(node) {
-    /* clone the node so we can add it to the document in the different place */
-    node = node.cloneNode(true);
-
-    var pageSize = Divmod.Runtime.theRuntime.getPageSize();
-
-    /* make an overlay element */
-    var blurOverlay = MochiKit.DOM.DIV({"class": "blur-overlay"}, "&#160;");
-    blurOverlay.style.height = document.documentElement.scrollHeight + "px";
-
-    /* add it to the document */
-    document.body.appendChild(blurOverlay);
-    /* add our cloned node after it */
-    document.body.appendChild(node);
-
-    var elemSize = Divmod.Runtime.theRuntime.getElementSize(node);
-
-    node.style.position = "absolute";
-    node.style.left = Math.floor((pageSize.w / 2) - (pageSize.w / 2)) + "px";
-    node.style.top  = Math.floor((pageSize.h / 2) - (elemSize.h / 2)) + "px";
-    node.style.display = "";
-
-    /* we use setTimeout(... 0) so the handler gets added after the current
-     * onclick event (if any) is done
-     */
-    setTimeout(
-        function() {
-            document.body.onclick = function() {
-                document.body.removeChild(blurOverlay);
-                document.body.removeChild(node);
-                document.body.onclick = null;
-            }
-        }, 0);
-}
 
 /**
  * @return: array of values that appear in a1 and not a2
