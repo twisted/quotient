@@ -856,6 +856,11 @@ Quotient.Mailbox.Controller.methods(
         var getHeight = function(node) {
             return Divmod.Runtime.theRuntime.getElementSize(node).h;
         }
+        var setHeight = function(node, height) {
+            if(0 < height) {
+                node.style.height = height + "px";
+            }
+        }
 
         if(!self.totalFooterHeight) {
             var blockFooter = self.firstNodeByAttribute("class", "right-block-footer");
@@ -864,12 +869,12 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var swHeight = self.getHeight();
-        self.contentTableGrid[0][1].style.height = swHeight + "px";
-        self.scrollWidget._scrollViewport.style.height = swHeight + "px";
+        setHeight(self.contentTableGrid[0][1], swHeight);
+        setHeight(self.scrollWidget._scrollViewport, swHeight);
 
-        self.messageDetail.style.height = (Divmod.Runtime.theRuntime.getPageSize().h -
-                                           self.ypos - 14 -
-                                           self.totalFooterHeight) + "px";
+        setHeight(self.messageDetail, (Divmod.Runtime.theRuntime.getPageSize().h -
+                                       self.ypos - 14 -
+                                       self.totalFooterHeight));
 
         setTimeout(
             function() {
