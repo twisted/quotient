@@ -232,7 +232,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
 
     portNumber = attributes.integer(
         "The TCP port to bind to serve SMTP.",
-        default=6025)
+        default=0)
     securePortNumber = attributes.integer(
         "The TCP port to bind to serve SMTP/SSL.",
         default=0)

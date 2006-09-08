@@ -97,26 +97,77 @@ Quotient.Mailbox.ScrollingWidget.methods(
             oldNode.style.backgroundColor = '';
         }
 
-        if (webID == null) {
+        if (webID != null) {
+            self._selectedRowID = webID;
+
+            row = self.model.findRowData(webID);
+            node = row.__node__;
+
+            row["read"] = true;
+
+            if (node.style.fontWeight == "bold") {
+                self.decrementActiveMailViewCount();
+            }
+
+            node.style.fontWeight = "";
+            node.style.backgroundColor = '#FFFFFF';
+        } else {
             self._selectedRowID = null;
-            return oldSelectedRowID;
         }
 
-        self._selectedRowID = webID;
-
-        row = self.model.findRowData(webID);
-        node = row.__node__;
-
-        row["read"] = true;
-
-        if (node.style.fontWeight == "bold") {
-            self.widgetParent.decrementActiveMailViewCount();
-        }
-
-        node.style.fontWeight = "";
-        node.style.backgroundColor = '#FFFFFF';
-
+        /*
+         * XXX selectionChanged returns a Deferred, we should really be
+         * propagating it.
+         */
+        self.selectionChanged(webID);
         return oldSelectedRowID;
+    },
+
+    /**
+     * Called whenever the selected row is changed.
+     *
+     * This implementation updates the message detail area of the Controller
+     * which is the parent widget of this widget.  It returns a Deferred which
+     * fires when this has been completed.
+     */
+    function selectionChanged(self, webID) {
+        if (webID == null) {
+            self.widgetParent.clearMessageDetail();
+            return Divmod.Defer.succeed(null);
+        } else {
+            return self.widgetParent.updateMessageDetail(webID);
+        }
+    },
+
+    function decrementActiveMailViewCount(self) {
+        return self.widgetParent.decrementActiveMailViewCount();
+    },
+
+    /**
+     * Remove the row at the given index and update the message selection if
+     * necessary.
+     */
+    function removeRow(self, index) {
+        var row = self.model.getRowData(index);
+        /*
+         * The row was selected - unselect it quick or
+         * something terrible will occur.
+         */
+        if (row.__id__ == self._selectedRowID) {
+            self._selectWebID(null);
+        }
+        return Quotient.Mailbox.ScrollingWidget.upcall(self, 'removeRow', index);
+    },
+
+    /**
+     * Return the row data for the currently selected row.  Return null if
+     * there is no row selected.
+     */
+    function getSelectedRow(self) {
+        if (self._selectedRowID != null) {
+            return self.model.findRowData(self._selectedRowID);
+        }
+        return null;
     },
 
     /**
@@ -278,11 +329,19 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * Toggle the membership of a row in the group selection set and update the
      * checkbox image for that row.
      */
-    function groupSelectRowAndUpdateCheckbox(self, webID, checkbox) {
+    function groupSelectRowAndUpdateCheckbox(self, webID, checkboxImage) {
         var state = self.groupSelectRow(webID);
         var segs = checkboxImage.src.split("/");
         segs[segs.length - 1] = "checkbox-" + state + ".gif";
         checkboxImage.src = segs.join("/");
+    },
+
+    /**
+     * Return the checkbox image node for the given row.
+     */
+    function _getCheckbox(self, row) {
+        return Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            row.__node__, 'class', 'checkbox-image');
     },
 
     /**
@@ -306,10 +365,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
             }
         }
 
-        var getCheckbox = function(n) {
-            return Nevow.Athena.FirstNodeByAttribute(n, "class", "checkbox-image");
-        }
-
         var selected, row, webID, count=0;
         for(var i = 0; i < self.model.rowCount(); i++) {
             row = self.model.getRowData(i);
@@ -321,13 +376,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
                     /* and it's selection status isn't the desired one */
                     if(selected != selectRows) {
                         /* then change it */
-                        self.groupSelectRowAndUpdateCheckbox(webID, getCheckbox(row.__node__));
+                        self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
                         count++;
                     }
                 /* if we don't like it, but it's in the target state */
                 } else if(selected == selectRows) {
                     /* then change it */
-                    self.groupSelectRowAndUpdateCheckbox(webID, getCheckbox(row.__node__));
+                    self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
                 }
             }
         }
@@ -407,30 +462,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Remove the given row from the scrolltable
-     *
-     * @param webID: The web ID of the row to remove.
-     */
-    function removeWebID(self, webID) {
-        var result = self.model.removeRow(webID)
-        var index = result.index;
-        var row = result.row;
-        var node = row.__node__;
-
-        node.parentNode.removeChild(node);
-        self.adjustViewportHeight(-1);
-
-        for (var i = index; i < self.model.rowCount(); ++i) {
-            row = self.model.getRowData(i);
-            if (row != undefined) {
-                node = row.__node__;
-                node.style.top = (
-                    parseInt(node.style.top) - self._rowHeight) + "px";
-            }
-        }
-    },
-
-    /**
      * Override to update counts and do something else.
      *
      * XXX - This should be a callback on .scrolled()
@@ -459,7 +490,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
  */
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function __init__(self, node, messageCount, complexityLevel) {
+    function __init__(self, node, messageCount, selectedMessageIdentifier, complexityLevel) {
         self.lastPageSize = Divmod.Runtime.theRuntime.getPageSize();
 
         /*
@@ -543,9 +574,23 @@ Quotient.Mailbox.Controller.methods(
         self.groupActionsForm = Nevow.Athena.FirstNodeByAttribute(
                                     self.contentTableGrid[1][1], "name", "group-actions");
 
+        self.nextMessagePreview = self.firstWithClass(
+            self.contentTableGrid[1][2],
+            "next-message-preview");
+
         self.setMessageCount(messageCount);
 
         self.delayedLoad(complexityLevel);
+    },
+
+    function _getViewCountNode(self, view) {
+        var viewNode = self.mailViewNodes[view];
+        if (viewNode === undefined || viewNode === null) {
+            throw new Error("Request for invalid view: " + view);
+        }
+        var count = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            viewNode.parentNode, 'class', 'count').firstChild;
+        return count;
     },
 
     /**
@@ -553,10 +598,13 @@ Quotient.Mailbox.Controller.methods(
      *
      * @param view: One of "All", "Inbox", "Spam" or "Sent".
      */
-    function unreadCountForView(self, view) {
-        var viewNode = self.mailViewNodes[view];
-        var count = Nevow.Athena.NodeByAttribute(viewNode, "class", "count");
-        return parseInt(count.firstChild.nodeValue);
+    function getUnreadCountForView(self, view) {
+        return parseInt(self._getViewCountNode(view).nodeValue);
+    },
+
+    function setUnreadCountForView(self, view, count) {
+        var countNode = self._getViewCountNode(view);
+        countNode.nodeValue = String(count);
     },
 
     /**
@@ -621,10 +669,24 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
+    /**
+     * XXX
+     */
+    function changeBatchSelectionByNode(self, buttonNode) {
+        /*
+         * This doesn't actually use the button node, since it has essentially
+         * nothing to do with the state of the batch selection nodes in the
+         * DOM.
+         */
+        var selectNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            self.node, 'name', 'batch-type');
+        return self.changeBatchSelection(selectNode.value);
+    },
+
+    /**
+     * XX
+     */
     function changeBatchSelection(self, to) {
-        if(to == undefined) {
-            to = document.forms["batch-selection"].elements["batch-type"].value;
-        }
         var args = [to != "none"];
         if(to in self._batchSelectionPredicates) {
             args.push(self._batchSelectionPredicates[to]);
@@ -699,37 +761,82 @@ Quotient.Mailbox.Controller.methods(
         return [include, exclude];
     },
 
-    function touchBatch(self, action, isDestructive) {
-        var remoteArgs = [action + "MessageBatch", self._batchSelection];
-        remoteArgs = remoteArgs.concat(self.getBatchExceptions());
+    function _removeRows(self, rows) {
+        /*
+         * This action is removing rows from visibility.  Drop them
+         * from the model.  Change the currently selected row, if
+         * necessary.
+         */
+        var i, row, index, removed = 0;
+        var indices = self.scrollWidget.model.getRowIndices();
 
-        for(var i = 3; i < arguments.length; i++) {
-            remoteArgs.push(arguments[i]);
+        for (i = 0; i < indices.length; ++i) {
+            index = indices[i] - removed;
+            row = self.scrollWidget.model.getRowData(index);
+            if (row.__id__ in self.scrollWidget.selectedGroup) {
+                self.scrollWidget.removeRow(index);
+                removed += 1;
+            }
         }
 
-        self.messageDetail.style.opacity = .2;
-        return self.callRemote.apply(self, remoteArgs).addCallback(
-            function(data) {
-                self.messageDetail.style.opacity = 1;
-                self.setMessageContent(data[0]);
-
-                var affectedCount = data[1];
-                var affectedUnreadCount = data[2];
-
-                self.adjustProgressBar(affectedCount);
-                self.adjustCounts(remoteArgs, affectedUnreadCount);
-
-                self._batchSelection = null;
-                self._changeGroupActionAvailability(false);
-                var D = self.scrollWidget.emptyAndRefill();
-
-                D.addCallback(
-                    function(passthrough) {
-                        self.scrollWidget._selectFirstRow();
-                        return passthrough;
-                    });
-                return D;
+        return self.scrollWidget.scrolled().addCallback(
+            function(ignored) {
+                /*
+                 * XXX - Selecting the first row is wrong - we should select a
+                 * row very near to the previously selected row, instead.
+                 */
+                if (self.scrollWidget.getSelectedRow() == null) {
+                    self.scrollWidget._selectFirstRow();
+                }
             });
+    },
+
+    /**
+     * Call the given function after setting the message detail area's opacity
+     * to 0.2.  Set the message detail area's opacity back to 1.0 after the
+     * Deferred the given function returns has fired.
+     */
+    function withReducedMessageDetailOpacity(self, callable) {
+        self.messageDetail.style.opacity = 0.2;
+        var result = callable();
+        result.addBoth(
+            function(passthrough) {
+                self.messageDetail.style.opacity = 1.0;
+                return passthrough;
+            });
+        return result;
+    },
+
+    function touchBatch(self, action, isDestructive) {
+        var exceptions = self.getBatchExceptions();
+        var include = exceptions[0];
+        var exclude = exceptions[1];
+
+        var result = self.withReducedMessageDetailOpacity(
+            function() {
+                var acted = self.callRemote("actOnMessageBatch", action, self._batchSelection, include, exclude);
+                acted.addCallback(
+                    function(counts) {
+                        var readTouchedCount = counts[0];
+                        var unreadTouchedCount = counts[1];
+
+                        /*
+                         * XXX I don't know what this next line means or whether it is
+                         * correct or not and there is no test coverage for it.
+                         */
+                        self.adjustProgressBar(readTouchedCount + unreadTouchedCount);
+
+                        if (isDestructive) {
+                            var result = self._removeRows(self.scrollWidget.selectedGroup);
+                            self.scrollWidget.selectedGroup = {};
+                            return result;
+                        }
+                        return null;
+
+                    });
+                return acted;
+            });
+        return result;
     },
 
     /**
@@ -755,16 +862,9 @@ Quotient.Mailbox.Controller.methods(
      * @return: undefined
      */
     function decrementMailViewCount(self, viewName, byHowMuch) {
-        var decrementNodeValue = function(node) {
-            node.firstChild.nodeValue = parseInt(node.firstChild.nodeValue) - byHowMuch;
-        }
-
-        var cnode = self.firstWithClass(self.mailViewNodes[viewName], "count");
-        decrementNodeValue(cnode);
-
-        if(viewName == "Inbox") {
-            decrementNodeValue(self.firstWithClass(self.mailViewNodes["All"], "count"));
-        }
+        self.setUnreadCountForView(
+            viewName,
+            self.getUnreadCountForView(viewName) - byHowMuch);
     },
 
     /**
@@ -1017,7 +1117,7 @@ Quotient.Mailbox.Controller.methods(
             function(messageData) {
                 self.scrollWidget.model.findRowData(toMessageID)["read"] = true;
                 self.messageDetail.style.opacity = 1;
-                self.setMessageContent(messageData, true);
+                self.setMessageContent(messageData[0], messageData[1], messageData[2]);
             });
     },
 
@@ -1066,7 +1166,7 @@ Quotient.Mailbox.Controller.methods(
         return self.callRemote(viewFunction, value).addCallback(
             function(messageData) {
                 self.setMessageCount(messageData[0]);
-                self.setMessageContent(messageData[1], true);
+                self.setMessageContent(messageData[1][0], messageData[1][1], messageData[1][2]);
                 if (messageData[2] != null) {
                     self.updateMailViewCounts(messageData[2]);
                 }
@@ -1100,6 +1200,12 @@ Quotient.Mailbox.Controller.methods(
             });
     },
 
+    /**
+     * Change the class of the given node to C{"selected-list-option"}, change
+     * the class of any existing selected nodes in the same select group to
+     * C{"list-option"}, and change the C{onclick} handler of those nodes to be
+     * the same as the C{onclick} handler for the given node.
+     */
     function _selectListOption(self, n) {
         var sibs = n.parentNode.childNodes;
         for(var i = 0; i < sibs.length; i++) {
@@ -1114,16 +1220,28 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Select a tag by its DOM node.
+     */
+    function chooseTagByNode(self, tagNode) {
+        var tagName = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            tagNode, 'class', 'opt-name');
+        self._selectListOption(tagNode);
+        return self.chooseTag(tagName.firstChild.nodeValue);
+    },
+
+    /**
      * Select a new tag from which to display messages.  Adjust local state to
      * indicate which tag is being viewed and, if necessary, ask the server
      * for the messages to display.
      *
-     * @param n: The node which this input handler is attached to.
-     * @return: C{undefined}
+     * @type tagName: string
+     * @param tagName: The tag to select.
      */
-    function chooseTag(self, n) {
-        self._selectListOption(n);
-        return self._chooseViewParameter('viewByTag', n);
+    function chooseTag(self, tagName) {
+        if (tagName == 'All') {
+            tagName = null;
+        }
+        return self._sendViewRequest('viewByTag', tagName);
     },
 
     /**
@@ -1174,6 +1292,17 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Call chooseMailView with the view name contained in the child node of
+     * C{viewNode} with class "opt-name".
+     */
+    function chooseMailViewByNode(self, viewNode) {
+        var view = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            viewNode, 'class', 'opt-name');
+        self._selectListOption(viewNode);
+        return self.chooseMailView(view.firstChild.nodeValue);
+    },
+
+    /**
      * Select a new, semantically random set of messages to display.  Adjust
      * local state to indicate which random crap is being viewed and, if
      * necessary, ask the server for the messages to display.
@@ -1185,7 +1314,6 @@ Quotient.Mailbox.Controller.methods(
         self.disableGroupActions();
 
         self._viewingByView = view;
-        self._selectListOption(self.mailViewNodes[view]);
         self._selectViewShortcut();
 
         if(!self.visibilityByView) {
@@ -1204,7 +1332,7 @@ Quotient.Mailbox.Controller.methods(
         self.setGroupActions(namesOnly("show"));
 
         return self._chooseViewParameter(
-                    'viewByMailType', self.mailViewNodes[view], false);
+            'viewByMailType', null, false, view);
     },
 
     /**
@@ -1290,6 +1418,16 @@ Quotient.Mailbox.Controller.methods(
 
 
     /**
+     * Select a new account by DOM node.
+     */
+    function chooseAccountByNode(self, accountNode) {
+        var accountName = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            accountNode, 'class', 'opt-name');
+        self._selectListOption(accountNode);
+        return self.chooseAccount(accountName.firstChild.nodeValue);
+    },
+
+    /**
      * Select a new account, the messages from which to display.  Adjust local
      * state to indicate which account's messages are being viewed and, if
      * necessary, ask the server for the messages to display.
@@ -1298,8 +1436,20 @@ Quotient.Mailbox.Controller.methods(
      * @return: C{undefined}
      */
     function chooseAccount(self, n) {
+        if (tagName == 'All') {
+            tagName = null;
+        }
+        return self._sendViewRequest('viewByAccount', tagName);
+    },
+
+    /**
+     * Select a new person by DOM node.
+     */
+    function choosePersonByNode(self, personNode) {
+        var personKey = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+            personNode, 'class', 'person-key');
         self._selectListOption(n);
-        return self._chooseViewParameter('viewByAccount', n);
+        return self.choosePerson(personKey.firstChild.nodeValue);
     },
 
     /**
@@ -1310,14 +1460,12 @@ Quotient.Mailbox.Controller.methods(
      * @param n: The node which this input handler is attached to.
      * @return: C{undefined}
      */
-    function choosePerson(self, n) {
-        var keyn = Nevow.Athena.FirstNodeByAttribute(n, "class", "person-key");
-        self._selectListOption(n);
-        return self._chooseViewParameter('viewByPerson', null, true, keyn.firstChild.nodeValue);
+    function choosePerson(self, personKey) {
+        return self._sendViewRequest('viewByPerson', personKey);
     },
 
     function setupMailViewNodes(self) {
-        if(!self.mailViewBody) {
+        if (!self.mailViewBody) {
             var mailViewPane = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-content");
             var mailViewBody = self.firstWithClass(mailViewPane, "pane-body");
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
@@ -1325,11 +1473,21 @@ Quotient.Mailbox.Controller.methods(
 
         var nodes = {"All": null, "Trash": null, "Sent": null,
                      "Spam": null, "Inbox": null, "Deferred": null};
+        var e, nameNode, name;
+
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
-            var e = self.mailViewBody.childNodes[i];
-            if(e.tagName && (e.firstChild.firstChild.nodeValue in nodes)) {
-                nodes[e.firstChild.firstChild.nodeValue] = e;
+            e = self.mailViewBody.childNodes[i];
+            try {
+                nameNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
+                    e, 'class', 'opt-name');
+            } catch (err) {
+                if (err instanceof Divmod.Runtime.NodeAttributeError) {
+                    continue;
+                }
+                throw err;
             }
+            name = nameNode.firstChild.nodeValue;
+            nodes[name] = e.firstChild.nextSibling;
         }
         self.mailViewNodes = nodes;
     },
@@ -1382,29 +1540,38 @@ Quotient.Mailbox.Controller.methods(
      * @return: C{undefined}
      */
     function touch(self, action, isProgress) {
-        var remoteArgs = [action + "CurrentMessage", isProgress];
-        for(var i = 3; i < arguments.length; i++) {
-            remoteArgs.push(arguments[i]);
-        }
-        var nextID = self.scrollWidget.model.findNextRow(self.scrollWidget._selectedRowID)
-            || self.scrollWidget.model.findPrevRow(self.scrollWidget._selectedRowID);
+        var model = self.scrollWidget.model;
+        var selected = self.scrollWidget._selectedRowID;
+        var nextMessageID;
 
-        if (isProgress && nextID != undefined) {
-            /*
-             * Select the new row before destroying the old one, since
-             * destroying the old one leaves us with an invalid webID as our
-             * remembered selected row.  Maybe _selectWebID just handle errors
-             * from the lookup function when trying to mutate its old row, but
-             * I'll do that later.
-             */
-            var oldWebID = self.scrollWidget._selectWebID(nextID);
-            if (oldWebID != null) {
-                self.scrollWidget.removeWebID(oldWebID);
-            }
-            self.scrollWidget.scrolled();
+        if (selected === undefined) {
+            throw new Error("No row selected.");
         }
 
-        return self.doTouch(remoteArgs, isProgress, 1, 0);
+        var result = self.withReducedMessageDetailOpacity(
+            function() {
+                var acted = self.callRemote("actOnMessageIdentifierList", action, [selected]);
+                acted.addCallback(
+                    function(ignored) {
+                        if (isProgress) {
+                            nextMessageID = model.findNextRow(selected);
+                            if (!nextMessageID) {
+                                nextMessageID = model.findPrevRow(selected);
+                            }
+
+                            self.scrollWidget.removeRow(self.scrollWidget.model.findIndex(selected));
+
+                            if (nextMessageID) {
+                                self.scrollWidget._selectWebID(nextMessageID);
+                            }
+
+                            return self.scrollWidget.scrolled();
+
+                        }
+                    });
+                return acted;
+            });
+        return result;
     },
 
     /**
@@ -1419,68 +1586,36 @@ Quotient.Mailbox.Controller.methods(
      *                       group being acted upon.
      */
     function touchSelectedGroup(self, action, isDestructive) {
-        var args = [];
-        for(var i = 1; i < arguments.length; i++) {
-            args.push(arguments[i]);
-        }
-        /* make sure additional arguments get forwarded correctly */
-        if(self._batchSelection) {
-            return self.touchBatch.apply(self, args);
-        }
-        var sw = self.scrollWidget;
-        var selgroup = sw.selectedGroup;
-        var webIDs = MochiKit.Base.keys(selgroup);
-        var selectedRowOffset = sw.model.findIndex(sw._selectedRowID);
-        var selectedRowID = sw._selectedRowID;
-        var isProgress = isDestructive;
-        var nextMessageID = null;
+        self.disableGroupActions();
+        var result = self.withReducedMessageDetailOpacity(
+            function() {
+                var acted = self.callRemote(
+                    "actOnMessageIdentifierList", action,
+                    Divmod.dir(self.scrollWidget.selectedGroup));
+                acted.addCallback(
+                    function(counts) {
+                        var readTouchedCount = counts[0];
+                        var unreadTouchedCount = counts[1];
 
-        var affectedUnreadCount = 0;
-        if(isDestructive) {
-            var rowData, offset;
-            /* FIXME optimize.  selectedGroup can be a mapping of
-               webIDs to column dictionaries or something */
-            for(var webID in selgroup) {
-                offset = sw.model.findIndex(webID);
-                if(offset == null) {
-                    delete selgroup[webID];
-                    continue;
-                }
-                rowData = sw.model.getRowData(offset);
-                if(!rowData["read"]) {
-                    affectedUnreadCount++;
-                }
-            }
-            /* if this action is going to dismiss the message being viewed */
-            if(selectedRowID in selgroup) {
-                /* is there a row after the selected row that isn't earmarked for destruction */
-                var predicate = function(rowOffset, rowData, rowElement) {
-                                    return !(rowData["__id__"] in selgroup);
-                                }
-                nextMessageID = sw.model.findNextRow(sw._selectedRowID, predicate, false)
-                    || sw.model.findPrevRow(sw._selectedRowID, predicate, false);
-            /* if it isn't, then we aren't going to progress */
-            } else {
-                isProgress = false;
-            }
-        }
+                        /*
+                         * XXX I don't know what this next line means or whether it is
+                         * correct or not and there is no test coverage for it.
+                         */
+                        self.adjustProgressBar(readTouchedCount + unreadTouchedCount);
 
-        if(isDestructive) {
-            for(var k in selgroup) {
-                sw.removeWebID(k);
-            }
-            self.disableGroupActions();
-            if(nextMessageID != undefined) {
-                sw._selectWebID(nextMessageID);
-                sw.scrolled();
-            }
-        }
+                        if (isDestructive) {
+                            var result = self._removeRows(self.scrollWidget.selectedGroup);
+                            self.scrollWidget.selectedGroup = {};
+                            return result;
+                        } else {
+                            self.enableGroupActions();
+                            return null;
+                        }
 
-        sw.selectedGroup = {};
-        var remoteArgs = [action + "MessageGroup", isProgress, nextMessageID, webIDs];
-        remoteArgs = remoteArgs.concat(args.slice(2));
-
-        return self.doTouch(remoteArgs, isProgress, webIDs.length, affectedUnreadCount);
+                    });
+                return acted;
+            });
+        return result;
     },
 
     /**
@@ -1553,7 +1688,7 @@ Quotient.Mailbox.Controller.methods(
                 self.adjustCounts(remoteArgs, touchingHowManyUnread);
 
                 if(isProgress) {
-                    self.setMessageContent(nextMessage);
+                    self.setMessageContent(nextMessage[0], nextMessage[1], nextMessage[2]);
                 } else if(nextMessage) {
                     self.displayInlineWidget(nextMessage);
                 }
@@ -1598,12 +1733,26 @@ Quotient.Mailbox.Controller.methods(
         self._changeGroupActionAvailability(false);
     },
 
+    function enableGroupActions(self) {
+        self._changeGroupActionAvailability(true);
+    },
+
+    /**
+     * Return the node with the event handler which allows an action to be
+     * applied to a group of messages.
+     */
+    function _getGroupActionPerformButton(self) {
+        return self.getFirstNode(
+            self.groupActionsForm.parentNode.parentNode,
+            "group-action-perform");
+    },
+
     /**
      * @param available: boolean.  true = enable, false = disable
      */
     function _changeGroupActionAvailability(self, available) {
         var form = self.groupActionsForm;
-        var gap = self.getFirstNode(form.parentNode.parentNode, "group-action-perform");
+        var gap = self._getGroupActionPerformButton();
         var select = form.elements["group-action"];
 
         if(available) {
@@ -1611,9 +1760,25 @@ Quotient.Mailbox.Controller.methods(
             select.removeAttribute("disabled");
             gap.style.cursor = "";
             gap.onclick = function() {
-                self.performSelectedGroupAction();
+                try {
+                    var form = self.groupActionsForm;
+                    var actionName = form.elements["group-action"].value;
+
+                    if(actionName == "train-spam") {
+                        actionName = "trainSpam";
+                    } else if (actionName == "train-ham") {
+                        actionName = "trainHam";
+                    }
+                    if (self._batchSelection) {
+                        self.touchBatch(actionName, true);
+                    } else {
+                        self.touchSelectedGroup(actionName, true);
+                    }
+                } catch (err) {
+                    Divmod.err(err);
+                }
                 return false;
-            }
+            };
         } else {
             select.style.opacity = gap.style.opacity = ".3";
             select.setAttribute("disabled", "true");
@@ -1622,21 +1787,6 @@ Quotient.Mailbox.Controller.methods(
                 return false;
             }
         }
-    },
-
-    function performSelectedGroupAction(self) {
-        var form = self.groupActionsForm;
-        var actionName = form.elements["group-action"].value;
-
-        var args = [];
-
-        if(actionName == "train-spam" || actionName == "train-ham") {
-            args.push(actionName.split("-")[1] == "spam");
-            actionName = "train";
-        }
-
-        /* for now, all group actions are destructive */
-        self.touchSelectedGroup.apply(self, [actionName, true].concat(args));
     },
 
     /**
@@ -1867,15 +2017,37 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Empty the message detail view area of content.
+     */
+    function clearMessageDetail(self) {
+        self.messageDetail.scrollTop = 0;
+        self.messageDetail.scrollLeft = 0;
+        Divmod.Runtime.theRuntime.setNodeContent(
+            self.messageDetail,
+            '<span xmlns="http://www.w3.org/1999/xhtml"></span>');
+        Divmod.Runtime.theRuntime.setNodeContent(
+            self.nextMessagePreview,
+            '<span xmlns="http://www.w3.org/1999/xhtml"></span>');
+    },
+
+    /**
+     * Update the message detail area to display the specified message.  Return
+     * a Deferred which fires when this has finished.
+     */
+    function updateMessageDetail(self, webID) {
+        return self.callRemote("fastForward", webID).addCallback(
+            function(info) {
+                return self.setMessageContent(
+                    info[0], info[1], info[2]);
+            });
+    },
+
+    /**
      * @param data: Three-Array of the html for next message preview, the
      * html for the current message, and some structured data describing
      * the current message
      */
-    function setMessageContent(self, data) {
-        var nextMessagePreview = data.shift();
-        var currentMessageDisplay = data.shift();
-        var currentMessageData = data.shift();
-
+    function setMessageContent(self, nextMessagePreview, currentMessageDisplay, currentMessageData) {
         self.currentMessageData = currentMessageData;
 
         Divmod.msg("setMessageContent(" +
@@ -1905,11 +2077,6 @@ Quotient.Mailbox.Controller.methods(
         }
 
         if (nextMessagePreview != null) {
-            if(!self.nextMessagePreview) {
-                self.nextMessagePreview = self.firstWithClass(
-                                            self.contentTableGrid[1][2],
-                                            "next-message-preview");
-            }
             /* so this is a message, not a compose fragment */
             Divmod.Runtime.theRuntime.setNodeContent(
                 self.nextMessagePreview,

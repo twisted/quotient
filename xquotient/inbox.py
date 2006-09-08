@@ -1,5 +1,6 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
 import re
+from itertools import chain, imap
 
 from datetime import timedelta
 from zope.interface import implements
@@ -50,11 +51,13 @@ def quoteBody(m, maxwidth=78):
 
     return [ '\n>'.join(newtext) ]
 
+
 def reSubject(m, pfx='Re: '):
     newsubject = m.subject
     if not newsubject.lower().startswith(pfx.lower()):
         newsubject = pfx + newsubject
     return newsubject
+
 
 def replyTo(m):
     try:
@@ -63,24 +66,6 @@ def replyTo(m):
         recipient = m.sender
     return recipient
 
-def makeBatchAction(actionName):
-    def batchAction(self, batchType, include=(), exclude=(), *args):
-        return self._performBatchAction(actionName,
-                                        self._messagesForBatchType(batchType, include, exclude),
-                                        args)
-    return transacted(batchAction)
-
-def makeGroupAction(actionName):
-    def groupAction(self, advance, nextMessageWebID, webIDs, *args):
-        return self._performGroupAction(actionName,
-                                        advance, nextMessageWebID, webIDs, args)
-    return transacted(groupAction)
-
-def makeSingleAction(actionName):
-    def singleAction(self, advance, *args):
-        return self._performSingleAction(actionName, advance, args)
-
-    return transacted(singleAction)
 
 class UndeferTask(Item):
     """
@@ -142,13 +127,125 @@ class Inbox(Item, InstallableMixin):
         super(Inbox, self).installOn(other)
         other.powerUp(self, ixmantissa.INavigableElement)
 
+
+    def getBaseComparison(self,
+                          view,
+                          viewingByTag=None,
+                          viewingByPerson=None,
+                          viewingByAccount=None):
+        """
+        Return an IComparison to be used as the basic restriction for a view
+        onto the mailbox with the given parameters.
+        """
+
+        inTrashView = view == 'Trash'
+        inDeferredView = view == 'Deferred'
+        inSentView = view == 'Sent'
+        inAllView = view == 'All'
+        inSpamView = view == 'Spam'
+
+        comparison = [
+            Message.trash == inTrashView,
+            Message.draft == False,
+            Message.deferred == inDeferredView]
+
+        if not inTrashView:
+            comparison.append(Message.outgoing == inSentView)
+
+        if not (inAllView or inTrashView or inSpamView):
+            comparison.append(Message.archived == False)
+
+        if not (inSentView or inTrashView):
+            # Note - Message.spam defaults to None, and inSpamView will
+            # always be either True or False.  This means messages which
+            # haven't been processed by the spam filtering system will never
+            # show up in any query!  Is this a problem?  It depends how
+            # responsive the spam filtering system ends up being, I suppose.
+            # Currently, it should be fast enough so as not to make much of
+            # a difference, but that may not always be the case.  However,
+            # ultimately we are going to need to support updating messages
+            # views without doing a complete page re-load, at which point
+            # delivered but unfiltered messages will just show up on the
+            # page, which should result in this minor inequity being more or
+            # less irrelevant.
+            comparison.append(Message.spam == inSpamView)
+
+
+        if viewingByTag is not None:
+            comparison.extend((
+                tags.Tag.object == Message.storeID,
+                tags.Tag.name == viewingByTag))
+
+        if viewingByAccount is not None:
+            comparison.append(Message.source == viewingByAccount)
+
+        if viewingByPerson is not None:
+            comparison.extend((
+                Message.sender == people.EmailAddress.address,
+                people.EmailAddress.person == people.Person.storeID,
+                people.Person.storeID == viewingByPerson.storeID))
+
+        return attributes.AND(*comparison)
+
+
+    def getComparisonForBatchType(self,
+                                  batchType,
+                                  view,
+                                  viewingByTag=None,
+                                  viewingByPerson=None,
+                                  viewingByAccount=None):
+        """
+        Return an IComparison to be used as the restriction for a particular
+        batch of messages from a view onto the mailbox with the given
+        parameters.
+        """
+        comp = self.getBaseComparison(view, viewingByTag, viewingByPerson, viewingByAccount)
+        if batchType in ("read", "unread"):
+            comp = attributes.AND(comp, Message.read == (batchType == "read"))
+        return comp
+
+
+    def messagesForBatchType(self,
+                             batchType,
+                             view,
+                             viewingByTag=None,
+                             viewingByPerson=None,
+                             viewingByAccount=None):
+        """
+        Return a list of L{exmess.Message} instances which belong to the
+        specified batch.
+
+        @param batchType: A string defining a particular batch.  For example,
+        C{"read"} or C{"unread"}.
+
+        @rtype: C{list}
+        """
+        return self.store.query(
+                Message,
+                self.getComparisonForBatchType(
+                    batchType, view, viewingByTag,
+                    viewingByPerson, viewingByAccount))
+
+
     def action_archive(self, message):
+        """
+        Move the given message to the archive.
+        """
         message.archived = True
 
+
     def action_delete(self, message):
+        """
+        Move the given message to the trash.
+        """
         message.trash = True
 
-    def action_defer(self, message, days, hours, minutes):
+
+    def action_defer(self, message, days=0, hours=0, minutes=0):
+        """
+        Change the state of the given message to Deferred and schedule it to
+        be changed back after the given interval has elapsed.
+        """
         message.deferred = True
         task = UndeferTask(store=self.store,
                            message=message,
@@ -158,8 +255,21 @@ class Inbox(Item, InstallableMixin):
         iaxiom.IScheduler(self.store).schedule(task, task.deferredUntil)
         return task
 
-    def action_train(self, message, spam):
-        message.train(spam)
+
+    def action_trainSpam(self, message):
+        """
+        Train the message filter using the given message as an example of
+        spam.
+        """
+        message.train(True)
+
+
+    def action_trainHam(self, message):
+        """
+        Train the message filter using the given message as an example of
+        ham.
+        """
+        message.train(False)
 
 
 
@@ -209,7 +319,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     inSentView = False
     inSpamView = False
     inDeferredView = False
-    currentMessage = None
 
     viewingByTag = None
     viewingByAccount = None
@@ -223,28 +332,27 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         self.store = inbox.store
         self.inbox = inbox
 
-        self._resetCurrentMessage()
+        currentMessage, nextMessage = self._resetCurrentMessage()
+        self._currentMessageAtRenderTime = currentMessage
+        self._nextMessageAtRenderTime = nextMessage
+
 
     def getInitialArguments(self):
-        return (self.getMessageCount(), self.inbox.uiComplexity)
+        if self._currentMessageAtRenderTime is not None:
+            msgid = self.translator.toWebID(self._currentMessageAtRenderTime).decode('ascii')
+        else:
+            msgid = None
+        return (self.getMessageCount(), msgid, self.inbox.uiComplexity)
+
 
     def _resetCurrentMessage(self):
-        self.currentMessage = self.getLastMessage()
-        if self.currentMessage is not None:
-            self.currentMessage.read = True
-            self.nextMessage = self.getMessageBefore(self.currentMessage)
+        currentMessage = self.getLastMessage()
+        if currentMessage is not None:
+            currentMessage.read = True
+            nextMessage = self.getMessageBefore(currentMessage)
         else:
-            self.nextMessage = None
-
-
-    def getFirstMessage(self):
-        """
-        Retrieve the message which was received before all other messages.
-        """
-        return self.inbox.store.findFirst(
-            Message,
-            self._getBaseComparison(),
-            sort=Message.receivedWhen.ascending)
+            nextMessage = None
+        return currentMessage, nextMessage
 
 
     def getLastMessage(self):
@@ -253,7 +361,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         """
         return self.inbox.store.findFirst(
             Message,
-            self._getBaseComparison(),
+            self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                         self.viewingByTag,
+                                         self.viewingByPerson,
+                                         self.viewingByAccount),
             sort=Message.receivedWhen.descending)
 
 
@@ -264,7 +375,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         @type whichMessage: L{exmess.Message}
         """
         sort = Message.receivedWhen.desc
-        comparison = attributes.AND(self._getBaseComparison(),
+        comparison = attributes.AND(self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                 self.viewingByTag,
+                                                                 self.viewingByPerson,
+                                                                 self.viewingByAccount),
                                     Message.receivedWhen < whichMessage.receivedWhen)
         return self.inbox.store.findFirst(Message,
                                           comparison,
@@ -279,7 +393,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         @type whichMessage: L{exmess.Message}
         """
         sort = Message.receivedWhen.asc
-        comparison = attributes.AND(self._getBaseComparison(),
+        comparison = attributes.AND(self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                 self.viewingByTag,
+                                                                 self.viewingByPerson,
+                                                                 self.viewingByAccount),
                                     Message.receivedWhen > whichMessage.receivedWhen)
         return self.inbox.store.findFirst(Message,
                                           comparison,
@@ -287,25 +404,31 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                                           sort=sort)
 
 
-    def _currentAsFragment(self):
-        if self.currentMessage is None:
-            return ''
-        f = ixmantissa.INavigableFragment(self.currentMessage)
+    def _messageFragment(self, message):
+        f = ixmantissa.INavigableFragment(message)
         f.setFragmentParent(self)
+        return f
+
+
+    def _currentAsFragment(self, currentMessage):
+        if currentMessage is None:
+            return ''
+        f = self._messageFragment(currentMessage)
         self.currentMessageDetail = f
         return f
 
 
-    def _currentMessageData(self):
-        if self.currentMessage is not None:
+    def _currentMessageData(self, currentMessage):
+        if currentMessage is not None:
             return {
-                u'spam': self.currentMessage.spam,
-                u'trained': self.currentMessage.trained,
+                u'identifier': self.translator.toWebID(currentMessage).decode('ascii'),
+                u'spam': currentMessage.spam,
+                u'trained': currentMessage.trained,
                 }
         return {}
 
     def messageDetail(self, request, tag):
-        return self._currentAsFragment()
+        return self._currentAsFragment(self._currentMessageAtRenderTime)
     renderer(messageDetail)
 
 
@@ -324,13 +447,15 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
 
     def spamState(self, request, tag):
-        if self.currentMessage is None:
+        currentMessage = self._currentMessageAtRenderTime
+
+        if currentMessage is None:
             return tag['????']
-        if self.currentMessage.trained:
+        if currentMessage.trained:
             confidence = 'definitely'
         else:
             confidence = 'probably'
-        if self.currentMessage.spam:
+        if currentMessage.spam:
             modifier = ''
         else:
             modifier = 'not'
@@ -338,18 +463,15 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     renderer(spamState)
 
 
-    def _getScrolltableComparison(self):
-        if self.currentMessage is not None:
-            beforeTime = self.currentMessage.receivedWhen
-        else:
-            beforeTime = None
-
-        return self._getBaseComparison(beforeTime)
-
     def scroller(self, request, tag):
+        currentMessage = self._currentMessageAtRenderTime
+
         f = ScrollingFragment(self.inbox.store,
                               Message,
-                              self._getScrolltableComparison(),
+                              self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                           self.viewingByTag,
+                                                           self.viewingByPerson,
+                                                           self.viewingByAccount),
                               (Message.senderDisplay,
                                Message.subject,
                                Message.receivedWhen,
@@ -421,7 +543,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         @return: number of unread messages in current view
         """
         return self.inbox.store.count(Message,
-                                      attributes.AND(self._getBaseComparison(),
+                                      attributes.AND(self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                                  self.viewingByTag,
+                                                                                  self.viewingByPerson,
+                                                                                  self.viewingByAccount),
                                                      Message.read == False))
 
     def mailViewChooser(self, request, tag):
@@ -480,20 +605,22 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     renderer(accountChooser)
 
 
-    def _nextMessagePreview(self):
-        if self.currentMessage is None:
+    def _nextMessagePreview(self, currentMessage, nextMessage):
+        if currentMessage is None:
             return u'No more messages'
         onePattern = inevow.IQ(self.docFactory).onePattern
-        if self.nextMessage is None:
+        if nextMessage is None:
             return onePattern('last-message')
-        m = self.nextMessage
+        m = nextMessage
         return dictFillSlots(onePattern('next-message'),
                              dict(sender=m.senderDisplay,
                                   subject=m.subject,
                                   date=m.sentWhen.asHumanly()))
 
     def nextMessagePreview(self, request, tag):
-        return self._nextMessagePreview()
+        currentMessage = self._currentMessageAtRenderTime
+        nextMessage = self._nextMessageAtRenderTime
+        return self._nextMessagePreview(currentMessage, nextMessage)
     renderer(nextMessagePreview)
 
 
@@ -508,28 +635,31 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     setComplexity = transacted(setComplexity)
 
-    def selectMessage(self, message):
-        """
-        Set C{message} as the current message.  Also cache the message that
-        will be displayed next, which is going to be the message received
-        immediately before C{message}.
-        """
-        self.currentMessage = message
-        message.read = True
-        next = self.getMessageBefore(message)
-        if next is None:
-            next = self.getMessageAfter(message)
-        self.nextMessage = next
-
     def fastForward(self, webID):
-        self.selectMessage(self.translator.fromWebID(webID))
-        return self._current()
+        """
+        Retrieve message detail information for the specified message as well
+        as look-ahead information for the next message.  Mark the specified
+        message as read.
+        """
+        currentMessage = self.translator.fromWebID(webID)
+        nextMessage = self.getMessageAfter(currentMessage)
+
+        currentMessage.read = True
+
+        return [
+            self._messagePreview(nextMessage),
+            self._messageFragment(currentMessage),
+            self._messageData(currentMessage),
+            ]
     expose(fastForward)
 
     fastForward = transacted(fastForward)
 
-    def _resetScrollQuery(self):
-        self.scrollingFragment.baseConstraint = self._getScrolltableComparison()
+    def _resetScrollQuery(self, currentMessage):
+        self.scrollingFragment.baseConstraint = self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                             self.viewingByTag,
+                                                                             self.viewingByPerson,
+                                                                             self.viewingByAccount)
 
     def mailViewCounts(self):
         counts = {}
@@ -551,7 +681,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                 return name
 
 
-    def _updatedViewState(self):
+    def _updatedViewState(self, currentMessage, nextMessage):
         """
         Retrieve state relevant to the view: the number of messages in the
         current view, the current message body, and the number of messages in
@@ -561,7 +691,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         None.  This will be the case when it would be too expensive to compute.
         """
         return (self.getMessageCount(),
-                self._current(),
+                self._current(currentMessage, nextMessage),
                 None) # self.mailViewCounts()
 
 
@@ -571,30 +701,30 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         else:
             self.viewingByPerson = self.translator.fromWebID(webID)
 
-        self._resetCurrentMessage()
-        self._resetScrollQuery()
-        return self._updatedViewState()
+        currentMessage, nextMessage = self._resetCurrentMessage()
+        self._resetScrollQuery(currentMessage)
+        return self._updatedViewState(currentMessage, nextMessage)
     expose(viewByPerson)
-
     viewByPerson = transacted(viewByPerson)
+
 
     def viewByTag(self, tag):
         self.viewingByTag = tag
-        self._resetCurrentMessage()
-        self._resetScrollQuery()
-        return self._updatedViewState()
+        currentMessage, nextMessage = self._resetCurrentMessage()
+        self._resetScrollQuery(currentMessage)
+        return self._updatedViewState(currentMessage, nextMessage)
     expose(viewByTag)
-
     viewByTag = transacted(viewByTag)
+
 
     def viewByAccount(self, account):
         self.viewingByAccount = account
-        self._resetCurrentMessage()
-        self._resetScrollQuery()
-        return self._updatedViewState()
+        currentMessage, nextMessage = self._resetCurrentMessage()
+        self._resetScrollQuery(currentMessage)
+        return self._updatedViewState(currentMessage, nextMessage)
     expose(viewByAccount)
-
     viewByAccount = transacted(viewByAccount)
+
 
     def changeView(self, typ):
         self.inAllView = self.inTrashView = self.inSentView = self.inSpamView = self.inDeferredView = False
@@ -604,19 +734,25 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     def viewByMailType(self, typ):
         self.changeView(typ)
-        self._resetCurrentMessage()
-        self._resetScrollQuery()
-        return self._updatedViewState()
+        currentMessage, nextMessage = self._resetCurrentMessage()
+        self._resetScrollQuery(currentMessage)
+        return self._updatedViewState(currentMessage, nextMessage)
     expose(viewByMailType)
 
     viewByMailType = transacted(viewByMailType)
 
     def getMessageCount(self):
-        return self.inbox.store.count(Message, self._getBaseComparison())
+        return self.inbox.store.count(Message, self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                            self.viewingByTag,
+                                                                            self.viewingByPerson,
+                                                                            self.viewingByAccount))
     expose(getMessageCount)
 
     def getMessages(self, **k):
-        return self.inbox.store.query(Message, self._getBaseComparison(), **k)
+        return self.inbox.store.query(Message, self.inbox.getBaseComparison(self.getCurrentViewName(),
+                                                                            self.viewingByTag,
+                                                                            self.viewingByPerson,
+                                                                            self.viewingByAccount), **k)
 
     def _squish(self, thing):
         # replacing &nbsp with &#160 in renderers.SpacePreservingStringRenderer
@@ -630,90 +766,87 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         #        text = text.replace('&' + eref + ';', '&#' + entity.num + ';')
         return replaceControlChars(unicode(flatten(thing), 'utf-8'))
 
-    def _current(self):
-        return (self._squish(self._nextMessagePreview()),
-                self._squish(self._currentAsFragment()),
-                self._currentMessageData())
-
-    def _moveToNextMessage(self):
-        previousMessage = self.currentMessage
-        currentMessage = self.nextMessage
-
-        if currentMessage is not None:
-            self.selectMessage(currentMessage)
-        else:
-            self.currentMessage = self.getMessageBefore(previousMessage)
-            self.nextMessage = None
-
-    def _progressOrDont(self, advance):
-        if advance:
-            self._moveToNextMessage()
-        return self._current()
+    def _current(self, currentMessage, nextMessage):
+        return (self._squish(self._nextMessagePreview(currentMessage, nextMessage)),
+                self._squish(self._currentAsFragment(currentMessage)),
+                self._currentMessageData(currentMessage))
 
     def _getActionMethod(self, actionName):
         return getattr(self.inbox, 'action_' + actionName)
 
     def _performMany(self, actionName, messages=(), webIDs=(), args=()):
+        readCount = 0
+        unreadCount = 0
         action = self._getActionMethod(actionName)
-        for message in messages:
+        for message in chain(messages, imap(self.translator.fromWebID, webIDs)):
+            if message.read:
+                readCount += 1
+            else:
+                unreadCount += 1
             action(message, *args)
-        for webID in webIDs:
-            action(self.translator.fromWebID(webID), *args)
+        return readCount, unreadCount
 
-    archiveCurrentMessage = expose(makeSingleAction('archive'))
-    deleteCurrentMessage  = expose(makeSingleAction('delete'))
-    deferCurrentMessage   = expose(makeSingleAction('defer'))
-    trainCurrentMessage   = expose(makeSingleAction('train'))
 
-    archiveMessageGroup = expose(makeGroupAction('archive'))
-    deleteMessageGroup  = expose(makeGroupAction('delete'))
-    trainMessageGroup   = expose(makeGroupAction('train'))
+    def _messageData(self, msg):
+        if msg is not None:
+            return {
+                u'identifier': self.translator.toWebID(msg).decode('ascii'),
+                u'trained': msg.trained,
+                u'spam': msg.spam,
+                }
+        return None
 
-    archiveMessageBatch = expose(makeBatchAction('archive'))
-    deleteMessageBatch  = expose(makeBatchAction('delete'))
-    trainMessageBatch   = expose(makeBatchAction('train'))
 
-    def _getComparisonForBatchType(self, batchType):
-        comp = self._getBaseComparison()
-        if batchType in ("read", "unread"):
-            comp = attributes.AND(comp, Message.read == (batchType == "read"))
-        return comp
+    def _messagePreview(self, msg):
+        if msg is not None:
+            return {
+                u'subject': msg.subject}
+        return None
 
-    def _performBatchAction(self, actionName, messages, args):
-        self._performMany(actionName, messages, args=args)
 
-        # this could probably be more fine-grained
-        if self.currentMessage in messages or self.nextMessage in messages:
-            self._resetCurrentMessage()
+    def actOnMessageIdentifierList(self, action, messageIdentifiers, extraArguments=None):
+        """
+        Perform an action on list of messages specified by their web
+        identifier.
 
-        return (self._current(), len(messages), sum(1 for m in messages if not m.read))
+        @type action: C{unicode}
+        @param action: The name of the action to perform.  This may be any
+        string which can be prepended with C{'action_'} to name a method
+        defined on this class.
 
-    def _performGroupAction(self, actionName, advance, nextMessageWebID, webIDs, args):
-        self._performMany(actionName, webIDs=webIDs, args=args)
+        @type currentMessageIdentifier: C{unicode}
+        @param currentMessageIdentifier: The web ID for the message which is
+        currently being displayed on the client.
 
-        if advance:
-            if nextMessageWebID is not None:
-                self.nextMessage = self.translator.fromWebID(nextMessageWebID)
-            return self._progressOrDont(advance)
+        @type messageIdentifiers: C{list} of C{unicode}
+        @param messageIdentifiers: A list of web IDs for messages on which to act.
 
-    def _performSingleAction(self, actionName, advance, args):
-        action = self._getActionMethod(actionName)
-        action(self.currentMessage, *args)
+        @type extraArguments: C{None} or C{dict}
+        @param extraArguments: Additional keyword arguments to pass on to the
+        action handler.
+        """
+        messages = map(self.translator.fromWebID, messageIdentifiers)
+        return self._performMany(action, messages, **(extraArguments or {}))
+    expose(actOnMessageIdentifierList)
 
-        return self._progressOrDont(advance)
 
-    def _messagesForBatchType(self, batchType, include, exclude):
-        comp = attributes.AND(
-                Message.storeID.notOneOf(
-                    self.translator.linkFrom(wid) for wid in exclude),
-                self._getComparisonForBatchType(batchType))
+    def actOnMessageBatch(self, action, batchType, include, exclude, extraArguments=None):
+        """
+        Perform an action on a set of messages defined by a common
+        characteristic or which are specifically included but not specifically
+        excluded.
+        """
+        view = self.getCurrentViewName()
+        messages = set(self.inbox.messagesForBatchType(
+                batchType, view, self.viewingByTag,
+                self.viewingByPerson, self.viewingByAccount))
+        more = set(map(self.translator.fromWebID, include))
+        less = set(map(self.translator.fromWebID, exclude))
 
-        comp = attributes.OR(
-                Message.storeID.oneOf(
-                    self.translator.linkFrom(wid) for wid in include),
-                comp)
+        targets = (messages | more) - less
+        return self._performMany(action, targets, **(extraArguments or {}))
+    expose(actOnMessageBatch)
 
-        return list(self.store.query(Message, comp))
 
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.inbox.store.findUnique(compose.Composer)
@@ -725,11 +858,11 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                                      inline=True)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
-
         return unicode(flatten(cf), 'utf-8')
 
-    def replyToCurrentMessage(self, advance):
-        curmsg = self.currentMessage
+
+    def replyToMessage(self, messageIdentifier, advance):
+        curmsg = self.translator.fromWebID(messageIdentifier)
 
         if curmsg.sender is not None:
             origfrom = curmsg.sender
@@ -746,10 +879,11 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return self._composeSomething(replyTo(curmsg),
                                       reSubject(curmsg),
                                       '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
-    expose(replyToCurrentMessage)
+    expose(replyToMessage)
 
-    def forwardCurrentMessage(self, advance):
-        curmsg = self.currentMessage
+
+    def forwardMessage(self, messageIdentifier, advance):
+        curmsg = self.translator.fromWebID(messageIdentifier)
 
         reply = ['\nBegin forwarded message:\n']
         for hdr in u'From Date To Subject Reply-to'.split():
@@ -765,54 +899,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                                       reSubject(curmsg, 'Fwd: '),
                                       '\n\n' + '\n> '.join(reply),
                                       self.currentMessageDetail.attachmentParts)
-    expose(forwardCurrentMessage)
-
-    def _getBaseComparison(self, beforeTime=None):
-        if beforeTime is None:
-            beforeTime = Time()
-
-        comparison = [
-            Message.trash == self.inTrashView,
-            Message.draft == False,
-            Message.deferred == self.inDeferredView]
-
-        if not self.inTrashView:
-            comparison.append(Message.outgoing == self.inSentView)
-
-        if not (self.inAllView or self.inTrashView or self.inSpamView):
-            comparison.append(Message.archived == False)
-
-        if not (self.inSentView or self.inTrashView):
-            # Note - Message.spam defaults to None, and inSpamView will
-            # always be either True or False.  This means messages which
-            # haven't been processed by the spam filtering system will never
-            # show up in any query!  Is this a problem?  It depends how
-            # responsive the spam filtering system ends up being, I suppose.
-            # Currently, it should be fast enough so as not to make much of
-            # a difference, but that may not always be the case.  However,
-            # ultimately we are going to need to support updating messages
-            # views without doing a complete page re-load, at which point
-            # delivered but unfiltered messages will just show up on the
-            # page, which should result in this minor inequity being more or
-            # less irrelevant.
-            comparison.append(Message.spam == self.inSpamView)
-
-
-        if self.viewingByTag is not None:
-            comparison.extend((
-                tags.Tag.object == Message.storeID,
-                tags.Tag.name == self.viewingByTag))
-
-        if self.viewingByAccount is not None:
-            comparison.append(Message.source == self.viewingByAccount)
-
-        if self.viewingByPerson is not None:
-            comparison.extend((
-                Message.sender == people.EmailAddress.address,
-                people.EmailAddress.person == people.Person.storeID,
-                people.Person.storeID == self.viewingByPerson.storeID))
-
-        return attributes.AND(*comparison)
+    expose(forwardMessage)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
 

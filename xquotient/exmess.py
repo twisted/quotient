@@ -189,6 +189,8 @@ class Message(item.Item):
         self._prefs = None
 
     def walkMessage(self, prefer=None):
+        if self.impl is None:
+            return []
         if prefer is None:
             if self._prefs is None:
                 self._prefs = ixmantissa.IPreferenceAggregator(self.store)
@@ -205,6 +207,8 @@ class Message(item.Item):
 
     def walkAttachments(self):
         '''"attachments" are message parts that are not readable'''
+        if self.impl is None:
+            return []
         return self.impl.walkAttachments()
 
     def getAttachment(self, partID):

@@ -8,13 +8,12 @@ from epsilon.extime import Time
 from axiom.store import Store
 from axiom.scheduler import Scheduler
 
-from xmantissa.ixmantissa import INavigableFragment
+from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
 from xmantissa.webapp import PrivateApplication
-from xmantissa.webtheme import getLoader
 
 from xquotient.exmess import Message
 from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, UndeferTask
-
+from xquotient.quotientapp import QuotientPreferenceCollection
 
 class MessageRetrievalTestCase(TestCase):
     """
@@ -25,29 +24,56 @@ class MessageRetrievalTestCase(TestCase):
         Create a handful of messages spread out over a brief time period so
         that tests can assert things about methods which operate on messages.
         """
-        s = Store()
+        self.store = Store()
 
         # Inbox requires but does not provide IWebTranslator.
-        PrivateApplication(store=s).installOn(s)
+        self.privateApplication = PrivateApplication(store=self.store)
+        self.privateApplication.installOn(self.store)
+        self.webTranslator = IWebTranslator(self.store)
 
         baseTime = datetime(year=2001, month=3, day=6)
         self.msgs = []
         for i in xrange(5):
             self.msgs.append(
-                Message(store=s,
+                Message(store=self.store,
                         read=False,
                         spam=False,
                         receivedWhen=Time.fromDatetime(
                             baseTime + timedelta(seconds=i))))
-        self.inbox = InboxScreen(Inbox(store=s))
+        self.inbox = InboxScreen(Inbox(store=self.store))
 
 
-    def testGetFirstMessage(self):
+    def test_getInitialArguments(self):
         """
-        Test that InboxScreen.getFirstMessage returns the first message,
-        ordered by received time.
+        Test that L{InboxScreen} properly initializes its client-side
+        complement with the number of messages in the current view, an
+        identifier for the first message, and the persistent complexity
+        setting.
         """
-        self.assertIdentical(self.msgs[0], self.inbox.getFirstMessage())
+        args = self.inbox.getInitialArguments()
+        messageCount, messageIdentifier, complexity = args
+        self.assertEquals(messageCount, 5)
+        self.assertEquals(
+            messageIdentifier,
+            self.webTranslator.toWebID(self.msgs[-1]).decode('ascii'))
+        self.failUnless(isinstance(messageIdentifier, unicode))
+        self.assertEquals(complexity, 1)
+
+
+    def test_getInitialArgumentsEmptyMailbox(self):
+        """
+        Test that an empty mailbox is properly represented by the return value
+        of L{InboxScreen.getInitialArguments}.
+        """
+        store = Store()
+        PrivateApplication(store=store).installOn(store)
+        inbox = Inbox(store=store)
+        screen = InboxScreen(inbox)
+        args = screen.getInitialArguments()
+        messageCount, messageIdentifier, complexity = args
+        self.assertEquals(messageCount, 0)
+        self.assertEquals(messageIdentifier, None)
+        self.assertEquals(complexity, 1)
 
 
     def testGetLastMessage(self):
@@ -80,15 +106,6 @@ class MessageRetrievalTestCase(TestCase):
                              self.inbox.getMessageBefore(self.msgs[-1]))
         self.assertIdentical(None,
                              self.inbox.getMessageBefore(self.msgs[0]))
-
-
-    def testGetFirstMessageWithFlags(self):
-        """
-        Test that messages which do not satisfy the view requirements of the
-        inbox are not considered for return by InboxScreen.getFirstMessage.
-        """
-        self.msgs[0].archived = True
-        self.assertIdentical(self.msgs[1], self.inbox.getFirstMessage())
 
 
     def testGetLastMessageWithFlags(self):
@@ -273,7 +290,11 @@ class InboxTestCase(TestCase):
 
     def _setUpInbox(self):
         s = Store()
-        PrivateApplication(store=s).installOn(s)
+
+        QuotientPreferenceCollection(store=s).installOn(s)
+
+        self.translator = PrivateApplication(store=s)
+        self.translator.installOn(s)
 
         msgs = list(Message(store=s,
                             subject=unicode(str(i)),
@@ -286,36 +307,8 @@ class InboxTestCase(TestCase):
 
         self.inboxScreen = InboxScreen(Inbox(store=s))
         self.msgs = msgs
+        self.msgIds = map(self.translator.toWebID, self.msgs)
 
-    def assertMsgSubjectsAre(self, s1, s2):
-        self.assertEquals(self.inboxScreen.currentMessage.subject, s1)
-        self.assertEquals(self.inboxScreen.nextMessage.subject, s2)
-
-    def testLookahead(self):
-        """
-        Test that the one message lookahead feature of the inbox
-        works in the right direction (from newest message to oldest).
-        We test this in two places: after instantiating InboxScreen,
-        where the currentMessage and nextMessage attributes are initially
-        set, and after calling InboxScreen.selectMessage(), which changes
-        both attributes
-        """
-
-        self._setUpInbox()
-        assertMsgSubjectsAre = self.assertMsgSubjectsAre
-        msgs = self.msgs
-        inboxScreen =self.inboxScreen
-
-        # '4' is the newest message
-        assertMsgSubjectsAre('4', '3')
-        inboxScreen.selectMessage(msgs[1])
-        assertMsgSubjectsAre('3', '2')
-        inboxScreen.selectMessage(msgs[2])
-        assertMsgSubjectsAre('2', '1')
-        inboxScreen.selectMessage(msgs[3])
-        assertMsgSubjectsAre('1', '0')
-        inboxScreen.selectMessage(msgs[4])
-        assertMsgSubjectsAre('0', '1')
 
     def testLookaheadWithActions(self):
         """
@@ -326,53 +319,179 @@ class InboxTestCase(TestCase):
         selectMessage().  Do this all the way down, until there
         are no messages left
         """
-
         self._setUpInbox()
-        assertMsgSubjectsAre = self.assertMsgSubjectsAre
-        inboxScreen = self.inboxScreen
 
-        # XXX this is a temporary hack.  ideally the methods
-        # we are calling would live on the model, and we wouldn't
-        # need to set up a bunch of rendering junk or whatever
-        # in order to archive a message and progress to the next
-        # message, but they don't, and it's a substantial refactoring.
-        # for now we'll kill the method that does all of the
-        # annoying things
+        for i in range(len(self.msgs) - 2):
+            readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+                'archive',
+                [self.msgIds[i]])
 
-        inboxScreen._current = lambda: None
+            self.assertEquals(readCount, 1)
+            self.assertEquals(unreadCount, 0)
 
-        assertMsgSubjectsAre('4', '3')
-        inboxScreen.archiveCurrentMessage(advance=True)
-        assertMsgSubjectsAre('3', '2')
-        inboxScreen.archiveCurrentMessage(advance=True)
-        assertMsgSubjectsAre('2', '1')
-        inboxScreen.archiveCurrentMessage(advance=True)
-        assertMsgSubjectsAre('1', '0')
-        inboxScreen.archiveCurrentMessage(advance=True)
-        self.assertEquals(inboxScreen.currentMessage.subject, '0')
-        self.failUnless(inboxScreen.nextMessage is None)
-        inboxScreen.archiveCurrentMessage(advance=True)
-        self.failUnless(inboxScreen.currentMessage is None)
-        self.failUnless(inboxScreen.nextMessage is None)
+        readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+            'archive',
+            [self.msgIds[i + 1]])
 
-    def testLookaheadWithActionsLastMessage(self):
+        self.assertEquals(readCount, 1)
+        self.assertEquals(unreadCount, 0)
+
+        readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+            'archive',
+            [self.msgIds[i + 2]])
+
+        self.assertEquals(readCount, 1)
+        self.assertEquals(unreadCount, 0)
+    testLookaheadWithActions.todo = "read/unread flag not managed properly yet."
+
+
+    def test_fastForward(self):
         """
-        Similar to L{testLookaheadWithActions}, but only
-        dismiss the penultimate message, asserting that
-        afterwards, the lookahead correctly points to the
-        pre-penultimate message
+        Test fast forwarding to a particular message by id.
         """
-
         self._setUpInbox()
-        assertMsgSubjectsAre = self.assertMsgSubjectsAre
-        inboxScreen = self.inboxScreen
 
-        # XXX see comment in L{testLookaheadWithActions}
+        preview, fragment, data = self.inboxScreen.fastForward(self.msgIds[2])
+        self.assertEquals(data[u'identifier'], self.msgIds[2])
+        self.assertEquals(preview[u'subject'], self.msgs[1].subject)
+        self.failUnless(self.msgs[2].read)
 
-        inboxScreen._current = lambda: None
 
-        assertMsgSubjectsAre('4', '3')
-        inboxScreen.selectMessage(self.msgs[3])
-        assertMsgSubjectsAre('1', '0')
-        inboxScreen.archiveCurrentMessage(advance=True)
-        assertMsgSubjectsAre('0', '2')
+    def test_messagesForBatchType(self):
+        """
+        Test that the correct messages are returned from
+        L{Inbox.messagesForBatchType}.
+        """
+        store = Store()
+        inbox = Inbox(store=store)
+
+        # Test that even with no messages, it spits out the right value (an
+        # empty list).
+        for batchType in ("read", "unread", "all"):
+            self.assertEquals(
+                list(inbox.messagesForBatchType(batchType, "Inbox")),
+                [])
+
+        # Make one message and assert that it only comes back from queries for
+        # the batch type which applies to it.
+        message = Message(store=store, spam=False)
+
+        message.read = False
+        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message])
+
+        message.read = True
+        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message])
+
+        # Make one more and make sure the batch is correct with various
+        # combinations of states between the two.
+        other = Message(store=store, spam=False)
+
+        other.read = False
+        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [other])
+        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message, other])
+
+        other.read = True
+        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message, other])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message, other])
+
+
+
+class ReadUnreadTestCase(TestCase):
+    """
+    Tests for all operations which should change the read/unread state of
+    messages.
+    """
+    NUM_MESSAGES = 5
+
+    def setUp(self):
+        self.store = Store()
+
+        # Required for InboxScreen to even be instantiated
+        self.translator = PrivateApplication(store=self.store)
+        self.translator.installOn(self.store)
+
+        # Required for InboxScreen.fastForward to be called successfully.
+        self.preferences = QuotientPreferenceCollection(store=self.store)
+
+        self.inbox = Inbox(store=self.store)
+        self.inbox.installOn(self.store)
+        self.messages = []
+        for i in range(self.NUM_MESSAGES):
+            self.messages.append(
+                Message(store=self.store,
+                        spam=False,
+                        receivedWhen=Time(),
+                        ))
+
+
+    def test_screenCreation(self):
+        """
+        Test that creating the view for an inbox marks the first message in
+        that mailbox as read.
+
+        XXX - Uhhh, is this actually the desired behavior?  It seems kind of
+        broken. -exarkun
+        """
+
+        # Make sure things start out in the state we expect
+        for msg in self.messages:
+            self.failIf(msg.read, "Messages should start unread.")
+
+        screen = InboxScreen(self.inbox)
+
+        # All but the first message should still be unread
+        for msg in self.messages[:-1]:
+            self.failIf(msg.read, "Subsequent messages should be unread.")
+
+        # But the first message in the mailbox should now be read
+        self.failUnless(self.messages[-1].read, "First message should be read.")
+
+
+    def test_fastForward(self):
+        """
+        Test that fast forwarding to a message marks that message as read.
+        """
+        screen = InboxScreen(self.inbox)
+
+        screen.fastForward(self.translator.toWebID(self.messages[-2]))
+
+        # All but the first two messages should still be unread
+        for msg in self.messages[:-2]:
+            self.failIf(msg.read, "Subsequent messages should be unread.")
+
+        # But the first two should be read.
+        for msg in self.messages[-2:]:
+            self.failUnless(msg.read, "First two messages should be read.")
+
+        # Jump to the end of the mailbox
+        screen.fastForward(self.translator.toWebID(self.messages[0]))
+
+        for msg in self.messages[1:-2]:
+            self.failIf(msg.read, "Middle messages should be unread.")
+
+        for msg in self.messages[:1] + self.messages[-2:]:
+            self.failUnless(msg.read, "Outter messages should be read.")
+
+
+    def test_actOnMessageIdentifierList(self):
+        """
+        Test that when an unread message is revealed as a result of performing
+        some action, that message becomes marked as read.
+        """
+        screen = InboxScreen(self.inbox)
+
+        screen.actOnMessageIdentifierList(
+            'archive',
+            [self.translator.toWebID(self.messages[-1])])
+
+        for msg in self.messages[:-1]:
+            self.failIf(msg.read, "Subsequent messages should be unread.")
+
+        for msg in self.messages[-1:]:
+            self.failUnless(msg.read, "Initial and revealed message should be read.")

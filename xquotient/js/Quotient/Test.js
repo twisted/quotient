@@ -134,6 +134,14 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
         result.addCallback(function(widget) {
                 self.scrollingWidget = widget;
                 self.node.appendChild(widget.node);
+
+                /*
+                 * XXX Clobber these method, since our ScrollingWidget doesn't
+                 * have a widgetParent which implements the necessary methods.
+                 */
+                widget.decrementActiveMailViewCount = function() {};
+                widget.selectionChanged = function() {};
+
                 return widget.initializationDeferred;
             });
         return result;
@@ -167,6 +175,27 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 self.assertEqual(
                     oldWebID, webID,
                     "Expected first message ID as previous message ID.");
+            });
+    },
+
+    /**
+     * Test that the selected web ID determines the row returned by
+     * L{getSelectedRow}.
+     */
+    function test_getSelectedRow(self) {
+        return self.setUp().addCallback(function() {
+                var webID;
+
+                webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget._selectWebID(webID);
+                self.assertEqual(self.scrollingWidget.getSelectedRow().__id__, webID);
+
+                webID = self.scrollingWidget.model.getRowData(1).__id__;
+                self.scrollingWidget._selectWebID(webID);
+                self.assertEqual(self.scrollingWidget.getSelectedRow().__id__, webID);
+
+                self.scrollingWidget._selectWebID(null);
+                self.assertEqual(self.scrollingWidget.getSelectedRow(), null);
             });
     },
 
@@ -361,19 +390,29 @@ Quotient.Test.ControllerTestCase.methods(
                  * one of the unread messages as read.
                  */
                 self.assertEqual(
-                    self.controllerWidget.unreadCountForView("Inbox"), 1);
+                    self.controllerWidget.getUnreadCountForView("Inbox"), 1);
 
                 self.assertEqual(
-                    self.controllerWidget.unreadCountForView("Spam"), 1);
+                    self.controllerWidget.getUnreadCountForView("Spam"), 1);
 
                 /*
                  * Three instead of four for the reason mentioned above.
                  */
                 self.assertEqual(
-                    self.controllerWidget.unreadCountForView("All"), 1);
+                    self.controllerWidget.getUnreadCountForView("All"), 1);
 
                 self.assertEqual(
-                    self.controllerWidget.unreadCountForView("Sent"), 0);
+                    self.controllerWidget.getUnreadCountForView("Sent"), 0);
+            });
+    },
+
+    /**
+     * Test the mutation function for unread counts by view.
+     */
+    function test_setUnreadCounts(self) {
+        return self.setUp().addCallback(function(ignored) {
+                self.controllerWidget.setUnreadCountForView("Inbox", 7);
+                self.assertEquals(self.controllerWidget.getUnreadCountForView("Inbox"), 7);
             });
     },
 
@@ -674,6 +713,347 @@ Quotient.Test.ControllerTestCase.methods(
                     "Expected first row to be selected after view change.");
             });
         return result;
+    },
+
+    /**
+     * Test that the currently selected message can be archived.
+     */
+    function test_archiveCurrentMessage(self) {
+        var model;
+        var rowIdentifiers;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.touch("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote(
+                    "archivedFlagsByWebIDs",
+                    rowIdentifiers[0],
+                    rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(flags) {
+                self.assertArraysEqual(
+                    flags,
+                    [true, false]);
+
+                self.assertEqual(
+                    model.getRowData(0).__id__, rowIdentifiers[1]);
+            });
+        return result;
+    },
+
+    /**
+     * Test that the checkbox for a row changes to the checked state when that
+     * row is added to the group selection.
+     */
+    function test_groupSelectRowCheckbox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var scroller = self.controllerWidget.scrollWidget;
+                var row = scroller.model.getRowData(0);
+                var webID = row.__id__;
+                var checkboxImage = scroller._getCheckbox(row);
+                scroller.groupSelectRowAndUpdateCheckbox(
+                    webID, checkboxImage);
+                /*
+                 * The checkbox should be checked now.
+                 */
+                self.assertNotEqual(
+                    checkboxImage.src.indexOf("checkbox-on.gif"), -1,
+                    "Checkbox image was not the on image.");
+            });
+        return result;
+    },
+
+    /**
+     * Test that the checkbox for a row changes to the unchecked state when
+     * that row is removed from the group selection.
+     */
+    function test_groupUnselectRowCheckbox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var scroller = self.controllerWidget.scrollWidget;
+                var row = scroller.model.getRowData(0);
+                var webID = row.__id__;
+                var checkboxImage = scroller._getCheckbox(row);
+
+                /*
+                 * Select it first, so the next call will unselect it.
+                 */
+                scroller.groupSelectRow(webID);
+
+                scroller.groupSelectRowAndUpdateCheckbox(
+                    webID, checkboxImage);
+                /*
+                 * The checkbox should be checked now.
+                 */
+                self.assertNotEqual(
+                    checkboxImage.src.indexOf("checkbox-off.gif"), -1,
+                    "Checkbox image was not the on image.");
+            });
+        return result;
+    },
+
+    /**
+     * Test changing the batch selection to all messages.
+     */
+    function test_changeBatchSelectionAll(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.controllerWidget.changeBatchSelection("all");
+
+                var scroller = self.controllerWidget.scrollWidget
+                var selected = scroller.selectedGroup;
+
+                self.assertEqual(Divmod.dir(selected).length, 2);
+                self.assertIn(scroller.model.getRowData(0).__id__, selected);
+                self.assertIn(scroller.model.getRowData(1).__id__, selected);
+            });
+        return result;
+    },
+
+    /**
+     * Test changing the batch selection to read messages.
+     */
+    function test_changeBatchSelectionRead(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.controllerWidget.changeBatchSelection("read");
+
+                var scroller = self.controllerWidget.scrollWidget
+                var selected = scroller.selectedGroup;
+
+                self.assertEqual(Divmod.dir(selected).length, 1);
+                self.assertIn(scroller.model.getRowData(0).__id__, selected);
+            });
+        return result;
+    },
+
+    /**
+     * Test changing the batch selection to unread messages.
+     */
+    function test_changeBatchSelectionUnread(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.controllerWidget.changeBatchSelection("unread");
+
+                var scroller = self.controllerWidget.scrollWidget
+                var selected = scroller.selectedGroup;
+
+                self.assertEqual(Divmod.dir(selected).length, 1);
+                self.assertIn(scroller.model.getRowData(1).__id__, selected);
+            });
+        return result;
+    },
+
+    /**
+     * Test deleting the currently selected message batch.
+     */
+    function test_deleteBatch(self) {
+        var rowIdentifiers;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.changeBatchSelection("unread");
+                return self.controllerWidget.touchBatch("delete", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote(
+                    'deletedFlagsByWebIDs',
+                    rowIdentifiers[0],
+                    rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(deletedFlags) {
+                self.assertArraysEqual(
+                    deletedFlags,
+                    [false, true]);
+            });
+        return result;
+    },
+
+    /**
+     * Test archiving the currently selected message batch.
+     */
+    function test_archiveBatch(self) {
+        var rowIdentifiers;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.changeBatchSelection("unread");
+                return self.controllerWidget.touchBatch("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote(
+                    'archivedFlagsByWebIDs',
+                    rowIdentifiers[0],
+                    rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(deletedFlags) {
+                self.assertArraysEqual(
+                    deletedFlags,
+                    [false, true]);
+            });
+        return result;
+    },
+
+    /**
+     * Test archiving a batch which includes the currently selected message.
+     * This should change the message selection to the next message in the
+     * mailbox.
+     */
+    function test_archiveBatchIncludingSelection(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.controllerWidget.changeBatchSelection("read");
+                return self.controllerWidget.touchBatch("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+                self.assertEqual(
+                    model.getRowData(0).__id__,
+                    self.controllerWidget.scrollWidget.getSelectedRow().__id__);
+            });
+        return result;
+    },
+
+    /**
+     * Test selecting every message in the view and then archiving them.
+     */
+    function test_archiveAllBySelection(self) {
+        var rowNodes;
+        var scroller;
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                scroller = self.controllerWidget.scrollWidget;
+                model = scroller.model;
+
+                var rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                rowNodes = [
+                    model.getRowData(0).__node__,
+                    model.getRowData(1).__node__];
+
+                scroller.groupSelectRow(rowIdentifiers[0]);
+                scroller.groupSelectRow(rowIdentifiers[1]);
+
+                return self.controllerWidget.touchSelectedGroup("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Everything has been archived, make sure there are no rows
+                 * left.
+                 */
+                self.assertEqual(model.rowCount(), 0);
+
+                /*
+                 * And none of those rows that don't exist in the model should
+                 * be displayed, either.
+                 */
+                self.assertEqual(rowNodes[0].parentNode, null);
+                self.assertEqual(rowNodes[1].parentNode, null);
+            });
+        return result;
+    },
+
+    /**
+     * Test archiving the selected group of messages.
+     */
+    function test_archiveGroupSelection(self) {
+        var rowIdentifiers;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[1]);
+                return self.controllerWidget.touchSelectedGroup("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote(
+                    'archivedFlagsByWebIDs',
+                    rowIdentifiers[0],
+                    rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(deletedFlags) {
+                self.assertArraysEqual(
+                    deletedFlags,
+                    [false, true]);
+            });
+        return result;
+    },
+
+    /**
+     * Test archiving the selected group of messages, including the currently
+     * selected message.
+     */
+    function test_archiveGroupSelectionIncludingSelection(self) {
+        var model;
+        var rowIdentifiers;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[0]);
+                return self.controllerWidget.touchSelectedGroup("archive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    model.getRowData(0).__id__,
+                    self.controllerWidget.scrollWidget.getSelectedRow().__id__);
+                self.assertEqual(
+                    model.getRowData(0).__id__,
+                    rowIdentifiers[1]);
+            });
+        return result;
     }
 
     /**
@@ -681,9 +1061,7 @@ Quotient.Test.ControllerTestCase.methods(
      *
      * - Test Controller.toggleGroupActions
      * - Test Controller.disableGroupActions
-     * - Test Controller.touchSelectedGroup
-     * - Test Controller.changeBatchSelection
-     * - Test Controller.touchBatch
+     * - Test Controller.touchSelectedGroup including selected message
      */
 
     );

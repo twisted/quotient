@@ -39,6 +39,7 @@ class ScrollingWidgetTestCase(testcase.TestCase):
 
     def getScrollingWidget(self, howManyElements=0):
         store = Store()
+        PrivateApplication(store=store).installOn(store)
         elements = [ScrollElement(store=store) for n in xrange(howManyElements)]
         columns = [ScrollElement.column]
         f = SequenceScrollingFragment(store, elements, columns)
@@ -140,37 +141,41 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         impl = _Part(store=inbox.store)
 
         # Inbox messages
-        m = Message(store=inbox.store, sender=self.aliceEmail,
-                    subject=u'1st message', receivedWhen=self.sent,
-                    sentWhen=self.sent, spam=False, archived=False,
-                    read=False, impl=impl)
-        catalog.tag(m, u"foo")
+        m1 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'1st message',
+            receivedWhen=self.sent, sentWhen=self.sent, spam=False,
+            archived=False, read=False, impl=impl)
+        catalog.tag(m1, u"foo")
 
-        m = Message(store=inbox.store, sender=self.aliceEmail,
-                    subject=u'2nd message', receivedWhen=self.sent + offset,
-                    sentWhen=self.sent, spam=False, archived=False,
-                    read=False, impl=impl)
-        catalog.tag(m, u"bar")
+        m2 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'2nd message',
+            receivedWhen=self.sent + offset, sentWhen=self.sent,
+            spam=False, archived=False, read=False, impl=impl)
+        catalog.tag(m2, u"bar")
 
         # Archive messages
-        Message(store=inbox.store, sender=self.aliceEmail, subject=u'3rd message',
-                receivedWhen=self.sent + offset * 2, sentWhen=self.sent,
-                spam=False, archived=True, read=True, impl=impl)
+        m3 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'3rd message',
+            receivedWhen=self.sent + offset * 2, sentWhen=self.sent,
+            spam=False, archived=True, read=True, impl=impl)
 
-        Message(store=inbox.store, sender=self.aliceEmail, subject=u'4th message',
-                receivedWhen=self.sent + offset * 3, sentWhen=self.sent,
-                spam=False, archived=True, read=True, impl=impl)
+        m4 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'4th message',
+            receivedWhen=self.sent + offset * 3, sentWhen=self.sent,
+            spam=False, archived=True, read=True, impl=impl)
 
         # Spam message
-        Message(store=inbox.store, sender=self.bobEmail, subject=u'5th message',
-                receivedWhen=self.sent + offset * 4, sentWhen=self.sent,
-                spam=True, archived=False, read=False, impl=impl)
+        m5 = Message(
+            store=inbox.store, sender=self.bobEmail, subject=u'5th message',
+            receivedWhen=self.sent + offset * 4, sentWhen=self.sent,
+            spam=True, archived=False, read=False, impl=impl)
 
         # Sent message
-        Message(store=inbox.store, sender=self.bobEmail, subject=u'6th message',
-                receivedWhen=self.sent + offset * 5, sentWhen=self.sent,
-                spam=False, archived=False, read=True, outgoing=True,
-                impl=impl)
+        m6 = Message(
+            store=inbox.store, sender=self.bobEmail, subject=u'6th message',
+            receivedWhen=self.sent + offset * 5, sentWhen=self.sent,
+            spam=False, archived=False, read=True, outgoing=True,
+            impl=impl)
 
         # Alice
         alice = Person(store=inbox.store, organizer=organizer, name=u"Alice")
@@ -184,6 +189,11 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             application.toWebID(alice): u'Alice',
             application.toWebID(bob): u'Bob'}
 
+        self.messages = dict(
+            (application.toWebID(m), m)
+            for m
+            in [m1, m2, m3, m4, m5])
+
         fragment = InboxScreen(inbox)
         fragment.setFragmentParent(self)
         return fragment
@@ -196,6 +206,22 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         """
         return [self.names[k] for k in keys]
     expose(personNamesByKeys)
+
+
+    def deletedFlagsByWebIDs(self, *ids):
+        """
+        Return the deleted flag of the messages with the given webIDs.
+        """
+        return [self.messages[id].trash for id in ids]
+    expose(deletedFlagsByWebIDs)
+
+
+    def archivedFlagsByWebIDs(self, *ids):
+        """
+        Return the archived flag of the messages with the given webIDs.
+        """
+        return [self.messages[id].archived for id in ids]
+    expose(archivedFlagsByWebIDs)
 
 
 

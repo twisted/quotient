@@ -25,25 +25,25 @@
   </div>
 
   <div nevow:pattern="accountChooser">
-    <div nevow:pattern="accountChoice" class="list-option"
-      onclick="Quotient.Mailbox.Controller.get(this).chooseAccount(this); return false"
-      ><span class="opt-name"><nevow:slot name="accountName" /></span></div>
+    <div nevow:pattern="accountChoice" class="list-option">
+      <athena:handler event="onclick" handler="chooseAccountByTag" />
+      <span class="opt-name"><nevow:slot name="accountName" /></span></div>
     <div nevow:pattern="selectedAccountChoice" class="selected-list-option"
       ><span class="opt-name"><nevow:slot name="accountName" /></span></div>
   </div>
 
   <div nevow:pattern="tagChooser" class="tag-chooser">
-    <div nevow:pattern="tagChoice" class="list-option"
-      onclick="Quotient.Mailbox.Controller.get(this).chooseTag(this); return false"
-      ><span class="opt-name"><nevow:slot name="tagName" /></span></div>
+    <div nevow:pattern="tagChoice" class="list-option">
+      <athena:handler event="onclick" handler="chooseTagByNode" />
+      <span class="opt-name"><nevow:slot name="tagName" /></span></div>
     <div nevow:pattern="selectedTagChoice" class="selected-list-option"
       ><span class="opt-name"><nevow:slot name="tagName" /></span></div>
   </div>
 
   <div nevow:pattern="personChooser" class="person-chooser">
-    <div nevow:pattern="personChoice" class="list-option"
-      onclick="Quotient.Mailbox.Controller.get(this).choosePerson(this); return false"
-      ><span class="opt-name"><nevow:slot name="personName" /></span>
+    <div nevow:pattern="personChoice" class="list-option">
+      <athena:handler event="onclick" handler="choosePersonByNode" />
+      <span class="opt-name"><nevow:slot name="personName" /></span>
       <span style="display: none" class="person-key"
         ><nevow:slot name="personKey" /></span></div>
     <div nevow:pattern="selectedPersonChoice" class="selected-list-option"
@@ -53,10 +53,9 @@
   </div>
 
   <div nevow:pattern="mailViewChooser" class="view-chooser">
-    <div nevow:pattern="mailViewChoice" class="list-option"
-      onclick="Quotient.Mailbox.Controller.get(this).chooseMailView(
-        this.firstChild.firstChild.nodeValue); return false"
-      ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
+    <div nevow:pattern="mailViewChoice" class="list-option">
+      <athena:handler event="onclick" handler="chooseMailViewByNode" />
+      <span class="opt-name"><nevow:slot name="mailViewName" /></span>
       (<span class="count"><nevow:slot name="count" /></span>)</div>
     <div nevow:pattern="selectedMailViewChoice" class="selected-list-option"
       ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
@@ -86,20 +85,23 @@
     <div class="quotient-menubar">
       <div class="complexity-icons">
         <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
-          onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-          onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-          onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
-          class="complexity-icon" />
+             onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
+             class="complexity-icon">
+          <athena:handler event="onmouseover" handler="complexityHover" />
+          <athena:handler event="onmouseout" handler="complexityHover" />
+        </img>
         <img src="/Quotient/static/images/complexity-selector-2-unselected.png"
-          onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-          onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
           onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this, true)"
-          class="complexity-icon" />
+          class="complexity-icon">
+          <athena:handler event="onmouseover" handler="complexityHover" />
+          <athena:handler event="onmouseout" handler="complexityHover" />
+        </img>
         <img src="/Quotient/static/images/complexity-selector-1-selected.png"
-          onmouseover="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
-          onmouseout="Quotient.Mailbox.Controller.get(this).complexityHover(this)"
           onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this, true)"
-          class="selected-complexity-icon" />
+          class="selected-complexity-icon">
+          <athena:handler event="onmouseover" handler="complexityHover" />
+          <athena:handler event="onmouseout" handler="complexityHover" />
+        </img>
         </div>
         <div class="menubar-separator" />
         <nevow:invisible nevow:render="composeLink" />
@@ -107,7 +109,8 @@
     </div>
     <div class="content-table-container">
       <div class="message-actions-container">
-        <select class="view-shortcut-container" onchange="Quotient.Mailbox.Controller.get(this).chooseMailView(this.value)">
+        <select class="view-shortcut-container">
+          <athena:handler event="onchange" handler="chooseMailViewByNode" />
           <option value="Inbox">Inbox</option>
           <option value="All">All</option>
           <option value="Deferred">Deferred</option>
@@ -244,9 +247,8 @@
                     </form>
                   </td>
                   <td style="padding-left: 2px">
-                    <nevow:invisible nevow:render="button"
-                      onclick="Quotient.Mailbox.Controller.get(this).changeBatchSelection(); return false"
-                      href="#">
+                    <nevow:invisible nevow:render="button" href="#">
+                      <athena:handler event="onclick" handler="changeBatchSelectionByNode" />
                       select
                     </nevow:invisible>
                   </td>
@@ -275,7 +277,6 @@
                 <div class="progress-meter">
                   <div class="progress-bar" />
                 </div>
-
                 <div class="next-message-preview">
                   <nevow:invisible nevow:render="nextMessagePreview" />
                 </div>
