@@ -1955,7 +1955,7 @@ Quotient.Mailbox.Controller.methods(
         if(Quotient.Common.Util.startswith('www', s)) {
             target = 'http://' + target;
         }
-        return MochiKit.DOM.A({"href":target}, s);
+        return MochiKit.DOM.A({"href":target, "target": "_blank"}, s);
     },
 
     function highlightExtracts(self) {
