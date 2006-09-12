@@ -1,3 +1,7 @@
+0.1.14 (2006-08-30):
+  - Refactored mailbox view.
+  - Various bug and UI fixes.
+
 0.1.13 (2006-08-22):
   - Better IE support.
 
