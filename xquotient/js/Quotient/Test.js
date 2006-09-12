@@ -1386,24 +1386,29 @@ Quotient.Test.GrabberListTestCase.methods(
      */
     function test_visibility(self) {
         var scrollerNode = self.firstNodeByAttribute(
-                            "class", "scrolltable-widget-node");
+            "class", "scrolltable-widget-node");
 
-        /* there is one grabber.  make sure the table is visible */
-        self.assertEquals(scrollerNode.style.display, "");
+        var scrollWidget = Nevow.Athena.Widget.get(scrollerNode)
+        scrollWidget.initializationDeferred.addCallback(
+            function(ignored) {
+                /* there is one grabber.  make sure the table is visible */
+                self.assertEquals(scrollerNode.style.display, "");
 
-        var D = self.callRemote("deleteGrabber");
-        D.addCallback(
-            function() {
-                /* grabber has been deleted.  reload scrolltable */
-                D = Nevow.Athena.Widget.get(scrollerNode).emptyAndRefill();
+                var D = self.callRemote("deleteGrabber");
                 D.addCallback(
                     function() {
-                        /* make sure it isn't visible */
-                        self.assertEquals(scrollerNode.style.display, "none");
+                        /* grabber has been deleted.  reload scrolltable */
+                        D = scrollWidget.emptyAndRefill();
+                        D.addCallback(
+                            function() {
+                                /* make sure it isn't visible */
+                                self.assertEquals(scrollerNode.style.display, "none");
+                            });
+                        return D;
                     });
                 return D;
             });
-        return D;
+        return scrollWidget.initializationDeferred;
     });
 
 Quotient.Test.ShowNodeAsDialogTestCase = Nevow.Athena.Test.TestCase.subclass(

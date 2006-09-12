@@ -2,8 +2,10 @@ from nevow.livetrial.testcase import TestCase
 from nevow.athena import expose
 
 from axiom.store import Store
+from axiom.scheduler import Scheduler
 
 from xmantissa.webtheme import getLoader
+from xmantissa.webapp import PrivateApplication
 
 from xquotient import grabber
 
@@ -16,6 +18,8 @@ class AddGrabberTestCase(TestCase):
 
     def getWidgetDocument(self):
         s = Store()
+        Scheduler(store=s).installOn(s)
+        PrivateApplication(store=s).installOn(s)
 
         grabberConfig = grabber.GrabberConfiguration(store=s)
         grabberConfig.installOn(s)
@@ -34,6 +38,8 @@ class GrabberListTestCase(TestCase):
 
     def getWidgetDocument(self):
         s = Store()
+        Scheduler(store=s).installOn(s)
+        PrivateApplication(store=s).installOn(s)
 
         grabberConfig = grabber.GrabberConfiguration(store=s)
         grabberConfig.installOn(s)
