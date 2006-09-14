@@ -80,7 +80,7 @@ class Filter(item.Item, item.InstallableMixin):
     def _train(self, instruction):
         for f in self._filters():
             f.train(instruction.spam, instruction.message)
-        item.deleteFromStore()
+        instruction.deleteFromStore()
 
 
     def _parsePostiniHeader(self, s):

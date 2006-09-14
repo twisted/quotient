@@ -12,7 +12,7 @@ from axiom.attributes import boolean
 from xquotient.iquotient import IHamFilter
 from xquotient.spam import Filter
 from xquotient.mimestorage import Part
-from xquotient.exmess import Message
+from xquotient.exmess import Message, _TrainingInstruction
 
 
 class TestFilter(Item):
@@ -154,3 +154,14 @@ class FilterTestCase(TestCase):
         f.processItem(msg)
         self.failUnless(msg.spam)
         self.failUnless(msg.trained)
+
+    def test_processTrainingInstructions(self):
+        """
+        When a user trains a message, a _TrainingInstruction item gets
+        created to signal the batch processor to do the training. Make
+        that gets run OK.
+        """
+        self.store = Store()
+        f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
+        ti = _TrainingInstruction(store=self.store, spam=True)
+        f.processItem(ti)
