@@ -1,9 +1,5 @@
 .content-table-container {
-    padding: 0px 15px 0px 15px;
-}
-
-.checkbox-image {
-    display: block;
+    padding-left: 50px;
 }
 
 .add-grabber-error {
@@ -11,63 +7,6 @@
     color: red;
 }
 
-.message-actions-left-edge .spacer,
-.content-table-right-edge .spacer, .right-block-footer-edge .spacer,
-.content-table-left-edge .spacer, .left-block-footer-edge .spacer,
-.view-pane-right-edge .spacer {
-    width: 5px;
-}
-
-.content-table-left-edge, .content-table-right-edge {
-    background-color: #CCEBF5;
-}
-
-.view-pane-right-edge {
-    background-color: #CCEBF5;
-    border-right: solid 1px #7FCCE5;
-}
-
-.content-table-left-edge {
-    border-left: solid 1px #7FCCE5;
-    border-right: solid 1px #7FCCE5;
-}
-
-.content-table-right-edge {
-    border-right: solid 1px #7FCCE5;
-    background-image: url(/Quotient/static/images/2px-blue-border-vertical.png);
-    background-position: top right;
-    background-repeat: repeat-y;
-}
-
-.left-block-footer-edge {
-    background-color: #CCEBF5;
-    border-bottom: solid 1px #7FCCE5;
-    border-left: solid 1px #7FCCE5;
-}
-
-.right-block-footer-edge {
-    background-color: #CCEBF5;
-    border-bottom: solid 1px #7FCCE5;
-    border-right: solid 1px #7FCCE5;
-    background-image: url(/Quotient/static/images/2px-blue-border-vertical.png);
-    background-position: top right;
-    background-repeat: repeat-y;
-}
-
-.mid-block-footer {
-    border-top: solid 1px #7FCCE5;
-    border-right: solid 1px #7FCCE5;
-}
-
-.right-block-footer, .mid-block-footer, .left-block-footer, .left-block-footer-right-edge {
-    background-color: #CCEBF5;
-    background-image: url(/Quotient/static/images/2px-blue-border-horizontal.png);
-    background-position: bottom left;
-    background-repeat: repeat-x;
-    border-bottom: solid 1px #7FCCE5;
-    background-position: bottom left;
-    background-repeat: repeat-x;
-}
 .loading {
     position: absolute;
     width: 2000px;
@@ -105,11 +44,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 }
 
 .scrolltable-cell, .message-detail-cell {
-    border-top: solid 1px #7FCCE5;
-}
-
-.scrolltable-cell {
-    border-right: solid 1px #7FCCE5;
+    border-left: solid 1px #7FCCE5;
 }
 
 .message-detail-cell {
@@ -219,11 +154,6 @@ ul.file-list, ul.file-list li {
     background-color: #7FCCE5;
     border-bottom: solid 1px #0099CC;
     width: 100%;
-}
-
-.quotient-menubar-inner {
-    border-top: solid 1px #A6DBED;
-    border-bottom: solid 1px #59BDDD;
 }
 
 .extract-text > span {
@@ -365,7 +295,6 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     font: bold 90% Helvetica, Arial, sans-serif;
     text-transform: uppercase;
     background-color: #0099CC;
-    padding: 0px 6px 0px 6px;
 }
 
 .button-content a:active {
@@ -380,6 +309,17 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     background-color: #D9F0F7;
 }
 
+.left-block-footer, .mid-block-footer, .right-block-footer {
+    background-color: #D9F0F7;
+    border-left: solid 1px #7FCCE5;
+    border-bottom: solid 1px #7FCCE5;
+    border-top: solid 1px #7FCCE5;
+}
+
+.right-block-footer {
+    border-right: solid 1px #7FCCE5;
+}
+
 .view-shortcut-container {
     white-space: nowrap;
     float: left;
@@ -392,7 +332,6 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 
 .sender {
     color: #109FCF;
-    font-size: 1.2em;
 }
 
 .subject {
@@ -472,8 +411,10 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 .view-pane-tl { margin: 0px 0px 0px -1px }
 
 .masthead-content, .masthead-content-bottom {
-    border-bottom: solid 1px #7FCCE5;
-    border-top: solid 1px #7FCCE5;
+    background-color: #D2E6FF;
+    border: solid 1px #7FCCE5;
+    border-top: none;
+    border-left: none;
     padding-top: 2px;
 }
 
@@ -504,8 +445,9 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 .view-pane-cell {
-    border: solid 1px #7FCCE5;
-    border-left: none;
+    width: 200px;
+    border-left: solid 1px #7FCCE5;
+    border-right: none;
     height: 100%;
     padding-bottom: 1px;
 }
@@ -514,7 +456,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     cursor: pointer;
     font-weight: bold;
     color: #11A0CF;
-    margin: 6px 0px 6px 4px;
+    margin-bottom: 6px;
 }
 
 .list-option {
@@ -524,9 +466,10 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 .list-option, .selected-list-option {
     overflow: hidden;
     width: 182px;
-    padding: 2px 0px 2px 18px;
-    margin: 1px 0px 1px 0px;
+    padding-left: 18px;
     white-space: nowrap;
+    margin-top: 1px;
+    margin-bottom: 1px;
 }
 
 .list-option:hover {
@@ -537,53 +480,21 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     margin-top: 1px;
     margin-bottom: 1px;
     color: #FFFFFF;
-    background-color: #0099CC;
+    background-color: #7FCCE5;
 }
 
-.q-scroll-row, .q-scroll-row-unread {
-    background-color: #FFFFFF;
-}
-
-.scroll-row-icons {
-    height: 100%;
-    padding: 0px 4px 0px 4px;
-    float: left;
-}
-
-.scroll-row-icons img {
-    border-width: 0px;
-    margin-bottom: 2px;
-}
-
-.q-scroll-row-unread {
-    font-weight: bold;
-}
-
-.q-scroll-row, .q-scroll-row-selected, .q-scroll-row-unread {
+.q-scroll-row {
     display: block;
     white-space: nowrap;
     overflow: hidden;
     font-size: .8em;
-    width: 100%;
+    width: 99%;
+    margin: 0px 1px 1px 1px;
     padding: 8px 0px 8px 0px;
-    -moz-outline-width: 0px;
-    border-top: solid 1px #CCEBF5;
+    background-color: #EDF8FB;
 }
 
-.q-scroll-row .unread-marker, .q-scroll-row-selected .unread-marker {
-    display: none;
-}
-
-.q-scroll-row-selected:link, .q-scroll-row-selected:visited, .q-scroll-row-selected {
-    color: #FFFFFF;
-    background-color: #0099CC;
-}
-
-.q-scroll-row-selected .sender {
-    color: #FFFFFF;
-}
-
-.q-scroll-row:visited, .q-scroll-row:link, .q-scroll-row-unread:link, .q-scroll-row-unread:visited {
+.q-scroll-row:visited, .q-scroll-row:link {
     color: #000000;
 }
 
@@ -611,10 +522,6 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     width: 99%;
 }
 
-.message-actions {
-    margin-left: 2px;
-}
-
 .next-message > .next {
     color: #81B1E2;
 }
@@ -626,12 +533,9 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 
 .message-actions-container {
     background-color: #CCEBF5;
+    border-bottom: solid 1px #7FCCE5;
     border-left: solid 1px #7FCCE5;
-    border-right: solid 1px #7FCCE5;
-    padding: 8px 0px 3px 0px;
-    background-image: url(/Quotient/static/images/2px-blue-border-vertical.png);
-    background-position: top right;
-    background-repeat: repeat-y;
+    padding: 2px 0px 2px 0px;
 }
 
 .progress-meter {

@@ -93,7 +93,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
         if (self._selectedRowID) {
             oldSelectedRowID = self._selectedRowID;
-            self.model.findRowData(self._selectedRowID).__node__.className = 'q-scroll-row';
+            oldNode = self.model.findRowData(self._selectedRowID).__node__;
+            oldNode.style.backgroundColor = '';
         }
 
         if (webID != null) {
@@ -102,12 +103,14 @@ Quotient.Mailbox.ScrollingWidget.methods(
             row = self.model.findRowData(webID);
             node = row.__node__;
 
-            if (!row.read) {
+            row["read"] = true;
+
+            if (node.style.fontWeight == "bold") {
                 self.decrementActiveMailViewCount();
             }
 
-            row.read = true;
-            node.className = 'q-scroll-row-selected';
+            node.style.fontWeight = "";
+            node.style.backgroundColor = '#FFFFFF';
         } else {
             self._selectedRowID = null;
         }
@@ -186,40 +189,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * XXX - should be template changes.
      */
     function makeRowElement(self, rowOffset, rowData, cells) {
-        var style = "height: " + (self._rowHeight - 9) + "px";
-        if(rowData.read) {
-            className = "q-scroll-row";
-        } else {
-            className = "q-scroll-row-unread";
+        var style = "border-top: solid 1px #FFFFFF; height: " + (self._rowHeight - 9) + "px";
+        if(!rowData["read"]) {
+            style += ";font-weight: bold";
         }
-        var icons = [
-            MochiKit.DOM.IMG({"class": "unread-marker",
-                              "src": "/Quotient/static/images/unread-marker.png"}),
-            MochiKit.DOM.IMG({
-                    "src": "/Quotient/static/images/checkbox-off.gif",
-                    "class": "checkbox-image",
-                    "onclick": function senderDisplayClicked(event) {
-                        self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
-
-                        this.blur();
-
-                        if (!event) {
-                            event = window.event;
-                        }
-                        event.cancelBubble = true;
-                        if(event.stopPropagation) {
-                            event.stopPropagation();
-                        }
-
-                        return false;
-            }})];
-
-        var rowDOM = MochiKit.Base.filter(null, cells);
+        var data = [MochiKit.Base.filter(null, cells)];
         if(0 < rowData["attachments"]) {
-            icons.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png"}));
+            data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
+                                        "style": "float: right; border: none"}));
         }
         return MochiKit.DOM.A(
-            {"class": className,
+            {"class": "q-scroll-row",
              "href": "#",
              "style": style,
              "onclick": function(event) {
@@ -227,7 +207,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 self._selectWebID(rowData["__id__"]);
                 self.widgetParent.fastForward(rowData["__id__"]);
                 return false;
-            }}, [MochiKit.DOM.DIV({"class": "scroll-row-icons"}, icons), rowDOM]);
+            }}, data);
     },
 
     /**
@@ -266,10 +246,30 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
-            var content = [massage(colName)];
+            attrs["title"] = rowData["sender"];
+            var content = [
+                MochiKit.DOM.IMG({
+                    "src": "/Quotient/static/images/checkbox-off.gif",
+                    "class": "checkbox-image",
+                    "border": 0,
+                    "onclick": function senderDisplayClicked(event) {
+                        self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
+
+                        this.blur();
+
+                        if (!event) {
+                            event = window.event;
+                        }
+                        event.cancelBubble = true;
+                        if(event.stopPropagation) {
+                            event.stopPropagation();
+                        }
+
+                        return false;
+                    }}), massage(colName)];
 
             if (rowData["everDeferred"]) {
-                content.push(IMG({"src": "/Quotient/static/images/boomerang.png",
+                content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
                                   "border": "0"}));
             }
 
@@ -516,6 +516,16 @@ Quotient.Mailbox.Controller.methods(
                     }, false);
             }, false);
 
+        var search = document.getElementById("search-button");
+        if(search) {
+            /* if there aren't any search providers available,
+             * then there won't be a search button */
+            var width = Divmod.Runtime.theRuntime.getElementSize(search.parentNode).w;
+            var contentTableContainer = Nevow.Athena.FirstNodeByAttribute(
+                                    node, "class", "content-table-container");
+            contentTableContainer.style.paddingRight = width + "px";
+        }
+
         Quotient.Mailbox.Controller.upcall(self, "__init__", node);
 
         self._batchSelectionPredicates = {read:   function(r) { return  r["read"] },
@@ -539,12 +549,12 @@ Quotient.Mailbox.Controller.methods(
 
         self.setupMailViewNodes();
 
-        self.messageDetail = self.firstWithClass(self.contentTableGrid[0][4], "message-detail");
+        self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
 
-        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][1], "view-pane-cell");
+        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-cell");
         self.viewShortcutSelect = self.firstWithClass(self.node, "view-shortcut-container");
 
         var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.node,
@@ -565,10 +575,10 @@ Quotient.Mailbox.Controller.methods(
 
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
         self.groupActionsForm = Nevow.Athena.FirstNodeByAttribute(
-                                    self.contentTableGrid[1][3], "name", "group-actions");
+                                    self.contentTableGrid[1][1], "name", "group-actions");
 
         self.nextMessagePreview = self.firstWithClass(
-            self.contentTableGrid[1][4],
+            self.contentTableGrid[1][2],
             "next-message-preview");
 
         self.setMessageCount(messageCount);
@@ -608,7 +618,7 @@ Quotient.Mailbox.Controller.methods(
     function getPeople(self) {
         var people = [];
         var personChooser = Divmod.Runtime.theRuntime.firstNodeByAttribute(
-            self.contentTableGrid[0][1], 'class', 'person-chooser');
+            self.contentTableGrid[0][0], 'class', 'person-chooser');
         var personChoices = Divmod.Runtime.theRuntime.nodesByAttribute(
             personChooser, 'class', 'list-option');
         var nameNode, keyNode;
@@ -703,7 +713,7 @@ Quotient.Mailbox.Controller.methods(
 
     function adjustProgressBar(self, lessHowManyMessages) {
         if(self.progressBar) {
-            self.progressBar = self.firstWithClass(self.contentTableGrid[1][4],
+            self.progressBar = self.firstWithClass(self.contentTableGrid[1][2],
                                                    "progress-bar");
         }
         self.progressBar.style.borderRight = "solid 1px #6699CC";
@@ -962,11 +972,11 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var swHeight = self.getHeight();
-        setHeight(self.contentTableGrid[0][3], swHeight);
+        setHeight(self.contentTableGrid[0][1], swHeight);
         setHeight(self.scrollWidget._scrollViewport, swHeight);
 
         setHeight(self.messageDetail, (Divmod.Runtime.theRuntime.getPageSize().h -
-                                       self.ypos - 13 -
+                                       self.ypos - 14 -
                                        self.totalFooterHeight));
 
         setTimeout(
@@ -1028,29 +1038,26 @@ Quotient.Mailbox.Controller.methods(
     function _setComplexityVisibility(self, c) {
         var fontSize;
         if(c == 1) {
-            self.messageActions.style.paddingLeft = "";
-            self.contentTableGrid[0][1].style.display = "none";
-            self.contentTableGrid[1][1].style.display = "none";
-            self.hideAll(self._getContentTableColumn(3));
-            self.hideAll(self._getContentTableColumn(2));
+            self.contentTableGrid[0][0].style.display = "none";
+            self.contentTableGrid[1][0].style.display = "none";
+            self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
+            self.viewShortcutSelect.style.display = "";
             /* use the default font-size, because complexity 1
                is the default complexity. */
             fontSize = "";
         } else if(c == 2) {
-            self.messageActions.style.paddingLeft = "";
-            self.contentTableGrid[0][1].style.display = "none";
-            self.contentTableGrid[1][1].style.display = "none";
-            self.showAll(self._getContentTableColumn(3));
-            self.hideAll(self._getContentTableColumn(2));
+            self.contentTableGrid[0][0].style.display = "none";
+            self.contentTableGrid[1][0].style.display = "none";
+            self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
+            self.viewShortcutSelect.style.display = "";
             fontSize = "1.3em";
         } else if(c == 3) {
-            self.messageActions.style.paddingLeft = "210px";
-            self.contentTableGrid[0][1].style.display = "";
-            self.contentTableGrid[1][1].style.display = "";
-            self.showAll(self._getContentTableColumn(3));
-            self.showAll(self._getContentTableColumn(2));
+            self.viewShortcutSelect.style.display = "none";
+            self.contentTableGrid[0][0].style.display = "";
+            self.contentTableGrid[1][0].style.display = "";
+            self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             fontSize = "1.3em";
         }
@@ -1244,7 +1251,7 @@ Quotient.Mailbox.Controller.methods(
      * Add the given tags as options inside the "View By Tag" element
      */
     function addTagsToViewSelector(self, taglist) {
-        var tc = self.firstWithClass(self.contentTableGrid[0][1], "tag-chooser");
+        var tc = self.firstWithClass(self.contentTableGrid[0][0], "tag-chooser");
         var choices = tc.getElementsByTagName("span");
         var currentTags = [];
         for(var i = 0; i < choices.length; i++) {
@@ -1266,11 +1273,11 @@ Quotient.Mailbox.Controller.methods(
      * visibility values to lists of button descriptors
      */
     function createVisibilityMatrix(self) {
-        var train_ham = "train-ham";
-        var train_spam  = "train-spam";
-        var delete_ = "delete";
-        var archive = "archive";
-        var defer   = "defer";
+        var train_ham = ["train-ham", false];
+        var train_spam  = ["train-spam", false];
+        var delete_ = ["delete", true];
+        var archive = ["archive", true];
+        var defer   = ["defer", true];
 
         return {
             Spam:     {show: [delete_, train_ham],
@@ -1356,16 +1363,16 @@ Quotient.Mailbox.Controller.methods(
      *
      * @param topRow: boolean - from top button row?
      */
-    function getButton(self, name) {
+    function getButton(self, name, topRow) {
         if(!self.buttons) {
             self.buttons = {};
         }
-        if(!(name in self.buttons)) {
-            self.buttons[name] = self.firstWithClass(
-                                    self.messageActions,
-                                    name + "-button");
+        if(!([name, topRow] in self.buttons)) {
+            self.buttons[[name, topRow]] = self.firstWithClass(
+                                                    self.messageActions[new Number(!topRow)],
+                                                    name + "-button");
         }
-        return self.buttons[name];
+        return self.buttons[[name, topRow]];
     },
 
     /**
@@ -1375,7 +1382,7 @@ Quotient.Mailbox.Controller.methods(
     function setDisplayForButtons(self, display, buttonArgs) {
         var button;
         for(var i = 0; i < buttonArgs.length; i++) {
-            button = self.getButton(buttonArgs[i]);
+            button = self.getButton.apply(self, buttonArgs[i]);
             button.style.display = display;
         }
     },
@@ -1462,7 +1469,7 @@ Quotient.Mailbox.Controller.methods(
 
     function setupMailViewNodes(self) {
         if (!self.mailViewBody) {
-            var mailViewPane = self.firstWithClass(self.contentTableGrid[0][1], "view-pane-content");
+            var mailViewPane = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-content");
             var mailViewBody = self.firstWithClass(mailViewPane, "pane-body");
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
@@ -1814,8 +1821,8 @@ Quotient.Mailbox.Controller.methods(
     function setProgressWidth(self) {
         if(!self.progressBar) {
             self.progressBar = self.firstWithClass(
-                                self.contentTableGrid[1][4], "progress-bar");
-            self.messageActions = self.firstNodeByAttribute("class", "message-actions");
+                                self.contentTableGrid[1][2], "progress-bar");
+            self.messageActions = self.nodesByAttribute("class", "message-actions");
         }
         var visibility;
         if(self.remainingMessages == 0) {
@@ -1826,7 +1833,9 @@ Quotient.Mailbox.Controller.methods(
         }
 
         self.progressBar.style.visibility = visibility;
-        self.messageActions.style.visibility = visibility;
+        for(var i = 0; i < self.messageActions.length; i++) {
+            self.messageActions[i].style.visibility = visibility;
+        }
     },
 
     function archiveThis(self, n) {
