@@ -83,58 +83,46 @@
 
   <div class="inbox-content">
     <div class="quotient-menubar">
-      <div class="complexity-icons">
-        <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
-             onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
-             class="complexity-icon">
-          <athena:handler event="onmouseover" handler="complexityHover" />
-          <athena:handler event="onmouseout" handler="complexityHover" />
-        </img>
-        <img src="/Quotient/static/images/complexity-selector-2-unselected.png"
-          onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this, true)"
-          class="complexity-icon">
-          <athena:handler event="onmouseover" handler="complexityHover" />
-          <athena:handler event="onmouseout" handler="complexityHover" />
-        </img>
-        <img src="/Quotient/static/images/complexity-selector-1-selected.png"
-          onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this, true)"
-          class="selected-complexity-icon">
-          <athena:handler event="onmouseover" handler="complexityHover" />
-          <athena:handler event="onmouseout" handler="complexityHover" />
-        </img>
-        </div>
-        <div class="menubar-separator" />
-        <nevow:invisible nevow:render="composeLink" />
-        <div style="clear: left; font-size: 0px">&#160;</div>
+      <div class="quotient-menubar-inner">
+        <div class="complexity-icons">
+          <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
+              onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
+              class="complexity-icon">
+            <athena:handler event="onmouseover" handler="complexityHover" />
+            <athena:handler event="onmouseout" handler="complexityHover" />
+          </img>
+          <img src="/Quotient/static/images/complexity-selector-2-unselected.png"
+            onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this, true)"
+            class="complexity-icon">
+            <athena:handler event="onmouseover" handler="complexityHover" />
+            <athena:handler event="onmouseout" handler="complexityHover" />
+          </img>
+          <img src="/Quotient/static/images/complexity-selector-1-selected.png"
+            onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this, true)"
+            class="selected-complexity-icon">
+            <athena:handler event="onmouseover" handler="complexityHover" />
+            <athena:handler event="onmouseout" handler="complexityHover" />
+          </img>
+          </div>
+          <div class="menubar-separator" />
+          <nevow:invisible nevow:render="composeLink" />
+          <div style="clear: left; font-size: 0px">&#160;</div>
+      </div>
     </div>
     <div class="content-table-container">
       <div class="message-actions-container">
-        <select class="view-shortcut-container">
-          <athena:handler event="onchange" handler="chooseMailViewByNode" />
-          <option value="Inbox">Inbox</option>
-          <option value="All">All</option>
-          <option value="Deferred">Deferred</option>
-          <option value="Sent">Sent</option>
-          <option value="Spam">Spam</option>
-          <option value="Trash">Trash</option>
-        </select>
-        <div class="message-actions" style="visibility: hidden; margin-left: 2px">
+        <div class="message-actions" style="visibility: hidden">
+          <select class="view-shortcut-container">
+            <athena:handler event="onchange" handler="chooseMailViewByNode" />
+            <option value="Inbox">Inbox</option>
+            <option value="All">All</option>
+            <option value="Deferred">Deferred</option>
+            <option value="Sent">Sent</option>
+            <option value="Spam">Spam</option>
+            <option value="Trash">Trash</option>
+          </select>
           <!-- button renderer will place the contents of the tag inside the
           "content" slot of an instance of the "button" template pattern -->
-          <div class="message-actions" style="visibility: hidden; float: right">
-            <span class="train-spam-button">
-              <nevow:invisible nevow:render="button" href="#">
-                <athena:handler event="onclick" handler="trainSpam" />
-                This Is Spam
-              </nevow:invisible>
-            </span>
-            <span class="train-ham-button" style="display: none;">
-              <nevow:invisible nevow:render="button" href="#">
-                <athena:handler event="onclick" handler="trainHam" />
-                Not Spam
-              </nevow:invisible>
-            </span>
-          </div>
           <span class="archive-button">
             <nevow:invisible nevow:render="button"
               onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
@@ -174,39 +162,27 @@
             href="#">
             print
           </nevow:invisible>
-          <!-- in IE the defer select is taller than the buttons, and when we hide it
-                in certain views, things get a bit fucked up.  there is probably a better
-                way to fix this -->
-          <select style="visibility: hidden">
-            <option>HORRIBLE HACK</option>
-          </select>
-          <div style="height: 2px; font-size: 0px; clear: both">&#160;</div>
-          <form style="display: none" class="defer-form"
-            onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
-            <table style="table-layout: fixed">
-              <tr>
-                <td>Days:</td><td><input type="text" name="days" value="0" /></td>
-              </tr>
-              <tr>
-                <td>Hours:</td><td><input type="text" name="hours" value="1" /></td>
-              </tr>
-              <tr>
-                <td>Minutes:</td><td><input type="text" name="minutes" value="0" /></td>
-              </tr>
-              <tr>
-                <td colspan="2" align="right">
-                  <input type="submit" value="Cancel"
-                    onclick="Quotient.Mailbox.Controller.get(this).hideDeferForm(); return false" />
-                  <input type="submit" value="Defer" />
-                </td>
-              </tr>
-            </table>
-          </form>
+          <div style="float: right">
+            <span class="train-spam-button">
+              <nevow:invisible nevow:render="button" href="#">
+                <athena:handler event="onclick" handler="trainSpam" />
+                This Is Spam
+              </nevow:invisible>
+            </span>
+            <span class="train-ham-button" style="display: none;">
+              <nevow:invisible nevow:render="button" href="#">
+                <athena:handler event="onclick" handler="trainHam" />
+                Not Spam
+              </nevow:invisible>
+            </span>
+          </div>
         </div>
+        <div style="height: 1px; clear: both">&#160;</div>
       </div>
       <table style="height: 100%; width: 100%" cellpadding="0" cellspacing="0" class="content-table">
         <tbody>
           <tr valign="top">
+            <td class="content-table-left-edge"><div class="spacer" /></td>
             <td class="view-pane-cell" style="display: none">
               <div class="view-pane-container">
                 <div class="view-pane">
@@ -217,6 +193,7 @@
                 </div>
               </div>
             </td>
+            <td class="view-pane-right-edge"><div class="spacer" /></td>
             <td class="scrolltable-cell">
               <div class="scrolltable-container" style="top: -1000px; left: -1000px">
                 <div style="position: absolute; z-index: 99; display: none" class="throbber">
@@ -230,9 +207,12 @@
                 <nevow:invisible nevow:render="messageDetail" />
               </div>
             </td>
+            <td class="content-table-right-edge"><div class="spacer" /></td>
           </tr>
           <tr>
+            <td class="left-block-footer-edge"><div class="spacer" /></td>
             <td class="left-block-footer" style="display: none">&#160;</td>
+            <td class="left-block-footer-right-edge"><div class="spacer">&#160;</div></td>
             <td class="mid-block-footer" style="display: none">
               <table align="center" cellpadding="0" cellspacing="0" style="padding: 0px 2px 0px 2px">
                 <tr>
@@ -282,6 +262,7 @@
                 </div>
               </div>
             </td>
+            <td class="right-block-footer-edge"><div class="spacer" /></td>
           </tr>
         </tbody>
       </table>
