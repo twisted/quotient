@@ -156,8 +156,6 @@ Quotient.Compose.Controller.methods(
             bg.style.width = pageSize.w + "px";
             document.body.appendChild(bg);
 
-            document.body.appendChild(
-                MochiKit.DOM.DIV({"id": "attach-dialog-bg"}));
             if(self.attachDialog.style.left == "") {
                 var elemSize = Divmod.Runtime.theRuntime.getElementSize(self.attachDialog);
                 self.attachDialog.style.display = "none";
