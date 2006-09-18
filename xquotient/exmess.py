@@ -543,7 +543,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                 personStan = people.PersonFragment(p, self.original.sender)
             personStan.page = self.page
         else:
-            personStan = self.original.sender
+            personStan = tags.span(title=self.original.sender)[
+                            self.original.senderDisplay]
 
         tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone'))
         sentWhen = self.original.sentWhen

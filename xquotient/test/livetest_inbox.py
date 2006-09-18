@@ -237,4 +237,3 @@ class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
         fragment.setFragmentParent(self)
         return fragment
     expose(getEmptyControllerWidget)
-

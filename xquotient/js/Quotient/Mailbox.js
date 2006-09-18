@@ -246,26 +246,27 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
+            attrs["title"] = rowData["sender"];
             var content = [
                 MochiKit.DOM.IMG({
-                        "src": "/Quotient/static/images/checkbox-off.gif",
-                        "class": "checkbox-image",
-                        "border": 0,
-                        "onclick": function senderDisplayClicked(event) {
-                            self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
+                    "src": "/Quotient/static/images/checkbox-off.gif",
+                    "class": "checkbox-image",
+                    "border": 0,
+                    "onclick": function senderDisplayClicked(event) {
+                        self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
 
-                            this.blur();
+                        this.blur();
 
-                            if (!event) {
-                                event = window.event;
-                            }
-                            event.cancelBubble = true;
-                            if(event.stopPropagation) {
-                                event.stopPropagation();
-                            }
+                        if (!event) {
+                            event = window.event;
+                        }
+                        event.cancelBubble = true;
+                        if(event.stopPropagation) {
+                            event.stopPropagation();
+                        }
 
-                            return false;
-                        }}), massage(colName)];
+                        return false;
+                    }}), massage(colName)];
 
             if (rowData["everDeferred"]) {
                 content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
@@ -458,7 +459,9 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * metadata.
      */
     function skipColumn(self, name) {
-        return name == "read" || name == "sentWhen" || name == "attachments" || name == "everDeferred";
+        return name == "read" || name == "sentWhen" ||
+               name == "attachments" || name == "everDeferred" ||
+               name == "sender";
     },
 
     /**

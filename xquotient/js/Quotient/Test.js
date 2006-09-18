@@ -1054,6 +1054,28 @@ Quotient.Test.ControllerTestCase.methods(
                     rowIdentifiers[1]);
             });
         return result;
+    },
+
+    /**
+     * Test that the (undisplayed) Message.sender column is passed to the
+     * scrolltable model
+     */
+    function test_senderColumn(self) {
+        var model = self.controllerWidget.scrollWidget.model;
+        self.failUnless(model.getRowData(0).sender);
+    },
+
+    /**
+     * Test that the node generated for the "senderDisplay" column of the
+     * first row
+     */
+    function test_cellNode(self) {
+        var view = self.controllerWidget.scrollWidget;
+        var rowData = view.model.getRowData(0);
+        var cell = view.makeCellElement("senderDisplay", rowData);
+        self.assertEqual(cell.title, rowData["sender"]);
+        self.assertEqual(cell.firstChild.nodeValue, rowData["senderDisplay"]);
+        self.assertEqual(cell.className, "sender");
     }
 
     /**

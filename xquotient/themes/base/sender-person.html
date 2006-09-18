@@ -5,7 +5,9 @@
       onclick="Quotient.Common.SenderPerson.get(this).showAddPerson(event, this.parentNode, this);
                return false">
       <img src="/Quotient/static/images/not-a-person.png" border="0"/></a>
-    <span class="sender-person-name"><nevow:slot name="name" /></span>
+    <span class="sender-person-name"
+      ><nevow:attr name="title"><nevow:slot
+          name="identifier" /></nevow:attr><nevow:slot name="name" /></span>
     <span class="person-identifier" style="display: none;"
       ><nevow:slot name="identifier" /></span>
   </nevow:invisible>
