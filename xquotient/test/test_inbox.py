@@ -50,30 +50,12 @@ class MessageRetrievalTestCase(TestCase):
         identifier for the first message, and the persistent complexity
         setting.
         """
-        args = self.inbox.getInitialArguments()
-        messageCount, messageIdentifier, complexity = args
-        self.assertEquals(messageCount, 5)
-        self.assertEquals(
-            messageIdentifier,
-            self.webTranslator.toWebID(self.msgs[-1]).decode('ascii'))
-        self.failUnless(isinstance(messageIdentifier, unicode))
-        self.assertEquals(complexity, 1)
+        [complexity] = self.inbox.getInitialArguments()
+        self.assertEqual(complexity, 1)
 
-
-    def test_getInitialArgumentsEmptyMailbox(self):
-        """
-        Test that an empty mailbox is properly represented by the return value
-        of L{InboxScreen.getInitialArguments}.
-        """
-        store = Store()
-        PrivateApplication(store=store).installOn(store)
-        inbox = Inbox(store=store)
-        screen = InboxScreen(inbox)
-        args = screen.getInitialArguments()
-        messageCount, messageIdentifier, complexity = args
-        self.assertEquals(messageCount, 0)
-        self.assertEquals(messageIdentifier, None)
-        self.assertEquals(complexity, 1)
+        self.inbox.inbox.uiComplexity = 2
+        [complexity] = self.inbox.getInitialArguments()
+        self.assertEqual(complexity, 2)
 
 
     def testGetLastMessage(self):
@@ -90,10 +72,14 @@ class MessageRetrievalTestCase(TestCase):
         InboxScreen.getMessageAfter.  Also test that None is returned if there
         is no such message.
         """
-        self.assertIdentical(self.msgs[1],
-                             self.inbox.getMessageAfter(self.msgs[0]))
-        self.assertIdentical(None,
-                             self.inbox.getMessageAfter(self.msgs[-1]))
+        self.assertIdentical(
+            self.msgs[1],
+            self.inbox.getMessageAfter(self.inbox.viewSelection,
+                                       self.msgs[0]))
+        self.assertIdentical(
+            None,
+            self.inbox.getMessageAfter(self.inbox.viewSelection,
+                                       self.msgs[-1]))
 
 
     def testGetMessageBefore(self):
@@ -102,10 +88,14 @@ class MessageRetrievalTestCase(TestCase):
         InboxScreen.getMessageBefore.  Also test that None is returned if there
         is no such message.
         """
-        self.assertIdentical(self.msgs[-2],
-                             self.inbox.getMessageBefore(self.msgs[-1]))
-        self.assertIdentical(None,
-                             self.inbox.getMessageBefore(self.msgs[0]))
+        self.assertIdentical(
+            self.msgs[-2],
+            self.inbox.getMessageBefore(self.inbox.viewSelection,
+                                        self.msgs[-1]))
+        self.assertIdentical(
+            None,
+            self.inbox.getMessageBefore(self.inbox.viewSelection,
+                                        self.msgs[0]))
 
 
     def testGetLastMessageWithFlags(self):
@@ -123,7 +113,9 @@ class MessageRetrievalTestCase(TestCase):
         inbox are not considered for return by InboxScreen.getMessageAfter.
         """
         self.msgs[1].archived = True
-        self.assertIdentical(self.msgs[2], self.inbox.getMessageAfter(self.msgs[0]))
+        self.assertIdentical(
+            self.msgs[2],
+            self.inbox.getMessageAfter(self.inbox.viewSelection, self.msgs[0]))
 
 
     def testGetMessageBeforeWithFlags(self):
@@ -132,7 +124,10 @@ class MessageRetrievalTestCase(TestCase):
         inbox are not considered for return by InboxScreen.getMessageAfter.
         """
         self.msgs[-2].archived = True
-        self.assertIdentical(self.msgs[-3], self.inbox.getMessageBefore(self.msgs[-1]))
+        self.assertIdentical(
+            self.msgs[-3],
+            self.inbox.getMessageBefore(self.inbox.viewSelection,
+                                        self.msgs[-1]))
 
 
 
@@ -172,42 +167,43 @@ class InboxTestCase(TestCase):
         # we're in the "Inbox" view
         inbox = Inbox(store=s)
         inboxScreen = InboxScreen(inbox)
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 13)
+        viewSelection = dict(inboxScreen.viewSelection)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 13)
         s.findFirst(Message, Message.read == True).read = False
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 14)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 14)
 
-        inboxScreen.changeView('Spam')
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 0)
+        viewSelection["view"] = 'spam'
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
 
         spam = []
         for m in s.query(Message, Message.read == False, limit=6):
             m.spam = True
             spam.append(m)
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 6)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 6)
 
         for m in spam:
             m.spam = False
         m.archived = True
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 0)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
 
-        inboxScreen.changeView('All')
+        viewSelection["view"] = 'all'
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 14)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 14)
 
-        inboxScreen.changeView('Sent')
+        viewSelection["view"] = 'sent'
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 0)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
 
         m.archived = False
         m.outgoing = True
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 1)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 1)
 
-        inboxScreen.changeView('Inbox')
+        viewSelection["view"] = 'inbox'
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(), 13)
+        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 13)
 
     def testMailViewCounts(self):
         s = Store()
@@ -219,10 +215,10 @@ class InboxTestCase(TestCase):
 
         PrivateApplication(store=s).installOn(s)
         inboxScreen = InboxScreen(Inbox(store=s))
-        self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
+        self.assertEqual(inboxScreen.viewSelection["view"], 'inbox')
 
         def assertCountsAre(**d):
-            for k in ('Trash', 'Sent', 'Spam', 'All', 'Inbox', 'Deferred'):
+            for k in ('trash', 'sent', 'spam', 'all', 'inbox', 'deferred'):
                 if not k in d:
                     d[k] = 0
             self.assertEqual(inboxScreen.mailViewCounts(), d)
@@ -230,34 +226,25 @@ class InboxTestCase(TestCase):
         # the Inbox will mark the first Message in it's query as read,
         # so we subtract one from the expected counts
 
-        assertCountsAre(Inbox=8, All=11)
+        assertCountsAre(inbox=8, all=11)
 
         for i in xrange(4):
             Message(store=s, read=False, spam=True, receivedWhen=Time())
         for i in xrange(3):
             Message(store=s, read=True, spam=True, receivedWhen=Time())
 
-        assertCountsAre(Inbox=8, All=11, Spam=4)
+        assertCountsAre(inbox=8, all=11, spam=4)
 
         for i in xrange(2):
             Message(store=s, read=False, trash=True, receivedWhen=Time())
 
-        assertCountsAre(Inbox=8, All=11, Spam=4, Trash=2)
+        assertCountsAre(inbox=8, all=11, spam=4, trash=2)
 
         for i in xrange(4):
             Message(store=s, read=False, outgoing=True, receivedWhen=Time())
 
-        assertCountsAre(Inbox=8, All=11, Spam=4, Trash=2, Sent=4)
-        self.assertEqual(inboxScreen.getCurrentViewName(), 'Inbox')
-
-    def testViewSwitching(self):
-        s = Store()
-        PrivateApplication(store=s).installOn(s)
-        inboxScreen = InboxScreen(Inbox(store=s))
-
-        for view in ('Inbox', 'All', 'Spam', 'Trash', 'Sent'):
-            inboxScreen.changeView(view)
-            self.assertEqual(inboxScreen.getCurrentViewName(), view)
+        assertCountsAre(inbox=8, all=11, spam=4, trash=2, sent=4)
+        self.assertEqual(inboxScreen.viewSelection["view"], 'inbox')
 
     def testDefer(self):
         s = Store()
@@ -306,6 +293,7 @@ class InboxTestCase(TestCase):
         msgs.reverse()
 
         self.inboxScreen = InboxScreen(Inbox(store=s))
+        self.viewSelection = dict(self.inboxScreen.viewSelection)
         self.msgs = msgs
         self.msgIds = map(self.translator.toWebID, self.msgs)
 
@@ -351,7 +339,7 @@ class InboxTestCase(TestCase):
         """
         self._setUpInbox()
 
-        preview, fragment, data = self.inboxScreen.fastForward(self.msgIds[2])
+        preview, fragment, data = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
         self.assertEquals(data[u'identifier'], self.msgIds[2])
         self.assertEquals(preview[u'subject'], self.msgs[1].subject)
         self.failUnless(self.msgs[2].read)
@@ -365,11 +353,17 @@ class InboxTestCase(TestCase):
         store = Store()
         inbox = Inbox(store=store)
 
+        viewSelection = {
+            u"view": "inbox",
+            u"tag": None,
+            u"person": None,
+            u"account": None}
+
         # Test that even with no messages, it spits out the right value (an
         # empty list).
         for batchType in ("read", "unread", "all"):
             self.assertEquals(
-                list(inbox.messagesForBatchType(batchType, "Inbox")),
+                list(inbox.messagesForBatchType(batchType, viewSelection)),
                 [])
 
         # Make one message and assert that it only comes back from queries for
@@ -377,28 +371,28 @@ class InboxTestCase(TestCase):
         message = Message(store=store, spam=False)
 
         message.read = False
-        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
 
         message.read = True
-        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [])
-        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
 
         # Make one more and make sure the batch is correct with various
         # combinations of states between the two.
         other = Message(store=store, spam=False)
 
         other.read = False
-        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [other])
-        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message, other])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [other])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
 
         other.read = True
-        self.assertEquals(list(inbox.messagesForBatchType("read", "Inbox")), [message, other])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", "Inbox")), [])
-        self.assertEquals(list(inbox.messagesForBatchType("all", "Inbox")), [message, other])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message, other])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
 
 
 
@@ -458,8 +452,9 @@ class ReadUnreadTestCase(TestCase):
         Test that fast forwarding to a message marks that message as read.
         """
         screen = InboxScreen(self.inbox)
+        viewSelection = screen.viewSelection
 
-        screen.fastForward(self.translator.toWebID(self.messages[-2]))
+        screen.fastForward(viewSelection, self.translator.toWebID(self.messages[-2]))
 
         # All but the first two messages should still be unread
         for msg in self.messages[:-2]:
@@ -470,7 +465,7 @@ class ReadUnreadTestCase(TestCase):
             self.failUnless(msg.read, "First two messages should be read.")
 
         # Jump to the end of the mailbox
-        screen.fastForward(self.translator.toWebID(self.messages[0]))
+        screen.fastForward(viewSelection, self.translator.toWebID(self.messages[0]))
 
         for msg in self.messages[1:-2]:
             self.failIf(msg.read, "Middle messages should be unread.")

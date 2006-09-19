@@ -4,7 +4,7 @@ from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.webtheme import getLoader
 
 class SenderPersonFragment(athena.LiveFragment):
-    jsClass = 'Quotient.Common.SenderPerson'
+    jsClass = u'Quotient.Common.SenderPerson'
 
     def __init__(self, message):
         self.message = message

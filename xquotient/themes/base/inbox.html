@@ -118,10 +118,10 @@
           <option value="Spam">Spam</option>
           <option value="Trash">Trash</option>
         </select>
-        <div class="message-actions" style="visibility: hidden; margin-left: 2px">
+        <div class="message-actions" style="margin-left: 2px">
           <!-- button renderer will place the contents of the tag inside the
           "content" slot of an instance of the "button" template pattern -->
-          <div class="message-actions" style="visibility: hidden; float: right">
+          <div class="message-actions" style="float: right">
             <span class="train-spam-button">
               <nevow:invisible nevow:render="button" href="#">
                 <athena:handler event="onclick" handler="trainSpam" />
@@ -159,21 +159,30 @@
               <option>other...</option>
             </select>
           </span>
-          <nevow:invisible nevow:render="button"
-            onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
-            href="#">
-            forward
-          </nevow:invisible>
-          <nevow:invisible nevow:render="button"
-            onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
-            href="#">
-            reply
-          </nevow:invisible>
-          <nevow:invisible nevow:render="button"
-            onclick="Quotient.Mailbox.Controller.get(this).printable(); return false"
-            href="#">
-            print
-          </nevow:invisible>
+          <span class="forward-button">
+            <nevow:invisible
+               nevow:render="button"
+               onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
+               href="#">
+              forward
+            </nevow:invisible>
+          </span>
+          <span class="reply-button">
+            <nevow:invisible
+               nevow:render="button"
+               onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
+               href="#">
+              reply
+            </nevow:invisible>
+          </span>
+          <span class="print-button">
+            <nevow:invisible
+               nevow:render="button"
+               onclick="Quotient.Mailbox.Controller.get(this).printable(); return false"
+               href="#">
+              print
+            </nevow:invisible>
+          </span>
           <!-- in IE the defer select is taller than the buttons, and when we hide it
                 in certain views, things get a bit fucked up.  there is probably a better
                 way to fix this -->

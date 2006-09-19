@@ -339,7 +339,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
     fragmentName = 'compose'
     live = 'athena'
-    jsClass = 'Quotient.Compose.Controller'
+    jsClass = u'Quotient.Compose.Controller'
     title = ''
 
     _savedDraft = None
@@ -701,7 +701,7 @@ class Drafts(item.Item, item.InstallableMixin):
         other.powerUp(self, ixmantissa.INavigableElement)
 
 class DraftsScreen(ScrollingFragment):
-    jsClass = 'Quotient.Compose.DraftListScrollingWidget'
+    jsClass = u'Quotient.Compose.DraftListScrollingWidget'
 
     def __init__(self, original):
         ScrollingFragment.__init__(

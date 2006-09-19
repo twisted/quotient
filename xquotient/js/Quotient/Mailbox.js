@@ -1,6 +1,25 @@
 
+/**
+ *
+ * XXX TODO -
+ *
+ * - Synchronized getter/setter methods: current _selectWebID returns a
+ *   Deferred: if you call getSelectedRow before that Deferred fires, you'll
+ *   get the newly selected row; if you try to inspect the message detail
+ *   (display or structured data) before that Deferred fires, you'll see the
+ *   old message data.
+ *
+ * - Batched updates: calling _selectWebID multiple times before the first
+ *   call's Deferred fires should make the fewest round-trips and display
+ *   updates possible, rather than doing all of the intermediate work which has
+ *   been rendered irrelevant by the subsequent calls.
+ *
+ */
+
+
 // import Mantissa.People
 // import Mantissa.ScrollTable
+// import Mantissa.LiveForm
 
 // import Quotient
 // import Quotient.Common
@@ -13,9 +32,19 @@ Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass
 
 Quotient.Mailbox.ScrollingWidget.methods(
     function __init__(self, node) {
-        Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
+        /*
+         * XXX TODO - viewSelection should be a parameter to __init__
+         */
+        self.viewSelection = {
+            "view": "inbox",
+            "tag": null,
+            "person": null,
+            "account": null};
         self.selectedGroup = {};
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
+
+        Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
+
         self._scrollViewport.style.maxHeight = "";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
         try {
@@ -24,6 +53,22 @@ Quotient.Mailbox.ScrollingWidget.methods(
             self.throbberNode = document.createElement('span');
         }
         self.throbber = Quotient.Throbber.Throbber(self.throbberNode);
+    },
+
+    /**
+     * Override the base implementation to pass along our current view
+     * selection.
+     */
+    function getTableMetadata(self) {
+        return self.callRemote("getTableMetadata", self.viewSelection);
+    },
+
+    /**
+     * Override the base implementation to pass along our current view
+     * selection.
+     */
+    function getRows(self, firstRow, lastRow) {
+        return self.callRemote("requestRowRange", self.viewSelection, firstRow, lastRow);
     },
 
     /**
@@ -41,6 +86,33 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
 
     /**
+     * Change the view being viewed.  Return a Deferred which fires with the
+     * number of messages in the new view.
+     */
+    function changeViewSelection(self, viewType, value) {
+        self.throbber.startThrobbing();
+        self.viewSelection[viewType] = value;
+        var result = Divmod.Defer.gatherResults(
+            [self.callRemote("requestCurrentSize", self.viewSelection),
+             self.emptyAndRefill()]);
+        result.addCallback(
+            function(info) {
+                var messageCount = info[0];
+                self.setViewportHeight(messageCount);
+                return self._selectFirstRow().addCallback(
+                    function(ignored) {
+                        return messageCount;
+                    });
+            });
+        result.addBoth(
+            function(passthrough) {
+                self.throbber.stopThrobbing();
+                return passthrough;
+            });
+        return result;
+    },
+
+    /**
      * Extend the base behavior to reset the message selection group tracking
      * object.
      *
@@ -49,7 +121,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
      */
     function emptyAndRefill(self) {
         self.selectedGroup = {};
-        return Quotient.Mailbox.ScrollingWidget.upcall(self, 'emptyAndRefill');
+        return self._selectWebID(null).addCallback(
+            function(ignored) {
+                return Quotient.Mailbox.ScrollingWidget.upcall(self, 'emptyAndRefill');
+            });
     },
 
     /**
@@ -82,9 +157,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
      *
      * @type webID: string
      *
-     * @rtype: string
-     * @return: The webID of the previously selected message, or null if there
-     * was no previously selected message.
+     * @return: A Deferred which will fire with the webID of the previously
+     * selected message, or null if there was no previously selected message,
+     * once the selection has been changed and the mailbox view brought up to
+     * date.
      */
     function _selectWebID(self, webID) {
         var row;
@@ -115,28 +191,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
             self._selectedRowID = null;
         }
 
-        /*
-         * XXX selectionChanged returns a Deferred, we should really be
-         * propagating it.
-         */
-        self.selectionChanged(webID);
-        return oldSelectedRowID;
+        return self.selectionChanged(webID).addCallback(
+            function(ignored) {
+                return oldSelectedRowID;
+            });
     },
 
     /**
      * Called whenever the selected row is changed.
-     *
-     * This implementation updates the message detail area of the Controller
-     * which is the parent widget of this widget.  It returns a Deferred which
-     * fires when this has been completed.
      */
     function selectionChanged(self, webID) {
-        if (webID == null) {
-            self.widgetParent.clearMessageDetail();
-            return Divmod.Defer.succeed(null);
-        } else {
-            return self.widgetParent.updateMessageDetail(webID);
-        }
+        return self.widgetParent.selectionChanged(webID);
     },
 
     function decrementActiveMailViewCount(self) {
@@ -148,15 +213,21 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * necessary.
      */
     function removeRow(self, index) {
+        var unselect;
         var row = self.model.getRowData(index);
         /*
          * The row was selected - unselect it quick or
          * something terrible will occur.
          */
         if (row.__id__ == self._selectedRowID) {
-            self._selectWebID(null);
+            unselect = self._selectWebID(null);
+        } else {
+            unselect = Divmod.Defer.succeed(null);
         }
-        return Quotient.Mailbox.ScrollingWidget.upcall(self, 'removeRow', index);
+        return unselect.addCallback(
+            function(ignored) {
+                Quotient.Mailbox.ScrollingWidget.upcall(self, 'removeRow', index);
+            });
     },
 
     /**
@@ -177,9 +248,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * If there are no rows, no action will be taken.
      */
     function _selectFirstRow(self) {
+        var webID;
         if (self.model.rowCount()) {
-            self._selectWebID(self.model.getRowData(0)['__id__']);
+            webID = self.model.getRowData(0)['__id__'];
+        } else {
+            webID = null;
         }
+        return self._selectWebID(webID);
     },
 
 
@@ -203,11 +278,18 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "href": "#",
              "style": style,
              "onclick": function(event) {
-                /* don't select based on rowOffset because it'll change as rows are removed */
-                self._selectWebID(rowData["__id__"]);
-                self.widgetParent.fastForward(rowData["__id__"]);
-                return false;
-            }}, data);
+                    var webID = rowData["__id__"];
+                    return Nevow.Athena.Widget.dispatchEvent(
+                        self, "onclick", "<row clicked>",
+                        function() {
+                            /* don't select based on rowOffset because it'll
+                             * change as rows are removed
+                             */
+                            self._selectWebID(webID);
+                            return false;
+                        });
+                }
+            }, data);
     },
 
     /**
@@ -493,7 +575,21 @@ Quotient.Mailbox.ScrollingWidget.methods(
  */
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
-    function __init__(self, node, messageCount, selectedMessageIdentifier, complexityLevel) {
+    function __init__(self, node, complexityLevel) {
+        Quotient.Mailbox.Controller.upcall(self, '__init__', node);
+        self.complexityLevel = complexityLevel;
+
+        /*
+         * Fired when the initial load has finished.
+         */
+        self.initializationDeferred = Divmod.Defer.Deferred();
+    },
+
+    /**
+     * Do a bunch of initialization, like finding useful nodes and child
+     * widgets and filling up the scrolltable.
+     */
+    function loaded(self) {
         self.lastPageSize = Divmod.Runtime.theRuntime.getPageSize();
 
         /*
@@ -521,35 +617,29 @@ Quotient.Mailbox.Controller.methods(
             /* if there aren't any search providers available,
              * then there won't be a search button */
             var width = Divmod.Runtime.theRuntime.getElementSize(search.parentNode).w;
-            var contentTableContainer = Nevow.Athena.FirstNodeByAttribute(
-                                    node, "class", "content-table-container");
+            var contentTableContainer = self.firstNodeByAttribute("class", "content-table-container");
             contentTableContainer.style.paddingRight = width + "px";
         }
-
-        Quotient.Mailbox.Controller.upcall(self, "__init__", node);
 
         self._batchSelectionPredicates = {read:   function(r) { return  r["read"] },
                                           unread: function(r) { return !r["read"] }}
 
         self.currentMessageData = null;
 
-        self._cacheContentTableGrid();
-
-        /*
-         * This attribute keeps track of which of the weird message view
-         * settings is currently selected.  Currently, the server renders the
-         * initially selected view as Inbox.  If that changes, this code will
-         * need to be updated.
-         *
-         * Hopefully, this will all be thrown away before too long, though,
-         * because it is stupid.
-         */
-
-        self._viewingByView = 'Inbox';
+        var contentTableNodes = self._getContentTableGrid();
+        self.contentTable = contentTableNodes.table;
+        self.contentTableGrid = contentTableNodes.grid;
 
         self.setupMailViewNodes();
 
         self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
+
+
+        self.progressBar = self.firstWithClass(
+            self.contentTableGrid[1][2], "progress-bar");
+
+        self.messageActions = self.firstNodeByAttribute("class", "message-actions");
+
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
@@ -557,9 +647,7 @@ Quotient.Mailbox.Controller.methods(
         self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-cell");
         self.viewShortcutSelect = self.firstWithClass(self.node, "view-shortcut-container");
 
-        var scrollNode = Nevow.Athena.FirstNodeByAttribute(self.node,
-                                                           "athena:class",
-                                                           "Quotient.Mailbox.ScrollingWidget");
+        var scrollNode = self.firstNodeByAttribute("athena:class", "Quotient.Mailbox.ScrollingWidget");
 
         self.scrollWidget = Nevow.Athena.Widget.get(scrollNode);
 
@@ -569,8 +657,11 @@ Quotient.Mailbox.Controller.methods(
          */
         self.scrollWidget.initializationDeferred.addCallback(
             function(passthrough) {
-                self.scrollWidget._selectFirstRow();
-                return passthrough;
+                return self.scrollWidget._selectFirstRow().addCallback(
+                    function(ignored) {
+                        self.initializationDeferred.callback(null);
+                        return passthrough;
+                    });
             });
 
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
@@ -581,9 +672,147 @@ Quotient.Mailbox.Controller.methods(
             self.contentTableGrid[1][2],
             "next-message-preview");
 
-        self.setMessageCount(messageCount);
+        /*
+         * See L{_getActionButtons} for description of the structure of
+         * C{actions}.
+         */
+        self.actions = self._getActionButtons();
 
-        self.delayedLoad(complexityLevel);
+        self.delayedLoad(self.complexityLevel);
+    },
+
+    /**
+     * level = integer between 1 and 3
+     * node = the image that represents this complexity level
+     * report = boolean - should we persist this change
+     */
+    function setComplexity(self, level, node, report) {
+        if (node.className == "selected-complexity-icon") {
+            return;
+        }
+
+        self._setComplexityVisibility(level);
+        self.complexityLevel = level;
+
+        if (report) {
+            self.callRemote("setComplexity", level);
+        }
+
+        var gparent = node.parentNode.parentNode;
+        var selected = Nevow.Athena.FirstNodeByAttribute(gparent, "class", "selected-complexity-icon");
+
+        selected.className = "complexity-icon";
+        self.complexityHover(selected);
+        if (!report) {
+            self.complexityHover(node);
+        }
+        node.className = "selected-complexity-icon";
+        self.recalculateMsgDetailWidth(false);
+    },
+
+    /**
+     * Called whenever the selected message changes.
+     *
+     * This implementation updates the message detail area of the Controller
+     * which is the parent widget of this widget.  It returns a Deferred which
+     * fires when this has been completed.
+     */
+    function selectionChanged(self, webID) {
+        if (webID == null) {
+            self.clearMessageDetail();
+            return Divmod.Defer.succeed(null);
+        } else {
+            return self.updateMessageDetail(webID);
+        }
+    },
+
+    /**
+     * Return an object with view names as keys and objects defining the
+     * actions available to those views as values.  The value objects have
+     * action names as keys and objects with two properties as values:
+     * C{button}, bound to the DOM node which represents the action's button;
+     * C{enable}, bound to a boolean indicating whether this action is
+     * available to this view.
+     */
+    function _getActionButtons(self) {
+        var buttonInfo = {
+            "all": ["defer", "delete", "forward",
+                    "reply", "print", "train-spam"],
+            "inbox": ["archive", "defer", "delete",
+                      "forward", "reply", "print", "train-spam"],
+            "spam": ["defer", "delete", "forward",
+                     "reply", "print", "train-ham"],
+            "deferred": ["forward", "reply", "print"],
+            "sent": ["delete", "forward", "reply", "print"],
+            "trash": ["forward" ,"reply", "print"]};
+
+        /*
+         * Compute list of all button names from the buttonInfo structured.
+         */
+        var view, i, j;
+        var allButtonNames = [];
+        for (view in buttonInfo) {
+            for (i = 0; i < buttonInfo[view].length; ++i) {
+                /*
+                 * Try to find this button in the list of all button names
+                 */
+                for (j = 0; j < allButtonNames.length; ++j) {
+                    if (buttonInfo[view][i] == allButtonNames[j]) {
+                        break;
+                    }
+                }
+                /*
+                 * Didn't break out of the loop -- didn't find the name, so add
+                 * it.
+                 */
+                if (j == allButtonNames.length) {
+                    allButtonNames.push(buttonInfo[view][i]);
+                }
+            }
+        }
+
+        function difference(minuend, subtrahend) {
+            var i, j;
+            var diff = [];
+            for (i = 0; i < minuend.length; ++i) {
+                for (j = 0; j < subtrahend.length; ++j) {
+                    if (minuend[i] == subtrahend[j]) {
+                        break;
+                    }
+                }
+                if (j == subtrahend.length) {
+                    diff.push(minuend[i]);
+                }
+            }
+            return diff;
+        }
+
+        function getActionButton(name) {
+            return Divmod.Runtime.theRuntime.firstNodeByAttribute(
+                self.messageActions, "class", name + "-button");
+        }
+
+        var views = {};
+        var actions;
+        var actionName;
+        for (view in buttonInfo) {
+            actions = {};
+            for (i = 0; i < buttonInfo[view].length; ++i) {
+                actionName = buttonInfo[view][i];
+                actions[actionName] = {
+                    "button": getActionButton(actionName),
+                    "enable": true};
+            }
+            hide = difference(allButtonNames, buttonInfo[view]);
+            for (i = 0; i < hide.length; ++i) {
+                actionName = hide[i];
+                actions[actionName] = {
+                    "button": getActionButton(actionName),
+                    "enable": false};
+            }
+            views[view] = actions;
+        }
+        return views;
     },
 
     function _getViewCountNode(self, view) {
@@ -599,7 +828,7 @@ Quotient.Mailbox.Controller.methods(
     /**
      * Return the count of unread messages in the given view.
      *
-     * @param view: One of "All", "Inbox", "Spam" or "Sent".
+     * @param view: One of "all", "inbox", "spam" or "sent".
      */
     function getUnreadCountForView(self, view) {
         return parseInt(self._getViewCountNode(view).nodeValue);
@@ -635,7 +864,7 @@ Quotient.Mailbox.Controller.methods(
         return people;
     },
 
-    function _cacheContentTableGrid(self) {
+    function _getContentTableGrid(self) {
         self.inboxContent = self.firstNodeByAttribute("class", "inbox-content");
         var firstByTagName = function(container, tagName) {
             return self.getFirstElementByTagNameShallow(container, tagName);
@@ -652,8 +881,7 @@ Quotient.Mailbox.Controller.methods(
                 Divmod.Runtime.theRuntime.getElementsByTagNameShallow(
                     contentTableRows[i], "td"));
         }
-        self.contentTable = contentTable;
-        self.contentTableGrid = contentTableGrid;
+        return {table: contentTable, grid: contentTableGrid};
     },
 
     function _getContentTableColumn(self, offset) {
@@ -711,16 +939,6 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    function adjustProgressBar(self, lessHowManyMessages) {
-        if(self.progressBar) {
-            self.progressBar = self.firstWithClass(self.contentTableGrid[1][2],
-                                                   "progress-bar");
-        }
-        self.progressBar.style.borderRight = "solid 1px #6699CC";
-        self.remainingMessages -= lessHowManyMessages;
-        self.setProgressWidth();
-    },
-
     /**
      * Return a two element list.  The first element will be a sequence
      * of web IDs for currently selected messages who do not fit the batch
@@ -772,25 +990,29 @@ Quotient.Mailbox.Controller.methods(
          */
         var i, row, index, removed = 0;
         var indices = self.scrollWidget.model.getRowIndices();
+        var removalDeferreds = [];
 
         for (i = 0; i < indices.length; ++i) {
             index = indices[i] - removed;
             row = self.scrollWidget.model.getRowData(index);
             if (row.__id__ in self.scrollWidget.selectedGroup) {
-                self.scrollWidget.removeRow(index);
+                removalDeferreds.push(self.scrollWidget.removeRow(index));
                 removed += 1;
             }
         }
 
-        return self.scrollWidget.scrolled().addCallback(
+        return Divmod.Defer.gatherResults(removalDeferreds).addCallback(
             function(ignored) {
-                /*
-                 * XXX - Selecting the first row is wrong - we should select a
-                 * row very near to the previously selected row, instead.
-                 */
-                if (self.scrollWidget.getSelectedRow() == null) {
-                    self.scrollWidget._selectFirstRow();
-                }
+                return self.scrollWidget.scrolled().addCallback(
+                    function(ignored) {
+                        /*
+                         * XXX - Selecting the first row is wrong - we should select a
+                         * row very near to the previously selected row, instead.
+                         */
+                        if (self.scrollWidget.getSelectedRow() == null) {
+                            return self.scrollWidget._selectFirstRow();
+                        }
+                    });
             });
     },
 
@@ -817,17 +1039,13 @@ Quotient.Mailbox.Controller.methods(
 
         var result = self.withReducedMessageDetailOpacity(
             function() {
-                var acted = self.callRemote("actOnMessageBatch", action, self._batchSelection, include, exclude);
+                var acted = self.callRemote(
+                    "actOnMessageBatch", action, self.scrollWidget.viewSelection,
+                    self._batchSelection, include, exclude);
                 acted.addCallback(
                     function(counts) {
                         var readTouchedCount = counts[0];
                         var unreadTouchedCount = counts[1];
-
-                        /*
-                         * XXX I don't know what this next line means or whether it is
-                         * correct or not and there is no test coverage for it.
-                         */
-                        self.adjustProgressBar(readTouchedCount + unreadTouchedCount);
 
                         if (isDestructive) {
                             var result = self._removeRows(self.scrollWidget.selectedGroup);
@@ -881,7 +1099,8 @@ Quotient.Mailbox.Controller.methods(
             byHowMuch = 1;
         }
 
-        self.decrementMailViewCount(self._viewingByView, byHowMuch);
+        self.decrementMailViewCount(
+            self.scrollWidget.viewSelection["view"], byHowMuch);
     },
 
     /**
@@ -1037,23 +1256,26 @@ Quotient.Mailbox.Controller.methods(
 
     function _setComplexityVisibility(self, c) {
         var fontSize;
-        if(c == 1) {
+        var messageBody;
+
+        if (c == 1) {
             self.contentTableGrid[0][0].style.display = "none";
             self.contentTableGrid[1][0].style.display = "none";
             self.hideAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("absolute");
             self.viewShortcutSelect.style.display = "";
-            /* use the default font-size, because complexity 1
-               is the default complexity. */
+            /* use the default font-size, because complexity 1 is the default
+             * complexity.
+             */
             fontSize = "";
-        } else if(c == 2) {
+        } else if (c == 2) {
             self.contentTableGrid[0][0].style.display = "none";
             self.contentTableGrid[1][0].style.display = "none";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             self.viewShortcutSelect.style.display = "";
             fontSize = "1.3em";
-        } else if(c == 3) {
+        } else if (c == 3) {
             self.viewShortcutSelect.style.display = "none";
             self.contentTableGrid[0][0].style.display = "";
             self.contentTableGrid[1][0].style.display = "";
@@ -1061,43 +1283,17 @@ Quotient.Mailbox.Controller.methods(
             self.setScrollTablePosition("static");
             fontSize = "1.3em";
         }
+
         try {
-            var messageBody = self.firstWithClass(self.messageDetail, "message-body");
+            messageBody = self.firstWithClass(self.messageDetail, "message-body");
             messageBody.style.fontSize = fontSize;
-        } catch(e) {}
+        } catch (e) {
+            0;
+        }
 
-        /* store this for next time we load a message
-           in this complexity level */
+        /* store this for next time we load a message in this complexity level
+         */
         self.fontSize = fontSize;
-    },
-
-    /**
-     * level = integer between 1 and 3
-     * node = the image that represents this complexity level
-     * report = boolean - should we persist this change
-     */
-    function setComplexity(self, level, node, report) {
-        if(node.className == "selected-complexity-icon") {
-            return;
-        }
-
-        self._setComplexityVisibility(level);
-        self.complexityLevel = level;
-
-        if(report) {
-            self.callRemote("setComplexity", level);
-        }
-
-        var gparent = node.parentNode.parentNode;
-        var selected = Nevow.Athena.FirstNodeByAttribute(
-                        gparent, "class", "selected-complexity-icon");
-        selected.className = "complexity-icon";
-        self.complexityHover(selected);
-        if(!report) {
-            self.complexityHover(node);
-        }
-        node.className = "selected-complexity-icon";
-        self.recalculateMsgDetailWidth(false);
     },
 
     function setViewsContainerDisplay(self, d) {
@@ -1115,91 +1311,50 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function fastForward(self, toMessageID) {
-        self.messageDetail.style.opacity = .2;
-        return self.callRemote("fastForward", toMessageID).addCallback(
-            function(messageData) {
-                self.scrollWidget.model.findRowData(toMessageID)["read"] = true;
-                self.messageDetail.style.opacity = 1;
-                self.setMessageContent(messageData[0], messageData[1], messageData[2]);
+        return self.withReducedMessageDetailOpacity(
+            function() {
+                return self.callRemote("fastForward", self.scrollWidget.viewSelection, toMessageID).addCallback(
+                    function(messageData) {
+                        var rowData = null;
+                        try {
+                            rowData = self.scrollWidget.model.findRowData(toMessageID);
+                        } catch (err) {
+                            if (err instanceof Mantissa.ScrollTable.NoSuchWebID) {
+                                /*
+                                 * Someone removed the row we were going to display.  Oh well, do nothing, instead.
+                                 */
+
+                            } else {
+                                throw err;
+                            }
+                        }
+                        if (rowData != null) {
+                            rowData.read = true;
+                            return self.setMessageContent(messageData[0], messageData[1], messageData[2]);
+                        }
+                    });
             });
     },
 
-
     /**
-     * Change the set of messages currently being viewed.
+     * Change the view being viewed.
      *
-     * @param viewName: A short string identifying the new set of messages to
-     * view.  For example, C{"All"} or C{"Spam"}.
+     * @param key: The parameter of the view to change.  One of C{"view"},
+     * C{"tag"}, C{"person"}, or C{"account"}.
      *
-     * @return: A Deferred which fires when the view has been updated and the
-     * new messages have been retrieved and displayed.
+     * @param value: The new value of the given view parameter.
+     *
+     * @return: A Deferred which fires when the view selection has been changed
+     * and a new set of messages is being displayed.
      */
-    function switchView(self, viewName) {
-        return self._sendViewRequest('viewByMailType', viewName);
-    },
-
-    /**
-     * pre-process a request to call a remote view-changing method.
-     * @param viewFunction: name of the remote method
-     * @param node: (optional) node containing the argument for the method
-     * @param catchAll: treat "All" as a special view name
-     * @param value: (optional) must be specified if C{node} isn't.
-     *               this is the argument that'll get passed to the remote
-     *               method
-     */
-    function _chooseViewParameter(self, viewFunction, node,
-                                  catchAll /* = true */,
-                                  value /* = null */) {
-        if (catchAll == undefined) {
-            catchAll = true;
-        }
-
-        if(value == undefined) {
-            value = node.firstChild.firstChild.nodeValue;
-        }
-        if (catchAll && value == 'All') {
-            value = null;
-        }
-        return self._sendViewRequest(viewFunction, value);
-    },
-
-    function _sendViewRequest(self, viewFunction, value) {
-        self.scrollWidget.throbber.startThrobbing();
-
-        return self.callRemote(viewFunction, value).addCallback(
-            function(messageData) {
-                self.setMessageCount(messageData[0]);
-                self.setMessageContent(messageData[1][0], messageData[1][1], messageData[1][2]);
-                if (messageData[2] != null) {
-                    self.updateMailViewCounts(messageData[2]);
+    function changeViewSelection(self, key, value) {
+        return self.scrollWidget.changeViewSelection(key, value).addCallback(
+            function(messageCount) {
+                if (messageCount) {
+                    self.messageActions.style.visibility = "";
+                } else {
+                    self.messageActions.style.visibility = "hidden";
                 }
-                self.scrollWidget.setViewportHeight(messageData[0]);
-                self.scrollWidget._selectWebID(null);
-                var newMessagesDisplayed = self.scrollWidget.emptyAndRefill();
-
-                /*
-                 * XXX - This can just be a callback on newMessagesDisplayed, I
-                 * think. -exarkun
-                 */
-                self.scrollWidget._pendingRowSelection = function(count) {
-                    if(0 < count) {
-                        self._selectAndFetchFirstRow(false);
-                    }
-                }
-                newMessagesDisplayed.addBoth(
-                    function(passthrough) {
-                        /*
-                         * Select the first message now being displayed.
-                         */
-                        self.scrollWidget._selectFirstRow();
-
-                        /*
-                         * Stop the throbber since we're basically done now.
-                         */
-                        self.scrollWidget.throbber.stopThrobbing();
-                        return passthrough;
-                    });
-                return newMessagesDisplayed;
             });
     },
 
@@ -1229,7 +1384,7 @@ Quotient.Mailbox.Controller.methods(
         var tagName = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             tagNode, 'class', 'opt-name');
         self._selectListOption(tagNode);
-        return self.chooseTag(tagName.firstChild.nodeValue);
+        return self.chooseTag(tagName.firstChild.nodeValue.toLowerCase());
     },
 
     /**
@@ -1241,10 +1396,10 @@ Quotient.Mailbox.Controller.methods(
      * @param tagName: The tag to select.
      */
     function chooseTag(self, tagName) {
-        if (tagName == 'All') {
+        if (tagName == 'all') {
             tagName = null;
         }
-        return self._sendViewRequest('viewByTag', tagName);
+        return self.changeViewSelection("tag", tagName);
     },
 
     /**
@@ -1263,35 +1418,9 @@ Quotient.Mailbox.Controller.methods(
             tc.appendChild(
                 MochiKit.DOM.DIV({"class": "list-option",
                                   "onclick": function() {
-                                      self.chooseTag(this);
+                                      self.chooseTagByNode(this);
                                     }}, MochiKit.DOM.SPAN({"class": "opt-name"}, needToAdd[i])));
         }
-    },
-
-    /**
-     * Return a mapping of view names to mappings of
-     * visibility values to lists of button descriptors
-     */
-    function createVisibilityMatrix(self) {
-        var train_ham = ["train-ham", false];
-        var train_spam  = ["train-spam", false];
-        var delete_ = ["delete", true];
-        var archive = ["archive", true];
-        var defer   = ["defer", true];
-
-        return {
-            Spam:     {show: [delete_, train_ham],
-                       hide: [archive, defer, train_spam]},
-            All:      {show: [delete_, train_spam],
-                       hide: [archive, defer, train_ham]},
-            Inbox:    {show: [archive, defer, delete_, train_spam],
-                       hide: [train_ham]},
-            Sent:     {show: [delete_],
-                       hide: [train_ham, train_spam, archive, defer]},
-            Trash:    {show: [],
-                       hide: [train_ham, train_spam, archive, defer, delete_]},
-            Deferred: {show: [],
-                       hide: [train_ham, train_spam, archive, defer, delete_]}}
     },
 
     /**
@@ -1302,7 +1431,7 @@ Quotient.Mailbox.Controller.methods(
         var view = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             viewNode, 'class', 'opt-name');
         self._selectListOption(viewNode);
-        return self.chooseMailView(view.firstChild.nodeValue);
+        return self.chooseMailView(view.firstChild.nodeValue.toLowerCase());
     },
 
     /**
@@ -1310,80 +1439,45 @@ Quotient.Mailbox.Controller.methods(
      * local state to indicate which random crap is being viewed and, if
      * necessary, ask the server for the messages to display.
      *
-     * @param view: the name of the view to switch to
+     * @param viewName: the name of the view to switch to
      * @return: L{Deferred}, which will fire after view change is complete
      */
-    function chooseMailView(self, view) {
+    function chooseMailView(self, viewName) {
+        var actions = self.actions[viewName];
+        if (actions === undefined) {
+            throw new Error("Unknown view: " + viewName);
+        }
         self.disableGroupActions();
-
-        self._viewingByView = view;
-        self._selectViewShortcut();
-
-        if(!self.visibilityByView) {
-            self.visibilityByView = self.createVisibilityMatrix();
+        self._selectViewShortcut(viewName);
+        var enableActionNames = [];
+        for (var actionName in actions) {
+            if (actions[actionName].enable) {
+                enableActionNames.push(actionName);
+                actions[actionName].button.style.display = "";
+            } else {
+                actions[actionName].button.style.display = "none";
+            }
         }
-
-        var visibilityForThisView = self.visibilityByView[self._viewingByView];
-        self.setDisplayForButtons("",     visibilityForThisView["show"]);
-        self.setDisplayForButtons("none", visibilityForThisView["hide"]);
-
-        var namesOnly = function(k) {
-            return MochiKit.Base.map(MochiKit.Base.itemgetter(0),
-                                     visibilityForThisView[k]);
-        }
-
-        self.setGroupActions(namesOnly("show"));
-
-        return self._chooseViewParameter(
-            'viewByMailType', null, false, view);
+        self.setGroupActions(enableActionNames);
+        return self.changeViewSelection("view", viewName);
     },
 
     /**
      * Select the view shortcut link that corresponds to the
      * current mail view, if any.
      */
-    function _selectViewShortcut(self) {
-        if(self._viewingByView != "Inbox"
-            && self._viewingByView != "Sent"
-            && self._viewingByView != "Spam") {
+    function _selectViewShortcut(self, viewName) {
+        var current = viewName;
+        if(current != "inbox" && current != "sent" && current != "spam") {
             return;
         }
 
         var options = self.viewShortcutSelect.getElementsByTagName("option");
         for(var i = 0; i < options.length; i++) {
-            if(options[i].value == self._viewingByView) {
+            if(options[i].value == current) {
                 self.viewShortcutSelect.selectedIndex = i;
                 break;
             }
-        }
-    },
-
-    /**
-     * Return the node for the named button
-     *
-     * @param topRow: boolean - from top button row?
-     */
-    function getButton(self, name, topRow) {
-        if(!self.buttons) {
-            self.buttons = {};
-        }
-        if(!([name, topRow] in self.buttons)) {
-            self.buttons[[name, topRow]] = self.firstWithClass(
-                                                    self.messageActions[new Number(!topRow)],
-                                                    name + "-button");
-        }
-        return self.buttons[[name, topRow]];
-    },
-
-    /**
-     * Apply display value C{display} to each button identified in C{buttonArgs}
-     * @param buttonArgs: list of [C{name}, C{topRow}] (see signature of L{getButton})
-     */
-    function setDisplayForButtons(self, display, buttonArgs) {
-        var button;
-        for(var i = 0; i < buttonArgs.length; i++) {
-            button = self.getButton.apply(self, buttonArgs[i]);
-            button.style.display = display;
         }
     },
 
@@ -1435,14 +1529,15 @@ Quotient.Mailbox.Controller.methods(
      * state to indicate which account's messages are being viewed and, if
      * necessary, ask the server for the messages to display.
      *
-     * @param n: The node which this input handler is attached to.
+     * @param accountName: The name of the account to view messages from.
      * @return: C{undefined}
      */
-    function chooseAccount(self, n) {
-        if (tagName == 'All') {
-            tagName = null;
+    function chooseAccount(self, accountName) {
+        if (accountName == 'all') {
+            accountName = null;
         }
-        return self._sendViewRequest('viewByAccount', tagName);
+
+        return self.changeViewSelection("account", accountName);
     },
 
     /**
@@ -1464,7 +1559,7 @@ Quotient.Mailbox.Controller.methods(
      * @return: C{undefined}
      */
     function choosePerson(self, personKey) {
-        return self._sendViewRequest('viewByPerson', personKey);
+        return self.changeViewSelection("person", personKey);
     },
 
     function setupMailViewNodes(self) {
@@ -1474,8 +1569,8 @@ Quotient.Mailbox.Controller.methods(
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
 
-        var nodes = {"All": null, "Trash": null, "Sent": null,
-                     "Spam": null, "Inbox": null, "Deferred": null};
+        var nodes = {"all": null, "trash": null, "sent": null,
+                     "spam": null, "inbox": null, "deferred": null};
         var e, nameNode, name;
 
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
@@ -1489,7 +1584,7 @@ Quotient.Mailbox.Controller.methods(
                 }
                 throw err;
             }
-            name = nameNode.firstChild.nodeValue;
+            name = nameNode.firstChild.nodeValue.toLowerCase();
             nodes[name] = e.firstChild.nextSibling;
         }
         self.mailViewNodes = nodes;
@@ -1520,7 +1615,7 @@ Quotient.Mailbox.Controller.methods(
             }
             return;
         }
-        sw._selectFirstRow();
+        return sw._selectFirstRow();
     },
 
     /**
@@ -1545,7 +1640,6 @@ Quotient.Mailbox.Controller.methods(
     function touch(self, action, isProgress) {
         var model = self.scrollWidget.model;
         var selected = self.scrollWidget._selectedRowID;
-        var nextMessageID;
 
         if (selected === undefined) {
             throw new Error("No row selected.");
@@ -1553,26 +1647,35 @@ Quotient.Mailbox.Controller.methods(
 
         var result = self.withReducedMessageDetailOpacity(
             function() {
+                var nextMessageID = model.findNextRow(selected);
+                if (!nextMessageID) {
+                    nextMessageID = model.findPrevRow(selected);
+                }
+
                 var acted = self.callRemote("actOnMessageIdentifierList", action, [selected]);
-                acted.addCallback(
-                    function(ignored) {
-                        if (isProgress) {
-                            nextMessageID = model.findNextRow(selected);
-                            if (!nextMessageID) {
-                                nextMessageID = model.findPrevRow(selected);
-                            }
 
-                            self.scrollWidget.removeRow(self.scrollWidget.model.findIndex(selected));
+                var removed;
+                if (isProgress) {
+                    /*
+                     * I know that this is removing the current row so I know
+                     * that the Deferred fires synchronously and never fails so
+                     * I don't have to add a callback or errback.
+                     */
+                    removed = self.scrollWidget.removeRow(self.scrollWidget.model.findIndex(selected));
 
-                            if (nextMessageID) {
-                                self.scrollWidget._selectWebID(nextMessageID);
-                            }
+                    /*
+                     * This Deferred, however, is asynchronous.
+                     */
+                    if (nextMessageID) {
+                        removed = self.scrollWidget._selectWebID(nextMessageID);
+                    }
+                } else {
+                    removed = Divmod.Defer.succeed(null);
+                }
 
-                            return self.scrollWidget.scrolled();
+                var scrolled = self.scrollWidget.scrolled();
 
-                        }
-                    });
-                return acted;
+                return Divmod.Defer.gatherResults([acted, removed, scrolled]);
             });
         return result;
     },
@@ -1599,12 +1702,6 @@ Quotient.Mailbox.Controller.methods(
                     function(counts) {
                         var readTouchedCount = counts[0];
                         var unreadTouchedCount = counts[1];
-
-                        /*
-                         * XXX I don't know what this next line means or whether it is
-                         * correct or not and there is no test coverage for it.
-                         */
-                        self.adjustProgressBar(readTouchedCount + unreadTouchedCount);
 
                         if (isDestructive) {
                             var result = self._removeRows(self.scrollWidget.selectedGroup);
@@ -1653,49 +1750,18 @@ Quotient.Mailbox.Controller.methods(
         var addTo;
 
         if(action == "archive") {
-            addTo = "All";
+            addTo = "all";
         } else if(action == "train") {
             if(args[args.length-1]) {
-                addTo = "Spam";
+                addTo = "spam";
             } else {
-                addTo = "Inbox";
+                addTo = "inbox";
             }
         } else {
             return;
         }
 
         self.decrementMailViewCount(addTo, -affectedUnreadCount);
-    },
-
-    /**
-     * Call a remote method and handle it's result, which is expected
-     * to be a new set of message-related UI state.  This is typically
-     * done when acting on a message.
-     *
-     * @param remoteArgs: array of arguments for callRemote()
-     *
-     * @param isProgress: A boolean indicating whether the message will be
-     * removed from the current message list and the progress bar updated to
-     * reflect this.
-     *
-     * @param touchingHowMany: integer, indicating the number of messages
-     *                         that are affected by this action
-     */
-    function doTouch(self, remoteArgs, isProgress, touchingHowMany, touchingHowManyUnread) {
-        self.messageDetail.style.opacity = .2;
-        return self.callRemote.apply(self, remoteArgs).addCallback(
-            function(nextMessage) {
-                self.messageDetail.style.opacity = 1;
-
-                self.adjustProgressBar(touchingHowMany);
-                self.adjustCounts(remoteArgs, touchingHowManyUnread);
-
-                if(isProgress) {
-                    self.setMessageContent(nextMessage[0], nextMessage[1], nextMessage[2]);
-                } else if(nextMessage) {
-                    self.displayInlineWidget(nextMessage);
-                }
-            });
     },
 
     /**
@@ -1812,43 +1878,17 @@ Quotient.Mailbox.Controller.methods(
         self.inboxContent.style.display = "";
     },
 
-    function setMessageCount(self, count) {
-        self.remainingMessages = count;
-        self.totalMessages = count;
-        self.setProgressWidth();
-    },
-
-    function setProgressWidth(self) {
-        if(!self.progressBar) {
-            self.progressBar = self.firstWithClass(
-                                self.contentTableGrid[1][2], "progress-bar");
-            self.messageActions = self.nodesByAttribute("class", "message-actions");
-        }
-        var visibility;
-        if(self.remainingMessages == 0) {
-            visibility = "hidden";
-        } else {
-            visibility = "";
-            self.progressBar.style.width = Math.ceil((self.remainingMessages / self.totalMessages) * 100) + "%";
-        }
-
-        self.progressBar.style.visibility = visibility;
-        for(var i = 0; i < self.messageActions.length; i++) {
-            self.messageActions[i].style.visibility = visibility;
-        }
-    },
-
     function archiveThis(self, n) {
         /*
-         * Archived messages show up in the "All" view.  So, if we are in any
+         * Archived messages show up in the "all" view.  So, if we are in any
          * view other than that, this action should make the message
          * disappear.
          */
-        self.touch("archive", self._viewingByView != "All");
+        self.touch("archive", self.scrollWidget.viewSelection["view"] != "all");
     },
 
     function deleteThis(self, n) {
-        self.touch("delete", self._viewingByView != "Trash");
+        self.touch("delete", self.scrollWidget.viewSelection["view"] != "trash");
     },
 
     function showDeferForm(self) {
@@ -1917,7 +1957,7 @@ Quotient.Mailbox.Controller.methods(
     function trainSpam(self) {
         self.touch(
             "train",
-            (self._viewingByView != "Spam"),
+            (self.scrollWidget.viewSelection["view"] != "spam"),
             true);
         return false;
     },
@@ -1925,7 +1965,7 @@ Quotient.Mailbox.Controller.methods(
     function trainHam(self) {
         self.touch(
             "train",
-            (self._viewingByView == "Spam"),
+            (self.scrollWidget.viewSelection["view"] == "spam"),
             false);
         return false;
     },
@@ -2025,12 +2065,13 @@ Quotient.Mailbox.Controller.methods(
     function clearMessageDetail(self) {
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
-        Divmod.Runtime.theRuntime.setNodeContent(
-            self.messageDetail,
-            '<span xmlns="http://www.w3.org/1999/xhtml"></span>');
-        Divmod.Runtime.theRuntime.setNodeContent(
-            self.nextMessagePreview,
-            '<span xmlns="http://www.w3.org/1999/xhtml"></span>');
+
+        var clearNodes = [self.messageDetail, self.nextMessagePreview];
+        for (var i = 0; i < clearNodes.length; ++i) {
+            while (clearNodes[i].firstChild) {
+                clearNodes[i].removeChild(clearNodes[i].firstChild);
+            }
+        }
     },
 
     /**
@@ -2038,11 +2079,21 @@ Quotient.Mailbox.Controller.methods(
      * a Deferred which fires when this has finished.
      */
     function updateMessageDetail(self, webID) {
-        return self.callRemote("fastForward", webID).addCallback(
-            function(info) {
-                return self.setMessageContent(
-                    info[0], info[1], info[2]);
-            });
+        return self.fastForward(webID);
+    },
+
+    function onePattern(self, name) {
+        if (name == "next-message") {
+            return {
+                'fillSlots': function(key, value) {
+                    return '<div xmlns="http://www.w3.org/1999/xhtml">Next: ' + value + '</div>';
+                }
+            };
+        } else if (name == "no-more-messages") {
+            return '<span xmlns="http://www.w3.org/1999/xhtml">No more messages.</span>';
+        } else {
+            throw new Error("No such pattern: " + name);
+        }
     },
 
     /**
@@ -2053,52 +2104,53 @@ Quotient.Mailbox.Controller.methods(
     function setMessageContent(self, nextMessagePreview, currentMessageDisplay, currentMessageData) {
         self.currentMessageData = currentMessageData;
 
-        Divmod.msg("setMessageContent(" +
-                   currentMessageData +
-                   ")");
-
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
 
-        Divmod.Runtime.theRuntime.setNodeContent(
-            self.messageDetail,
-            ('<div xmlns="http://www.w3.org/1999/xhtml">' +
-             currentMessageDisplay +
-             '</div>'));
+        return self.addChildWidgetFromWidgetInfo(currentMessageDisplay).addCallback(
+            function(widget) {
+                while (self.messageDetail.firstChild) {
+                    self.messageDetail.removeChild(self.messageDetail.firstChild);
+                }
+                self.messageDetail.appendChild(widget.node);
 
-        var modifier, spamConfidence;
+                var modifier, spamConfidence;
 
-        if (currentMessageData.trained) {
-            spamConfidence = 'definitely';
-        } else {
-            spamConfidence = 'probably';
-        }
-        if (currentMessageData.spam) {
-            modifier = '';
-        } else {
-            modifier = 'not';
-        }
+                if (currentMessageData.trained) {
+                    spamConfidence = 'definitely';
+                } else {
+                    spamConfidence = 'probably';
+                }
+                if (currentMessageData.spam) {
+                    modifier = '';
+                } else {
+                    modifier = 'not';
+                }
 
-        if (nextMessagePreview != null) {
-            /* so this is a message, not a compose fragment */
-            Divmod.Runtime.theRuntime.setNodeContent(
-                self.nextMessagePreview,
-                ('<div xmlns="http://www.w3.org/1999/xhtml">' +
-                 nextMessagePreview +
-                 '</div>'));
-            self.highlightExtracts();
-        }
+                var pattern;
+                if (nextMessagePreview != null) {
+                    /* so this is a message, not a compose fragment
+                     */
+                    pattern = self.onePattern('next-message');
+                    pattern = pattern.fillSlots('subject',
+                                      nextMessagePreview['subject']);
+                    self.highlightExtracts();
+                } else {
+                    pattern = self.onePattern('no-more-messages');
+                }
+                Divmod.Runtime.theRuntime.setNodeContent(self.nextMessagePreview, pattern);
 
-        /* if this is the "no more messages" pseudo-message,
-           then there won't be any message body */
-        try {
-            var messageBody = self.firstWithClass(
-                                self.messageDetail,
-                                "message-body");
-        } catch(e) {
-            return;
-        }
-        /* set the font size to the last value used in
-           _setComplexityVisibility() */
-        messageBody.style.fontSize = self.fontSize;
-    })
+                /* if this is the "no more messages" pseudo-message,
+                   then there won't be any message body */
+                try {
+                    var messageBody = self.firstWithClass(
+                        self.messageDetail,
+                        "message-body");
+                } catch(e) {
+                    return;
+                }
+                /* set the font size to the last value used in
+                   _setComplexityVisibility() */
+                messageBody.style.fontSize = self.fontSize;
+            });
+    });

@@ -1,7 +1,5 @@
 // import Nevow.Athena.Test
 
-// import Mantissa.Test
-
 // import Quotient.Throbber
 // import Quotient.Message
 // import Quotient.Mailbox
@@ -126,21 +124,21 @@ Quotient.Test.ScrollingWidgetTestCase = Nevow.Athena.Test.TestCase.subclass('Quo
 Quotient.Test.ScrollingWidgetTestCase.methods(
     function setUp(self) {
         var result = self.callRemote('getScrollingWidget', 5);
-        result.addCallback(function(widgetMarkup) {
-                return Mantissa.Test.addChildWidgetFromMarkup(
-                    self.node, widgetMarkup,
-                    'Quotient.Mailbox.ScrollingWidget');
+        result.addCallback(function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
             });
         result.addCallback(function(widget) {
                 self.scrollingWidget = widget;
                 self.node.appendChild(widget.node);
 
                 /*
-                 * XXX Clobber these method, since our ScrollingWidget doesn't
+                 * XXX Clobber these methods, since our ScrollingWidget doesn't
                  * have a widgetParent which implements the necessary methods.
                  */
                 widget.decrementActiveMailViewCount = function() {};
-                widget.selectionChanged = function() {};
+                widget.selectionChanged = function selectionChanged() {
+                    return Divmod.Defer.succeed(null);
+                };
 
                 return widget.initializationDeferred;
             });
@@ -155,10 +153,12 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
     function test_firstSelectWebID(self) {
         return self.setUp().addCallback(function() {
                 var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                var result = self.scrollingWidget._selectWebID(webID);
-                self.assertEqual(
-                    result, null,
-                    "Expected null as previously selected message ID.");
+                return self.scrollingWidget._selectWebID(webID).addCallback(
+                    function(oldWebID) {
+                        self.assertEqual(
+                            oldWebID, null,
+                            "Expected null as previously selected message ID.");
+                    });
             });
     },
 
@@ -169,12 +169,16 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
     function test_secondSelectWebID(self) {
         return self.setUp().addCallback(function() {
                 var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                self.scrollingWidget._selectWebID(webID);
-                var otherWebID = self.scrollingWidget.model.getRowData(1).__id__;
-                var oldWebID = self.scrollingWidget._selectWebID(otherWebID);
-                self.assertEqual(
-                    oldWebID, webID,
-                    "Expected first message ID as previous message ID.");
+                return self.scrollingWidget._selectWebID(webID).addCallback(
+                    function(ignored) {
+                        var otherWebID = self.scrollingWidget.model.getRowData(1).__id__;
+                        return self.scrollingWidget._selectWebID(otherWebID).addCallback(
+                            function(oldWebID) {
+                                self.assertEqual(
+                                    oldWebID, webID,
+                                    "Expected first message ID as previous message ID.");
+                            });
+                    });
             });
     },
 
@@ -206,11 +210,15 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
     function test_unselectWebID(self) {
         return self.setUp().addCallback(function() {
                 var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                self.scrollingWidget._selectWebID(webID);
-                var oldWebID = self.scrollingWidget._selectWebID(null);
-                self.assertEqual(
-                    oldWebID, webID,
-                    "Expected first message ID as previous message ID.");
+                return self.scrollingWidget._selectWebID(webID).addCallback(
+                    function(ignored) {
+                        return self.scrollingWidget._selectWebID(null).addCallback(
+                            function(oldWebID) {
+                                self.assertEqual(
+                                    oldWebID, webID,
+                                    "Expected first message ID as previous message ID.");
+                            });
+                    });
             });
     },
 
@@ -328,10 +336,9 @@ Quotient.Test.ControllerTestCase.methods(
      */
     function setUp(self) {
         var result = self.callRemote('getControllerWidget');
-        result.addCallback(function(widgetMarkup) {
-                return Mantissa.Test.addChildWidgetFromMarkup(
-                    self.node, widgetMarkup,
-                    'Quotient.Mailbox.Controller');
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
             });
         result.addCallback(function(widget) {
                 self.controllerWidget = widget;
@@ -390,19 +397,19 @@ Quotient.Test.ControllerTestCase.methods(
                  * one of the unread messages as read.
                  */
                 self.assertEqual(
-                    self.controllerWidget.getUnreadCountForView("Inbox"), 1);
+                    self.controllerWidget.getUnreadCountForView("inbox"), 1);
 
                 self.assertEqual(
-                    self.controllerWidget.getUnreadCountForView("Spam"), 1);
+                    self.controllerWidget.getUnreadCountForView("spam"), 1);
 
                 /*
                  * Three instead of four for the reason mentioned above.
                  */
                 self.assertEqual(
-                    self.controllerWidget.getUnreadCountForView("All"), 1);
+                    self.controllerWidget.getUnreadCountForView("all"), 1);
 
                 self.assertEqual(
-                    self.controllerWidget.getUnreadCountForView("Sent"), 0);
+                    self.controllerWidget.getUnreadCountForView("sent"), 0);
             });
     },
 
@@ -411,8 +418,8 @@ Quotient.Test.ControllerTestCase.methods(
      */
     function test_setUnreadCounts(self) {
         return self.setUp().addCallback(function(ignored) {
-                self.controllerWidget.setUnreadCountForView("Inbox", 7);
-                self.assertEquals(self.controllerWidget.getUnreadCountForView("Inbox"), 7);
+                self.controllerWidget.setUnreadCountForView("inbox", 7);
+                self.assertEquals(self.controllerWidget.getUnreadCountForView("inbox"), 7);
             });
     },
 
@@ -505,7 +512,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.switchView('All');
+                return self.controllerWidget.chooseMailView('all');
             });
         result.addCallback(
             function(ignored) {
@@ -530,7 +537,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.switchView('Spam');
+                return self.controllerWidget.chooseMailView('spam');
             });
         result.addCallback(
             function(ignored) {
@@ -552,7 +559,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.switchView('Sent');
+                return self.controllerWidget.chooseMailView('sent');
             });
         result.addCallback(
             function(ignored) {
@@ -585,13 +592,12 @@ Quotient.Test.ControllerTestCase.methods(
                  * Change to the all view, so that we see all messages instead
                  * of just inbox messages.
                  */
-                var result = self.controllerWidget.switchView('All');
+                var result = self.controllerWidget.chooseMailView('all');
                 result.addCallback(function(ignored) {
                         /*
                          * Next view only messages from Alice.
                          */
-                        return self.controllerWidget._sendViewRequest(
-                            'viewByPerson', people[0].key);
+                        return self.controllerWidget.choosePerson(people[0].key);
                     });
 
                 /*
@@ -624,8 +630,7 @@ Quotient.Test.ControllerTestCase.methods(
                 /*
                  * Change to the view of messages with the foo tag.
                  */
-                return self.controllerWidget._sendViewRequest(
-                    'viewByTag', 'foo');
+                return self.controllerWidget.chooseTag('foo');
             });
         /*
          * Once the view is updated, test that only the message tagged "foo" is
@@ -657,7 +662,7 @@ Quotient.Test.ControllerTestCase.methods(
                 self.throbber = Quotient.Test.TestThrobber();
                 self.controllerWidget.scrollWidget.throbber = self.throbber;
 
-                var result = self.controllerWidget.switchView('All');
+                var result = self.controllerWidget.chooseMailView('all');
 
                 /*
                  * Throbber should have been started by the view change.
@@ -703,7 +708,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.switchView('All');
+                return self.controllerWidget.chooseMailView('all');
             });
         result.addCallback(
             function(ignored) {
@@ -747,6 +752,26 @@ Quotient.Test.ControllerTestCase.methods(
 
                 self.assertEqual(
                     model.getRowData(0).__id__, rowIdentifiers[1]);
+            });
+        return result;
+    },
+
+    /**
+     * Test that an archive request issued while another is outstanding also
+     * completes successfully.
+     */
+    function test_concurrentArchive(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var firstArchive = self.controllerWidget.touch("archive", true);
+                var secondArchive = self.controllerWidget.touch("archive", true);
+                return Divmod.Defer.gatherResults([firstArchive, secondArchive]);
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(self.controllerWidget.scrollWidget.model.rowCount(), 0);
+                self.assertEqual(self.controllerWidget.scrollWidget.getSelectedRow(), null);
             });
         return result;
     },
@@ -1097,14 +1122,22 @@ Quotient.Test.EmptyControllerTestCase.methods(
      */
     function setUp(self) {
         var result = self.callRemote('getEmptyControllerWidget');
-        result.addCallback(function(widgetMarkup) {
-                return Mantissa.Test.addChildWidgetFromMarkup(
-                    self.node, widgetMarkup,
-                    'Quotient.Mailbox.Controller');
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
             });
         result.addCallback(function(widget) {
                 self.controllerWidget = widget;
+
+                /*
+                 * XXX
+                 */
+                widget.selectionChanged = function selectionChanged() {
+                    return Divmod.Defer.succeed(null);
+                };
+
                 self.node.appendChild(widget.node);
+
                 return widget.initializationDeferred;
             });
         return result;
@@ -1134,7 +1167,7 @@ Quotient.Test.EmptyControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.switchView('All');
+                return self.controllerWidget.chooseMailView('all');
             });
         result.addCallback(
             function(ignored) {

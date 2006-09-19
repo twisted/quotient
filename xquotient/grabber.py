@@ -846,7 +846,7 @@ class ResumeAction(tdbview.Action):
 
 
 class ConfiguredGrabbersView(ScrollingFragment):
-    jsClass = 'Quotient.Grabber.ScrollingWidget'
+    jsClass = u'Quotient.Grabber.ScrollingWidget'
 
     def __init__(self, store):
         ScrollingFragment.__init__(self, store, POP3Grabber, None,

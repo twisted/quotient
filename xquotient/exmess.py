@@ -469,7 +469,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     implements(ixmantissa.INavigableFragment)
     fragmentName = 'message-detail'
     live = 'athena'
-    jsClass = 'Quotient.Message.MessageDetail'
+    jsClass = u'Quotient.Message.MessageDetail'
 
     printing = False
     _partsByID = None

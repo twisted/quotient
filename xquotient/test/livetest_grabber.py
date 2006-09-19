@@ -14,7 +14,7 @@ class AddGrabberTestCase(TestCase):
     Tests for the add grabber liveform
     """
 
-    jsClass = 'Quotient.Test.AddGrabberTestCase'
+    jsClass = u'Quotient.Test.AddGrabberTestCase'
 
     def getWidgetDocument(self):
         s = Store()
@@ -34,7 +34,7 @@ class GrabberListTestCase(TestCase):
     Tests for the grabber list/scrolltable
     """
 
-    jsClass = 'Quotient.Test.GrabberListTestCase'
+    jsClass = u'Quotient.Test.GrabberListTestCase'
 
     def getWidgetDocument(self):
         s = Store()

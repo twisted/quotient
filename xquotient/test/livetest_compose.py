@@ -51,7 +51,7 @@ class ComposeTestCase(testcase.TestCase):
         composer.installOn(s)
 
         composerFrag = ixmantissa.INavigableFragment(composer)
-        composerFrag.jsClass = 'Quotient.Test.ComposeController'
+        composerFrag.jsClass = u'Quotient.Test.ComposeController'
         composerFrag.setFragmentParent(self)
         composerFrag.docFactory = getLoader(composerFrag.fragmentName)
 
@@ -62,7 +62,7 @@ class DraftsTestCase(testcase.TestCase):
     Tests for the L{xquotient.compose.DraftsScreen} scrolltable
     """
 
-    jsClass = 'Quotient.Test.DraftsTestCase'
+    jsClass = u'Quotient.Test.DraftsTestCase'
 
     def getWidgetDocument(self):
         s = Store()

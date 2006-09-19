@@ -6,7 +6,7 @@ class ShowNodeAsDialogTestCase(TestCase):
     Tests for Quotient.Common.Util.showNodeAsDialog
     """
 
-    jsClass = 'Quotient.Test.ShowNodeAsDialogTestCase'
+    jsClass = u'Quotient.Test.ShowNodeAsDialogTestCase'
 
     def getWidgetDocument(self):
         return tags.h1(style='display: none',

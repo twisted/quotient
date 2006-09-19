@@ -38,7 +38,7 @@ def makePersonExtracts(store, person):
         imageSet.person = person
 
 class AddPersonFragment(people.AddPersonFragment):
-    jsClass = 'Quotient.Common.AddPerson'
+    jsClass = u'Quotient.Common.AddPerson'
 
     lastPerson = None
 

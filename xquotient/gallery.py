@@ -130,7 +130,7 @@ class GalleryScreen(athena.LiveFragment):
     fragmentName = 'gallery'
     live = 'athena'
     title = ''
-    jsClass = 'Quotient.Gallery.Controller'
+    jsClass = u'Quotient.Gallery.Controller'
 
     organizer = None
 

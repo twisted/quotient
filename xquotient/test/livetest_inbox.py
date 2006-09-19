@@ -14,10 +14,9 @@ from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
-from xmantissa.scrolltable import SequenceScrollingFragment
 from xmantissa.test.livetest_scrolltable import ScrollElement
 
-from xquotient.inbox import Inbox, InboxScreen
+from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
 from xquotient.exmess import Message
 from xquotient.compose import Composer
 from xquotient.quotientapp import QuotientPreferenceCollection
@@ -42,8 +41,7 @@ class ScrollingWidgetTestCase(testcase.TestCase):
         PrivateApplication(store=store).installOn(store)
         elements = [ScrollElement(store=store) for n in xrange(howManyElements)]
         columns = [ScrollElement.column]
-        f = SequenceScrollingFragment(store, elements, columns)
-        f.jsClass = u'Quotient.Mailbox.ScrollingWidget'
+        f = MailboxScrollingFragment(store, lambda view: None, None, ScrollElement, columns)
         f.docFactory = getLoader(f.fragmentName)
         f.setFragmentParent(self)
         return f
