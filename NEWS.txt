@@ -1,3 +1,8 @@
+0.1.16 (2006-09-20):
+  - Email address tooltips are shown on the names of message senders, if
+    they are not in the addressbook.
+  - Inbox view selection criteria are now handled in a single object.
+
 0.1.15 (2006-09-12):
   - URLs in messages now open in a new window.
   - Help text added to spam retrain/reclassify buttons.
