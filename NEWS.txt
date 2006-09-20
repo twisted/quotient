@@ -1,3 +1,9 @@
+0.1.15 (2006-09-12):
+  - URLs in messages now open in a new window.
+  - Help text added to spam retrain/reclassify buttons.
+  - CID links are now removed from HTML messages.
+  - Various bugfixes and UI improvements.
+
 0.1.14 (2006-08-30):
   - Refactored mailbox view.
   - Various bug and UI fixes.
