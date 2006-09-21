@@ -215,8 +215,10 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin
     def assertIndexability(self, msg):
         fi = ixmantissa.IFulltextIndexable(msg.message)
         self.assertEquals(fi.uniqueIdentifier(), unicode(msg.message.storeID))
-        self.assertEquals(fi.textParts(), [
-            u'Hello Bob,\n  How are you?\n-A\n'])
+        self.assertEquals(sorted(fi.textParts()), [
+            u'Hello Bob,\n  How are you?\n-A\n',
+            u'a test message, comma separated',
+            u'alice@example.com'])
         self.assertEquals(fi.keywordParts(), {
             u'subject': u'a test message, comma separated',
             u'sender': u'alice@example.com'})

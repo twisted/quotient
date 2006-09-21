@@ -256,10 +256,15 @@ class Message(item.Item):
         return str(self.storeID)
 
 
+    def sortKey(self):
+        return unicode(self.sentWhen.asPOSIXTimestamp())
+
+
     def textParts(self):
-        return [part.getUnicodeBody()
-                for part
-                in self.impl.getTypedParts('text/plain', 'text/rtf')]
+        parts = [part.getUnicodeBody()
+                    for part
+                    in self.impl.getTypedParts('text/plain', 'text/rtf')]
+        return parts + self.keywordParts().values()
 
 
     def keywordParts(self):
