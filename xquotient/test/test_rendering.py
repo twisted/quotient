@@ -3,8 +3,8 @@ from twisted.python.filepath import FilePath
 
 from epsilon.extime import Time
 
-from nevow import loaders, tags, athena, context, rend
-from nevow.test.test_rend import req as makeRequest
+from nevow import loaders, rend
+from nevow.testutil import renderPage, renderLivePage, FragmentWrapper
 
 from axiom.store import Store
 
@@ -18,6 +18,19 @@ from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.qpeople import MessageList, MessageLister
 
+
+class ThemedFragmentWrapper(FragmentWrapper):
+    """
+    I wrap myself around an Athena fragment, providing a minimal amount of html
+    scaffolding in addition to an L{athena.LivePage}.
+
+    The fragment will have its fragment parent and docFactory (based on
+    fragmentName) set.
+    """
+    def render_fragment(self, ctx, data):
+        f = super(ThemedFragmentWrapper, self).render_fragment(ctx, data)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
 
 def makeMessage(receiver, parts, impl):
     """
@@ -79,55 +92,14 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         self.store = Store(self.dbdir)
 
 
-    def wrapFragment(self, f):
-        """
-        Wrap a L{athena.LivePage}, including a minimal amount of html
-        scaffolding, around the given fragment.
-
-        The fragment will have its fragment parent and docFactory (based on
-        fragmentName) set.
-
-        @param f: The fragment to include in the page.
-        @return: An page instance which will include the given fragment when
-        rendered.
-        """
-        class _Page(athena.LivePage):
-            docFactory = loaders.stan(
-                            tags.html[
-                                tags.body[
-                                    tags.directive('fragment')]])
-
-            def render_fragment(self, ctx, data):
-                f.setFragmentParent(self)
-                f.docFactory = getLoader(f.fragmentName)
-                return f
-
-        return _Page()
-
-
-    def renderLivePage(self, res, topLevelContext=context.WebContext):
-        """
-        Render the given resource.  Return a Deferred which fires when it has
-        rendered.
-        """
-        D = self.renderPage(res, topLevelContext)
-        return D.addCallback(lambda x: (res._messageDeliverer.close(), x)[1])
-
-
-    def renderPage(self, res, topLevelContext=context.WebContext):
-        return res.renderHTTP(
-                    topLevelContext(
-                        tag=res, parent=context.RequestContext(tag=makeRequest())))
-
-
     def test_messageRendering(self):
         """
         Test rendering of message detail for an extremely complex message.
         """
         msg = self.store.findUnique(Message)
-        return self.renderLivePage(
-                    self.wrapFragment(
-                        MessageDetail(msg)))
+        return renderLivePage(
+                   ThemedFragmentWrapper(
+                       MessageDetail(msg)))
 
 
     def test_inboxRendering(self):
@@ -146,9 +118,9 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         composer = compose.Composer(store=self.store)
         composer.installOn(self.store)
 
-        return self.renderLivePage(
-                    self.wrapFragment(
-                        InboxScreen(inbox)))
+        return renderLivePage(
+                   ThemedFragmentWrapper(
+                       InboxScreen(inbox)))
 
     def test_peopleMessageListRendering(self):
         mlister = MessageLister(store=self.store)
@@ -170,7 +142,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
 
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
-        return self.renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
+        return renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
 
     def test_draftsRendering(self):
         """
@@ -185,8 +157,8 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
         compose.Composer(store=self.store)
         drafts = compose.Drafts(store=self.store)
-        return self.renderLivePage(
-                    self.wrapFragment(
+        return renderLivePage(
+                    ThemedFragmentWrapper(
                         compose.DraftsScreen(drafts)))
 
 

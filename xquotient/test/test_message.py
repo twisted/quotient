@@ -6,8 +6,9 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text
 
-from nevow.test.test_rend import deferredRender, req as makeRequest
 from nevow import context
+from nevow.testutil import AccumulatingFakeRequest as makeRequest
+from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
 from xquotient.exmess import Message, PartDisplayer, addMessageSource, getMessageSources
