@@ -1361,6 +1361,39 @@ Quotient.Test.ControllerTestCase.methods(
         self.assertEqual(cell.title, rowData["sender"]);
         self.assertEqual(cell.firstChild.nodeValue, rowData["senderDisplay"]);
         self.assertEqual(cell.className, "sender");
+    },
+
+    /**
+     * Test that changing the view from the view shortcut selector
+     * changes the view and selects the corresponding list-item in
+     * the main view selector.  Also test the inverse.
+     */
+    function test_viewShortcut(self) {
+        var select = self.controllerWidget.viewShortcutSelect;
+        var options = select.getElementsByTagName("option");
+        var changeView = function(name) {
+            for(var i = 0; i < options.length; i++) {
+                if(options[i].value == name) {
+                    select.selectedIndex = i;
+                    return;
+                }
+            }
+        }
+        changeView("all");
+        var D = self.controllerWidget.chooseMailViewByShortcutNode(select);
+        return D.addCallback(
+            function() {
+                var viewSelectorNode = self.controllerWidget.mailViewNodes["all"];
+                self.assertEqual(
+                    viewSelectorNode.parentNode.className,
+                    "selected-list-option");
+
+                return self.controllerWidget.chooseMailViewByNode(
+                            self.controllerWidget.mailViewNodes["inbox"].parentNode);
+        }).addCallback(
+            function() {
+                self.assertEqual(select.value, "inbox");
+        });
     }
 
     /**

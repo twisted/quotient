@@ -110,13 +110,13 @@
     <div class="content-table-container">
       <div class="message-actions-container">
         <select class="view-shortcut-container">
-          <athena:handler event="onchange" handler="chooseMailViewByNode" />
-          <option value="Inbox">Inbox</option>
-          <option value="All">All</option>
-          <option value="Deferred">Deferred</option>
-          <option value="Sent">Sent</option>
-          <option value="Spam">Spam</option>
-          <option value="Trash">Trash</option>
+          <athena:handler event="onchange" handler="chooseMailViewByShortcutNode" />
+          <option value="inbox">Inbox</option>
+          <option value="all">All</option>
+          <option value="deferred">Deferred</option>
+          <option value="sent">Sent</option>
+          <option value="spam">Spam</option>
+          <option value="trash">Trash</option>
         </select>
         <div class="message-actions" style="margin-left: 2px">
           <!-- button renderer will place the contents of the tag inside the

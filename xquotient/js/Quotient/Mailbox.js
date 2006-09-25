@@ -1431,8 +1431,15 @@ Quotient.Mailbox.Controller.methods(
     function chooseMailViewByNode(self, viewNode) {
         var view = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             viewNode, 'class', 'opt-name');
-        self._selectListOption(viewNode);
         return self.chooseMailView(view.firstChild.nodeValue.toLowerCase());
+    },
+
+    /**
+     * Call chooseMailView with the view contained in the value of attribute
+     * of the view shortcut <select> C{shortcutNode}
+     */
+    function chooseMailViewByShortcutNode(self, shortcutNode) {
+        return self.chooseMailView(shortcutNode.value);
     },
 
     /**
@@ -1450,6 +1457,7 @@ Quotient.Mailbox.Controller.methods(
         }
         self.disableGroupActions();
         self._selectViewShortcut(viewName);
+        self._selectListOption(self.mailViewNodes[viewName].parentNode);
         var enableActionNames = [];
         for (var actionName in actions) {
             if (actions[actionName].enable) {
@@ -1469,10 +1477,6 @@ Quotient.Mailbox.Controller.methods(
      */
     function _selectViewShortcut(self, viewName) {
         var current = viewName;
-        if(current != "inbox" && current != "sent" && current != "spam") {
-            return;
-        }
-
         var options = self.viewShortcutSelect.getElementsByTagName("option");
         for(var i = 0; i < options.length; i++) {
             if(options[i].value == current) {
