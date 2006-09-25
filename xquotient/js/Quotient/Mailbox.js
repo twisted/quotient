@@ -640,6 +640,7 @@ Quotient.Mailbox.Controller.methods(
 
         self.messageActions = self.firstNodeByAttribute("class", "message-actions");
 
+        self.deferForm = self.nodeByAttribute("class", "defer-form");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
@@ -1627,9 +1628,8 @@ Quotient.Mailbox.Controller.methods(
      *     "archive"
      *     "delete"
      *     "defer"
-     *     "replyTo"
-     *     "forward"
-     *     "train"
+     *     "trainSpam"
+     *     "trainHam"
      *
      * @param isProgress: A boolean indicating whether the message will be
      * removed from the current message list and the progress bar updated to
@@ -1858,26 +1858,6 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    /**
-     * Hide the inbox controls and splat the given HTML ontop
-     */
-    function displayInlineWidget(self, html) {
-        self.inboxContent.style.display = "none";
-        if(!self.widgetContainer) {
-            self.widgetContainer = self.firstWithClass(self.node, "widget-container");
-        }
-        Divmod.Runtime.theRuntime.setNodeContent(
-            self.widgetContainer, '<div xmlns="http://www.w3.org/1999/xhtml">' + html + '</div>');
-    },
-
-    /**
-     * Inverse of displayInlineWidget()
-     */
-    function hideInlineWidget(self) {
-        MochiKit.DOM.replaceChildNodes(self.widgetContainer);
-        self.inboxContent.style.display = "";
-    },
-
     function archiveThis(self, n) {
         /*
          * Archived messages show up in the "all" view.  So, if we are in any
@@ -1892,9 +1872,6 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function showDeferForm(self) {
-        if(!self.deferForm) {
-            self.deferForm = self.nodeByAttribute("class", "defer-form");
-        }
         self.deferForm.style.display = "";
     },
 
@@ -1932,10 +1909,20 @@ Quotient.Mailbox.Controller.methods(
         var hours = parseInt(self.deferForm.hours.value);
         var minutes = parseInt(self.deferForm.minutes.value);
         self.deferForm.style.display = "none";
-        self.touch("defer", true, days, hours, minutes);
+        return self.touch("defer", true, days, hours, minutes);
     },
 
-    function replyToThis(self, n) {
+    /**
+     * Remove all content from the message detail area and add the given node.
+     */
+    function setMessageDetail(self, node) {
+        while (self.messageDetail.firstChild) {
+            self.messageDetail.removeChild(self.messageDetail.firstChild);
+        }
+        self.messageDetail.appendChild(node);
+    },
+
+    function replyToThis(self) {
         /*
          * This brings up a composey widget thing.  When you *send* that
          * message (or save it as a draft or whatever, I suppose), *then* this
@@ -1943,30 +1930,87 @@ Quotient.Mailbox.Controller.methods(
          * archived and possibly removed from the view.  But nothing happens
          * *here*.
          */
-        self.touch("replyTo", false);
+        var result = self.callRemote(
+            "replyToMessage", self.scrollWidget.getSelectedRow().__id__);
+        result.addCallback(
+            function(composeInfo) {
+                return self.addChildWidgetFromWidgetInfo(composeInfo);
+            });
+        result.addCallback(
+            function(compose) {
+                self.setMessageDetail(compose.node);
+            });
+        return result;
     },
 
     function forwardThis(self, n) {
         /*
          * See replyToThis
          */
-        self.touch("forward", false);
+        var result = self.callRemote(
+            "forwardMessage", self.scrollWidget.getSelectedRow().__id__);
+        result.addCallback(
+            function(composeInfo) {
+                return self.addChildWidgetFromWidgetInfo(composeInfo);
+            });
+        result.addCallback(
+            function(compose) {
+                self.setMessageDetail(compose.node);
+            });
+        return result;
     },
 
-
-    function trainSpam(self) {
-        self.touch(
-            "train",
+    /**
+     * Instruct the server to train the spam filter using the current message
+     * as an example of spam.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: A Deferred which fires when the training action has been
+     * completed.
+     */
+    function _trainSpam(self) {
+        return self.touch(
+            "trainSpam",
             (self.scrollWidget.viewSelection["view"] != "spam"),
             true);
+    },
+
+    /**
+     * Instruct the server to train the spam filter using the current message
+     * as an example of spam.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: C{false}
+     */
+    function trainSpam(self) {
+        self._trainSpam();
         return false;
     },
 
-    function trainHam(self) {
-        self.touch(
-            "train",
+    /**
+     * Instruct the server to train the spam filter using the current message
+     * as an example of ham.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: A Deferred which fires when the training action has been
+     * completed.
+     */
+    function _trainHam(self) {
+        return self.touch(
+            "trainHam",
             (self.scrollWidget.viewSelection["view"] == "spam"),
             false);
+    },
+
+    /**
+     * Instruct the server to train the spam filter using the current message
+     * as an example of ham.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: C{false}
+     */
+    function trainHam(self) {
+        self._trainHam();
         return false;
     },
 
@@ -2109,10 +2153,7 @@ Quotient.Mailbox.Controller.methods(
 
         return self.addChildWidgetFromWidgetInfo(currentMessageDisplay).addCallback(
             function(widget) {
-                while (self.messageDetail.firstChild) {
-                    self.messageDetail.removeChild(self.messageDetail.firstChild);
-                }
-                self.messageDetail.appendChild(widget.node);
+                self.setMessageDetail(widget.node);
 
                 var modifier, spamConfidence;
 

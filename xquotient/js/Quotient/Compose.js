@@ -110,16 +110,55 @@ Quotient.Compose.Controller.methods(
         self.autoSaveInterval = 30000; /* 30 seconds */
         self.inboxURL = self.nodeByAttribute("class", "inbox-link").href;
 
-        setTimeout(
-            function() {
-                self.saveDraft(false);
-            }, self.autoSaveInterval);
+        self.startSavingDrafts();
 
         self.makeFileInputs();
     },
 
+    /**
+     * Arrange for the state of the message being composed to be saved as a
+     * draft every C{self.autoSaveInterval} milliseconds.
+     */
+    function startSavingDrafts(self) {
+        self._savingDrafts = true;
+
+        var saveDraftLoop = function saveDraftLoop() {
+            self._draftCall = null;
+            if (self._savingDrafts) {
+                var saved = self.saveDraft(false);
+                saved.addCallback(
+                    function(ignored) {
+                        self._draftCall = setTimeout(saveDraftLoop, self.autoSaveInterval);
+                    });
+            }
+        };
+
+        /*
+         * XXX We need a scheduling API
+         */
+        self._draftCall = setTimeout(saveDraftLoop, self.autoSaveInterval);
+    },
+
+    /**
+     * Stop periodically saving drafts.
+     */
+    function stopSavingDrafts(self) {
+        self._savingDrafts = false;
+        /*
+         * XXX We need a scheduling API
+         */
+        if (self._draftCall != null) {
+            clearTimeout(self._draftCall);
+            self._draftCall = null;
+        }
+    },
+
     function cancel(self) {
-        self.widgetParent.hideInlineWidget();
+        self.stopSavingDrafts();
+        self.node.parentNode.removeChild(self.node);
+        /*
+         * XXX Remove this from Athena's widget map, too.
+         */
     },
 
     function toggleFilesForm(self) {
@@ -169,6 +208,10 @@ Quotient.Compose.Controller.methods(
         }
     },
 
+    /**
+     * Send the current message state to the server to be saved as a draft.
+     * Announce when this begins and ends graphically.
+     */
     function saveDraft(self, userInitiated) {
         var showDialog = function(text, fade) {
             var elem = MochiKit.DOM.DIV({"class": "draft-dialog"}, text);
@@ -180,37 +223,37 @@ Quotient.Compose.Controller.methods(
         showDialog("Saving draft...");
         var e = self.nodeByAttribute("name", "draft");
         e.checked = true;
-        self.submit().addCallback(
+        var result = self.submit().addCallback(
             function(shouldLoop) {
                 var time = (new Date()).toTimeString();
                 showDialog("Draft saved at " + time.substr(0, time.indexOf(' ')), true);
-                if(!userInitiated && shouldLoop) {
-                    setTimeout(
-                        function() {
-                            self.saveDraft(false);
-                        }, self.autoSaveInterval);
-                }
             });
         e.checked = false;
+        return result;
     },
 
     function submit(self) {
+        if (self._submitting) {
+            throw new Error("Concurrent submission rejected.");
+        }
+        self._submitting = true;
+
         self.savingADraft = self.nodeByAttribute("name", "draft").checked;
         var D = Quotient.Compose.Controller.upcall(self, "submit");
-        if(self.savingADraft) {
-            return D.addCallback(
-                function(ign) {
-                    return true;
+        D.addCallback(
+            function(passthrough) {
+                self._submitting = false;
+                return passthrough;
+            });
+        if (!self.savingADraft) {
+            D.addCallback(function(ign) {
+                    if (self.inline) {
+                        self.cancel();
+                    }
+                    return false;
                 });
         }
-        return D.addCallback(function(ign) {
-            if(self.inline) {
-                self.cancel();
-            } else {
-                document.location = self.inboxURL;
-            }
-            return false;
-        });
+        return D;
     },
 
     function makeFileInputs(self) {
@@ -485,4 +528,6 @@ Quotient.Compose.Controller.methods(
         if(!self.savingADraft) {
             return Quotient.Compose.Controller.upcall(self, "submitSuccess", result);
         }
-    });
+    }
+
+    );

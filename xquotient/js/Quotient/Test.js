@@ -1082,6 +1082,266 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test the spam filter can be trained on a particular message.
+     */
+    function test_trainSpam(self) {
+        var model;
+        var rowIdentifiers;
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+
+                model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__
+                    ];
+
+                return self.controllerWidget._trainSpam();
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Should have removed message from the current view, since it
+                 * is not the spam view.
+                 */
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(model.getRowData(0).__id__, rowIdentifiers[1]);
+
+                /*
+                 * Make sure the server thinks the message was trained as spam.
+                 */
+                return self.callRemote(
+                    "trainedStateByWebIDs",
+                    rowIdentifiers[0], rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(trainedStates) {
+                /*
+                 * This one was trained as spam.
+                 */
+                self.assertEqual(trainedStates[0].trained, true);
+                self.assertEqual(trainedStates[0].spam, true);
+
+                /*
+                 * This one was not.
+                 */
+                self.assertEqual(trainedStates[1].trained, false);
+            });
+        return result;
+    },
+
+
+    /**
+     * Like L{test_trainSpam}, only for training a message as ham rather than
+     * spam.
+     */
+    function test_trainHam(self) {
+        var model;
+        var rowIdentifiers;
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+
+                /*
+                 * Change to the spam view so training as ham will remove the
+                 * message from the view.
+                 */
+
+                return self.controllerWidget.chooseMailView("spam");
+            });
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [model.getRowData(0).__id__];
+
+                return self.controllerWidget._trainHam();
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Should have removed message from the current view.
+                 */
+                self.assertEqual(model.rowCount(), 0);
+
+                /*
+                 * Make sure the server thinks the message was trained as spam.
+                 */
+                return self.callRemote(
+                    "trainedStateByWebIDs", rowIdentifiers[0]);
+            });
+        result.addCallback(
+            function(trainedStates) {
+                /*
+                 * It was trained as ham.
+                 */
+                self.assertEqual(trainedStates[0].trained, true);
+                self.assertEqual(trainedStates[0].spam, false);
+            });
+        return result;
+    },
+
+    /**
+     * Test the message deferral functionality.
+     */
+    function test_defer(self) {
+        var model;
+        var rowIdentifiers;
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                return self.controllerWidget.deferThis();
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+
+                self.assertEqual(model.getRowData(0).__id__, rowIdentifiers[1]);
+
+                return self.callRemote(
+                    "deferredStateByWebIDs",
+                    rowIdentifiers[0], rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(deferredStates) {
+                self.assertEqual(deferredStates[0], true);
+                self.assertEqual(deferredStates[1], false);
+            });
+        return result;
+    },
+
+    /**
+     * Test that selecting the reply-to action for a message brings up a
+     * compose widget.
+     */
+    function test_replyTo(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.replyToThis();
+            });
+        result.addCallback(
+            function(ignored) {
+                var children = self.controllerWidget.childWidgets;
+                var lastChild = children[children.length - 1];
+                self.failUnless(lastChild instanceof Quotient.Compose.Controller);
+
+                /*
+                 * XXX Stop it from saving drafts, as this most likely won't
+                 * work and potentially corrupts page state in ways which will
+                 * break subsequent tests.
+                 */
+                lastChild.stopSavingDrafts();
+
+                /*
+                 * Make sure it's actually part of the page
+                 */
+                var parentNode = lastChild.node;
+                while (parentNode != null && parentNode != self.node) {
+                    parentNode = parentNode.parentNode;
+                }
+                self.assertEqual(parentNode, self.node);
+            });
+        return result;
+    },
+
+    /**
+     * Test that selecting the forward action for a message brings up a
+     * compose widget.
+     */
+    function test_forward(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.forwardThis();
+            });
+        result.addCallback(
+            function(ignored) {
+                var children = self.controllerWidget.childWidgets;
+                var lastChild = children[children.length - 1];
+                self.failUnless(lastChild instanceof Quotient.Compose.Controller);
+
+                /*
+                 * XXX Stop it from saving drafts, as this most likely won't
+                 * work and potentially corrupts page state in ways which will
+                 * break subsequent tests.
+                 */
+                lastChild.stopSavingDrafts();
+
+                /*
+                 * Make sure it's actually part of the page
+                 */
+                var parentNode = lastChild.node;
+                while (parentNode != null && parentNode != self.node) {
+                    parentNode = parentNode.parentNode;
+                }
+                self.assertEqual(parentNode, self.node);
+            });
+        return result;
+    },
+
+    /**
+     * Test that the send button on the compose widget returns the view to its
+     * previous state.
+     */
+    function test_send(self) {
+        var composer;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.replyToThis();
+            });
+        result.addCallback(
+            function(ignored) {
+                var children = self.controllerWidget.childWidgets;
+                composer = children[children.length - 1];
+                /*
+                 * Sanity check.
+                 */
+                self.failUnless(composer instanceof Quotient.Compose.Controller);
+
+                composer.stopSavingDrafts();
+
+                return composer.submit();
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Composer should no longer be displayed.
+                 */
+                self.assertEqual(composer.node.parentNode, null);
+
+                return composer.callRemote('getInvokeArguments');
+            });
+        result.addCallback(
+            function(invokeArguments) {
+                /*
+                 * Should have been called once.
+                 */
+                self.assertEqual(invokeArguments.length, 1);
+
+                self.assertArraysEqual(invokeArguments[0].toAddress, ['alice@example.com']);
+                self.assertArraysEqual(invokeArguments[0].cc, ['bob@example.com']);
+                self.assertArraysEqual(invokeArguments[0].bcc, ['']);
+                self.assertArraysEqual(invokeArguments[0].subject, ['Test Message']);
+                self.assertArraysEqual(invokeArguments[0].draft, [false]);
+                self.assertArraysEqual(invokeArguments[0].messageBody, ['message body text']);
+            });
+        return result;
+    },
+
+    /**
      * Test that the (undisplayed) Message.sender column is passed to the
      * scrolltable model
      */
@@ -1112,6 +1372,65 @@ Quotient.Test.ControllerTestCase.methods(
      */
 
     );
+
+
+Quotient.Test.EmptyInitialViewControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.Test.EmptyInitialViewControllerTestCase');
+Quotient.Test.EmptyInitialViewControllerTestCase.methods(
+    /**
+     * Retrieve a Controller Widget for an inbox from the server.
+     */
+    function setUp(self) {
+        var result = self.callRemote('getControllerWidget');
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        result.addCallback(function(widget) {
+                self.controllerWidget = widget;
+                self.node.appendChild(widget.node);
+                return self.controllerWidget.scrollWidget.initializationDeferred;
+            });
+        result.addCallback(function(widget) {
+                return self.controllerWidget.chooseMailView('all');
+            });
+        return result;
+    },
+
+    /**
+     * Test that the forward action works in this configuration.
+     */
+    function test_forward(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.forwardThis();
+            });
+        result.addCallback(
+            function(ignored) {
+                var children = self.controllerWidget.childWidgets;
+                var lastChild = children[children.length - 1];
+                self.failUnless(lastChild instanceof Quotient.Compose.Controller);
+
+                /*
+                 * XXX Stop it from saving drafts, as this most likely won't
+                 * work and potentially corrupts page state in ways which will
+                 * break subsequent tests.
+                 */
+                lastChild.stopSavingDrafts();
+
+                /*
+                 * Make sure it's actually part of the page
+                 */
+                var parentNode = lastChild.node;
+                while (parentNode != null && parentNode != self.node) {
+                    parentNode = parentNode.parentNode;
+                }
+                self.assertEqual(parentNode, self.node);
+            });
+        return result;
+    });
+
 
 
 Quotient.Test.EmptyControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.EmptyControllerTestCase');
@@ -1188,7 +1507,12 @@ Quotient.Test.ComposeController.methods(
 
 Quotient.Test.ComposeTestCase = Nevow.Athena.Test.TestCase.subclass('ComposeTestCase');
 Quotient.Test.ComposeTestCase.methods(
-    function run(self) {
+    /**
+     * Test the name completion method
+     * L{Quotient.Compose.Controller.reconstituteAddress} generates the correct
+     * address lists for various inputs.
+     */
+    function test_addressCompletion(self) {
         /* get the ComposeController */
         var controller = Quotient.Test.ComposeController.get(
                             Nevow.Athena.NodeByAttribute(
@@ -1261,7 +1585,8 @@ Quotient.Test.ComposeTestCase.methods(
                 controller.reconstituteAddress(reconstitutedAddresses[i][0]),
                 reconstitutedAddresses[i][1]);
         }
-    });
+    }
+    );
 
 
 Quotient.Test.MsgDetailTestBase = Nevow.Athena.Test.TestCase.subclass('MsgDetailTestBase');

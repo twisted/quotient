@@ -488,9 +488,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     def _currentAsFragment(self, currentMessage):
         if currentMessage is None:
             return ''
-        f = self._messageFragment(currentMessage)
-        self.currentMessageDetail = f
-        return f
+        return self._messageFragment(currentMessage)
 
 
     def _currentMessageData(self, currentMessage):
@@ -829,20 +827,22 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     expose(actOnMessageBatch)
 
 
+    composeFragmentFactory = compose.ComposeFragment
+
     def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
         composer = self.inbox.store.findUnique(compose.Composer)
-        cf = compose.ComposeFragment(composer,
-                                     toAddress=toAddress,
-                                     subject=subject,
-                                     messageBody=messageBody,
-                                     attachments=attachments,
-                                     inline=True)
+        cf = self.composeFragmentFactory(composer,
+                                         toAddress=toAddress,
+                                         subject=subject,
+                                         messageBody=messageBody,
+                                         attachments=attachments,
+                                         inline=True)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
-        return unicode(flatten(cf), 'utf-8')
+        return cf
 
 
-    def replyToMessage(self, messageIdentifier, advance):
+    def replyToMessage(self, messageIdentifier):
         curmsg = self.translator.fromWebID(messageIdentifier)
 
         if curmsg.sender is not None:
@@ -863,7 +863,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     expose(replyToMessage)
 
 
-    def forwardMessage(self, messageIdentifier, advance):
+    def forwardMessage(self, messageIdentifier):
         curmsg = self.translator.fromWebID(messageIdentifier)
 
         reply = ['\nBegin forwarded message:\n']
@@ -876,10 +876,12 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         reply.append('')
         reply.extend(quoteBody(curmsg))
 
+        currentMessageDetail = self._messageFragment(curmsg)
+
         return self._composeSomething('',
                                       reSubject(curmsg, 'Fwd: '),
                                       '\n\n' + '\n> '.join(reply),
-                                      self.currentMessageDetail.attachmentParts)
+                                      currentMessageDetail.attachmentParts)
     expose(forwardMessage)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from nevow.livetrial import testcase
-from nevow.athena import expose
+from nevow.athena import LiveFragment, expose
 
 from epsilon.extime import Time
 
@@ -9,6 +9,7 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom import attributes
 from axiom.tags import Catalog
+from axiom.scheduler import Scheduler
 
 from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
@@ -18,7 +19,7 @@ from xmantissa.test.livetest_scrolltable import ScrollElement
 
 from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
 from xquotient.exmess import Message
-from xquotient.compose import Composer
+from xquotient.compose import Composer, ComposeFragment
 from xquotient.quotientapp import QuotientPreferenceCollection
 
 
@@ -75,7 +76,77 @@ class _Part(Item):
 
 
 
+class StubComposeFragment(LiveFragment):
+    jsClass = ComposeFragment.jsClass
+    fragmentName = ComposeFragment.fragmentName
+
+    def __init__(self, composer, toAddress, subject, messageBody, attachments, inline):
+        self.composer = composer
+        self.toAddress = toAddress
+        self.subject = subject
+        self.messageBody = messageBody
+        self.attachments = attachments
+        self.inline = inline
+        self.invokeArguments = []
+
+
+    def getInvokeArguments(self):
+        """
+        Return a list of form arguments which have been passed to
+        C{self.invoke}.
+        """
+        return self.invokeArguments
+    expose(getInvokeArguments)
+
+
+    # These are the Athena methods required to be exposed
+    def invoke(self, arguments):
+        self.invokeArguments.append(arguments)
+    expose(invoke)
+
+
+    def getInitialArguments(self):
+        return (self.inline, ())
+
+
+    # Render stuff
+    def rend(self, ctx, data):
+        """
+        Fill the slots the template requires to be filled in order to be
+        rendered.
+        """
+        ctx.fillSlots('to', 'alice@example.com')
+        ctx.fillSlots('cc', 'bob@example.com')
+        ctx.fillSlots('subject', 'Test Message')
+        ctx.fillSlots('attachments', '')
+        ctx.fillSlots('body', 'message body text')
+        return LiveFragment.rend(self, ctx, data)
+
+
+    # These are the renderers required by the template.
+    def render_fileCabinet(self, ctx, data):
+        return ctx.tag
+
+
+    def render_compose(self, ctx, data):
+        return ctx.tag
+
+
+    def render_inboxLink(self, ctx, data):
+        return ctx.tag
+
+
+    def render_button(self, ctx, data):
+        return ctx.tag
+
+
+
 class _ControllerMixin:
+    aliceEmail = u'alice@example.com'
+    bobEmail = u'bob@example.com'
+
+    sent = Time.fromDatetime(datetime(1999, 12, 13))
+
     def getInbox(self):
         """
         Return a newly created Inbox, in a newly created Store which has all of
@@ -83,6 +154,7 @@ class _ControllerMixin:
         more than C{return Inbox(store=Store())}
         """
         s = Store()
+        Scheduler(store=s).installOn(s)
         Catalog(store=s)
         WebSite(store=s).installOn(s)
         PrivateApplication(store=s).installOn(s)
@@ -97,11 +169,6 @@ class _ControllerMixin:
 
 class ControllerTestCase(testcase.TestCase, _ControllerMixin):
     jsClass = u'Quotient.Test.ControllerTestCase'
-
-    aliceEmail = u'alice@example.com'
-    bobEmail = u'bob@example.com'
-
-    sent = Time.fromDatetime(datetime(1999, 12, 13))
 
     def getControllerWidget(self):
         """
@@ -193,6 +260,7 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             in [m1, m2, m3, m4, m5])
 
         fragment = InboxScreen(inbox)
+        fragment.composeFragmentFactory = StubComposeFragment
         fragment.setFragmentParent(self)
         return fragment
     expose(getControllerWidget)
@@ -222,6 +290,63 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
     expose(archivedFlagsByWebIDs)
 
 
+    def trainedStateByWebIDs(self, *ids):
+        """
+        Return a dictionary describing the spam training state of the messages
+        with the given webID.
+        """
+        return [{u'trained': self.messages[id].trained,
+                 u'spam': self.messages[id].spam}
+                for id in ids]
+    expose(trainedStateByWebIDs)
+
+
+    def deferredStateByWebIDs(self, *ids):
+        """
+        Return the deferred flag of the messages with the given webIDs.
+        """
+        return [self.messages[id].deferred for id in ids]
+    expose(deferredStateByWebIDs)
+
+
+
+class EmptyInitialViewControllerTestCase(testcase.TestCase, _ControllerMixin):
+    """
+    Tests for behaviors where the mailbox loads and the initial view is empty,
+    but other views contain messages.
+    """
+    jsClass = u'Quotient.Test.EmptyInitialViewControllerTestCase'
+
+    def getControllerWidget(self):
+        """
+        Retrieve the Controller widget for a mailbox with no message in the
+        inbox view but several messages in the archive view.
+        """
+        inbox = self.getInbox()
+
+
+        offset = timedelta(seconds=30)
+
+        impl = _Part(store=inbox.store)
+
+        # Archive messages
+        m1 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'1st message',
+            receivedWhen=self.sent, sentWhen=self.sent, spam=False,
+            archived=True, read=False, impl=impl)
+
+        m2 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'2nd message',
+            receivedWhen=self.sent + offset, sentWhen=self.sent,
+            spam=False, archived=True, read=False, impl=impl)
+
+        fragment = InboxScreen(inbox)
+        fragment.composeFragmentFactory = StubComposeFragment
+        fragment.setFragmentParent(self)
+        return fragment
+    expose(getControllerWidget)
+
+
 
 class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
     jsClass = u'Quotient.Test.EmptyControllerTestCase'
@@ -232,6 +357,7 @@ class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
         """
         inbox = self.getInbox()
         fragment = InboxScreen(inbox)
+        fragment.composeFragmentFactory = StubComposeFragment
         fragment.setFragmentParent(self)
         return fragment
     expose(getEmptyControllerWidget)
