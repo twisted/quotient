@@ -785,64 +785,6 @@ class StatusColumn(AttributeColumn):
     def getType(self):
         return TYPE_FRAGMENT
 
-class DeleteAction(tdbview.Action):
-    def __init__(self, actionID='delete',
-                 iconURL='/Mantissa/images/delete.png',
-                 description='Delete',
-                 disabledIconURL=None):
-        super(DeleteAction, self).__init__(actionID, iconURL, description, disabledIconURL)
-
-    def performOn(self, grabber):
-        grabber.delete()
-
-    def actionable(self, item):
-        return True
-
-class EditAction(tdbview.Action):
-    def __init__(self, actionID='edit',
-                 iconURL=None,
-                 description='Edit',
-                 disabledIconURL=None):
-        super(EditAction, self).__init__(actionID, iconURL, description, disabledIconURL)
-
-    def performOn(self, item):
-        raise NotImplementedError()
-
-    def actionable(self, item):
-        return True
-
-class PauseAction(tdbview.Action):
-    def __init__(self, actionID='pause',
-                 iconURL='/Quotient/static/images/action-pause.png',
-                 description='Pause',
-                 disabledIconURL=None):
-        super(PauseAction, self).__init__(actionID, iconURL, description, disabledIconURL)
-
-
-    def performOn(self, item):
-        item.paused = True
-
-
-    def actionable(self, item):
-        return not item.paused
-
-
-
-class ResumeAction(tdbview.Action):
-    def __init__(self, actionID='resume',
-                 iconURL='/Quotient/static/images/action-resume.png',
-                 description='Resume',
-                 disabledIconURL=None):
-        super(ResumeAction, self).__init__(actionID, iconURL, description, disabledIconURL)
-
-
-    def performOn(self, item):
-        item.paused = False
-
-
-    def actionable(self, item):
-        return item.paused
-
 
 
 class ConfiguredGrabbersView(ScrollingFragment):
@@ -853,10 +795,15 @@ class ConfiguredGrabbersView(ScrollingFragment):
                                    [POP3Grabber.username,
                                     POP3Grabber.domain,
                                     POP3Grabber.paused,
-                                    StatusColumn(POP3Grabber.status, self)],
-                                   actions=[PauseAction(),
-                                            ResumeAction(),
-                                            DeleteAction(),
-                                            EditAction()])
+                                    StatusColumn(POP3Grabber.status, self)])
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
+
+    def action_delete(self, grabber):
+        grabber.delete()
+
+    def action_pause(self, grabber):
+        grabber.paused = True
+
+    def action_resume(self, grabber):
+        grabber.paused = False

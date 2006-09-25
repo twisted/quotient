@@ -4,6 +4,33 @@
 // import Mantissa.TDB
 // import Mantissa.ScrollTable
 
+Quotient.Grabber.EditAction = Mantissa.ScrollTable.Action.subclass(
+                                'Quotient.Grabber.EditAction');
+
+Quotient.Grabber.EditAction.methods(
+    function enact(self, scrollingWidget, row) {
+        return scrollingWidget.widgetParent.loadEditForm(row.__id__);
+    });
+
+Quotient.Grabber.RefillingAction = Mantissa.ScrollTable.Action.subclass(
+                                    'Quotient.Grabber.RefillingAction');
+
+/**
+ * Trivial L{Mantissa.ScrollTable.Action} subclass with a handler that refills
+ * the scrolltable after the server-side action completes successfully.
+ * XXX: we should really just mutate the row node in place, e.g. to change
+ *      paused="true" to "false"
+ */
+Quotient.Grabber.RefillingAction.methods(
+    function __init__(self, name, displayName, icon) {
+        Quotient.Grabber.RefillingAction.upcall(
+            self, "__init__", name, displayName,
+            function(scrollingWidget, row, result) {
+                return scrollingWidget.emptyAndRefill();
+            },
+            icon);
+    });
+
 Quotient.Grabber.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
                                         'Quotient.Grabber.ScrollingWidget');
 
@@ -14,6 +41,20 @@ Quotient.Grabber.ScrollingWidget.methods(
                              "status": "200px",
                              "paused": "90px",
                              "actions": "100px"};
+
+        self.actions = [Quotient.Grabber.RefillingAction(
+                            "delete", "Delete",
+                            "/Mantissa/images/delete.png"),
+
+                        Quotient.Grabber.EditAction("edit", "Edit"),
+
+                        Quotient.Grabber.RefillingAction(
+                            "pause", "Pause",
+                            "/Quotient/static/images/action-pause.png"),
+
+                        Quotient.Grabber.RefillingAction(
+                            "resume", "Resume",
+                            "/Quotient/static/images/action-resume.png")];
 
         Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node);
         self._scrollViewport.style.height = '100px';
