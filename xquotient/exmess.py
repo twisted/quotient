@@ -306,7 +306,7 @@ class MessageDisplayPreferenceCollection(item.Item, item.InstallableMixin, Prefe
     implements(ixmantissa.IPreferenceCollection)
 
     installedOn = attributes.reference()
-    preferredFormat = attributes.text()
+    preferredFormat = attributes.text(default=u"text/html")
 
     def installOn(self, other):
         other.powerUp(self, ixmantissa.IPreferenceCollection, item.POWERUP_BEFORE)

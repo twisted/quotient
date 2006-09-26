@@ -15,6 +15,8 @@ from axiom.test.util import getPristineStore
 from xmantissa import offering, signup
 from xmantissa.plugins.free_signup import freeTicket
 
+from xquotient import exmess
+
 def createStore(testCase):
     dbpath = testCase.mktemp()
     axiomatic.main(['-d', dbpath, 'mantissa', '--admin-password', 'password'])
@@ -101,3 +103,12 @@ class InstallationTestCase(TestCase):
         """
         self.createSignupAndSignup(
             getQuotientOffering().benefactorFactories)
+
+    def testDefaultMessageDisplayPrefs(self):
+        """
+        On signup, users' preferred message format should be HTML.
+        """
+        ss = self.createSignupAndSignup(
+            getQuotientOffering().benefactorFactories)
+        self.assertEqual(ss.findUnique(
+            exmess.MessageDisplayPreferenceCollection).preferredFormat, u"text/html")
