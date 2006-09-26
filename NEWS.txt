@@ -1,8 +1,3 @@
-0.1.17 (2006-09-26):
-  - Default format for message display is now HTML.
-  - View shortcut selector now actually selects things.
-  - Spam training/reply/forward fixed.
-
 0.1.16 (2006-09-20):
   - Email address tooltips are shown on the names of message senders, if
     they are not in the addressbook.
