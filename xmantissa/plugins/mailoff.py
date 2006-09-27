@@ -49,9 +49,15 @@ popAccessBenefactorFactory = provisioning.BenefactorFactory(
     benefactorClass = popout.POP3Benefactor)
 
 ruleBenefactorFactory = provisioning.BenefactorFactory(
-    name = u'Filtering',
-    description = u'Pre-configured and user-customizable filtering of messages based on headers and such.',
-    benefactorClass = filter.FilterBenefactor,
+    name = u'Rule Filtering',
+    description = u'User-customizable filtering of messages based on headers and such.',
+    benefactorClass = filter.RuleFilterBenefactor,
+    dependencies = [quotientBenefactorFactory])
+
+mailingListBenefactorFactory = provisioning.BenefactorFactory(
+    name = u'Mailing List Filtering',
+    description = u'Automatic filtering of messages sent by various mailing list managers.',
+    benefactorClass = filter.MailingListFilterBenefactor,
     dependencies = [quotientBenefactorFactory])
 
 quotientPeopleBenefactorFactory = provisioning.BenefactorFactory(

@@ -1,13 +1,18 @@
 
 from twisted.trial import unittest
+from twisted.python.filepath import FilePath
 
-from axiom import store
+from axiom import store, tags, scheduler
 
-from xquotient import filter, mimepart
+from xquotient import filter, mimepart, mail
+from xquotient.mimestorage import Part
+from xquotient.exmess import Message
+
 
 class HeaderRuleTest(unittest.TestCase):
     def setUp(self):
-        self.store = store.Store()
+        self.storepath = self.mktemp()
+        self.store = store.Store(self.storepath)
         self.headerRule = filter.HeaderRule(
             store=self.store,
             headerName=u"subject",
@@ -77,3 +82,31 @@ class HeaderRuleTest(unittest.TestCase):
         casenotsame = mimepart.Header(u"subject", u"IS SUBJVAL THIS?")
         self.headerRule.operation = filter.CONTAINS
         return self._testImpl(same, notsame, casenotsame)
+
+    def testMailingListFilter(self):
+        """
+        Ensures that mailing list messages are not handled by RuleFilteringPowerup but are handled by MailingListFilteringPowerup.
+        """
+        self.tagcatalog = tags.Catalog(store=self.store)
+        scheduler.Scheduler(store=self.store).installOn(self.store)
+        mail.MessageSource(store=self.store)
+        mlfb = filter.MailingListFilterBenefactor(store=self.store)
+        rfb = filter.RuleFilterBenefactor(store=self.store)
+
+        part = Part()
+        part.addHeader(u'X-Mailman-Version', u"2.1.5")
+        part.addHeader(u'List-Id',
+                       u"Some mailing list <some-list.example.com>")
+        msg = Message(store=self.store)
+        part._addToStore(self.store, msg, FilePath(self.storepath
+                                                   ).child("files"
+                                                   ).child("x"))
+        rfb.endow(None, self.store)
+        rfp = self.store.findUnique(filter.RuleFilteringPowerup)
+        rfp.processItem(msg)
+        self.assertEqual(list(self.tagcatalog.tagsOf(msg)), [])
+        mlfb.endow(None, self.store)
+        mlfp = self.store.findUnique(filter.MailingListFilteringPowerup)
+        mlfp.processItem(msg)
+        self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
+                         [u'some-list.example.com'])

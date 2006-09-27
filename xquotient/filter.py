@@ -18,8 +18,12 @@ from xmantissa import ixmantissa, webnav, webtheme, liveform
 
 from xquotient import iquotient, mail
 
-class FilteringPowerup(item.Item, item.InstallableMixin):
-
+class RuleFilteringPowerup(item.Item, item.InstallableMixin):
+    """
+    Filters messages according to a set of user-defined filtering
+    rules.
+    """
+    typeName = 'xquotient_filter_filteringpowerup'
     installedOn = attributes.reference(doc="""
     Avatar which this powers up.
     """)
@@ -35,12 +39,8 @@ class FilteringPowerup(item.Item, item.InstallableMixin):
 
 
     def installOn(self, other):
-        super(FilteringPowerup, self).installOn(other)
+        super(RuleFilteringPowerup, self).installOn(other)
         self.store.findUnique(mail.MessageSource).addReliableListener(self)
-
-        # Hmm.  Mailing list filtering will just always be on, I guess.
-        self.powerUp(MailingListRule(store=self.store), iquotient.IFilteringRule)
-
         other.powerUp(self, ixmantissa.INavigableElement)
 
 
@@ -61,26 +61,55 @@ class FilteringPowerup(item.Item, item.InstallableMixin):
                 break
 
 
+class RuleFilterBenefactor(item.Item, item.InstallableMixin):
+    """
+    Endows users with RuleFilteringPowerup.
+    """
 
-class FilterBenefactor(item.Item, item.InstallableMixin):
+    typeName = 'xquotient_filter_filterbenefactor'
     implements(ixmantissa.IBenefactor)
 
     installedOn = attributes.reference()
     endowed = attributes.integer(default=0)
 
     def installOn(self, other):
-        super(FilterBenefactor, self).installOn(other)
+        super(RuleFilterBenefactor, self).installOn(other)
         other.powerUp(self, ixmantissa.IBenefactor)
 
 
     def endow(self, ticket, avatar):
         self.endowed += 1
         catalog = avatar.findOrCreate(tags.Catalog)
-        avatar.findOrCreate(FilteringPowerup, tagCatalog=catalog).installOn(avatar)
+        avatar.findOrCreate(RuleFilteringPowerup, tagCatalog=catalog).installOn(avatar)
 
 
     def revoke(self, ticket, avatar):
-        avatar.findUnique(FilteringPowerup).deleteFromStore()
+        avatar.findUnique(RuleFilteringPowerup).deleteFromStore()
+
+
+
+class MailingListFilterBenefactor(item.Item, item.InstallableMixin):
+    """
+    Endows users with MailingListFilteringPowerup.
+    """
+    implements(ixmantissa.IBenefactor)
+
+    installedOn = attributes.reference()
+    endowed = attributes.integer(default=0)
+
+    def installOn(self, other):
+        super(MailingListFilterBenefactor, self).installOn(other)
+        other.powerUp(self, ixmantissa.IBenefactor)
+
+
+    def endow(self, ticket, avatar):
+        self.endowed += 1
+        catalog = avatar.findOrCreate(tags.Catalog)
+        avatar.findOrCreate(MailingListFilteringPowerup, tagCatalog=catalog).installOn(avatar)
+
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(MailingListFilteringPowerup).deleteFromStore()
 
 
 
@@ -209,6 +238,27 @@ class HeaderRule(item.Item):
     def applyTo(self, item):
         return self.applyToHeaders(item.impl.getHeaders(self.headerName))
 
+class MailingListFilteringPowerup(item.Item, item.InstallableMixin):
+    """
+    Filters mail according to the mailing list it was sent from.
+    """
+    tagCatalog = attributes.reference(doc="""
+    The catalog in which to tag items to which this action is applied.
+    """)
+    mailingListRule = attributes.reference(doc="""
+    The mailing list filter used by this powerup.
+    """)
+
+    def installOn(self, other):
+        super(MailingListFilteringPowerup, self).installOn(other)
+        self.mailingListRule = self.store.findOrCreate(MailingListRule)
+        self.store.findUnique(mail.MessageSource).addReliableListener(self)
+
+    def processItem(self, item):
+        matched, proceed, extraData = self.mailingListRule.applyTo(item)
+        if matched:
+            self.mailingListRule.getAction().actOn(self, self.mailingListRule,
+                                                   item, extraData)
 
 
 class MailingListRule(item.Item):
@@ -259,7 +309,7 @@ class MailingListRule(item.Item):
                 return listId.replace('@', '.')
 
 
-    def match_mailman(self, headers, listExpr = re.compile(r'''<(?P<listId>[^>]*)>'''), versionHeader = 'X-Mailman-Version'):
+    def match_mailman(self, headers, listExpr = re.compile(r'''<(?P<listId>[^>]*)>'''), versionHeader = 'x-mailman-version'):
         if versionHeader in headers:
             listId = headers.get('list-id', [None])[0]
             if listId is not None:
@@ -383,4 +433,4 @@ class FilteringConfigurationFragment(athena.LiveFragment):
             action=action)
         self.original.powerUp(rule, iquotient.IFilteringRule)
 
-components.registerAdapter(FilteringConfigurationFragment, FilteringPowerup, ixmantissa.INavigableFragment)
+components.registerAdapter(FilteringConfigurationFragment, RuleFilteringPowerup, ixmantissa.INavigableFragment)
