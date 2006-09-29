@@ -1,3 +1,8 @@
+0.1.18 (2006-09-29):
+  - Unarchive and undelete buttons have been added.
+  - Mailing list filtering is now a separate powerup from user-configured 
+    rule filtering.
+
 0.1.17 (2006-09-26):
   - Default format for message display is now HTML.
   - View shortcut selector now actually selects things.
