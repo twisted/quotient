@@ -1342,6 +1342,70 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test that a message in the trash can be undeleted.
+     */
+    function test_undelete(self) {
+        var model;
+        var rowIdentifier;
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView("trash");
+            });
+        result.addCallback(
+            function(ignored) {
+                rowIdentifier = model.getRowData(0).__id__;
+                return self.controllerWidget.touch("undelete", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView("all");
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Undeleted message should be here _somewhere_.
+                 */
+                var row = model.findRowData(rowIdentifier);
+            });
+        return result;
+    },
+
+    /**
+     * Test that a message in the archive can be unarchived.
+     */
+    function test_unarchive(self) {
+        var model;
+        var rowIdentifier;
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView("all");
+            });
+        result.addCallback(
+            function(ignored) {
+                rowIdentifier = model.getRowData(0).__id__;
+                return self.controllerWidget.touch("unarchive", true);
+            });
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView("inbox");
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Undeleted message should be here _somewhere_.
+                 */
+                var row = model.findRowData(rowIdentifier);
+            });
+        return result;
+    },
+
+    /**
      * Test that the (undisplayed) Message.sender column is passed to the
      * scrolltable model
      */

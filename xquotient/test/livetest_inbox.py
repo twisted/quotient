@@ -187,6 +187,8 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
 
             The sent folter contains 1 read message.
 
+            The trash folder contains 2 read messages.
+
         There are also some people.  They are::
 
             Alice - alice@example.com
@@ -242,6 +244,19 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             spam=False, archived=False, read=True, outgoing=True,
             impl=impl)
 
+        # Trash messages
+        m7 = Message(
+            store=inbox.store, sender=self.bobEmail, subject=u'7th message',
+            receivedWhen=self.sent + offset * 6, sentWhen=self.sent,
+            spam=False, archived=False, read=True, outgoing=False,
+            trash=True, impl=impl)
+
+        m8 = Message(
+            store=inbox.store, sender=self.bobEmail, subject=u'8th message',
+            receivedWhen=self.sent + offset * 7, sentWhen=self.sent,
+            spam=False, archived=False, read=True, outgoing=False,
+            trash=True, impl=impl)
+
         # Alice
         alice = Person(store=inbox.store, organizer=organizer, name=u"Alice")
         EmailAddress(store=inbox.store, person=alice, address=self.aliceEmail)
@@ -257,7 +272,7 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         self.messages = dict(
             (application.toWebID(m), m)
             for m
-            in [m1, m2, m3, m4, m5])
+            in [m1, m2, m3, m4, m5, m6, m7, m8])
 
         fragment = InboxScreen(inbox)
         fragment.composeFragmentFactory = StubComposeFragment

@@ -142,11 +142,25 @@
               archive
             </nevow:invisible>
           </span>
+          <span class="unarchive-button">
+            <nevow:invisible nevow:render="button"
+              onclick="Quotient.Mailbox.Controller.get(this).unarchiveThis(this); return false"
+              href="#">
+              unarchive
+            </nevow:invisible>
+          </span>
           <span class="delete-button">
             <nevow:invisible nevow:render="button"
               onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false"
               href="#">
               delete
+            </nevow:invisible>
+          </span>
+          <span class="undelete-button">
+            <nevow:invisible nevow:render="button"
+              onclick="Quotient.Mailbox.Controller.get(this).undeleteThis(this); return false"
+              href="#">
+              undelete
             </nevow:invisible>
           </span>
           <span class="defer-button">

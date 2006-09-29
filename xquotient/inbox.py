@@ -229,11 +229,25 @@ class Inbox(Item, InstallableMixin):
         message.archived = True
 
 
+    def action_unarchive(self, message):
+        """
+        Move the given message out of the archive.
+        """
+        message.archived = False
+
+
     def action_delete(self, message):
         """
         Move the given message to the trash.
         """
         message.trash = True
+
+
+    def action_undelete(self, message):
+        """
+        Move the given message out of the trash.
+        """
+        message.trash = False
 
 
     def action_defer(self, message, days=0, hours=0, minutes=0):

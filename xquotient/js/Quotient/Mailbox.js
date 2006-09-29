@@ -679,6 +679,8 @@ Quotient.Mailbox.Controller.methods(
          */
         self.actions = self._getActionButtons();
 
+        self._setupActionButtonsForView(self.scrollWidget.viewSelection['view']);
+
         self.delayedLoad(self.complexityLevel);
     },
 
@@ -738,14 +740,14 @@ Quotient.Mailbox.Controller.methods(
     function _getActionButtons(self) {
         var buttonInfo = {
             "all": ["defer", "delete", "forward",
-                    "reply", "print", "train-spam"],
+                    "reply", "print", "train-spam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
                       "forward", "reply", "print", "train-spam"],
             "spam": ["defer", "delete", "forward",
                      "reply", "print", "train-ham"],
             "deferred": ["forward", "reply", "print"],
             "sent": ["delete", "forward", "reply", "print"],
-            "trash": ["forward" ,"reply", "print"]};
+            "trash": ["forward" ,"reply", "print", "undelete"]};
 
         /*
          * Compute list of all button names from the buttonInfo structured.
@@ -1451,14 +1453,20 @@ Quotient.Mailbox.Controller.methods(
      * @return: L{Deferred}, which will fire after view change is complete
      */
     function chooseMailView(self, viewName) {
+        self.disableGroupActions();
+        self._selectViewShortcut(viewName);
+        self._selectListOption(self.mailViewNodes[viewName].parentNode);
+        self._setupActionButtonsForView(viewName);
+        return self.changeViewSelection("view", viewName);
+    },
+
+    function _setupActionButtonsForView(self, viewName) {
+        var enableActionNames = [];
+
         var actions = self.actions[viewName];
         if (actions === undefined) {
             throw new Error("Unknown view: " + viewName);
         }
-        self.disableGroupActions();
-        self._selectViewShortcut(viewName);
-        self._selectListOption(self.mailViewNodes[viewName].parentNode);
-        var enableActionNames = [];
         for (var actionName in actions) {
             if (actions[actionName].enable) {
                 enableActionNames.push(actionName);
@@ -1468,7 +1476,6 @@ Quotient.Mailbox.Controller.methods(
             }
         }
         self.setGroupActions(enableActionNames);
-        return self.changeViewSelection("view", viewName);
     },
 
     /**
@@ -1871,8 +1878,16 @@ Quotient.Mailbox.Controller.methods(
         self.touch("archive", self.scrollWidget.viewSelection["view"] != "all");
     },
 
+    function unarchiveThis(self, n) {
+        self.touch("unarchive", self.scrollWidget.viewSelection["view"] == "all");
+    },
+
     function deleteThis(self, n) {
         self.touch("delete", self.scrollWidget.viewSelection["view"] != "trash");
+    },
+
+    function undeleteThis(self, n) {
+        self.touch("undelete", self.scrollWidget.viewSelection["view"] == "trash");
     },
 
     function showDeferForm(self) {
