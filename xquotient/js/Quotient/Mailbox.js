@@ -641,6 +641,7 @@ Quotient.Mailbox.Controller.methods(
         self.messageActions = self.firstNodeByAttribute("class", "message-actions");
 
         self.deferForm = self.nodeByAttribute("class", "defer-form");
+        self.deferSelect = self.nodeByAttribute("class", "defer");
 
         self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
         self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
@@ -1646,11 +1647,18 @@ Quotient.Mailbox.Controller.methods(
      * removed from the current message list and the progress bar updated to
      * reflect this.
      *
+     * @param arguments: An optional extra object to pass to the server-side
+     * action handler.
+     *
      * @return: C{undefined}
      */
-    function touch(self, action, isProgress) {
+    function touch(self, action, isProgress, /* optional */ extraArguments) {
         var model = self.scrollWidget.model;
         var selected = self.scrollWidget._selectedRowID;
+
+        if (extraArguments === undefined) {
+            extraArguments = null;
+        }
 
         if (selected === undefined) {
             throw new Error("No row selected.");
@@ -1663,7 +1671,7 @@ Quotient.Mailbox.Controller.methods(
                     nextMessageID = model.findPrevRow(selected);
                 }
 
-                var acted = self.callRemote("actOnMessageIdentifierList", action, [selected]);
+                var acted = self.callRemote("actOnMessageIdentifierList", action, [selected], extraArguments);
 
                 var removed;
                 if (isProgress) {
@@ -1898,37 +1906,71 @@ Quotient.Mailbox.Controller.methods(
         self.deferForm.style.display = "none";
     },
 
-    function defer(self, node) {
-        var options = node.getElementsByTagName("option");
-        var value = options[node.selectedIndex].firstChild.nodeValue;
-        node.selectedIndex = 0;
-
-        if(value == "other...") {
+    function _deferralStringToPeriod(self, value) {
+        if (value == "other...") {
             self.showDeferForm();
             return;
         }
-        if(value == "Defer") {
-            return;
+        if (value == "Defer") {
+            return null;
         }
         var args;
-        if(value == "1 day") {
-            args = [1, 0, 0];
-        } else if(value == "1 hour") {
-            args = [0, 1, 0];
-        } else if(value == "12 hours") {
-            args = [0, 12, 0];
-        } else if(value == "1 week") {
-            args = [7, 0, 0];
+        if (value == "1 day") {
+            return {"days": 1,
+                    "hours": 0,
+                    "minutes": 0};
+        } else if (value == "1 hour") {
+            return {"days": 0,
+                    "hours": 1,
+                    "minutes": 0};
+        } else if (value == "12 hours") {
+            return {"days": 0,
+                    "hours": 12,
+                    "minutes": 0};
+        } else if (value == "1 week") {
+            return {"days": 7,
+                    "hours": 0,
+                    "minutes": 0};
+        } else {
+            throw new Error("Invalid Deferral state:" + value);
         }
-        self.touch.apply(self, ["defer", true].concat(args));
+    },
+
+    /**
+     * Return an object describing the deferral period represented by the given
+     * node, or null if it indicates no deferral should be performed or
+     * something else if we should show the defer form.
+     */
+    function _getDeferralSelection(self, node) {
+        var options = self.deferSelect.getElementsByTagName("option");
+        var value = options[self.deferSelect.selectedIndex].firstChild.nodeValue;
+        return self._deferralStringToPeriod(value);
+    },
+
+    function defer(self, /* unused */ node) {
+        var period = self._getDeferralSelection();
+        node.selectedIndex = 0;
+        if (period === undefined || period === null) {
+            return;
+        }
+        self.touch("defer", true, period);
+    },
+
+    /**
+     * Return an object with three properties giving the current state of the
+     * defer period form.
+     */
+    function _getDeferralPeriod(self) {
+        var form = self.deferForm;
+        return {'days': parseInt(form.days.value),
+                'hours': parseInt(form.hours.value),
+                'minutes': parseInt(form.minutes.value)};
     },
 
     function deferThis(self) {
-        var days = parseInt(self.deferForm.days.value);
-        var hours = parseInt(self.deferForm.hours.value);
-        var minutes = parseInt(self.deferForm.minutes.value);
+        var period = self._getDeferralPeriod();
         self.deferForm.style.display = "none";
-        return self.touch("defer", true, days, hours, minutes);
+        return self.touch("defer", true, period);
     },
 
     /**
@@ -1990,8 +2032,7 @@ Quotient.Mailbox.Controller.methods(
     function _trainSpam(self) {
         return self.touch(
             "trainSpam",
-            (self.scrollWidget.viewSelection["view"] != "spam"),
-            true);
+            (self.scrollWidget.viewSelection["view"] != "spam"));
     },
 
     /**
@@ -2017,8 +2058,7 @@ Quotient.Mailbox.Controller.methods(
     function _trainHam(self) {
         return self.touch(
             "trainHam",
-            (self.scrollWidget.viewSelection["view"] == "spam"),
-            false);
+            (self.scrollWidget.viewSelection["view"] == "spam"));
     },
 
     /**

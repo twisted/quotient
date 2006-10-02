@@ -17,7 +17,7 @@ from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
 from xmantissa.test.livetest_scrolltable import ScrollElement
 
-from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
+from xquotient.inbox import Inbox, UndeferTask, InboxScreen, MailboxScrollingFragment
 from xquotient.exmess import Message
 from xquotient.compose import Composer, ComposeFragment
 from xquotient.quotientapp import QuotientPreferenceCollection
@@ -316,11 +316,20 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
     expose(trainedStateByWebIDs)
 
 
+    def _getDeferredState(self, msg):
+        if msg.deferred:
+            # XXX UndeferTask should remember the amount of time, not just the
+            # ultimate undefer time.
+            t = msg.store.findUnique(UndeferTask, UndeferTask.message == msg)
+            return t.deferredUntil.asPOSIXTimestamp()
+        return None
+
+
     def deferredStateByWebIDs(self, *ids):
         """
         Return the deferred flag of the messages with the given webIDs.
         """
-        return [self.messages[id].deferred for id in ids]
+        return [self._getDeferredState(self.messages[id]) for id in ids]
     expose(deferredStateByWebIDs)
 
 

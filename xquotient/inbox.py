@@ -250,7 +250,7 @@ class Inbox(Item, InstallableMixin):
         message.trash = False
 
 
-    def action_defer(self, message, days=0, hours=0, minutes=0):
+    def action_defer(self, message, days, hours, minutes):
         """
         Change the state of the given message to Deferred and schedule it to
         be changed back after the given interval has elapsed.
@@ -768,7 +768,12 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     def _getActionMethod(self, actionName):
         return getattr(self.inbox, 'action_' + actionName)
 
-    def _performMany(self, actionName, messages=(), webIDs=(), args=()):
+    def _performMany(self, actionName, messages=(), webIDs=(), args=None):
+
+        extra = {}
+        for k, v in (args or {}).iteritems():
+            extra[k.encode('ascii')] = v
+
         readCount = 0
         unreadCount = 0
         action = self._getActionMethod(actionName)
@@ -777,7 +782,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                 readCount += 1
             else:
                 unreadCount += 1
-            action(message, *args)
+            action(message, **extra)
         return readCount, unreadCount
 
 
@@ -820,7 +825,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         action handler.
         """
         messages = map(self.translator.fromWebID, messageIdentifiers)
-        return self._performMany(action, messages, **(extraArguments or {}))
+        return self._performMany(action, messages, args=extraArguments)
     expose(actOnMessageIdentifierList)
 
 
@@ -837,7 +842,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         less = set(map(self.translator.fromWebID, exclude))
 
         targets = (messages | more) - less
-        return self._performMany(action, targets, **(extraArguments or {}))
+        return self._performMany(action, targets, args=extraArguments)
     expose(actOnMessageBatch)
 
 

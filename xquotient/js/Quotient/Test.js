@@ -1185,6 +1185,107 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+
+    /**
+     * Test that the utility method L{_getDeferralPeriod} returns the correct
+     * values from the form in the document.
+     */
+    function test_getDeferralPeriod(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var period;
+                var form = self.controllerWidget.deferForm;
+                var days = form.days;
+                var hours = form.hours;
+                var minutes = form.minutes;
+
+                days.value = hours.value = minutes.value = 1;
+                period = self.controllerWidget._getDeferralPeriod();
+                self.assertEqual(period.days, 1);
+                self.assertEqual(period.hours, 1);
+                self.assertEqual(period.minutes, 1);
+
+                days.value = 2;
+                period = self.controllerWidget._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 1);
+                self.assertEqual(period.minutes, 1);
+
+                hours.value = 3;
+                period = self.controllerWidget._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 3);
+                self.assertEqual(period.minutes, 1);
+
+                minutes.value = 4;
+                period = self.controllerWidget._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 3);
+                self.assertEqual(period.minutes, 4);
+            });
+        return result;
+    },
+
+    /**
+     * Like L{test_getDeferralPeriod}, but for the utility method
+     * L{_deferralStringToPeriod} and L{_getDeferralSelection} (Sorry for
+     * putting these together, I think this is a really icky test and I didn't
+     * want to type out all this boilerplate twice -exarkun).
+     */
+    function test_deferralStringtoPeriod(self) {
+        var result = self.setUp(self);
+        result.addCallback(
+            function(ignored) {
+                var period;
+                var node = self.controllerWidget.deferSelect;
+
+                var deferralPeriods = {
+                    "one-day": {
+                        "days": 1,
+                        "hours": 0,
+                        "minutes": 0},
+                    "one-hour": {
+                        "days": 0,
+                        "hours": 1,
+                        "minutes": 0},
+                    "twelve-hours": {
+                        "days": 0,
+                        "hours": 12,
+                        "minutes": 0},
+                    "one-week": {
+                        "days": 7,
+                        "hours": 0,
+                        "minutes": 0}
+                };
+
+                var option;
+                var allOptions = node.getElementsByTagName("option");
+                for (var cls in deferralPeriods) {
+                    option = Divmod.Runtime.theRuntime.firstNodeByAttribute(node, "class", cls);
+                    period = self.controllerWidget._deferralStringToPeriod(option.value);
+                    self.assertEqual(period.days, deferralPeriods[cls].days);
+                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
+                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
+
+                    for (var i = 0; i < allOptions.length; ++i) {
+                        if (allOptions[i] === option) {
+                            node.selectedIndex = i;
+                            break;
+                        }
+                    }
+                    if (i == allOptions.length) {
+                        self.fail("Could not find option node to update selection index.");
+                    }
+                    period = self.controllerWidget._getDeferralSelection();
+                    self.assertEqual(period.days, deferralPeriods[cls].days);
+                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
+                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
+                }
+            });
+        return result;
+    },
+
     /**
      * Test the message deferral functionality.
      */
@@ -1215,8 +1316,19 @@ Quotient.Test.ControllerTestCase.methods(
             });
         result.addCallback(
             function(deferredStates) {
-                self.assertEqual(deferredStates[0], true);
-                self.assertEqual(deferredStates[1], false);
+                /*
+                 * First message should have an undeferral time that is at
+                 * least 30 minutes after the current time, since the minimum
+                 * deferral time is 1 hour. (XXX This is garbage - we need to
+                 * be able to test exact values here).
+                 */
+                self.assertNotEqual(deferredStates[0], null);
+                self.failUnless(
+                    deferredStates[0] - (30 * 60) > new Date().getTime() / 1000);
+                /*
+                 * Second message wasn't deferred
+                 */
+                self.assertEqual(deferredStates[1], null);
             });
         return result;
     },
