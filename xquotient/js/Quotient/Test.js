@@ -461,7 +461,7 @@ Quotient.Test.ControllerTestCase.methods(
                     new Date().getTimezoneOffset() * 100000).getDate();
 
                 self.assertEquals(rows[0]["date"], "1999-12-" + date);
-                self.assertEquals(rows[1]["date"], "1999-12-" + date);
+                self.assertEquals(rows[1]["date"], "4:05 PM");
             });
         return result;
     },
