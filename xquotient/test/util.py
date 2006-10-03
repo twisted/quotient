@@ -4,13 +4,30 @@ from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImag
 from axiom import store
 from axiom.userbase import LoginSystem
 
+from nevow.testutil import FragmentWrapper
+
 from xmantissa.offering import installOffering
+from xmantissa.webtheme import getLoader
 
 from xmantissa.plugins.mailoff import (
     plugin as quotientOffering, quotientBenefactorFactory)
 
 from xquotient.quotientapp import QuotientBenefactor
 from xquotient.mail import DeliveryAgent
+
+
+class ThemedFragmentWrapper(FragmentWrapper):
+    """
+    I wrap myself around an Athena fragment, providing a minimal amount of html
+    scaffolding in addition to an L{athena.LivePage}.
+
+    The fragment will have its fragment parent and docFactory (based on
+    fragmentName) set.
+    """
+    def render_fragment(self, ctx, data):
+        f = super(ThemedFragmentWrapper, self).render_fragment(ctx, data)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
 
 class PartMaker:
     """

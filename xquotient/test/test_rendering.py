@@ -4,33 +4,19 @@ from twisted.python.filepath import FilePath
 from epsilon.extime import Time
 
 from nevow import loaders, rend
-from nevow.testutil import renderPage, renderLivePage, FragmentWrapper
+from nevow.testutil import renderPage, renderLivePage
 
 from axiom.store import Store
 
 from xmantissa.webapp import PrivateApplication
-from xmantissa.webtheme import getLoader
 from xmantissa.people import Person, EmailAddress
 
 from xquotient.exmess import Message, MessageDetail, PartDisplayer
 from xquotient.inbox import Inbox, InboxScreen
 from xquotient import compose
-from xquotient.test.util import MIMEReceiverMixin, PartMaker
+from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 from xquotient.qpeople import MessageList, MessageLister
 
-
-class ThemedFragmentWrapper(FragmentWrapper):
-    """
-    I wrap myself around an Athena fragment, providing a minimal amount of html
-    scaffolding in addition to an L{athena.LivePage}.
-
-    The fragment will have its fragment parent and docFactory (based on
-    fragmentName) set.
-    """
-    def render_fragment(self, ctx, data):
-        f = super(ThemedFragmentWrapper, self).render_fragment(ctx, data)
-        f.docFactory = getLoader(f.fragmentName)
-        return f
 
 def makeMessage(receiver, parts, impl):
     """

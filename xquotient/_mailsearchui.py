@@ -2,6 +2,7 @@
 from zope.interface import implements
 
 from nevow.page import renderer
+from nevow import tags
 
 from xmantissa import ixmantissa, scrolltable, webtheme
 
@@ -27,15 +28,17 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
 
 
     def search(self, ctx, data):
-        f = scrolltable.StoreIDSequenceScrollingFragment(
-            self.store,
-            self.searchResults,
-            (exmess.Message.senderDisplay,
-             exmess.Message.subject,
-             exmess.Message.sentWhen,
-             exmess.Message.read))
-        f.jsClass = u'Quotient.Search.SearchResults'
-        f.setFragmentParent(self)
-        f.docFactory = webtheme.getLoader(f.fragmentName)
-        return f
+        if self.searchResults:
+            f = scrolltable.StoreIDSequenceScrollingFragment(
+                self.store,
+                self.searchResults,
+                (exmess.Message.senderDisplay,
+                exmess.Message.subject,
+                exmess.Message.sentWhen,
+                exmess.Message.read))
+            f.jsClass = u'Quotient.Search.SearchResults'
+            f.setFragmentParent(self)
+            f.docFactory = webtheme.getLoader(f.fragmentName)
+            return f
+        return tags.h2['No results']
     renderer(search)
