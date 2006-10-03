@@ -495,7 +495,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 HH -= 12;
                 meridian = "PM";
             }
-            return HH + ":" + pad(MM) + " " + meridian;
+            return HH + ":" + MM + " " + meridian;
         }
         function pad(n) {
             return (n < 10) ? "0" + n : n;
