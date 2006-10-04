@@ -11,7 +11,8 @@ from nevow.testutil import AccumulatingFakeRequest as makeRequest
 from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
-from xquotient.exmess import Message, PartDisplayer, addMessageSource, getMessageSources
+from xquotient.exmess import Message, MessageDetail, PartDisplayer, addMessageSource, getMessageSources
+from xquotient.quotientapp import QuotientPreferenceCollection
 
 
 class UtilityTestCase(TestCase):
@@ -153,3 +154,13 @@ class WebTestCase(TestCase):
         D = self._testPartDisplayerScrubbing(self.suspectHTML, scrub=False)
         D.addCallback(lambda s: self.assertEqual(s, self.suspectHTML))
         return D
+
+    def testZipFileName(self):
+        """
+        Test L{xquotient.exmess.MessageDetail._getZipFileName}
+        """
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+        QuotientPreferenceCollection(store=s).installOn(s)
+        md = MessageDetail(Message(store=s, subject=u'a/b/c', sender=u'foo@bar'))
+        self.assertEqual(md.zipFileName, 'foo@bar-abc-attachments.zip')

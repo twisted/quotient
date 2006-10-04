@@ -494,13 +494,23 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         # temporary measure, until we can express this dependency less weirdly
         self.organizer = original.store.findUnique(people.Organizer, default=None)
 
-        self.children = {'attachments.zip': ZippedAttachmentResource(original)}
+        self.zipFileName = self._getZipFileName()
+        self.children = {self.zipFileName: ZippedAttachmentResource(original)}
 
     def head(self):
         return None
 
     def getInitialArguments(self):
         return (self.getMoreDetailSetting(),)
+
+    def _getZipFileName(self):
+        """
+        Return a useful filename for the zip file which will contain the
+        attachments of this message
+        """
+        return '%s-%s-attachments.zip' % (self.original.sender,
+                                          ''.join(c for c in self.original.subject
+                                                    if c.isalnum() or c in ' -_@'))
 
     def render_addPersonFragment(self, ctx, data):
         from xquotient.qpeople import AddPersonFragment
@@ -626,8 +636,11 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         desc = 'Attachment'
         if 1 < acount:
             desc += 's'
-
-        ziplink = self.translator.linkTo(self.original.storeID) + '/attachments.zip'
+            ziplink = self.patterns['ziplink'].fillSlots(
+                        'url', (self.translator.linkTo(self.original.storeID) +
+                                '/' + self.zipFileName))
+        else:
+            ziplink = ''
 
         return dictFillSlots(self.patterns['attachment-panel'],
                              dict(count=acount,

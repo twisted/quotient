@@ -421,6 +421,7 @@ class ReadUnreadTestCase(TestCase):
                 Message(store=self.store,
                         spam=False,
                         receivedWhen=Time(),
+                        subject=u''
                         ))
 
 
@@ -490,3 +491,4 @@ class ReadUnreadTestCase(TestCase):
 
         for msg in self.messages[-1:]:
             self.failUnless(msg.read, "Initial and revealed message should be read.")
+

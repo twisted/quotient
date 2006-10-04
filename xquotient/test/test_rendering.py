@@ -30,6 +30,7 @@ def makeMessage(receiver, parts, impl):
                        receivedWhen=Time(),
                        sentWhen=Time(),
                        spam=False,
+                       subject=u'',
                        impl=impl)
 
 

@@ -7,6 +7,11 @@
       >Show original HTML</a>.
   </div>
 
+  <a nevow:pattern="ziplink">
+    <nevow:attr name="href"><nevow:slot name="url" /></nevow:attr>
+    Download All
+  </a>
+
   <tr nevow:pattern="attachment-panel" class="attachment-panel" valign="top">
     <td class="msg-detail-field-name">
       <span onclick="Quotient.Common.CollapsiblePane.toggle(this, '', this.parentNode.parentNode)"
@@ -20,9 +25,7 @@
       <nevow:slot name="description" /> -
       <nevow:slot name="size" />
 
-      <a><nevow:attr name="href"
-          ><nevow:slot name="ziplink" /></nevow:attr>
-        [Download All]</a>
+      <nevow:slot name="ziplink" />
       <div class="pane-body" style="position: absolute; top: -1000px; left: -1000px;">
         <nevow:slot name="attachments" />
       </div>
