@@ -1,8 +1,8 @@
-# -*- test-case-name xquotient.test.test_historic.test_compose1to2 -*-
+# -*- test-case-name xquotient.test.test_historic.test_composer2to3 -*-
 
 """
 Create stub database for upgrade of L{xquotient.compose.Composer} from
-version 1 to version 2.
+version 2 to version 3.
 """
 
 from axiom.test.historic.stubloader import saveStub
@@ -26,4 +26,4 @@ def createDatabase(s):
 
 
 if __name__ == '__main__':
-    saveStub(createDatabase, 7485)
+    saveStub(createDatabase, 9097)

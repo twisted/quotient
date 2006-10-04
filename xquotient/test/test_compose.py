@@ -6,6 +6,7 @@ from axiom import store
 from axiom import scheduler
 from axiom import item
 from axiom import attributes
+from axiom import userbase
 
 from xmantissa import webapp
 
@@ -25,7 +26,7 @@ class SmarthostCompositionTestMixin(object):
       by the ESMTP-sending code in compose.py; FIXME: make it work
       for the non-smarthost case too.
     * Set up a composer object
-    * Set up preferences for that composer
+    * Set up 2 from addresses
     """
 
     def setUp(self, dbdir=None):
@@ -35,16 +36,15 @@ class SmarthostCompositionTestMixin(object):
 
         self.store = store.Store(dbdir=dbdir)
         scheduler.Scheduler(store=self.store).installOn(self.store)
-        self.prefs = compose.ComposePreferenceCollection(
-            store=self.store,
-            preferredSmarthost=u'example.org',
-            smarthostUsername=u'radix',
-            smarthostPassword=u'secret',
-            )
-        self.prefs.installOn(self.store)
+        self.defaultFromAddr = compose.FromAddress(
+                                store=self.store,
+                                smtpHost=u'example.org',
+                                smtpUsername=u'radix',
+                                smtpPassword=u'secret',
+                                address=u'radix@example')
+        self.defaultFromAddr.setAsDefault()
 
-        self.composer = compose.Composer(store=self.store,
-                                         fromAddress=u'radix@example.com')
+        self.composer = compose.Composer(store=self.store)
         self.composer.installOn(self.store)
 
 
@@ -97,9 +97,10 @@ class ComposeFromTest(SmarthostCompositionTestMixin, unittest.TestCase):
         Sending a message should deliver to the smarthost on the
         configured port.
         """
-        self.prefs.smarthostPort = 26
+        self.defaultFromAddr.smtpPort = 26
         message = StubStoredMessageAndImplAndSource(store=self.store)
-        self.composer.sendMessage([u'testuser@example.com'], message)
+        self.composer.sendMessage(
+            self.defaultFromAddr, [u'testuser@example.com'], message)
         self.assertEquals(self.reactor.port, 26)
 
 
@@ -108,11 +109,11 @@ class ComposeFromTest(SmarthostCompositionTestMixin, unittest.TestCase):
         If there are smarthost preferences, the from address that they
         specify should be used.
         """
-        self.prefs.smarthostAddress = u'testuser2@example.com'
         message = StubStoredMessageAndImplAndSource(store=self.store)
-        self.composer.sendMessage([u'targetuser@example.com'], message)
+        self.composer.sendMessage(
+            self.defaultFromAddr, [u'targetuser@example.com'], message)
         self.assertEquals(str(self.reactor.factory.fromEmail),
-                          u'testuser2@example.com')
+                          self.defaultFromAddr.address)
 
 
 
@@ -136,26 +137,96 @@ class ComposeFragmentTest(SmarthostCompositionTestMixin, unittest.TestCase):
     def test_createMessageHonorsSmarthostFromAddress(self):
         """
         Sending a message through the Compose UI should honor the from
-        address setting in the smarthost.
+        address we give to it
         """
-        self.prefs.smarthostAddress = u'from@example.com'
+        self.defaultFromAddr.address = u'from@example.com'
         cf = compose.ComposeFragment(self.composer)
-        msg = cf.createMessage(u'testuser@example.com',
+        msg = cf.createMessage(self.defaultFromAddr,
+                               u'testuser@example.com',
                                u'Sup dood', u'A body', u'', u'', u'')
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)
         self.assertEquals(msg["from"], 'from@example.com')
 
-    def test_onlyHonorFromAddressIfSmarthostSet(self):
+class FromAddressConfigFragmentTest(unittest.TestCase):
+    """
+    Test L{compose.FromAddressConfigFragment}
+    """
+
+    def setUp(self):
+        self.store = store.Store()
+        cprefs = compose.ComposePreferenceCollection(store=self.store)
+        cprefs.installOn(self.store)
+        self.composer = compose.Composer(store=self.store)
+        self.frag = compose.FromAddressConfigFragment(cprefs)
+
+    def test_addAddress(self):
         """
-        Don't allow people to forge their from headers in mail that
-        doesn't go through a smarthost.
+        Test that L{compose.FromAddressConfigFragment.addAddress} creates
+        L{compose.FromAddress} items with the right attribute values
         """
-        self.prefs.preferredSmarthost = None
-        self.prefs.smarthostAddress = u'from@example.com'
-        cf = compose.ComposeFragment(self.composer)
-        msg = cf.createMessage(u'testuser@example.com',
-                               u'Sup dood', u'A body', u'', u'', u'')
-        file = msg.impl.source.open()
-        msg = Parser.Parser().parse(file)
-        self.assertEquals(msg["from"], 'radix@example.com')
+        attrs = dict(address=u'foo@bar',
+                     smtpHost=u'bar',
+                     smtpUsername=u'foo',
+                     smtpPort=25,
+                     smtpPassword=u'secret')
+
+        self.frag.addAddress(default=False, **attrs)
+        item = self.store.findUnique(compose.FromAddress)
+        for (k, v) in attrs.iteritems():
+            self.assertEquals(getattr(item, k), v)
+        # make sure it didn't make it the default
+        self.assertEquals(
+                self.store.count(
+                    compose.FromAddress,
+                    compose.FromAddress._default == True),
+                0)
+        item.deleteFromStore()
+
+        self.frag.addAddress(default=True, **attrs)
+        item = self.store.findUnique(compose.FromAddress)
+        for (k, v) in attrs.iteritems():
+            self.assertEquals(getattr(item, k), v)
+        # make sure it did
+        self.assertEquals(compose.FromAddress.findDefault(self.store), item)
+
+class FromAddressExtractionTest(unittest.TestCase):
+    """
+    Test  L{compose._getFromAddressFromStore}
+    """
+
+    def testPolicy(self):
+        """
+        Test that only internal or verified L{userbase.LoginMethod}s with
+        protocol=email are considered candidates for from addresses
+        """
+        s = store.Store(self.mktemp())
+        ls = userbase.LoginSystem(store=s)
+        ls.installOn(s)
+
+        acc = ls.addAccount('username', 'dom.ain', 'password', protocol=u'not email')
+        ss = acc.avatars.open()
+
+        # not verified or internal, should explode
+        self.assertRaises(
+            RuntimeError, lambda: compose._getFromAddressFromStore(ss))
+
+        # ANY_PROTOCOL
+        acc.addLoginMethod(u'yeah', u'x.z', internal=True)
+
+        # should work
+        self.assertEquals(
+            'yeah@x.z',
+            compose._getFromAddressFromStore(ss))
+
+        ss.findUnique(
+            userbase.LoginMethod,
+            userbase.LoginMethod.localpart == u'yeah').deleteFromStore()
+
+        # external, verified
+        acc.addLoginMethod(u'yeah', u'z.a', internal=False, verified=True)
+
+        # should work
+        self.assertEquals(
+            'yeah@z.a',
+            compose._getFromAddressFromStore(ss))

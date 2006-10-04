@@ -2,6 +2,15 @@
   nevow:render="liveFragment"
   style="border-top: solid 1px #0099CC;">
 
+  <select nevow:pattern="from-select" name="fromAddress">
+    <nevow:slot name="options" />
+  </select>
+
+  <option nevow:pattern="from-select-option">
+    <nevow:attr name="value"><nevow:slot name="value" /></nevow:attr>
+    <nevow:slot name="address" />
+  </option>
+
   <div style="display: none;
               position: absolute;
               top: 10px;
@@ -122,6 +131,10 @@
                       </div>
                     </div>
                   </td>
+                </tr>
+                <tr>
+                  <td class="header-table-first-col">From:</td>
+                  <td class="header-table-last-col"><nevow:slot name="from" /></td>
                 </tr>
                 <tr valign="top">
                   <td class="header-table-first-col">

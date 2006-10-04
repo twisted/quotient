@@ -86,3 +86,31 @@ class DraftsTestCase(testcase.TestCase):
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
+
+class FromAddressScrollTableTestCase(testcase.TestCase):
+    """
+    Tests for L{xquotient.compose.FromAddressScrollTable}
+    """
+
+    jsClass = u'Quotient.Test.FromAddressScrollTableTestCase'
+
+    def getWidgetDocument(self):
+        s = Store()
+
+        PrivateApplication(store=s).installOn(s)
+        compose.Composer(store=s).installOn(s)
+
+        compose.FromAddress(
+            store=s,
+            address=u'default@host').setAsDefault()
+
+        compose.FromAddress(
+            store=s,
+            address=u'notdefault@host',
+            smtpHost=u'host',
+            smtpUsername=u'notdefault')
+
+        f = compose.FromAddressScrollTable(s)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f

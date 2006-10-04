@@ -1,19 +1,18 @@
-# -*- test-case-name xquotient.test.test_historic.test_composePreferenceCollection1to2 -*-
+# -*- test-case-name xquotient.test.test_historic.test_composePreferenceCollection2to3 -*-
 
 """
 Create stub database for upgrade of
-L{xquotient.compose.ComposePreferenceCollection} from version 1 to
-version 2.
+L{xquotient.compose.ComposePreferenceCollection} from version 2 to version 3.
 """
 
 from axiom.test.historic.stubloader import saveStub
 from axiom.userbase import LoginMethod
 
-from xquotient.compose import ComposePreferenceCollection
+from xquotient.compose import ComposePreferenceCollection, Composer
 
 def createDatabase(s):
     """
-    Install a Composer on the given store.
+    Install a Composer and ComposePreferenceCollection on the given store.
     """
     LoginMethod(store=s,
                 localpart=u'foo',
@@ -23,9 +22,10 @@ def createDatabase(s):
                 account=s,
                 internal=False)
 
+    Composer(store=s).installOn(s)
     ComposePreferenceCollection(store=s).installOn(s)
 
 
 
 if __name__ == '__main__':
-    saveStub(createDatabase, 8183)
+    saveStub(createDatabase, 9237)

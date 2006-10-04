@@ -10,7 +10,8 @@ from twisted.names import client
 from twisted.internet import error, defer
 
 from nevow import inevow, rend, json
-from nevow.athena import expose
+from nevow.athena import expose, LiveElement
+from nevow.page import renderer
 
 from epsilon import extime
 
@@ -42,15 +43,60 @@ def _esmtpSendmail(username, password, smtphost, port, from_addr, to_addrs,
     return d
 
 
+def _getFromAddressFromStore(store):
+    """
+    Find a suitable outgoing email address by looking at the
+    L{userbase.LoginMethod} items in C{store}.  Throws L{RuntimeError} if it
+    can't find anything
+    """
+    for meth in userbase.getLoginMethods(store, protocol=u'email'):
+        if meth.internal or meth.verified:
+            return meth.localpart + '@' + meth.domain
+    raise RuntimeError("cannot find a suitable LoginMethod")
 
 class _TransientError(Exception):
     pass
 
 
+class FromAddress(item.Item):
+    """
+    I hold information about an email addresses that a user can send mail from
+    """
+    address = attributes.text(allowNone=False)
+    _default = attributes.boolean(default=False, doc="""
+                Is this the default from address?  Don't mutate this value
+                directly, use L{setAsDefault}
+                """)
+
+    # if any of these are set, they should all be set
+    smtpHost = attributes.text()
+    smtpPort = attributes.integer(default=25)
+    smtpUsername = attributes.text()
+    smtpPassword = attributes.text()
+
+    def setAsDefault(self):
+        """
+        Make this the default from address, revoking the defaultness of the
+        previous default.
+        """
+        default = self.store.findUnique(
+                    FromAddress, FromAddress._default == True,
+                    default=None)
+        if default is not None:
+            default._default = False
+        self._default = True
+
+    def findDefault(cls, store):
+        return store.findUnique(cls, cls._default == True)
+    findDefault = classmethod(findDefault)
+
 
 class _NeedsDelivery(item.Item):
+    schemaVersion = 2
+
     composer = attributes.reference()
     message = attributes.reference()
+    fromAddress = attributes.reference()
     toAddress = attributes.text()
     tries = attributes.integer(default=0)
 
@@ -86,19 +132,17 @@ class _NeedsDelivery(item.Item):
         @param fromAddress: An optional address to use in the SMTP
             conversation.
         """
-        # XXX
-        # Why aren't these self.compose.foo?  They probably should be.
-        prefCollection = self.store.findUnique(ComposePreferenceCollection)
-        if prefCollection.preferredSmarthost is not None:
-            fromAddress = prefCollection.smarthostAddress
-            if fromAddress is None:
-                fromAddress = self.composer.fromAddress
+        fromAddress = self.fromAddress
+        if fromAddress is None:
+            fromAddress = FromAddress.findDefault(self.store)
+
+        if fromAddress.smtpHost:
             return _esmtpSendmail(
-                prefCollection.smarthostUsername,
-                prefCollection.smarthostPassword,
-                prefCollection.preferredSmarthost,
-                prefCollection.smarthostPort,
-                fromAddress,
+                fromAddress.smtpUsername,
+                fromAddress.smtpPassword,
+                fromAddress.smtpHost,
+                fromAddress.smtpPort,
+                fromAddress.address,
                 [self.toAddress],
                 self.message.impl.source.open())
         else:
@@ -110,7 +154,7 @@ class _NeedsDelivery(item.Item):
                         userstore=self.store)
                 return smtp.sendmail(
                     host,
-                    self.composer.fromAddress,
+                    fromAddress.address,
                     [self.toAddress],
                     # XXX
                     self.message.impl.source.open())
@@ -162,21 +206,16 @@ class _NeedsDelivery(item.Item):
             d.addErrback(log.err)
 
 
+registerAttributeCopyingUpgrader(_NeedsDelivery, 1, 2)
+
 
 class Composer(item.Item, item.InstallableMixin):
     implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     typeName = 'quotient_composer'
-    schemaVersion = 2
+    schemaVersion = 3
 
     installedOn = attributes.reference()
-
-    fromAddress = attributes.inmemory()
-
-    def activate(self):
-        for (localpart, domain) in userbase.getAccountNames(self.store):
-            self.fromAddress = localpart + '@' + domain
-            return
 
     def installOn(self, other):
         super(Composer, self).installOn(other)
@@ -190,7 +229,7 @@ class Composer(item.Item, item.InstallableMixin):
                 authoritative=False)]
 
 
-    def sendMessage(self, toAddresses, msg):
+    def sendMessage(self, fromAddress, toAddresses, msg):
         """
         Send a message from this composer.
 
@@ -204,6 +243,7 @@ class Composer(item.Item, item.InstallableMixin):
                 store=self.store,
                 composer=self,
                 message=msg,
+                fromAddress=fromAddress,
                 toAddress=toAddress).run()
 
 
@@ -239,7 +279,7 @@ class Composer(item.Item, item.InstallableMixin):
             # this doesn't seem to get called (yet?)
             mr = iquotient.IMIMEDelivery(
                     self.store).createMIMEReceiver(
-                                'sent://' + self.fromAddress)
+                                'sent://' + FromAddress.findDefault(self.store).address)
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
@@ -266,6 +306,18 @@ def upgradeCompose1to2(oldComposer):
     return newComposer
 
 registerUpgrader(upgradeCompose1to2, 'quotient_composer', 1, 2)
+
+item.declareLegacyItem(Composer.typeName, 2,
+                       dict(installedOn=attributes.reference()))
+
+def composer2to3(old):
+    """
+    Remove the L{Composer.fromAddress} attribute
+    """
+    return old.upgradeVersion(old.typeName, 2, 3,
+                              installedOn=old.installedOn)
+
+registerUpgrader(composer2to3, Composer.typeName, 2, 3)
 
 class File(item.Item):
     typeName = 'quotient_file'
@@ -347,9 +399,13 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
     def __init__(self, original, toAddress='', subject='', messageBody='',
                  attachments=(), inline=False):
         self.original = original
+        self.translator = ixmantissa.IWebTranslator(original.store)
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
-            parameters=[liveform.Parameter(name='toAddress',
+            parameters=[liveform.Parameter(name='fromAddress',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=self.translator.fromWebID),
+                        liveform.Parameter(name='toAddress',
                                            type=liveform.TEXT_INPUT,
                                            coercer=unicode),
                         liveform.Parameter(name='subject',
@@ -375,7 +431,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         self.inline = inline
 
         self.docFactory = None
-        self.translator = ixmantissa.IWebTranslator(original.store)
         self.cabinet = self.original.store.findOrCreate(FileCabinet)
 
     def invoke(self, formPostEmulator):
@@ -417,8 +472,23 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         req = inevow.IRequest(ctx)
         draftWebID = req.args.get('draft', [None])[0]
 
-        attachmentPattern = inevow.IQ(self.docFactory).patternGenerator('attachment')
+        iq = inevow.IQ(self.docFactory)
+        attachmentPattern = iq.patternGenerator('attachment')
         attachments = []
+
+        fromAddrs = []
+        for fromAddress in self.original.store.query(FromAddress):
+            if fromAddress._default:
+                fromAddrs.insert(0, fromAddress)
+            else:
+                fromAddrs.append(fromAddress)
+
+        fromStan = iq.onePattern('from-select').fillSlots(
+                        'options', [iq.onePattern(
+                                    'from-select-option').fillSlots(
+                                        'address', addr.address).fillSlots(
+                                        'value', self.translator.toWebID(addr))
+                                        for addr in fromAddrs])
 
         if draftWebID is not None:
             draft = self.translator.fromWebID(draftWebID)
@@ -435,11 +505,12 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                     'id', f.storeID).fillSlots(
                                     'name', f.name))
 
-            slotData = dict(to=draft.message.recipient,
-                            subject=draft.message.subject,
-                            body=txt.getBody(decode=True),
-                            cc=cc,
-                            attachments=attachments)
+            slotData = {'to': draft.message.recipient,
+                        'from': fromStan,
+                        'subject': draft.message.subject,
+                        'body': txt.getBody(decode=True),
+                        'cc': cc,
+                        'attachments': attachments}
 
             # make subsequent edits overwrite the draft we're editing
             self._savedDraft = draft
@@ -449,11 +520,12 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                     'id', a.part.storeID).fillSlots(
                                     'name', a.filename or 'No Name'))
 
-            slotData = dict(to=self.toAddress,
-                            subject=self.subject,
-                            body=self.messageBody,
-                            cc='',
-                            attachments=attachments)
+            slotData = {'to': self.toAddress,
+                        'from': fromStan,
+                        'subject': self.subject,
+                        'body': self.messageBody,
+                        'cc': '',
+                        'attachments': attachments}
 
         return dictFillSlots(ctx.tag, slotData)
 
@@ -464,7 +536,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
     def head(self):
         return None
 
-    def createMessage(self, toAddress, subject, messageBody, cc, bcc, files):
+    def createMessage(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
         from email import (Generator as G, MIMEBase as MB,
                            MIMEMultipart as MMP, MIMEText as MT,
                            Header as MH, Charset as MC, Utils as EU)
@@ -501,19 +573,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
-        # XXX XXX XXX
-        prefCollection = self.original.store.findUnique(
-            ComposePreferenceCollection)
-        if prefCollection.preferredSmarthost is not None:
-            fromAddress = prefCollection.smarthostAddress
-        else:
-            if self.original.fromAddress.endswith('.divmod.com'):
-                (localpart, domain) = self.original.fromAddress.split('@')
-                fromAddress = localpart + '@divmod.com'
-            else:
-                fromAddress = self.original.fromAddress
-
-        m['From'] = encode(fromAddress)
+        m['From'] = encode(fromAddress.address)
         m['To'] = encode(toAddress)
         m['Subject'] = encode(subject)
         m['Date'] = EU.formatdate()
@@ -528,7 +588,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         def createMessageAndQueueIt():
             mr = iquotient.IMIMEDelivery(
                         self.original.store).createMIMEReceiver(
-                                'sent://' + self.original.fromAddress)
+                                'sent://' + fromAddress.address)
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
@@ -543,16 +603,16 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         return msg
 
     _mxCalc = None
-    def _sendMail(self, toAddress, subject, messageBody, cc, bcc, files):
+    def _sendMail(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
         # overwrite the previous draft of this message with another draft
-        self._saveDraft(toAddress, subject, messageBody, cc, bcc, files)
+        self._saveDraft(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
 
         addresses = [toAddress]
         if cc:
             addresses.append(cc)
 
         # except we are going to send this draft
-        self.original.sendMessage(addresses, self._savedDraft.message)
+        self.original.sendMessage(fromAddress, addresses, self._savedDraft.message)
         # and then make it not a draft anymore
         self._savedDraft.message.draft = False
 
@@ -562,8 +622,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         self._savedDraft.deleteFromStore()
         self._savedDraft = None
 
-    def _saveDraft(self, toAddress, subject, messageBody, cc, bcc, files):
-        msg = self.createMessage(toAddress, subject, messageBody, cc, bcc, files)
+    def _saveDraft(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
+        msg = self.createMessage(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
         msg.draft = True
 
         if self._savedDraft is not None:
@@ -578,12 +638,12 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             self._savedDraft = Draft(store=self.original.store, message=msg)
 
 
-    def _sendOrSave(self, toAddress, subject, messageBody, cc, bcc, files, draft):
+    def _sendOrSave(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files, draft):
         if draft:
             f = self._saveDraft
         else:
             f = self._sendMail
-        return f(toAddress, subject, messageBody, cc, bcc, files)
+        return f(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
@@ -598,6 +658,11 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
         from xquotient.mail import MailDeliveryAgent
         avatar.findOrCreate(MailDeliveryAgent).installOn(avatar)
         avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
+
+        defaultFrom = avatar.findOrCreate(
+                        FromAddress,
+                        address=_getFromAddressFromStore(avatar))
+        defaultFrom.setAsDefault()
 
         avatar.findOrCreate(Composer).installOn(avatar)
         avatar.findOrCreate(Drafts).installOn(avatar)
@@ -615,51 +680,19 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin, prefs.Prefer
     """
     implements(ixmantissa.IPreferenceCollection)
 
-    schemaVersion = 2
+    schemaVersion = 3
 
     installedOn = attributes.reference()
-
-    preferredSmarthost = attributes.text(doc="""
-    Hostname to which all outgoing mail will be delivered.
-    """)
-    smarthostUsername = attributes.text(doc="""
-    Username with which to authenticate to the smart host.
-    """)
-    smarthostPassword = attributes.text(doc="""
-    Password with which to authenticate to the smart host.
-    """)
-    smarthostPort = attributes.integer(doc="""
-    The port number which outbound messages will be delivered to.
-    """, default=25)
-    smarthostAddress = attributes.text(doc="""
-    The address which messages will be sent from.
-    """)
 
     def installOn(self, other):
         super(ComposePreferenceCollection, self).installOn(other)
         other.powerUp(self, ixmantissa.IPreferenceCollection)
 
-
     def getPreferenceParameters(self):
-        cls = ComposePreferenceCollection
-        def makeParam(name, coercer=unicode, type=liveform.TEXT_INPUT):
-            attrname = 'smarthost' + name.title()
-            return liveform.Parameter(attrname, type, coercer, 'Smarthost ' + name.title(),
-                                      default=getattr(self, attrname) or '')
-
-        return (liveform.Parameter(
-                   'preferredSmarthost',
-                   liveform.TEXT_INPUT,
-                   unicode,
-                   'Preferred Smarthost',
-                   default=self.preferredSmarthost or ''),
-                makeParam('username'),
-                makeParam('password', type=liveform.PASSWORD_INPUT),
-                makeParam('port', int),
-                makeParam('address'))
+        return None
 
     def getSections(self):
-        return None
+        return (FromAddressConfigFragment(self),)
 
     def getTabs(self):
         return (webnav.Tab('Mail', self.storeID, 0.0, children=(
@@ -669,6 +702,164 @@ class ComposePreferenceCollection(item.Item, item.InstallableMixin, prefs.Prefer
 
 registerAttributeCopyingUpgrader(ComposePreferenceCollection, 1, 2)
 
+item.declareLegacyItem(ComposePreferenceCollection.typeName, 2,
+                       dict(installedOn=attributes.reference(),
+                            preferredSmarthost=attributes.text(),
+                            smarthostUsername=attributes.text(),
+                            smarthostPassword=attributes.text(),
+                            smarthostPort=attributes.integer(),
+                            smarthostAddress=attributes.text()))
+
+def composePreferenceCollection2to3(old):
+    """
+    Create an L{FromAddress} out of the appropriate L{userbase.LoginMethod} in
+    the store, using L{_getFromAddressFromStore}.  This probably should
+    happen in the L{Composer} 2->3 upgrader, but we also make an
+    L{FromAddress} item out the smarthost attributes of C{old} if they are
+    set, and we need to do that after creating the initial L{FromAddress}, so
+    it gets set as the default.
+
+    Copy C{old.installedOn} onto the new L{ComposePreferenceCollection}
+    """
+    baseFrom = FromAddress(store=old.store,
+                           address=_getFromAddressFromStore(old.store))
+
+    if old.preferredSmarthost is not None:
+        s = old.store
+        smarthostFrom = FromAddress(store=s,
+                                    address=old.smarthostAddress,
+                                    smtpHost=old.preferredSmarthost,
+                                    smtpPort=old.smarthostPort,
+                                    smtpUsername=old.smarthostUsername,
+                                    smtpPassword=old.smarthostPassword)
+        smarthostFrom.setAsDefault()
+    else:
+        baseFrom.setAsDefault()
+
+    return old.upgradeVersion(old.typeName, 2, 3,
+                              installedOn=old.installedOn)
+
+registerUpgrader(composePreferenceCollection2to3,
+                 ComposePreferenceCollection.typeName,
+                 2, 3)
+
+class FromAddressConfigFragment(LiveElement):
+    """
+    Fragment which contains some stuff that helps users configure their from
+    addresses, such as an L{xmantissa.liveform.LiveForm} for adding new ones,
+    and an L{xmantissa.scrolltable.ScrollingFragment} for looking at and
+    editing existing ones
+    """
+    implements(ixmantissa.INavigableFragment)
+    fragmentName = 'from-address-config'
+    title = 'From Addresses'
+
+    def __init__(self, composePrefs):
+        self.composePrefs = composePrefs
+        LiveElement.__init__(self)
+
+    def addAddress(self, address, smtpHost, smtpPort, smtpUsername, smtpPassword, default):
+        """
+        Add a L{FromAddress} item with the given attribute values
+        """
+        composer = self.composePrefs.store.findUnique(Composer)
+
+        addr = FromAddress(store=self.composePrefs.store,
+                           address=address,
+                           smtpHost=smtpHost,
+                           smtpPort=smtpPort,
+                           smtpUsername=smtpUsername,
+                           smtpPassword=smtpPassword)
+
+        if default:
+            addr.setAsDefault()
+
+    def addAddressForm(self, req, tag):
+        """
+        @return: an L{xmantissa.liveform.LiveForm} instance which allows users
+                 to add from addresses
+        """
+        def makeRequiredCoercer(paramName, coerce=lambda v: v):
+            def notEmpty(value):
+                if not value:
+                    raise liveform.InvalidInput('value required for ' + paramName)
+                return coerce(value)
+            return notEmpty
+
+        def textParam(name, label, *a):
+            return liveform.Parameter(
+                    name, liveform.TEXT_INPUT, makeRequiredCoercer(name), label, *a)
+
+        # ideally we would only show the "address" input by default and have a
+        # "SMTP Info" disclosure link which exposes the rest of them
+
+        lf = liveform.LiveForm(
+                self.addAddress,
+                (textParam('address',  'Email Address'),
+                 textParam('smtpHost', 'SMTP Host'),
+                 liveform.Parameter(
+                    'smtpPort',
+                    liveform.TEXT_INPUT,
+                    makeRequiredCoercer('smtpPort', int),
+                    'SMTP Port',
+                    default=25),
+                 textParam('smtpUsername', 'SMTP Username'),
+                 liveform.Parameter(
+                    'smtpPassword',
+                     liveform.PASSWORD_INPUT,
+                     makeRequiredCoercer('smtpPassword'),
+                     'SMTP Password'),
+                 liveform.Parameter(
+                    'default',
+                    liveform.CHECKBOX_INPUT,
+                    bool,
+                    'Default?',
+                    'Use this as default from address')),
+                 description='Add From Address')
+        lf.jsClass = 'Quotient.Compose.AddAddressFormWidget'
+        lf.docFactory = getLoader('liveform-compact')
+        lf.setFragmentParent(self)
+        return lf
+    renderer(addAddressForm)
+
+    def fromAddressScrollTable(self, req, tag):
+        """
+        @return: L{FromAddressScrollTable}
+        """
+        f = FromAddressScrollTable(self.composePrefs.store)
+        f.docFactory = getLoader(f.fragmentName)
+        f.setFragmentParent(self)
+        return f
+    renderer(fromAddressScrollTable)
+
+    def head(self):
+        return None
+
+
+class FromAddressScrollTable(ScrollingFragment):
+    """
+    L{xmantissa.scrolltable.ScrollingFragment} subclass for browsing and
+    editing L{FromAddress} items
+    """
+    jsClass = 'Quotient.Compose.FromAddressScrollTable'
+
+    def __init__(self, store):
+        ScrollingFragment.__init__(self, store,
+                                    FromAddress,
+                                    None,
+                                    (FromAddress.address,
+                                     FromAddress.smtpHost,
+                                     FromAddress.smtpPort,
+                                     FromAddress.smtpUsername,
+                                     FromAddress._default))
+
+    def setDefaultAddress(self, webID):
+        """
+        Make the L{FromAddress} item with web ID C{webID} the default from
+        address for outgoing mail
+        """
+        self.webTranslator.fromWebID(webID).setAsDefault()
+    expose(setDefaultAddress)
 
 class Draft(item.Item):
     """

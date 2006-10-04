@@ -1708,6 +1708,54 @@ Quotient.Test.EmptyControllerTestCase.methods(
     }
     );
 
+/**
+ * Tests for Quotient.Compose.FromAddressScrollTable
+ */
+Quotient.Test.FromAddressScrollTableTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.FromAddressScrollTableTestCase');
+Quotient.Test.FromAddressScrollTableTestCase.methods(
+    /**
+     * @return: deferred firing with the FromAddressScrollTable associated
+     * with this test case
+     */
+    function getScroller(self) {
+        var scroller = Nevow.Athena.Widget.get(
+                        self.nodeByAttribute(
+                            "athena:class",
+                            "Quotient.Compose.FromAddressScrollTable"));
+        return scroller.initializationDeferred.addCallback(
+            function() {
+                return scroller;
+            });
+    },
+
+    /**
+     * Test that the model contains the right stuff for the two FromAddress
+     * items in the database
+     */
+    function test_model(self) {
+        return self.getScroller().addCallback(
+            function(scroller) {
+                self.assertEqual(scroller.model.rowCount(), 2);
+
+                var first = scroller.model.getRowData(0);
+                var second = scroller.model.getRowData(1);
+
+                self.failUnless(first._default);
+                self.failIf(second._default);
+
+                /* make sure we can change the default */
+                return scroller.setDefaultAddress(second.__id__).addCallback(
+                    function() {
+                        first = scroller.model.getRowData(0);
+                        second = scroller.model.getRowData(1);
+
+                        self.failUnless(second._default);
+                        self.failIf(first._default);
+                    })
+            });
+    });
+    
+
 Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
 Quotient.Test.ComposeController.methods(
     function saveDraft(self, userInitiated) {

@@ -115,6 +115,7 @@ class StubComposeFragment(LiveFragment):
         Fill the slots the template requires to be filled in order to be
         rendered.
         """
+        ctx.fillSlots('from', 'bob@example')
         ctx.fillSlots('to', 'alice@example.com')
         ctx.fillSlots('cc', 'bob@example.com')
         ctx.fillSlots('subject', 'Test Message')

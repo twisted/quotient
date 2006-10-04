@@ -4,6 +4,76 @@
 // import Fadomatic
 // import Mantissa.ScrollTable
 
+Quotient.Compose.AddAddressFormWidget = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.AddAddressFormWidget');
+/**
+ * Trivial Mantissa.LiveForm.FormWidget subclass which reloads the closest
+ * sibling FromAddressScrollTable after we have successfully submitted
+ */
+Quotient.Compose.AddAddressFormWidget.methods(
+    function submitSuccess(self, result) {
+        /* get our sibling FromAddressScrollTable */
+        var sf = Nevow.Athena.FirstNodeByAttribute(
+                    self.widgetParent.node,
+                    "athena:class",
+                    "Quotient.Compose.FromAddressScrollTable");
+        Nevow.Athena.Widget.get(sf).emptyAndRefill();
+        return Quotient.Compose.AddAddressFormWidget.upcall(
+                    self, "submitSuccess", result);
+    });
+
+Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.ScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
+/**
+ * Mantissa.ScrollTable.ScrollingWidget subclass for displaying FromAddress
+ * items
+ */
+Quotient.Compose.FromAddressScrollTable.methods(
+    function __init__(self, node) {
+        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node);
+        self._scrollViewport.style.height = "100px";
+        self.columnAliases = {smtpHost: "SMTP Host",
+                              smtpPort: "SMTP Port",
+                              smtpUsername: "SMTP Username",
+                              _default: "Default"};
+    },
+
+    /**
+     * Override default implementation to provide fallback column values -
+     * "None" instead of the empty string.  Also mark the default row
+     */
+    function makeCellElement(self, colName, rowData) {
+        if(rowData[colName] === null) {
+            rowData[colName] = "None";
+        }
+        return Quotient.Compose.FromAddressScrollTable.upcall(
+                    self, "makeCellElement", colName, rowData);
+    },
+
+    /**
+     * Set the default from address to the one with web ID C{webID}.
+     * Called when a row is clicked.
+     */
+    function setDefaultAddress(self, webID) {
+        return self.callRemote("setDefaultAddress", webID).addCallback(
+                function() {
+                    return self.emptyAndRefill();
+                });
+    },
+
+    /**
+     * Override default implementation to set onclick handler that calls
+     * L{setDefaultAddress}
+     */
+    function makeRowElement(self, rowOffset, rowData, cells) {
+        var elem = Quotient.Compose.FromAddressScrollTable.upcall(
+                        self, "makeRowElement", rowOffset, rowData, cells);
+        elem.onclick = function() {
+                            self.setDefaultAddress(rowData.__id__);
+                            return false;
+                        };
+        return elem;
+    });
+
+
 Quotient.Compose.FileUploadController = Divmod.Class.subclass('Quotient.Compose.FileUploadController');
 
 /**
