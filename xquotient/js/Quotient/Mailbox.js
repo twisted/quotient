@@ -744,8 +744,7 @@ Quotient.Mailbox.Controller.methods(
                     "reply", "print", "train-spam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
                       "forward", "reply", "print", "train-spam"],
-            "spam": ["defer", "delete", "forward",
-                     "reply", "print", "train-ham"],
+            "spam": ["delete", "train-ham"],
             "deferred": ["forward", "reply", "print"],
             "sent": ["delete", "forward", "reply", "print"],
             "trash": ["forward" ,"reply", "print", "undelete"]};
@@ -1507,22 +1506,35 @@ Quotient.Mailbox.Controller.methods(
      */
     function setGroupActions(self, actionNames) {
         var select = self.groupActionsForm.elements["group-action"];
-        while(0 < select.childNodes.length) {
+
+        while (select.firstChild) {
             select.removeChild(select.firstChild);
         }
+
         var nameToDisplay = {"train-ham": "Not Spam",
                              "train-spam": "Is Spam",
                              "delete": "Delete",
+                             "undelete": "Undelete",
                              "archive": "Archive",
+                             "unarchive": "Unarchive",
                              "defer": "Defer"};
-        for(var i = 0; i < actionNames.length; i++) {
+
+        var option, label, name;
+        for (var i = 0; i < actionNames.length; i++) {
+            name = actionNames[i];
+
             /* XXX hack.  we should be able to defer multiple msgs */
-            if(actionNames[i] == "defer") {
+            if(name == "defer") {
                 continue;
             }
-            select.appendChild(
-                MochiKit.DOM.OPTION(
-                    {"value": actionNames[i]}, nameToDisplay[actionNames[i]]));
+
+            if (nameToDisplay[name] !== undefined) {
+                label = document.createTextNode(nameToDisplay[name]);
+                option = document.createElement('option');
+                option.setAttribute('value', name);
+                option.appendChild(label);
+                select.appendChild(option);
+            }
         }
     },
 

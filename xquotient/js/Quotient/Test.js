@@ -885,6 +885,139 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+    function _actionTest(self, viewName, individualActionNames, batchActionNames) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView(viewName);
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Make sure that each individual action's button is displayed,
+                 * and any action not explicitly mentioned is hidden.
+                 */
+                var actions = self.controllerWidget.actions[viewName];
+                var allActionNames = Divmod.dir(actions);
+                var excludedActionNames = Divmod.dir(actions);
+
+                for (var i = 0; i < individualActionNames.length; ++i) {
+                    self.assertEqual(
+                        actions[individualActionNames[i]].button.style.display,
+                        "");
+
+                    for (var j = 0; j < excludedActionNames.length; ++j) {
+                        if (excludedActionNames[j] == individualActionNames[i]) {
+                            excludedActionNames.splice(j, 1);
+                            break;
+                        }
+                    }
+                }
+
+                /*
+                 * All the other actions should be hidden.
+                 */
+                for (var i = 0; i < excludedActionNames.length; ++i) {
+                    self.assertEqual(
+                        actions[excludedActionNames[i]].button.style.display,
+                        "none",
+                        excludedActionNames[i] + " was available in " + viewName + " view.");
+                }
+
+                /*
+                 * Group actions should be set up similarly.
+                 */
+                var i, j, found;
+                var groupActionSelect = self.controllerWidget.groupActionsForm.elements["group-action"];
+                for (i = 0; i < groupActionSelect.childNodes.length; ++i) {
+                    var option = groupActionSelect.childNodes[i];
+
+                    found = false;
+                    for (j = 0; j < batchActionNames.length; ++j) {
+                        if (option.value == batchActionNames[j]) {
+                            batchActionNames.splice(j, 1);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        self.fail(viewName + " had disallowed batch action " + option.value);
+                    }
+                }
+
+                /*
+                 * Anything left over was something that ought to have been
+                 * available but wasn't.
+                 */
+                if (batchActionNames.length) {
+                    self.fail("Failed to find expected batch actions: " + batchActionNames);
+                }
+            });
+        return result;
+    },
+
+    /**
+     * Test that the correct actions (and batch actions) are available in the inbox view.
+     */
+    function test_actionsForInbox(self) {
+        return self._actionTest(
+            "inbox",
+            ["archive", "defer", "delete", "forward",
+             "reply", "print", "train-spam"],
+            ["archive", "delete", "train-spam"]);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the all view.
+     */
+    function test_actionsForAll(self) {
+        return self._actionTest(
+            "all",
+            ["unarchive", "defer", "delete", "forward",
+             "reply", "print", "train-spam"],
+            ["unarchive", "delete", "train-spam"]);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the trash view.
+     */
+    function test_actionsForTrash(self) {
+        return self._actionTest(
+            "trash",
+            ["undelete", "forward", "reply", "print"],
+            ["undelete"]);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the spam view.
+     */
+    function test_actionsForSpam(self) {
+        return self._actionTest(
+            "spam",
+            ["delete", "train-ham"],
+            ["delete", "train-ham"]);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the deferred view.
+     */
+    function test_actionsForDeferred(self) {
+        return self._actionTest(
+            "deferred",
+            ["forward", "reply", "print"],
+            []);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the sent view.
+     */
+    function test_actionsForSent(self) {
+        return self._actionTest(
+            "sent",
+            ["delete", "forward", "reply", "print"],
+            ["delete"]);
+    },
+
     /**
      * Test deleting the currently selected message batch.
      */
