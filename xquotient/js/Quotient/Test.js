@@ -72,7 +72,20 @@ Quotient.Test.ScrollTableTestCase.methods(
         }
         self.assertNotEqual(self.scrollWidget, null, "Could not find ScrollingWidget.")
     },
+    /**
+     * Test receipt of timestamps from the server and their formatting.
+     */
+    function test_massageTimestamp(self) {
+        self.setUp();
 
+        /* October 3, 2006, 12:00:00 AM */
+        var timestamp = 1159920000 ;
+        var date = new Date(timestamp*1000);
+        self.assertEqual(self.scrollWidget.massageColumnValue(
+                           "", "timestamp",
+                           timestamp + date.getTimezoneOffset() * 60),
+                         "12:00 AM");
+    },
     /**
      * Test the custom date formatting method used by the Mailbox ScrollTable.
      */
@@ -94,6 +107,9 @@ Quotient.Test.ScrollTableTestCase.methods(
             self.scrollWidget.formatDate(when, now), '1:36 PM',
             "Different hour context failed.");
 
+        self.assertEqual(
+            self.scrollWidget.formatDate(new Date(2006, 7, 21, 13, 1, 10),
+                                         now), '1:01 PM');
         /*
          * August 22, 2006, 12:00 PM
          */
@@ -461,7 +477,7 @@ Quotient.Test.ControllerTestCase.methods(
                     new Date().getTimezoneOffset() * 100000).getDate();
 
                 self.assertEquals(rows[0]["date"], "1999-12-" + date);
-                self.assertEquals(rows[1]["date"], "1999-12-" + date);
+                self.assertEquals(rows[1]["date"], "4:05 PM");
             });
         return result;
     },

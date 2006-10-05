@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import time
 
 from nevow.livetrial import testcase
 from nevow.athena import LiveFragment, expose
@@ -145,9 +146,9 @@ class StubComposeFragment(LiveFragment):
 class _ControllerMixin:
     aliceEmail = u'alice@example.com'
     bobEmail = u'bob@example.com'
-
+    tzfactor = time.daylight and time.altzone or time.timezone
     sent = Time.fromDatetime(datetime(1999, 12, 13))
-
+    sent2 = Time().oneDay() + timedelta(hours=16, minutes=5, seconds=tzfactor)
     def getInbox(self):
         """
         Return a newly created Inbox, in a newly created Store which has all of
@@ -211,7 +212,7 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         # Inbox messages
         m1 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'1st message',
-            receivedWhen=self.sent, sentWhen=self.sent, spam=False,
+            receivedWhen=self.sent, sentWhen=self.sent2, spam=False,
             archived=False, read=False, impl=impl)
         catalog.tag(m1, u"foo")
 
