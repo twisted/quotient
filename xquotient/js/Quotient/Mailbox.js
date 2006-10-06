@@ -564,14 +564,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
      *
      * XXX - This should be a callback on .scrolled()
      * XXX - And counts should be managed in some completely different way
-     * XXX - And the _pendingRowSelection is just crazy, there should be a
-     * Deferred or something for whatever that is.
      */
     function cbRowsFetched(self, count) {
-        if(self._pendingRowSelection) {
-            self._pendingRowSelection(count);
-            self._pendingRowSelection = null;
-        }
         self.widgetParent.rowsFetched(count);
     });
 
@@ -1312,10 +1306,6 @@ Quotient.Mailbox.Controller.methods(
         self.fontSize = fontSize;
     },
 
-    function setViewsContainerDisplay(self, d) {
-        self.viewsContainer.style.display = d;
-    },
-
     function setScrollTablePosition(self, p) {
         self.scrolltableContainer.style.position = p;
         var d;
@@ -1626,34 +1616,6 @@ Quotient.Mailbox.Controller.methods(
             nodes[name] = e.firstChild.nextSibling;
         }
         self.mailViewNodes = nodes;
-    },
-
-    function _selectAndFetchFirstRow(self, requestMoreRowsIfNeeded) {
-        if(typeof requestMoreRowsIfNeeded === 'undefined') {
-            requestMoreRowsIfNeeded = true;
-        }
-
-        var sw = self.scrollWidget;
-        if (!sw.model.rowCount()) {
-            if (requestMoreRowsIfNeeded) {
-                /* free up some space */
-                sw._scrollViewport.scrollTop += sw._rowHeight * 3;
-                sw.scrolled();
-                /* the scroll widget's cbRowsFetched
-                   method will call this function when
-                   it gets rows */
-                sw._pendingRowSelection = function(count) {
-                    /* call ourselves, passing additional argument
-                       indicating that we shouldn't go through this
-                       rigmarole a second time if there still aren't enough rows */
-                    if(0 < count) {
-                        self._selectAndFetchFirstRow(false);
-                    }
-                }
-            }
-            return;
-        }
-        return sw._selectFirstRow();
     },
 
     /**
@@ -2252,6 +2214,13 @@ Quotient.Mailbox.Controller.methods(
                     modifier = 'not';
                 }
 
+                /* highlight the extracts here; the next message preview will
+                 * be null for the last message, but we still want to
+                 * highlight the extracts in that case.  it won't do any harm
+                 * if there isn't actually a message body, as
+                 * highlightExtracts() knows how to handle that */
+
+                self.highlightExtracts();
                 var pattern;
                 if (nextMessagePreview != null) {
                     /* so this is a message, not a compose fragment
@@ -2259,7 +2228,6 @@ Quotient.Mailbox.Controller.methods(
                     pattern = self.onePattern('next-message');
                     pattern = pattern.fillSlots('subject',
                                       nextMessagePreview['subject']);
-                    self.highlightExtracts();
                 } else {
                     pattern = self.onePattern('no-more-messages');
                 }

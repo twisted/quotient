@@ -705,7 +705,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         message as read.
         """
         currentMessage = self.translator.fromWebID(webID)
-        nextMessage = self.getMessageAfter(viewSelection, currentMessage)
+        nextMessage = self.getMessageBefore(viewSelection, currentMessage)
 
         currentMessage.read = True
 
