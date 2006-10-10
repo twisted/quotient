@@ -1,3 +1,10 @@
+0.1.19 (2006-10-05):
+  - Defer action has been fixed to use the actual deferral time.
+  - "No results" is shown if a search comes up empty.
+  - Filenames for attachment downloads have been improved.
+  - Alternate "from" addresses can now be set and chosen when composing a message.
+  - Times in the mailbox scrolltable are now formatted properly.
+
 0.1.18 (2006-09-29):
   - Unarchive and undelete buttons have been added.
   - Mailing list filtering is now a separate powerup from user-configured 
