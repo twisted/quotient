@@ -218,10 +218,10 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin
         self.assertEquals(sorted(fi.textParts()), [
             u'Hello Bob,\n  How are you?\n-A\n',
             u'a test message, comma separated',
-            u'alice@example.com'])
+            u'alice@example.com alice example com alice@example.com'])
         self.assertEquals(fi.keywordParts(), {
             u'subject': u'a test message, comma separated',
-            u'sender': u'alice@example.com'})
+            u'sender': u'alice@example.com alice example com alice@example.com'})
         self.assertEquals(fi.documentType(), msg.message.typeName)
 
 

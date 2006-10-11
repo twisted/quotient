@@ -10,7 +10,7 @@ from xmantissa.plugins.mailoff import indexingBenefactorFactory
 from xmantissa import ixmantissa
 
 from xquotient.quotientapp import INDEXER_TYPE
-from xquotient.exmess import Message
+from xquotient.exmess import Message, splitAddress
 from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 
 class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
@@ -56,6 +56,14 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         reader = self.indexer.openReadIndex()
         self.assertEqual(list(reader.search(u'hello')), [msg.storeID])
 
+    def testEmailAddressSplitter(self):
+        """
+        Ensure that we take an email address and break it on non-alphanumeric
+        characters for indexing.
+        """
+        splitted = splitAddress('john.smith@alum.mit.edu')
+        self.assertEqual(splitted, ['john', 'smith', 'alum', 'mit', 'edu'])
+        
     def testKeywordSearch(self):
         """
         Test that we get the expected results when searching for messages by
@@ -64,11 +72,19 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         msg = self._makeSimpleMsg(u'')
 
         msg.subject=u'hello world'
+        msg.sender=u'foo@jethro.org'
+        msg.senderDisplay=u'Fred Oliver Osgood'
 
         self._indexSomething(msg)
 
         reader = self.indexer.openReadIndex()
         self.assertEqual(list(reader.search(u'', {u'subject': u'world'})),
+                         [msg.storeID])
+        self.assertEqual(list(reader.search(u'', {u'sender': u'foo'})),
+                         [msg.storeID])
+        self.assertEqual(list(reader.search(u'', {u'sender': u'jethro'})),
+                         [msg.storeID])
+        self.assertEqual(list(reader.search(u'', {u'sender': u'osgood'})),
                          [msg.storeID])
 
 class ViewTestCase(TestCase, MIMEReceiverMixin):

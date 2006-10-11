@@ -1,6 +1,6 @@
 # -*- test-case-name: xquotient.test -*-
 from os import path
-import pytz, zipfile
+import pytz, zipfile, re
 
 from zope.interface import implements
 
@@ -26,6 +26,9 @@ from xquotient.actions import SenderPersonFragment
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
 
+MAX_SENDER_LEN = 128
+senderRE = re.compile('\\w{1,%i}' % MAX_SENDER_LEN, re.U)
+
 def mimeTypeToIcon(mtype,
                    webIconPath='/Quotient/static/images/attachment-types',
                    localIconPath=LOCAL_ICON_PATH,
@@ -49,6 +52,13 @@ def formatSize(size, step=1024.0):
         return '%d%s' % (size, suffixes[0])
     return 'huge'
 
+def splitAddress(emailString):
+    """
+    Split an email address on the non-alpanumeric characters.
+    e.g. foo@bar.com => ['foo', 'bar', 'com']
+    """
+    return senderRE.findall(emailString)
+    
 class _TrainingInstruction(item.Item):
     """
     Represents a single user-supplied instruction to teach the spam classifier
@@ -268,8 +278,16 @@ class Message(item.Item):
 
 
     def keywordParts(self):
+        senderParts = []
+        # The email address: 'foo@bar.com'
+        senderParts.append(self.sender)
+        # The sender parts broken apart: 'foo bar com'
+        senderParts += splitAddress(self.sender)
+        # The sender display name: 'Fred Oliver Osgood'
+        senderParts.append(self.senderDisplay)
+        senderParts = ' '.join(senderParts)
         return {u'subject': self.subject,
-                u'sender': self.sender}
+                u'sender': senderParts}
 
 
     def documentType(self):
