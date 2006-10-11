@@ -21,14 +21,15 @@ Quotient.Compose.AddAddressFormWidget.methods(
                     self, "submitSuccess", result);
     });
 
-Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
+Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.ScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
 /**
  * Mantissa.ScrollTable.ScrollingWidget subclass for displaying FromAddress
  * items
  */
 Quotient.Compose.FromAddressScrollTable.methods(
     function __init__(self, node) {
-        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node, 5);
+        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node);
+        self._scrollViewport.style.height = "100px";
         self.columnAliases = {smtpHost: "SMTP Host",
                               smtpPort: "SMTP Port",
                               smtpUsername: "SMTP Username",
@@ -126,14 +127,13 @@ Quotient.Compose.FileUploadController.methods(
         self.form.elements.upload.disabled = false;
     });
 
-Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass(
+Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
                                                 'Quotient.Compose.DraftListScrollingWidget');
 
 Quotient.Compose.DraftListScrollingWidget.methods(
     function __init__(self, node) {
         self.columnAliases = {"sentWhen": "Date"};
-        self.columnWidths = {"subject": "50%"};
-        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node, 15);
+        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node);
     },
 
     function massageColumnValue(self, columnName, columnType, columnValue) {

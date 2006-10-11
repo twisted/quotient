@@ -53,10 +53,6 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 }
 
 .scrolltable-container .scrolltable-widget-node {
-    margin: 0px;
-}
-
-.scrolltable-container .scrolltable {
     border-width: 0px;
 }
 
@@ -488,23 +484,14 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 .q-scroll-row {
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     font-size: .8em;
+    width: 99%;
+    margin: 0px 1px 1px 1px;
+    padding: 8px 0px 8px 0px;
     background-color: #EDF8FB;
-    cursor: pointer;
-}
-
-.q-scroll-row td {
-    border-bottom: solid 1px #FFFFFF;
-}
-
-.q-scroll-row .sender {
-    margin-top: 8px;
-}
-
-.q-scroll-row .date {
-    margin-bottom: 8px;
 }
 
 .q-scroll-row:visited, .q-scroll-row:link {

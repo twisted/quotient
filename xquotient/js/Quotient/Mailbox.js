@@ -72,29 +72,18 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Override the base implementation to pass along our current view
-     * selection.
-     */
-     function getSize(self) {
-        return self.callRemote("requestCurrentSize", self.viewSelection);
-    },
-
-    /**
      * Override default row to add some divs with particular classes, since
      * they will most likely change the height of our rows.
      */
     function _getRowGuineaPig(self) {
-        return self._createRow(
-                    0, {"sender": "FOO@BAR",
-                        "senderDisplay": "FOO",
-                        "subject": "A NORMAL SUBJECT",
-                        "receivedWhen": "1985-01-26",
-                        "read": false,
-                        "sentWhen": "1985-01-26",
-                        "attachments": 6,
-                        "everDeferred": true,
-                        "__id__": 6});
+        return MochiKit.DOM.DIV(
+            {"style": "visibility: hidden; font-weight: bold",
+             "class": "q-scroll-row"},
+            [MochiKit.DOM.DIV({"class": "sender"}, "TEST!!!"),
+             MochiKit.DOM.DIV({"class": "subject"}, "TEST!!!"),
+             MochiKit.DOM.DIV(null, "TEST!!!")]);
     },
+
 
     /**
      * Change the view being viewed.  Return a Deferred which fires with the
@@ -103,10 +92,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function changeViewSelection(self, viewType, value) {
         self.throbber.startThrobbing();
         self.viewSelection[viewType] = value;
-        var result = self.emptyAndRefill();
+        var result = Divmod.Defer.gatherResults(
+            [self.callRemote("requestCurrentSize", self.viewSelection),
+             self.emptyAndRefill()]);
         result.addCallback(
             function(info) {
                 var messageCount = info[0];
+                self.setViewportHeight(messageCount);
                 return self._selectFirstRow().addCallback(
                     function(ignored) {
                         return messageCount;
@@ -272,19 +264,19 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * XXX - should be template changes.
      */
     function makeRowElement(self, rowOffset, rowData, cells) {
-        /* box model includes padding mumble and we don't need to */
-        var height = (self._rowHeight - 11) + "px";
-        var style = "";
+        var style = "border-top: solid 1px #FFFFFF; height: " + (self._rowHeight - 9) + "px";
         if(!rowData["read"]) {
             style += ";font-weight: bold";
         }
         var data = [MochiKit.Base.filter(null, cells)];
         if(0 < rowData["attachments"]) {
             data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
-                                        "style": "float: right; border: none; height: 16px"}));
+                                        "style": "float: right; border: none"}));
         }
-        return MochiKit.DOM.TR(
+        return MochiKit.DOM.A(
             {"class": "q-scroll-row",
+             "href": "#",
+             "style": style,
              "onclick": function(event) {
                     var webID = rowData["__id__"];
                     return Nevow.Athena.Widget.dispatchEvent(
@@ -296,11 +288,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
                             self._selectWebID(webID);
                             return false;
                         });
-                },
-             "style": style,
-            }, MochiKit.DOM.TD(null,
-                /* height doesn't work as expected on a <td> */
-                MochiKit.DOM.DIV({"style": "height: " + height}, data)));
+                }
+            }, data);
     },
 
     /**
@@ -344,7 +333,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
                 MochiKit.DOM.IMG({
                     "src": "/Quotient/static/images/checkbox-off.gif",
                     "class": "checkbox-image",
-                    "height": "12px",
                     "border": 0,
                     "onclick": function senderDisplayClicked(event) {
                         self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
@@ -364,8 +352,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
 
             if (rowData["everDeferred"]) {
                 content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
-                                  "border": "0",
-                                  "height": "13px"}));
+                                  "border": "0"}));
             }
 
             return MochiKit.DOM.DIV(attrs, content);
