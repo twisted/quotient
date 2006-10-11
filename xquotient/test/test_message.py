@@ -4,16 +4,17 @@ from twisted.trial.unittest import TestCase
 
 from axiom.store import Store
 from axiom.item import Item
-from axiom.attributes import text
+from axiom.attributes import text, inmemory
 
 from nevow import context
 from nevow.testutil import AccumulatingFakeRequest as makeRequest
 from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
+from xmantissa.prefs import PreferenceAggregator
 from xquotient.exmess import Message, MessageDetail, PartDisplayer, addMessageSource, getMessageSources
+from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.quotientapp import QuotientPreferenceCollection
-
 
 class UtilityTestCase(TestCase):
     """
@@ -62,6 +63,7 @@ class PartItem(Item):
 
     contentType = text()
     body = text()
+    preferred = inmemory()
 
     def walkAttachments(self):
         return (MockPart('foo.bar', 'XXX'),
@@ -75,6 +77,8 @@ class PartItem(Item):
         assert self.body is not None
         return self.body
 
+    def walkMessage(self, preferred):
+        self.preferred = preferred
 
 
 class MessageTestCase(TestCase):
@@ -164,3 +168,17 @@ class WebTestCase(TestCase):
         QuotientPreferenceCollection(store=s).installOn(s)
         md = MessageDetail(Message(store=s, subject=u'a/b/c', sender=u'foo@bar'))
         self.assertEqual(md.zipFileName, 'foo@bar-abc-attachments.zip')
+
+    def testPreferredFormat(self):
+        """
+        Make sure that we are sent the preferred type of text/html.
+        """
+        s = Store()
+        m = Message(store=s)
+        impl = PartItem(store=s)
+        m.impl = impl
+        PreferenceAggregator(store=s).installOn(s)
+        MessageDisplayPreferenceCollection(store=s).installOn(s)
+        m.walkMessage()
+        self.assertEqual(impl.preferred, 'text/html')
+

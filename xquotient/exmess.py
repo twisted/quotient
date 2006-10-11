@@ -194,7 +194,7 @@ class Message(item.Item):
         if prefer is None:
             if self._prefs is None:
                 self._prefs = ixmantissa.IPreferenceAggregator(self.store)
-            prefer = self._prefs.getPreferenceValue('preferredMimeType')
+            prefer = self._prefs.getPreferenceValue('preferredFormat')
         return self.impl.walkMessage(prefer)
 
     def getSubPart(self, partID):
