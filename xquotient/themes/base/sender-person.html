@@ -1,10 +1,11 @@
 <span xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  xmlns:athena="http://divmod.org/ns/nevow/0.7"
   nevow:render="liveFragment">
   <nevow:invisible nevow:render="senderPerson">
-    <a href="#"
-      onclick="Quotient.Common.SenderPerson.get(this).showAddPerson(event, this.parentNode, this);
-               return false">
-      <img src="/Quotient/static/images/not-a-person.png" border="0"/></a>
+    <a href="#">
+      <athena:handler event="onclick" handler="showAddPerson" />
+      <img src="/Quotient/static/images/not-a-person.png" border="0" />
+    </a>
     <span class="sender-person-name"
       ><nevow:attr name="title"><nevow:slot
           name="identifier" /></nevow:attr><nevow:slot name="name" /></span>

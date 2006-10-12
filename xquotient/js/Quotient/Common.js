@@ -7,7 +7,10 @@ Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
 /**
  * Show C{node} as a dialog - center it vertically and horizontally, grey
- * out the rest of the document, and hide it when the user clicks anywhere
+ * out the rest of the document, and hide it when the user clicks outside
+ * of the dialog.
+ *
+ * @return: pair of [dialog node, hide function]
  */
 Quotient.Common.Util.showNodeAsDialog = function(node) {
     /* clone the node so we can add it to the document in the different place */
@@ -27,21 +30,31 @@ Quotient.Common.Util.showNodeAsDialog = function(node) {
     var elemSize = Divmod.Runtime.theRuntime.getElementSize(node);
 
     node.style.position = "absolute";
-    node.style.left = Math.floor((pageSize.w / 2) - (pageSize.w / 2)) + "px";
+    node.style.left = Math.floor((pageSize.w / 2) - (elemSize.w / 2)) + "px";
     node.style.top  = Math.floor((pageSize.h / 2) - (elemSize.h / 2)) + "px";
     node.style.display = "";
+
+    var hidden = false;
+
+    var hide = function() {
+        if(hidden) {
+            return;
+        }
+        hidden = true;
+        document.body.removeChild(blurOverlay);
+        document.body.removeChild(node);
+        blurOverlay.onclick = null;
+    }
 
     /* we use setTimeout(... 0) so the handler gets added after the current
      * onclick event (if any) is done
      */
     setTimeout(
         function() {
-            document.body.onclick = function() {
-                document.body.removeChild(blurOverlay);
-                document.body.removeChild(node);
-                document.body.onclick = null;
-            }
+            blurOverlay.onclick = hide;
         }, 0);
+
+    return {node: node, hide: hide};
 }
 
 /**
@@ -126,7 +139,7 @@ Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass('Quotient.Common.AddPer
 Quotient.Common.AddPerson.methods(
     function replaceAddPersonHTMLWithPersonHTML(self, identifier) {
         var D = self.callRemote('getPersonHTML');
-        D.addCallback(function(HTML) {
+        return D.addCallback(function(HTML) {
             var personIdentifiers = Nevow.Athena.NodesByAttribute(
                                       document.documentElement, 'class', 'person-identifier');
             var e = null;
@@ -137,92 +150,86 @@ Quotient.Common.AddPerson.methods(
                 }
             }
         });
+    },
+
+    /**
+     * Return the L{Mantissa.LiveForm.FormWidget} instance which controls our
+     * form
+     */
+    function getAddPersonForm(self) {
+        return Nevow.Athena.Widget.get(self.node.getElementsByTagName("form")[0]);
     });
 
 Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass("Quotient.Common.SenderPerson");
 Quotient.Common.SenderPerson.methods(
-    function showAddPerson(self, event, node, eventTarget) {
-        self.node = node;
+    /**
+     * Pre-fill the add person form with the information we know about this
+     * sender
+     */
+    function _preFillForm(self) {
+        var getValueOfNodeWithClass = function(cls) {
+            return self.firstNodeByAttribute("class", cls).firstChild.nodeValue;
+        }
 
-        var name = self.nodeByAttribute('class', 'sender-person-name').firstChild.nodeValue;
-        var parts = new Object();
-
-        parts["firstname"] = '';
-        parts["lastname"] = '';
+        var name = getValueOfNodeWithClass("sender-person-name");
+        var values = {lastname: [""]};
 
         if(name.match(/\s+/)) {
             var split = name.split(/\s+/, 2);
-            parts["firstname"] = split[0];
-            parts["lastname"]  = split[1];
+            values["firstname"] = [split[0]];
+            values["lastname"]  = [split[1]];
         } else if(name.match(/@/)) {
-            parts["firstname"] = name.split(/@/, 2)[0];
+            values["firstname"] = [name.split(/@/, 2)[0]];
         } else {
-            parts["firstname"] = name;
+            values["firstname"] = [name];
         }
 
-        self.email = self.nodeByAttribute('class', 'person-identifier').firstChild.nodeValue;
-        parts["email"] = self.email;
+        self.email = getValueOfNodeWithClass("person-identifier");
+        values["email"] = [self.email];
 
-        self.addPersonFragment = document.getElementById("add-person-fragment");
+        self.addPersonFormWidget.setInputValues(values);
+    },
 
-        var coords = Divmod.Runtime.theRuntime.getEventCoords(event);
-        self.addPersonFragment.style.top = coords.y + 'px';
-        self.addPersonFragment.style.left = coords.x + 25 + 'px';
+    /**
+     * Show an "Add Person" dialog, with the form fields pre-filled with the
+     * information we know about the sender (first name, last name, email
+     * address)
+     */
+    function showAddPerson(self) {
+        var addPersonDialogNode = Nevow.Athena.FirstNodeByAttribute(
+                                    self.widgetParent.node,
+                                    "class",
+                                    "add-person-fragment");
+        self.addPersonFormWidget = Nevow.Athena.Widget.get(
+                                    Nevow.Athena.FirstNodeByAttribute(
+                                        addPersonDialogNode,
+                                        "class",
+                                        "add-person")).getAddPersonForm();
 
-        self.form = self.addPersonFragment.getElementsByTagName("form")[0];
-        self.submitFunction = function() { self.submitForm() };
+        self._preFillForm();
 
-        self.originalSubmitHandler = self.form.onsubmit;
-        self.form.onsubmit = function() {
-            var liveform = Nevow.Athena.Widget.get(self.form);
+        self.dialog = Quotient.Common.Util.showNodeAsDialog(addPersonDialogNode);
+
+        /* set the handlers on the cloned node returned by showNodeAsDialog().
+         * FIXME should do a better thing here */
+        var form = self.dialog.node.getElementsByTagName("form")[0];
+        form.onsubmit = function() {
+            var liveform = Nevow.Athena.Widget.get(form);
             liveform.submit().addCallback(
                 function() {
-                    self.submitForm();
+                    return self._personAdded();
                 });
             return false;
         }
-
-        var inputs = Nevow.Athena.NodesByAttribute(self.addPersonFragment, 'type', 'text');
-        var firstnameInput;
-
-        for(var i = 0; i < inputs.length; i++) {
-            if(!firstnameInput && inputs[i].name == "firstname") {
-                firstnameInput = inputs[i];
-            }
-            if(inputs[i].name in parts) {
-                inputs[i].value = parts[inputs[i].name];
-            } else {
-                inputs[i].value = "";
-            }
-        }
-
-        setTimeout(
-            function() {
-                eventTarget.onclick = function() {
-                    document.body.onclick = null;
-                    self.hideAddPerson();
-                    return false;
-                }
-            }, 0);
-
-        self.eventTarget = eventTarget;
-        self.addPersonFragment.style.display = "";
-        firstnameInput.focus();
     },
 
-    function submitForm(self) {
-        var node = Nevow.Athena.NodeByAttribute(self.addPersonFragment, "class", "add-person");
-        Quotient.Common.AddPerson.get(node).replaceAddPersonHTMLWithPersonHTML(self.email);
-        self.hideAddPerson();
-    },
-
-    function hideAddPerson(self) {
-        self.addPersonFragment.style.display = "none";
-        self.form.onsubmit = self.originalSubmitHandler;
-        self.eventTarget.onclick = function(event) {
-            self.showAddPerson(event, self.node, self.eventTarget);
-            return false;
-        }
+    /**
+     * Person has been added.  Tell AddPerson to replace the "Add Person"
+     * nodes with Person nodes & hide the "Add Person" dialog
+     */
+    function _personAdded(self) {
+        self.dialog.hide();
+        return self.addPersonFormWidget.widgetParent.replaceAddPersonHTMLWithPersonHTML(self.email);
     });
 
 Quotient.Common.CollapsiblePane = {};

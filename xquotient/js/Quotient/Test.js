@@ -2071,7 +2071,7 @@ Quotient.Test.MsgDetailTestCase.methods(
         }
 
         assertFieldsEqual(
-            {from: "sender@host",
+            {from: '"Sender" <sender@host>',
              to: "recipient@host",
              subject: "the subject",
              sent: "Wed, 31 Dec 1969 19:00:00 -0500",
@@ -2098,6 +2098,32 @@ Quotient.Test.MsgDetailTestCase.methods(
                 self.assertEquals(moreDetail, false);
                 self.assertMoreDetailVisibility(false);
         });
+    });
+
+Quotient.Test.MsgDetailAddPersonTestCase = Quotient.Test.MsgDetailTestBase.subclass(
+                                                'MsgDetailAddPersonTestCase');
+
+Quotient.Test.MsgDetailAddPersonTestCase.methods(
+    /**
+     * Test showing Add Person dialog, and adding a person
+     */
+    function test_addPerson(self) {
+        var msg = self.getMsgDetailWidget();
+        var sp = Nevow.Athena.Widget.get(
+                    msg.firstNodeByAttribute(
+                        "athena:class",
+                        "Quotient.Common.SenderPerson"));
+        sp.showAddPerson();
+
+        self.assertEquals(sp.dialog.node.style.display, "");
+        self.assertEquals(sp.dialog.node.style.position, "absolute");
+
+        var dialogLiveForm = Nevow.Athena.Widget.get(sp.dialog.node.getElementsByTagName("form")[0]);
+
+        return dialogLiveForm.submit().addCallback(
+            function() {
+                return self.callRemote("verifyPerson");
+            });
     });
 
 Quotient.Test.MsgDetailInitArgsTestCase = Quotient.Test.MsgDetailTestBase.subclass(
@@ -2207,7 +2233,7 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
                         "class",
                         "ShowNodeAsDialogTestCase-dialog");
         /* show it as a dialog */
-        Quotient.Common.Util.showNodeAsDialog(node);
+        var dialog = Quotient.Common.Util.showNodeAsDialog(node);
 
         var getElements = function() {
             return Nevow.Athena.NodesByAttribute(
@@ -2222,10 +2248,19 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
         /* should be two - the original and the cloned dialog */
         self.assertEquals(nodes.length, 2);
         var orignode = nodes[0], dlgnode = nodes[1];
+        self.assertEquals(dlgnode, dialog.node);
 
         self.assertEquals(orignode.style.display, "none");
         self.assertEquals(dlgnode.style.display, "");
         self.assertEquals(dlgnode.style.position, "absolute");
+
+        dialog.hide();
+
+        nodes = getElements();
+
+        /* should be one, now that the dialog has been hidden */
+        self.assertEquals(nodes.length, 1);
+        self.assertEquals(nodes[0], orignode);
     });
 
 Quotient.Test.DraftsTestCase = Nevow.Athena.Test.TestCase.subclass(

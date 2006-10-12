@@ -542,7 +542,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     margin-left: 4px;
 }
 
-#add-person-fragment {
+.add-person-fragment {
     background-color: #FFFFFF;
     position: absolute;
     z-index: 99;
