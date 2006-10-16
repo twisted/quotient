@@ -77,14 +77,12 @@ Quotient.Test.ScrollTableTestCase.methods(
      */
     function test_massageTimestamp(self) {
         self.setUp();
-
-        /* October 3, 2006, 12:00:00 AM */
-        var timestamp = 1159920000 ;
-        var date = new Date(timestamp*1000);
-        self.assertEqual(self.scrollWidget.massageColumnValue(
-                           "", "timestamp",
-                           timestamp + date.getTimezoneOffset() * 60),
-                         "12:00 AM");
+        self.callRemote('getTimestamp').addCallback(function (timestamp) {
+                var date = new Date(timestamp*1000);
+                self.assertEqual(self.scrollWidget.massageColumnValue(
+                            "", "timestamp",
+                            timestamp + date.getTimezoneOffset() * 60),
+                                 "12:00 AM")});
     },
     /**
      * Test the custom date formatting method used by the Mailbox ScrollTable.

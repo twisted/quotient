@@ -60,7 +60,11 @@ class ScrollTableTestCase(ScrollingWidgetTestCase):
     def getWidgetDocument(self):
         return self.getScrollingWidget()
 
-
+    def getTimestamp(self):
+        return Time.fromDatetime(datetime.now().replace(hour=0,
+                                                        minute=0, second=0)
+                                 ).asPOSIXTimestamp()
+    expose(getTimestamp)
 
 class _Part(Item):
     typeName = 'mock_part_item'
