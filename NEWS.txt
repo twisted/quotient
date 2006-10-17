@@ -1,3 +1,7 @@
+0.1.21 (2006-10-17):
+  - Added cancellable 'add person' dialog.
+  - Reverted Scrolltable due to performance problems.
+
 0.1.20 (2006-10-10):
   - Fixed bug where clicking on an account inthe account list wouldn't do anything.
   - Better looking scrolltables.
