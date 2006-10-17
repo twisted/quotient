@@ -1,3 +1,9 @@
+0.1.20 (2006-10-10):
+  - Fixed bug where clicking on an account inthe account list wouldn't do anything.
+  - Better looking scrolltables.
+  - Fixed issue where urls aren't linked in the first message in the
+    scrolltable, and fixes direction of next message preview. 
+
 0.1.19 (2006-10-05):
   - Defer action has been fixed to use the actual deferral time.
   - "No results" is shown if a search comes up empty.
