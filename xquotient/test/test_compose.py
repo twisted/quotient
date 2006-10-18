@@ -230,3 +230,44 @@ class FromAddressExtractionTest(unittest.TestCase):
         self.assertEquals(
             'yeah@z.a',
             compose._getFromAddressFromStore(ss))
+
+
+class FromAddressTestCase(unittest.TestCase):
+    """
+    Test L{compose.FromAddress}
+    """
+
+    def testDefault(self):
+        """
+        Test L{compose.FromAddress.setAsDefault} and
+        L{compose.FromAddress.findDefault}
+        """
+        s = store.Store()
+
+        addrs = dict((localpart, compose.FromAddress(
+                                    store=s, address=localpart + '@host'))
+                        for localpart in u'foo bar baz'.split())
+
+        qux = compose.FromAddress(store=s, address=u'qux@host')
+        qux.setAsDefault()
+
+        self.assertEquals(compose.FromAddress.findDefault(s).address, u'qux@host')
+
+        addrs['foo'].setAsDefault()
+
+        self.assertEquals(compose.FromAddress.findDefault(s).address, u'foo@host')
+
+    def testSystemAddress(self):
+        """
+        Test L{compose.FromAddress.findSystemAddress}
+        """
+        s = store.Store(self.mktemp())
+        ls = userbase.LoginSystem(store=s)
+        ls.installOn(s)
+
+        acc = ls.addAccount('foo', 'host', 'password', protocol=u'email')
+        ss = acc.avatars.open()
+
+        fa = compose.FromAddress(store=ss)
+        self.assertIdentical(compose.FromAddress.findSystemAddress(ss), fa)
+        self.assertEquals(fa.address, 'foo@host')

@@ -2,8 +2,10 @@ from epsilon.extime import Time
 
 from nevow.livetrial import testcase
 from nevow import tags, loaders
+from nevow.athena import expose
 
 from axiom.store import Store
+from axiom.userbase import LoginMethod
 
 from xmantissa import ixmantissa
 from xmantissa.webtheme import getLoader
@@ -94,15 +96,22 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
 
     jsClass = u'Quotient.Test.FromAddressScrollTableTestCase'
 
-    def getWidgetDocument(self):
+    def getFromAddressScrollTable(self):
         s = Store()
 
         PrivateApplication(store=s).installOn(s)
         compose.Composer(store=s).installOn(s)
 
-        compose.FromAddress(
-            store=s,
-            address=u'default@host').setAsDefault()
+        LoginMethod(store=s,
+                    internal=False,
+                    protocol=u'email',
+                    localpart=u'default',
+                    domain=u'host',
+                    verified=True,
+                    account=s)
+
+        # system address
+        compose.FromAddress(store=s).setAsDefault()
 
         compose.FromAddress(
             store=s,
@@ -114,3 +123,4 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
+    expose(getFromAddressScrollTable)

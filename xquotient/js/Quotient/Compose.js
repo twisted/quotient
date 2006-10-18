@@ -21,19 +21,62 @@ Quotient.Compose.AddAddressFormWidget.methods(
                     self, "submitSuccess", result);
     });
 
+Quotient.Compose.DeleteFromAddressAction = Mantissa.ScrollTable.Action.subclass("Quotient.Compose.DeleteFromAddressAction");
+/**
+ * Action which deletes from addresses, and prevents the system address from
+ * getting deleted
+ */
+Quotient.Compose.DeleteFromAddressAction.methods(
+    function __init__(self, systemAddrWebID) {
+        Quotient.Compose.DeleteFromAddressAction.upcall(
+            self, "__init__", "delete", "Delete", null,
+            "/Mantissa/images/delete.png");
+        self.systemAddrWebID = systemAddrWebID;
+    },
+
+    function handleSuccess(self, scrollingWidget, row, result) {
+        return scrollingWidget.emptyAndRefill();
+    },
+
+    function enableForRow(self, row) {
+        return !(row._default || row.__id__ == self.systemAddrWebID);
+    });
+
+Quotient.Compose.SetDefaultFromAddressAction = Mantissa.ScrollTable.Action.subclass("Quotient.Compose.SetDefaultFromAddressAction");
+/**
+ * Action which sets a from address as the default
+ */
+Quotient.Compose.SetDefaultFromAddressAction.methods(
+    function __init__(self) {
+        Quotient.Compose.SetDefaultFromAddressAction.upcall(
+            self, "__init__", "setDefaultAddress", "Set Default");
+    },
+
+    function handleSuccess(self, scrollingWidget, row, result) {
+        return scrollingWidget.emptyAndRefill();
+    },
+
+    function enableForRow(self, row) {
+        return !row._default;
+    });
+
 Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.ScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
 /**
  * Mantissa.ScrollTable.ScrollingWidget subclass for displaying FromAddress
  * items
  */
 Quotient.Compose.FromAddressScrollTable.methods(
-    function __init__(self, node) {
-        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node);
-        self._scrollViewport.style.height = "100px";
+    function __init__(self, node, systemAddrWebID) {
+        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node, 5);
         self.columnAliases = {smtpHost: "SMTP Host",
                               smtpPort: "SMTP Port",
                               smtpUsername: "SMTP Username",
+                              _address: "Address",
                               _default: "Default"};
+        self.actions = [Quotient.Compose.SetDefaultFromAddressAction(),
+                        Quotient.Compose.DeleteFromAddressAction(
+                            systemAddrWebID)];
+        self.systemAddrWebID = systemAddrWebID;
     },
 
     /**
@@ -46,31 +89,6 @@ Quotient.Compose.FromAddressScrollTable.methods(
         }
         return Quotient.Compose.FromAddressScrollTable.upcall(
                     self, "makeCellElement", colName, rowData);
-    },
-
-    /**
-     * Set the default from address to the one with web ID C{webID}.
-     * Called when a row is clicked.
-     */
-    function setDefaultAddress(self, webID) {
-        return self.callRemote("setDefaultAddress", webID).addCallback(
-                function() {
-                    return self.emptyAndRefill();
-                });
-    },
-
-    /**
-     * Override default implementation to set onclick handler that calls
-     * L{setDefaultAddress}
-     */
-    function makeRowElement(self, rowOffset, rowData, cells) {
-        var elem = Quotient.Compose.FromAddressScrollTable.upcall(
-                        self, "makeRowElement", rowOffset, rowData, cells);
-        elem.onclick = function() {
-                            self.setDefaultAddress(rowData.__id__);
-                            return false;
-                        };
-        return elem;
     });
 
 

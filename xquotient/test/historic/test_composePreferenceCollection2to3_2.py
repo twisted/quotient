@@ -9,13 +9,10 @@ from xquotient.compose import ComposePreferenceCollection, Composer, FromAddress
 
 class ComposePreferenceCollectionUpgradeTestCase(StubbedTest):
     def testUpgrade(self):
-        cpc = self.store.findUnique(ComposePreferenceCollection)
         composer = self.store.findUnique(Composer)
 
-        newFrom = self.store.findUnique(
-                    FromAddress,
-                    # foo/bar are the localpart/domain of the LoginMethod
-                    FromAddress.address == u'foo@bar')
+        # foo/bar are the localpart/domain of the LoginMethod
+        newFrom = FromAddress.findByAddress(self.store, u'foo@bar')
 
         self.assertEqual(newFrom.smtpHost, None)
         self.assertEqual(newFrom.smtpUsername, None)

@@ -13,7 +13,7 @@ from nevow import inevow, rend, json
 from nevow.athena import expose, LiveElement
 from nevow.page import renderer
 
-from epsilon import extime
+from epsilon import extime, descriptor
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
@@ -62,7 +62,27 @@ class FromAddress(item.Item):
     """
     I hold information about an email addresses that a user can send mail from
     """
-    address = attributes.text(allowNone=False)
+    schemaVersion = 2
+
+    _address = attributes.text(doc="""
+                The email address.  Don't set this directly; use
+                C{self.address}.
+                """)
+
+    class address(descriptor.attribute):
+        def get(self):
+            """
+            Substitute the result of C{_getFromAddressFromStore} on our store if
+            C{self._address} is None, so we can avoid storing the system address
+            in the database, as it will change if this store is migrated
+            """
+            if self._address is None:
+                return _getFromAddressFromStore(self.store)
+            return self._address
+
+        def set(self, value):
+            self._address = value
+
     _default = attributes.boolean(default=False, doc="""
                 Is this the default from address?  Don't mutate this value
                 directly, use L{setAsDefault}
@@ -87,8 +107,47 @@ class FromAddress(item.Item):
         self._default = True
 
     def findDefault(cls, store):
+        """
+        Find the L{FromAddress} item which is the current default address
+        """
         return store.findUnique(cls, cls._default == True)
     findDefault = classmethod(findDefault)
+
+    def findSystemAddress(cls, store):
+        """
+        Find the L{FromAddress} item which represents the "system address" -
+        i.e. the L{FromAddress} item we created out of the user's login
+        credentials
+        """
+        return cls.findByAddress(store, None)
+    findSystemAddress = classmethod(findSystemAddress)
+
+    def findByAddress(cls, store, address):
+        """
+        Find the L{FromAddress} item with address C{address}
+        """
+        return store.findUnique(cls, cls._address == address)
+    findByAddress = classmethod(findByAddress)
+
+
+
+def fromAddress1to2(old):
+    new = old.upgradeVersion(old.typeName, 1, 2,
+                             _address=old.address,
+                             _default=old._default,
+                             smtpHost=old.smtpHost,
+                             smtpPort=old.smtpPort,
+                             smtpUsername=old.smtpUsername,
+                             smtpPassword=old.smtpPassword)
+
+    if new._address == _getFromAddressFromStore(new.store):
+        new._address = None
+    return new
+
+
+
+registerUpgrader(fromAddress1to2, FromAddress.typeName, 1, 2)
+
 
 
 class _NeedsDelivery(item.Item):
@@ -659,9 +718,7 @@ class ComposeBenefactor(item.Item, item.InstallableMixin):
         avatar.findOrCreate(MailDeliveryAgent).installOn(avatar)
         avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
 
-        defaultFrom = avatar.findOrCreate(
-                        FromAddress,
-                        address=_getFromAddressFromStore(avatar))
+        defaultFrom = avatar.findOrCreate(FromAddress, _address=None)
         defaultFrom.setAsDefault()
 
         avatar.findOrCreate(Composer).installOn(avatar)
@@ -836,37 +893,68 @@ class FromAddressConfigFragment(LiveElement):
         return None
 
 
+
+class FromAddressAddressColumn(object):
+    implements(ixmantissa.IColumn)
+
+    attributeID = '_address'
+
+    def sortAttribute(self):
+        return FromAddress._address
+
+    def extractValue(self, model, item):
+        return item.address
+
+    def getType(self):
+        return 'text'
+
+
+
 class FromAddressScrollTable(ScrollingFragment):
     """
-    L{xmantissa.scrolltable.ScrollingFragment} subclass for browsing and
-    editing L{FromAddress} items
+    L{xmantissa.scrolltable.ScrollingFragment} subclass for browsing
+    and editing L{FromAddress} items.
     """
-    jsClass = 'Quotient.Compose.FromAddressScrollTable'
+    jsClass = u'Quotient.Compose.FromAddressScrollTable'
 
     def __init__(self, store):
-        ScrollingFragment.__init__(self, store,
-                                    FromAddress,
-                                    None,
-                                    (FromAddress.address,
-                                     FromAddress.smtpHost,
-                                     FromAddress.smtpPort,
-                                     FromAddress.smtpUsername,
-                                     FromAddress._default))
+        ScrollingFragment.__init__(
+                self, store,
+                FromAddress,
+                None,
+                (FromAddressAddressColumn(),
+                 FromAddress.smtpHost,
+                 FromAddress.smtpPort,
+                 FromAddress.smtpUsername,
+                 FromAddress._default))
 
-    def setDefaultAddress(self, webID):
+    def action_setDefaultAddress(self, item):
         """
-        Make the L{FromAddress} item with web ID C{webID} the default from
-        address for outgoing mail
+        Make the C[item} the default L{FromAddress} for outgoing mail
         """
-        self.webTranslator.fromWebID(webID).setAsDefault()
-    expose(setDefaultAddress)
+        item.setAsDefault()
+
+    def action_delete(self, item):
+        """
+        Delete the given L{FromAddress}
+        """
+        item.deleteFromStore()
+
+    def getInitialArguments(self):
+        """
+        Include the web ID of the L{FromAddress} item which represents the
+        system address, so the client can prevent it from being deleted
+        """
+        return (unicode(self.webTranslator.toWebID(
+                            FromAddress.findSystemAddress(self.store)),
+                            'ascii'),)
+
 
 class Draft(item.Item):
     """
-    i only exist so my storeID can be exposed, instead of exposing
-    the storeID of the underlying Message (which gets overwritten
-    with each draft save).  this stops draft-editing URLs from being
-    invalidated every 30 seconds
+    i only exist so my storeID can be exposed, instead of exposing the storeID
+    of the underlying Message (which gets overwritten with each draft save).
+    this stops draft-editing URLs from being invalidated every 30 seconds
     """
 
     typeName = 'quotient_draft'

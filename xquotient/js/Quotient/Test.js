@@ -1861,18 +1861,34 @@ Quotient.Test.EmptyControllerTestCase.methods(
 Quotient.Test.FromAddressScrollTableTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.FromAddressScrollTableTestCase');
 Quotient.Test.FromAddressScrollTableTestCase.methods(
     /**
-     * @return: deferred firing with the FromAddressScrollTable associated
-     * with this test case
+     * Retreive a L{Quotient.Compose.FromAddressScrollTable} from the server
      */
-    function getScroller(self) {
-        var scroller = Nevow.Athena.Widget.get(
-                        self.nodeByAttribute(
-                            "athena:class",
-                            "Quotient.Compose.FromAddressScrollTable"));
-        return scroller.initializationDeferred.addCallback(
-            function() {
-                return scroller;
+    function setUp(self)  {
+        var result = self.callRemote("getFromAddressScrollTable");
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
             });
+        result.addCallback(
+            function(widget) {
+                self.scrollTable = widget;
+                self.node.appendChild(widget.node);
+                return widget.initializationDeferred;
+            });
+        return result;
+    },
+
+    /**
+     * @return: the scrolltable action with name C{name}
+     * @rtype: L{Mantissa.ScrollTable.Action}
+     */
+    function getAction(self, name) {
+        for(var i = 0; i < self.scrollTable.actions.length; i++){
+            if(self.scrollTable.actions[i].name == name) {
+                return self.scrollTable.actions[i];
+            }
+        }
+        throw new Error("no action with name " + name);
     },
 
     /**
@@ -1880,28 +1896,71 @@ Quotient.Test.FromAddressScrollTableTestCase.methods(
      * items in the database
      */
     function test_model(self) {
-        return self.getScroller().addCallback(
-            function(scroller) {
-                self.assertEqual(scroller.model.rowCount(), 2);
+        return self.setUp().addCallback(
+            function() {
+                self.assertEqual(self.scrollTable.model.rowCount(), 2);
 
-                var first = scroller.model.getRowData(0);
-                var second = scroller.model.getRowData(1);
+                var first = self.scrollTable.model.getRowData(0);
+                var second = self.scrollTable.model.getRowData(1);
 
                 self.failUnless(first._default);
                 self.failIf(second._default);
+        });
+    },
 
-                /* make sure we can change the default */
-                return scroller.setDefaultAddress(second.__id__).addCallback(
+    /**
+     * Test that the setDefaultAddress action works
+     */
+    function test_setDefaultAddress(self) {
+        return self.setUp().addCallback(
+            function() {
+                var second = self.scrollTable.model.getRowData(1);
+                var action = self.getAction("setDefaultAddress");
+                return action.enact(self.scrollTable, second).addCallback(
                     function() {
-                        first = scroller.model.getRowData(0);
-                        second = scroller.model.getRowData(1);
+                        second = self.scrollTable.model.getRowData(1)
+                        var first = self.scrollTable.model.getRowData(0);
 
                         self.failUnless(second._default);
                         self.failIf(first._default);
                     })
             });
+    },
+
+    /**
+     * Test that the delete & set default actions are disabled for the system
+     * address, which is also the default
+     */
+    function test_actionsDisabled(self) {
+        return self.setUp().addCallback(
+            function() {
+                var systemAddr = self.scrollTable.model.getRowData(0);
+                self.failUnless(systemAddr._default);
+                self.assertEqual(systemAddr.__id__, self.scrollTable.systemAddrWebID);
+
+                var actions = self.scrollTable.getActionsForRow(systemAddr);
+                self.assertEqual(actions.length, 0);
+
+                var otherAddr = self.scrollTable.model.getRowData(1);
+                actions = self.scrollTable.getActionsForRow(otherAddr);
+                self.assertEqual(actions.length, 2);
+            });
+    },
+
+    /**
+     * Test the delete action
+     */
+    function test_deleteAction(self) {
+        return self.setUp().addCallback(
+            function() {
+                var row = self.scrollTable.model.getRowData(1);
+                var action = self.getAction("delete");
+                return action.enact(self.scrollTable, row).addCallback(
+                    function() {
+                        self.assertEqual(self.scrollTable.model.rowCount(), 1);
+                    });
+            });
     });
-    
 
 Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
 Quotient.Test.ComposeController.methods(
