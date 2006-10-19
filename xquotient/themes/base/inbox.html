@@ -137,34 +137,35 @@
           </div>
           <span class="archive-button">
             <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).archiveThis(this); return false"
+              onclick="Quotient.Mailbox.Controller.get(this).archive(this); return false"
               href="#">
               archive
             </nevow:invisible>
           </span>
           <span class="unarchive-button">
             <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).unarchiveThis(this); return false"
+              onclick="Quotient.Mailbox.Controller.get(this).unarchive(this); return false"
               href="#">
               unarchive
             </nevow:invisible>
           </span>
           <span class="delete-button">
             <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).deleteThis(this); return false"
+              onclick="Quotient.Mailbox.Controller.get(this).trash(this); return false"
               href="#">
               delete
             </nevow:invisible>
           </span>
           <span class="undelete-button">
             <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).undeleteThis(this); return false"
+              onclick="Quotient.Mailbox.Controller.get(this).untrash(this); return false"
               href="#">
               undelete
             </nevow:invisible>
           </span>
           <span class="defer-button">
-            <select onchange="Quotient.Mailbox.Controller.get(this).defer(this)" class="defer">
+            <select class="defer">
+              <athena:handler event="onchange" handler="selectDeferByNode" />
               <option class="defer-reset">Defer</option>
               <option class="one-hour">1 hour</option>
               <option class="twelve-hours">12 hours</option>
@@ -176,7 +177,7 @@
           <span class="forward-button">
             <nevow:invisible
                nevow:render="button"
-               onclick="Quotient.Mailbox.Controller.get(this).forwardThis(this); return false"
+               onclick="Quotient.Mailbox.Controller.get(this).forward(this); return false"
                href="#">
               forward
             </nevow:invisible>
@@ -184,7 +185,7 @@
           <span class="reply-button">
             <nevow:invisible
                nevow:render="button"
-               onclick="Quotient.Mailbox.Controller.get(this).replyToThis(this); return false"
+               onclick="Quotient.Mailbox.Controller.get(this).replyTo(this); return false"
                href="#">
               reply
             </nevow:invisible>
@@ -204,8 +205,8 @@
             <option>HORRIBLE HACK</option>
           </select>
           <div style="height: 2px; font-size: 0px; clear: both">&#160;</div>
-          <form style="display: none" class="defer-form"
-            onsubmit="Quotient.Mailbox.Controller.get(this).deferThis(); return false">
+          <form style="display: none" class="defer-form">
+            <athena:handler event="onsubmit" handler="formDeferByNode" />
             <table style="table-layout: fixed">
               <tr>
                 <td>Days:</td><td><input type="text" name="days" value="0" /></td>
@@ -218,8 +219,9 @@
               </tr>
               <tr>
                 <td colspan="2" align="right">
-                  <input type="submit" value="Cancel"
-                    onclick="Quotient.Mailbox.Controller.get(this).hideDeferForm(); return false" />
+                  <input type="submit" value="Cancel">
+                    <athena:handler event="onclick" handler="hideDeferForm" />
+                  </input>
                   <input type="submit" value="Defer" />
                 </td>
               </tr>
@@ -273,19 +275,6 @@
                     <nevow:invisible nevow:render="button" href="#">
                       <athena:handler event="onclick" handler="changeBatchSelectionByNode" />
                       select
-                    </nevow:invisible>
-                  </td>
-                  <td>
-                    <form name="group-actions" style="display: inline">
-                      <select style="opacity: .3; width: 95px" name="group-action" disabled="true" class="group-action" />
-                    </form>
-                  </td>
-                  <td class="group-action-perform" style="padding-left: 2px">
-                    <nevow:invisible nevow:render="button"
-                      style="opacity: 0.3; cursor: default"
-                      onclick="return false"
-                      href="#">
-                      perform
                     </nevow:invisible>
                   </td>
                 </tr>

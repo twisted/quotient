@@ -243,15 +243,6 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
      */
     function test_groupSelectRow(self) {
         return self.setUp().addCallback(function() {
-                /*
-                 * Test setup doesn't give the scrolling widget a parent which
-                 * can toggle group actions.  Clobber that method on our
-                 * instance so it doesn't explode.
-                 *
-                 * XXX This is terrible.  Find some way to remove it.
-                 */
-                self.scrollingWidget.enableGroupActions = function() {};
-
                 var webID = self.scrollingWidget.model.getRowData(0).__id__;
                 var state = self.scrollingWidget.groupSelectRow(webID);
                 self.assertEqual(state, "on");
@@ -268,57 +259,14 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
      */
     function test_groupUnselectRow(self) {
         return self.setUp().addCallback(function() {
-                /*
-                 * Test setup doesn't give the scrolling widget a parent which
-                 * can toggle group actions.  Clobber that method on our
-                 * instance so it doesn't explode.
-                 *
-                 * XXX This is terrible.  Find some way to remove it.
-                 */
-                self.scrollingWidget.disableGroupActions = function() {};
-
                 var webID = self.scrollingWidget.model.getRowData(0).__id__;
+                self.scrollingWidget.selectedGroup = {};
                 self.scrollingWidget.selectedGroup[webID] = null;
                 var state = self.scrollingWidget.groupSelectRow(webID);
                 self.assertEqual(state, "off");
-                self.failIf(
-                    webID in self.scrollingWidget.selectedGroup,
-                    "Expected selected webID not to be in the selected group.");
-            });
-    },
-
-    /**
-     * Test that group actions are enabled when the first row is added to the
-     * group selection.
-     */
-    function test_enableGroupActions(self) {
-        return self.setUp().addCallback(function() {
-                var enabled = false;
-                self.scrollingWidget.enableGroupActions = function enableGroupActions() {
-                    enabled = true;
-                };
-
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                var state = self.scrollingWidget.groupSelectRow(webID);
-                self.failUnless(enabled, "Adding row should have enabled group actions.");
-            });
-    },
-
-    /**
-     * Test that group actions are disabled when the last row is removed from
-     * the group selection.
-     */
-    function test_disableGroupActions(self) {
-        return self.setUp().addCallback(function() {
-                var disabled = false;
-                self.scrollingWidget.disableGroupActions = function disableGroupActions() {
-                    disabled = true;
-                };
-
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                self.scrollingWidget.selectedGroup[webID] = null;
-                var state = self.scrollingWidget.groupSelectRow(webID);
-                self.failUnless(disabled, "Removing row should have dsiabled group actions.");
+                self.assertEqual(
+                    self.scrollingWidget.selectedGroup, null,
+                    "Expected the selected group to be null.");
             });
     }
     );
@@ -749,7 +697,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(0).__id__,
                     model.getRowData(1).__id__];
 
-                self.controllerWidget.touch("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -778,8 +726,8 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                var firstArchive = self.controllerWidget.touch("archive", true);
-                var secondArchive = self.controllerWidget.touch("archive", true);
+                var firstArchive = self.controllerWidget.archive(null);
+                var secondArchive = self.controllerWidget.archive(null);
                 return Divmod.Defer.gatherResults([firstArchive, secondArchive]);
             });
         result.addCallback(
@@ -937,35 +885,6 @@ Quotient.Test.ControllerTestCase.methods(
                         "none",
                         excludedActionNames[i] + " was available in " + viewName + " view.");
                 }
-
-                /*
-                 * Group actions should be set up similarly.
-                 */
-                var i, j, found;
-                var groupActionSelect = self.controllerWidget.groupActionsForm.elements["group-action"];
-                for (i = 0; i < groupActionSelect.childNodes.length; ++i) {
-                    var option = groupActionSelect.childNodes[i];
-
-                    found = false;
-                    for (j = 0; j < batchActionNames.length; ++j) {
-                        if (option.value == batchActionNames[j]) {
-                            batchActionNames.splice(j, 1);
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        self.fail(viewName + " had disallowed batch action " + option.value);
-                    }
-                }
-
-                /*
-                 * Anything left over was something that ought to have been
-                 * available but wasn't.
-                 */
-                if (batchActionNames.length) {
-                    self.fail("Failed to find expected batch actions: " + batchActionNames);
-                }
             });
         return result;
     },
@@ -1047,7 +966,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.changeBatchSelection("unread");
-                return self.controllerWidget.touchBatch("delete", true);
+                return self.controllerWidget.trash(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1080,7 +999,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.changeBatchSelection("unread");
-                return self.controllerWidget.touchBatch("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1108,7 +1027,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection("read");
-                return self.controllerWidget.touchBatch("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1144,7 +1063,7 @@ Quotient.Test.ControllerTestCase.methods(
                 scroller.groupSelectRow(rowIdentifiers[0]);
                 scroller.groupSelectRow(rowIdentifiers[1]);
 
-                return self.controllerWidget.touchSelectedGroup("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1179,7 +1098,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[1]);
-                return self.controllerWidget.touchSelectedGroup("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1214,7 +1133,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[0]);
-                return self.controllerWidget.touchSelectedGroup("archive", true);
+                return self.controllerWidget.archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1449,7 +1368,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(0).__id__,
                     model.getRowData(1).__id__];
 
-                return self.controllerWidget.deferThis();
+                return self.controllerWidget.formDefer();
             });
         result.addCallback(
             function(ignored) {
@@ -1488,7 +1407,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyToThis();
+                return self.controllerWidget.replyTo();
             });
         result.addCallback(
             function(ignored) {
@@ -1523,7 +1442,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forwardThis();
+                return self.controllerWidget.forward();
             });
         result.addCallback(
             function(ignored) {
@@ -1559,7 +1478,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyToThis();
+                return self.controllerWidget.replyTo();
             });
         result.addCallback(
             function(ignored) {
@@ -1616,7 +1535,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.touch("undelete", true);
+                return self.controllerWidget.untrash(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1648,7 +1567,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.touch("unarchive", true);
+                return self.controllerWidget.unarchive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1722,8 +1641,6 @@ Quotient.Test.ControllerTestCase.methods(
     /**
      * XXX TODO
      *
-     * - Test Controller.toggleGroupActions
-     * - Test Controller.disableGroupActions
      * - Test Controller.touchSelectedGroup including selected message
      */
 
@@ -1760,7 +1677,7 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forwardThis();
+                return self.controllerWidget.forward();
             });
         result.addCallback(
             function(ignored) {

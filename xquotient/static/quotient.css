@@ -54,6 +54,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 
 .scrolltable-container .scrolltable-widget-node {
     border-width: 0px;
+    width: 300px;
 }
 
 .detail-toggle {

@@ -26,7 +26,15 @@
 // import Quotient.Throbber
 // import Quotient.Message
 
-
+/**
+ * Enhanced scrolling widget which suports the notion of one or more selected
+ * rows.
+ *
+ * @ivar viewSelection
+ * @ivar selectedGroup
+ * @ivar _selectedRow
+ *
+ */
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
     "Quotient.Mailbox.ScrollingWidget");
 
@@ -40,7 +48,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             "tag": null,
             "person": null,
             "account": null};
-        self.selectedGroup = {};
+        self.selectedGroup = null;
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
 
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
@@ -120,7 +128,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * the selection related features like this one should move over there.
      */
     function emptyAndRefill(self) {
-        self.selectedGroup = {};
+        self.selectedGroup = null;
         return self._selectWebID(null).addCallback(
             function(ignored) {
                 return Quotient.Mailbox.ScrollingWidget.upcall(self, 'emptyAndRefill');
@@ -370,42 +378,28 @@ Quotient.Mailbox.ScrollingWidget.methods(
      */
     function groupSelectRow(self, webID) {
         var state;
-        if(webID in self.selectedGroup) {
+        if (self.selectedGroup == null) {
+            self.selectedGroup = {};
+            self.selectedGroup[webID] = true;
+            return "on";
+        } else if (webID in self.selectedGroup) {
             delete self.selectedGroup[webID];
-            state = "off";
+            /*
+             * Determine if there are any webIDs left in the selected group.
+             */
+            var iterated = false;
+            for (var prop in self.selectedGroup) {
+                iterated = true;
+                break;
+            }
+            if (!iterated) {
+                self.selectedGroup = null;
+            }
+            return "off";
         } else {
             self.selectedGroup[webID] = true;
-            state = "on";
+            return "on";
         }
-
-        var selcount = MochiKit.Base.keys(self.selectedGroup).length;
-        /* are we transitioning from 0->1 or 1->0? */
-        if (selcount == 0 && state == "off") {
-            self.disableGroupActions();
-        } else if (selcount == 1 && state == "on") {
-            self.enableGroupActions();
-        }
-        return state;
-    },
-
-    /**
-     * Enable the user-interface for performing actions on the selected group
-     * of messages.
-     *
-     * XXX Give the widget parent a real enable method.
-     */
-    function enableGroupActions(self) {
-        self.widgetParent.toggleGroupActions();
-    },
-
-    /**
-     * Disable the user-interface for performing actions on the selected group
-     * of messages.
-     *
-     * XXX Give the widget parent a real disable method.
-     */
-    function disableGroupActions(self) {
-        self.widgetParent.toggleGroupActions();
     },
 
     /**
@@ -453,7 +447,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             row = self.model.getRowData(i);
             if(row) {
                 webID = row.__id__;
-                selected = (webID in self.selectedGroup);
+                selected = (self.selectedGroup != null && webID in self.selectedGroup);
                 /* if we like this row */
                 if(predicate(row)) {
                     /* and it's selection status isn't the desired one */
@@ -566,12 +560,17 @@ Quotient.Mailbox.ScrollingWidget.methods(
  * element for the message detail area.  The second element is also an array
  * with three elements: the footer td elements which correspond to the three td
  * elements in the first array.
+ *
+ * @ivar _batchSelection
+ *
  */
 Quotient.Mailbox.Controller = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Controller');
 Quotient.Mailbox.Controller.methods(
     function __init__(self, node, complexityLevel) {
         Quotient.Mailbox.Controller.upcall(self, '__init__', node);
+
         self.complexityLevel = complexityLevel;
+        self._batchSelection = null;
 
         /*
          * Fired when the initial load has finished.
@@ -661,8 +660,6 @@ Quotient.Mailbox.Controller.methods(
             });
 
         self.scrolltableContainer = self.scrollWidget.node.parentNode;
-        self.groupActionsForm = Nevow.Athena.FirstNodeByAttribute(
-                                    self.contentTableGrid[1][1], "name", "group-actions");
 
         self.nextMessagePreview = self.firstWithClass(
             self.contentTableGrid[1][2],
@@ -915,24 +912,15 @@ Quotient.Mailbox.Controller.methods(
      * XX
      */
     function changeBatchSelection(self, to) {
-        var args = [to != "none"];
-        if(to in self._batchSelectionPredicates) {
-            args.push(self._batchSelectionPredicates[to]);
-        }
+        var anySelected = (to != "none");
+        var selectionPredicate = self._batchSelectionPredicates[to];
 
-        /* we can't actually do anything useful with this count, like
-         * only enabling aggregate actions if it's > 0 because there
-         * could be as-yet unrequested rows that the action will affect.
-         * we could probably treat is as meaningful if we know we've
-         * already requested all of the rows, but that's not so important
-         * right now */
-        var count = self.scrollWidget.massSelectOrNot.apply(self.scrollWidget, args);
-        if(to == "none") {
-            self._changeGroupActionAvailability(false);
-            self._batchSelection = null;
-        } else {
-            self._changeGroupActionAvailability(true);
+        self.scrollWidget.massSelectOrNot(anySelected, selectionPredicate);
+
+        if (anySelected) {
             self._batchSelection = to;
+        } else {
+            self._batchSelection = null;
         }
     },
 
@@ -963,7 +951,7 @@ Quotient.Mailbox.Controller.methods(
             if(row != undefined) {
                 webID = row["__id__"];
                 /* if it's selected */
-                if (webID in sw.selectedGroup) {
+                if (sw.selectedGroup != null && webID in sw.selectedGroup) {
                     /* and it doesn't fulfill the predicate */
                     if (!pred(row)) {
                         /* then mark it for explicit inclusion */
@@ -992,7 +980,7 @@ Quotient.Mailbox.Controller.methods(
         for (i = 0; i < indices.length; ++i) {
             index = indices[i] - removed;
             row = self.scrollWidget.model.getRowData(index);
-            if (row.__id__ in self.scrollWidget.selectedGroup) {
+            if (self.scrollWidget.selectedGroup != null && row.__id__ in self.scrollWidget.selectedGroup) {
                 removalDeferreds.push(self.scrollWidget.removeRow(index));
                 removed += 1;
             }
@@ -1029,7 +1017,7 @@ Quotient.Mailbox.Controller.methods(
         return result;
     },
 
-    function touchBatch(self, action, isDestructive) {
+    function touchBatch(self, action, isDestructive, extraArguments) {
         var exceptions = self.getBatchExceptions();
         var include = exceptions[0];
         var exclude = exceptions[1];
@@ -1038,7 +1026,7 @@ Quotient.Mailbox.Controller.methods(
             function() {
                 var acted = self.callRemote(
                     "actOnMessageBatch", action, self.scrollWidget.viewSelection,
-                    self._batchSelection, include, exclude);
+                    self._batchSelection, include, exclude, extraArguments);
                 acted.addCallback(
                     function(counts) {
                         var readTouchedCount = counts[0];
@@ -1046,7 +1034,7 @@ Quotient.Mailbox.Controller.methods(
 
                         if (isDestructive) {
                             var result = self._removeRows(self.scrollWidget.selectedGroup);
-                            self.scrollWidget.selectedGroup = {};
+                            self.scrollWidget.selectedGroup = null;
                             return result;
                         }
                         return null;
@@ -1443,7 +1431,6 @@ Quotient.Mailbox.Controller.methods(
      * @return: L{Deferred}, which will fire after view change is complete
      */
     function chooseMailView(self, viewName) {
-        self.disableGroupActions();
         self._selectViewShortcut(viewName);
         self._selectListOption(self.mailViewNodes[viewName].parentNode);
         self._setupActionButtonsForView(viewName);
@@ -1465,7 +1452,6 @@ Quotient.Mailbox.Controller.methods(
                 actions[actionName].button.style.display = "none";
             }
         }
-        self.setGroupActions(enableActionNames);
     },
 
     /**
@@ -1482,52 +1468,6 @@ Quotient.Mailbox.Controller.methods(
             }
         }
     },
-
-    /**
-     * Internet Explorer doesn't honour the "display" CSS property
-     * or the "disabled" attribute on <option> nodes, so each time
-     * the list of available actions needs to change, we'll just
-     * remove all of the nodes in the group action <select> and
-     * replace them with the ones that we know we need.
-     *
-     * @param: array of available action names.  (e.g. train-ham,
-     *         train-spam, delete, archive, defer)
-     * @return: undefined
-     */
-    function setGroupActions(self, actionNames) {
-        var select = self.groupActionsForm.elements["group-action"];
-
-        while (select.firstChild) {
-            select.removeChild(select.firstChild);
-        }
-
-        var nameToDisplay = {"train-ham": "Not Spam",
-                             "train-spam": "Is Spam",
-                             "delete": "Delete",
-                             "undelete": "Undelete",
-                             "archive": "Archive",
-                             "unarchive": "Unarchive",
-                             "defer": "Defer"};
-
-        var option, label, name;
-        for (var i = 0; i < actionNames.length; i++) {
-            name = actionNames[i];
-
-            /* XXX hack.  we should be able to defer multiple msgs */
-            if(name == "defer") {
-                continue;
-            }
-
-            if (nameToDisplay[name] !== undefined) {
-                label = document.createTextNode(nameToDisplay[name]);
-                option = document.createElement('option');
-                option.setAttribute('value', name);
-                option.appendChild(label);
-                select.appendChild(option);
-            }
-        }
-    },
-
 
     /**
      * Select a new account by DOM node.
@@ -1606,6 +1546,30 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Perform the specified action.
+     *
+     * If the batch selection is set, perform it on that batch of messages.
+     *
+     * Otherwise if there is a selected group of messages, performed it on that
+     * set of messages.
+     *
+     * Otherwise perform it on the currently displayed message.
+     */
+    function touch(self, action, isProgress, /* optional */ extraArguments) {
+        if (extraArguments === undefined) {
+            extraArguments = null;
+        }
+
+        if (self._batchSelection != null) {
+            return self.touchBatch(action, isProgress, extraArguments);
+        } else if (self.scrollWidget.selectedGroup != null) {
+            return self.touchSelectedGroup(action, isProgress, extraArguments);
+        } else {
+            return self.touchCurrent(action, isProgress, extraArguments);
+        }
+    },
+
+    /**
      * Tell the server to perform some action on the currently visible
      * message.
      *
@@ -1626,13 +1590,9 @@ Quotient.Mailbox.Controller.methods(
      *
      * @return: C{undefined}
      */
-    function touch(self, action, isProgress, /* optional */ extraArguments) {
+    function touchCurrent(self, action, isProgress, /* optional */ extraArguments) {
         var model = self.scrollWidget.model;
         var selected = self.scrollWidget._selectedRowID;
-
-        if (extraArguments === undefined) {
-            extraArguments = null;
-        }
 
         if (selected === undefined) {
             throw new Error("No row selected.");
@@ -1645,7 +1605,9 @@ Quotient.Mailbox.Controller.methods(
                     nextMessageID = model.findPrevRow(selected);
                 }
 
-                var acted = self.callRemote("actOnMessageIdentifierList", action, [selected], extraArguments);
+                var acted = self.callRemote(
+                    "actOnMessageIdentifierList",
+                    action, [selected], extraArguments);
 
                 var removed;
                 if (isProgress) {
@@ -1684,13 +1646,13 @@ Quotient.Mailbox.Controller.methods(
      *                       if the currently selected one is not a member of the
      *                       group being acted upon.
      */
-    function touchSelectedGroup(self, action, isDestructive) {
-        self.disableGroupActions();
+    function touchSelectedGroup(self, action, isDestructive, extraArguments) {
         var result = self.withReducedMessageDetailOpacity(
             function() {
                 var acted = self.callRemote(
                     "actOnMessageIdentifierList", action,
-                    Divmod.dir(self.scrollWidget.selectedGroup));
+                    Divmod.dir(self.scrollWidget.selectedGroup),
+                    extraArguments);
                 acted.addCallback(
                     function(counts) {
                         var readTouchedCount = counts[0];
@@ -1698,10 +1660,9 @@ Quotient.Mailbox.Controller.methods(
 
                         if (isDestructive) {
                             var result = self._removeRows(self.scrollWidget.selectedGroup);
-                            self.scrollWidget.selectedGroup = {};
+                            self.scrollWidget.selectedGroup = null;
                             return result;
                         } else {
-                            self.enableGroupActions();
                             return null;
                         }
 
@@ -1757,133 +1718,40 @@ Quotient.Mailbox.Controller.methods(
         self.decrementMailViewCount(addTo, -affectedUnreadCount);
     },
 
-    /**
-     * Get the first node with class name C{className} below
-     * C{parent}.  Repeated calls will yield cached results.
-     *
-     * At some point change calls to firstWithClass() to use this
-     */
-    function getFirstNode(self, parent, className) {
-        if(!self._nodeCache) {
-            self._nodeCache = {};
-        }
-        if(!(parent in self._nodeCache)) {
-            self._nodeCache[parent] = {};
-        }
-        if(!(className in self._nodeCache[parent])) {
-            self._nodeCache[parent][className] = Nevow.Athena.FirstNodeByAttribute(
-                                                    parent, "class", className);
-        }
-        return self._nodeCache[parent][className];
-    },
-
-    /**
-     * called by the scrolltable when the number of messages
-     * in the message group selection transitions from 0->1
-     * or 1->0.
-     *
-     * enables or disables group message actions, depending
-     * on whether any messages are selected
-     */
-    function toggleGroupActions(self) {
-        var form = self.groupActionsForm;
-        var currentlyEnabled = !form.elements["group-action"].disabled;
-        self._changeGroupActionAvailability(!currentlyEnabled);
-    },
-
-    function disableGroupActions(self) {
-        self._changeGroupActionAvailability(false);
-    },
-
-    function enableGroupActions(self) {
-        self._changeGroupActionAvailability(true);
-    },
-
-    /**
-     * Return the node with the event handler which allows an action to be
-     * applied to a group of messages.
-     */
-    function _getGroupActionPerformButton(self) {
-        return self.getFirstNode(
-            self.groupActionsForm.parentNode.parentNode,
-            "group-action-perform");
-    },
-
-    /**
-     * @param available: boolean.  true = enable, false = disable
-     */
-    function _changeGroupActionAvailability(self, available) {
-        var form = self.groupActionsForm;
-        var gap = self._getGroupActionPerformButton();
-        var select = form.elements["group-action"];
-
-        if(available) {
-            select.style.opacity = gap.style.opacity = "";
-            select.removeAttribute("disabled");
-            gap.style.cursor = "";
-            gap.onclick = function() {
-                try {
-                    var form = self.groupActionsForm;
-                    var actionName = form.elements["group-action"].value;
-
-                    if(actionName == "train-spam") {
-                        actionName = "trainSpam";
-                    } else if (actionName == "train-ham") {
-                        actionName = "trainHam";
-                    }
-                    if (self._batchSelection) {
-                        self.touchBatch(actionName, true);
-                    } else {
-                        self.touchSelectedGroup(actionName, true);
-                    }
-                } catch (err) {
-                    Divmod.err(err);
-                }
-                return false;
-            };
-        } else {
-            select.style.opacity = gap.style.opacity = ".3";
-            select.setAttribute("disabled", "true");
-            gap.style.cursor = "default";
-            gap.onclick = function() {
-                return false;
-            }
-        }
-    },
-
-    function archiveThis(self, n) {
+    function archive(self, n) {
         /*
          * Archived messages show up in the "all" view.  So, if we are in any
          * view other than that, this action should make the message
          * disappear.
          */
-        self.touch("archive", self.scrollWidget.viewSelection["view"] != "all");
+        return self.touch("archive", self.scrollWidget.viewSelection["view"] != "all");
     },
 
-    function unarchiveThis(self, n) {
-        self.touch("unarchive", self.scrollWidget.viewSelection["view"] == "all");
+    function unarchive(self, n) {
+        return self.touch("unarchive", self.scrollWidget.viewSelection["view"] == "all");
     },
 
-    function deleteThis(self, n) {
-        self.touch("delete", self.scrollWidget.viewSelection["view"] != "trash");
+    function trash(self, n) {
+        return self.touch("delete", self.scrollWidget.viewSelection["view"] != "trash");
     },
 
-    function undeleteThis(self, n) {
-        self.touch("undelete", self.scrollWidget.viewSelection["view"] == "trash");
+    function untrash(self, n) {
+        return self.touch("undelete", self.scrollWidget.viewSelection["view"] == "trash");
     },
 
     function showDeferForm(self) {
-        self.deferForm.style.display = "";
+        return self.deferForm.style.display = "";
     },
 
     function hideDeferForm(self) {
         self.deferForm.style.display = "none";
+        return false;
     },
 
     function _deferralStringToPeriod(self, value) {
         if (value == "other...") {
             self.showDeferForm();
-            return;
+            return null;
         }
         if (value == "Defer") {
             return null;
@@ -1921,13 +1789,23 @@ Quotient.Mailbox.Controller.methods(
         return self._deferralStringToPeriod(value);
     },
 
-    function defer(self, /* unused */ node) {
-        var period = self._getDeferralSelection();
+    function selectDeferByNode(self, node) {
+        try {
+            self.selectDefer();
+        } catch (err) {
+            node.selectedIndex = 0;
+            throw err;
+        }
         node.selectedIndex = 0;
-        if (period === undefined || period === null) {
+        return false;
+    },
+
+    function selectDefer(self) {
+        var period = self._getDeferralSelection();
+        if (period === null) {
             return;
         }
-        self.touch("defer", true, period);
+        return self.touch("defer", true, period);
     },
 
     /**
@@ -1941,7 +1819,12 @@ Quotient.Mailbox.Controller.methods(
                 'minutes': parseInt(form.minutes.value)};
     },
 
-    function deferThis(self) {
+    function formDeferByNode(self, node) {
+        self.formDefer();
+        return false;
+    },
+
+    function formDefer(self) {
         var period = self._getDeferralPeriod();
         self.deferForm.style.display = "none";
         return self.touch("defer", true, period);
@@ -1957,7 +1840,7 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.appendChild(node);
     },
 
-    function replyToThis(self) {
+    function replyTo(self) {
         /*
          * This brings up a composey widget thing.  When you *send* that
          * message (or save it as a draft or whatever, I suppose), *then* this
@@ -1978,9 +1861,9 @@ Quotient.Mailbox.Controller.methods(
         return result;
     },
 
-    function forwardThis(self, n) {
+    function forward(self, n) {
         /*
-         * See replyToThis
+         * See replyTo
          */
         var result = self.callRemote(
             "forwardMessage", self.scrollWidget.getSelectedRow().__id__);
