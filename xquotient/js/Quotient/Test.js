@@ -1636,6 +1636,51 @@ Quotient.Test.ControllerTestCase.methods(
             function() {
                 self.assertEqual(select.value, "inbox");
         });
+    },
+
+
+    /**
+     * Test that values passed to setMessageContent show up in the display.
+     */
+    function test_setMessageContent(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote('getMessageDetail');
+            });
+        result.addCallback(
+            function(messageDetailInfo) {
+                var subject = 'test subject string';
+                self.controllerWidget.setMessageContent(
+                    {subject: subject},
+                    messageDetailInfo);
+                self.assertNotEqual(self.controllerWidget.node.innerHTML.indexOf(subject), -1);
+
+            });
+        return result;
+    },
+
+    /**
+     * Test that the subject of the message preview passed to setMessageContent
+     * is properly escaped if necessary.
+     */
+    function test_setPreviewQuoting(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.callRemote('getMessageDetail');
+            });
+        result.addCallback(
+            function(messageDetailInfo) {
+                var subject = 'test <subject> & string';
+                var escaped = 'test &lt;subject&gt; &amp; string';
+                self.controllerWidget.setMessageContent(
+                    {subject: subject},
+                    messageDetailInfo);
+                self.assertNotEqual(self.controllerWidget.node.innerHTML.indexOf(escaped), -1);
+
+            });
+        return result;
     }
 
     /**

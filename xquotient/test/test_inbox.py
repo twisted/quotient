@@ -339,8 +339,7 @@ class InboxTestCase(TestCase):
         """
         self._setUpInbox()
 
-        preview, fragment, data = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
-        self.assertEquals(data[u'identifier'], self.msgIds[2])
+        preview, fragment = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
         self.assertEquals(preview[u'subject'], self.msgs[3].subject)
         self.failUnless(self.msgs[2].read)
 

@@ -19,7 +19,7 @@ from xmantissa.people import Organizer, Person, EmailAddress
 from xmantissa.test.livetest_scrolltable import ScrollElement
 
 from xquotient.inbox import Inbox, UndeferTask, InboxScreen, MailboxScrollingFragment
-from xquotient.exmess import Message
+from xquotient.exmess import Message, MessageDetail
 from xquotient.compose import Composer, ComposeFragment
 from xquotient.quotientapp import QuotientPreferenceCollection
 
@@ -285,6 +285,16 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         fragment.setFragmentParent(self)
         return fragment
     expose(getControllerWidget)
+
+
+    def getMessageDetail(self):
+        """
+        Return the MessageDetail widget for a random message.
+        """
+        detail = MessageDetail(self.messages.values()[0])
+        detail.setFragmentParent(self)
+        return detail
+    expose(getMessageDetail)
 
 
     def personNamesByKeys(self, *keys):

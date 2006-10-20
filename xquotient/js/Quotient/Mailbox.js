@@ -617,8 +617,6 @@ Quotient.Mailbox.Controller.methods(
         self._batchSelectionPredicates = {read:   function(r) { return  r["read"] },
                                           unread: function(r) { return !r["read"] }}
 
-        self.currentMessageData = null;
-
         var contentTableNodes = self._getContentTableGrid();
         self.contentTable = contentTableNodes.table;
         self.contentTableGrid = contentTableNodes.grid;
@@ -1311,7 +1309,7 @@ Quotient.Mailbox.Controller.methods(
                         }
                         if (rowData != null) {
                             rowData.read = true;
-                            return self.setMessageContent(messageData[0], messageData[1], messageData[2]);
+                            return self.setMessageContent(messageData[0], messageData[1]);
                         }
                     });
             });
@@ -2046,7 +2044,10 @@ Quotient.Mailbox.Controller.methods(
         if (name == "next-message") {
             return {
                 'fillSlots': function(key, value) {
-                    return '<div xmlns="http://www.w3.org/1999/xhtml">Next: ' + value + '</div>';
+                    return (
+                        '<div xmlns="http://www.w3.org/1999/xhtml">Next: ' +
+                        value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') +
+                        '</div>');
                 }
             };
         } else if (name == "no-more-messages") {
@@ -2057,32 +2058,22 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * @param data: Three-Array of the html for next message preview, the
-     * html for the current message, and some structured data describing
-     * the current message
+     * @param nextMessagePreview: An object with a subject property giving
+     * the subject of the next message.  This value is not necessarily HTML;
+     * HTML entities should not be escaped and markup will not be
+     * interpreted (XXX - is this right?).
+     *
+     * @param currentMessageDisplay: Components of a MessageDetail widget,
+     * to be displayed in the message detail area of this controller.
+     *
      */
-    function setMessageContent(self, nextMessagePreview, currentMessageDisplay, currentMessageData) {
-        self.currentMessageData = currentMessageData;
-
+    function setMessageContent(self, nextMessagePreview, currentMessageDisplay) {
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
 
         return self.addChildWidgetFromWidgetInfo(currentMessageDisplay).addCallback(
             function(widget) {
                 self.setMessageDetail(widget.node);
-
-                var modifier, spamConfidence;
-
-                if (currentMessageData.trained) {
-                    spamConfidence = 'definitely';
-                } else {
-                    spamConfidence = 'probably';
-                }
-                if (currentMessageData.spam) {
-                    modifier = '';
-                } else {
-                    modifier = 'not';
-                }
 
                 /* highlight the extracts here; the next message preview will
                  * be null for the last message, but we still want to

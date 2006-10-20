@@ -712,7 +712,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return [
             self._messagePreview(nextMessage),
             self._messageFragment(currentMessage),
-            self._messageData(currentMessage),
             ]
     expose(fastForward)
 
@@ -784,16 +783,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                 unreadCount += 1
             action(message, **extra)
         return readCount, unreadCount
-
-
-    def _messageData(self, msg):
-        if msg is not None:
-            return {
-                u'identifier': self.translator.toWebID(msg).decode('ascii'),
-                u'trained': msg.trained,
-                u'spam': msg.spam,
-                }
-        return None
 
 
     def _messagePreview(self, msg):
