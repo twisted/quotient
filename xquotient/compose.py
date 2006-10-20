@@ -873,7 +873,7 @@ class FromAddressConfigFragment(LiveElement):
                     'Default?',
                     'Use this as default from address')),
                  description='Add From Address')
-        lf.jsClass = 'Quotient.Compose.AddAddressFormWidget'
+        lf.jsClass = u'Quotient.Compose.AddAddressFormWidget'
         lf.docFactory = getLoader('liveform-compact')
         lf.setFragmentParent(self)
         return lf

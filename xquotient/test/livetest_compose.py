@@ -89,6 +89,7 @@ class DraftsTestCase(testcase.TestCase):
         f.docFactory = getLoader(f.fragmentName)
         return f
 
+
 class FromAddressScrollTableTestCase(testcase.TestCase):
     """
     Tests for L{xquotient.compose.FromAddressScrollTable}
