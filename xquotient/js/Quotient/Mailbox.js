@@ -137,13 +137,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Override this to do nothing because the Inbox cannot be sorted at all!
-     *
-     * XXX - Hey, wtf, why can't the inbox be sorted? -exarkun
-     */
-    function setSortInfo(self, currentSortColumn, isAscendingNow) {},
-
-    /**
      * Override this to return an empty Array because the Inbox has no row
      * headers.
      */
