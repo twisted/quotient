@@ -537,6 +537,45 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test that the sent view has a "to" column instead of a "from" column.
+     */
+    function test_sentViewToColumn(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                /* Sanity check - sender should be displayed in this view.
+                 */
+                self.failIf(
+                    self.controllerWidget.scrollWidget.skipColumn(
+                        "senderDisplay"));
+                self.failUnless(
+                    self.controllerWidget.scrollWidget.skipColumn(
+                        "recipient"));
+
+                return self.controllerWidget.chooseMailView("sent");
+            });
+        result.addCallback(
+            function(ignored) {
+                var scrollWidget = self.controllerWidget.scrollWidget;
+
+                self.failUnless(
+                    self.controllerWidget.scrollWidget.skipColumn(
+                        "senderDisplay"));
+                self.failIf(
+                    self.controllerWidget.scrollWidget.skipColumn(
+                        "recipient"));
+
+                /* Make sure the values are correct.
+                 */
+                var node = scrollWidget.model.getRowData(0).__node__;
+                self.assertNotEqual(
+                    node.innerHTML.indexOf('alice@example.com'),
+                    -1);
+            });
+        return result;
+    },
+
+    /**
      * Test switching to a view of messages from a particular person.
      */
     function test_personView(self) {

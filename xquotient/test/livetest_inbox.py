@@ -248,7 +248,7 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             store=inbox.store, sender=self.bobEmail, subject=u'6th message',
             receivedWhen=self.sent + offset * 5, sentWhen=self.sent,
             spam=False, archived=False, read=True, outgoing=True,
-            impl=impl)
+            recipient=self.aliceEmail, impl=impl)
 
         # Trash messages
         m7 = Message(

@@ -100,6 +100,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function changeViewSelection(self, viewType, value) {
         self.throbber.startThrobbing();
         self.viewSelection[viewType] = value;
+        self.resetColumns();
         var result = Divmod.Defer.gatherResults(
             [self.callRemote("requestCurrentSize", self.viewSelection),
              self.emptyAndRefill()]);
@@ -281,6 +282,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
             data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
                                         "style": "float: right; border: none"}));
         }
+
         return MochiKit.DOM.A(
             {"class": "q-scroll-row",
              "href": "#",
@@ -535,9 +537,24 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * metadata.
      */
     function skipColumn(self, name) {
-        return name == "read" || name == "sentWhen" ||
-               name == "attachments" || name == "everDeferred" ||
-               name == "sender";
+        if (name == "read" || name == "sentWhen" ||
+            name == "attachments" || name == "everDeferred" ||
+            name == "sender") {
+            return true;
+        }
+
+        if (self.viewSelection.view == "sent") {
+            if (name == "senderDisplay") {
+                return true;
+            }
+        }
+
+        if (self.viewSelection.view != "sent") {
+            if (name == "recipient") {
+                return true;
+            }
+        }
+        return false;
     },
 
     /**
@@ -1432,6 +1449,7 @@ Quotient.Mailbox.Controller.methods(
         self._selectViewShortcut(viewName);
         self._selectListOption(self.mailViewNodes[viewName].parentNode);
         self._setupActionButtonsForView(viewName);
+
         return self.changeViewSelection("view", viewName);
     },
 

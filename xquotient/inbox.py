@@ -419,6 +419,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             Message,
             (Message.sender,
              Message.senderDisplay,
+             Message.recipient,
              Message.subject,
              Message.receivedWhen,
              Message.read,
