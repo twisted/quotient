@@ -1446,7 +1446,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyTo();
+                return self.controllerWidget.replyTo(false);
             });
         result.addCallback(
             function(ignored) {
@@ -1481,7 +1481,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forward();
+                return self.controllerWidget.forward(false);
             });
         result.addCallback(
             function(ignored) {
@@ -1517,7 +1517,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyTo();
+                return self.controllerWidget.replyTo(false);
             });
         result.addCallback(
             function(ignored) {
@@ -1720,6 +1720,105 @@ Quotient.Test.ControllerTestCase.methods(
 
             });
         return result;
+    },
+
+    /**
+     * @return: a function which can be added as a callback to a deferred
+     * which fires with an L{Quotient.Compose.Controller} instance.  Checks
+     * the the compose instance is inside the message detail of our
+     * L{Quotient.Mailbox.Controller}, and has the "inline" attribute set
+     */
+    function _makeComposeTester(self) {
+        return function(composer) {
+            self.failUnless(
+                composer instanceof Quotient.Compose.Controller);
+
+            self.assertEqual(composer.node.parentNode,
+                                self.controllerWidget.messageDetail);
+            self.failUnless(composer.inline);
+
+            return composer;
+        }
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Controller.splatComposeWidget} when not passed
+     * composeInfo or reloadMessage.
+     */
+    function test_splatCompose(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                return self.controllerWidget.splatComposeWidget();
+            });
+        result.addCallback(self._makeComposeTester());
+        return result;
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Controller.splatComposeWidget} when passed a
+     * composeInfo argument
+     */
+    function test_splatComposeComposeInfo(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                return self.controllerWidget.callRemote("getComposer");
+            });
+        result.addCallback(
+            function(composeInfo) {
+                return self.controllerWidget.splatComposeWidget(composeInfo);
+            });
+        result.addCallback(self._makeComposeTester());
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Controller.reloadMessageAfterComposeCompleted}
+     */
+    function test_reloadMessageAfterComposeCompleted(self) {
+        var cancelled = false;
+
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                return self.controllerWidget.splatComposeWidget();
+            });
+        result.addCallback(
+            function(composer) {
+                var controller = self.controllerWidget;
+                var curmsg = controller.scrollWidget.getSelectedRow();
+                var reload = controller.reloadMessageAfterComposeCompleted(composer);
+
+                setTimeout(
+                    function() {
+                        composer.cancel();
+                        cancelled = true;
+                    }, 1000);
+
+                return reload.addCallback(
+                    function() {
+                        return curmsg;
+                    });
+            });
+        result.addCallback(
+            function(curmsg) {
+                self.failUnless(cancelled);
+
+                /* check that the compose widget has been replaced with a
+                 * message detail, and that the current message in the
+                 * scrolltable is still curmsg */
+
+                Nevow.Athena.Widget.get(
+                    Nevow.Athena.FirstNodeByAttribute(
+                        self.controllerWidget.messageDetail,
+                        "athena:class",
+                        "Quotient.Message.MessageDetail"));
+
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget.getSelectedRow().__id__,
+                    curmsg.__id__);
+            });
+        return result;
     }
 
     /**
@@ -1761,7 +1860,7 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forward();
+                return self.controllerWidget.forward(false);
             });
         result.addCallback(
             function(ignored) {

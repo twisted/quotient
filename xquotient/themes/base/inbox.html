@@ -7,14 +7,6 @@
     Loading...
   </div>
 
-  <a nevow:pattern="compose-link">
-    <nevow:attr name="href"><nevow:slot name="href" /></nevow:attr>
-    <img src="/Quotient/static/images/pencil.png" border="0" style="margin-top: 2px" />
-    <span style="color: #0099CC; position: relative; top: -4px">
-      Compose
-    </span>
-  </a>
-
   <div style="position: static" class="widget-container" />
 
   <div nevow:pattern="last-message" class="last-message">
@@ -104,7 +96,13 @@
         </img>
         </div>
         <div class="menubar-separator" />
-        <nevow:invisible nevow:render="composeLink" />
+        <a href="#"
+          onclick="Quotient.Mailbox.Controller.get(this).splatComposeWidget(undefined, true); return false">
+          <img src="/Quotient/static/images/pencil.png" border="0" style="margin-top: 2px" />
+          <span style="color: #0099CC; position: relative; top: -4px">
+            Compose
+          </span>
+        </a>
         <div style="clear: left; font-size: 0px">&#160;</div>
     </div>
     <div class="content-table-container">

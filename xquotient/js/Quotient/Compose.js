@@ -184,8 +184,12 @@ Quotient.Compose.Controller.methods(
             self.toggleFilesForm();
         }
 
+        var mbody = self.firstNodeByAttribute("class", "message-body");
+        /* use a separate js class and/or template if this grows any more */
         if(inline) {
             self.firstNodeByAttribute("class", "cancel-link").style.display = "";
+            self.firstNodeByAttribute("class", "compose-table").style.width = "100%";
+            self.node.style.borderTop = "";
         }
 
         self.inline = inline;
@@ -201,6 +205,8 @@ Quotient.Compose.Controller.methods(
         self.startSavingDrafts();
 
         self.makeFileInputs();
+
+        self.completionDeferred = Divmod.Defer.Deferred();
     },
 
     /**
@@ -244,6 +250,7 @@ Quotient.Compose.Controller.methods(
     function cancel(self) {
         self.stopSavingDrafts();
         self.node.parentNode.removeChild(self.node);
+        self.completionDeferred.callback(null);
         /*
          * XXX Remove this from Athena's widget map, too.
          */
@@ -281,7 +288,7 @@ Quotient.Compose.Controller.methods(
             var bg = MochiKit.DOM.DIV({"id": "attach-dialog-bg"});
             bg.style.height = pageSize.h + "px";
             bg.style.width = pageSize.w + "px";
-            document.body.appendChild(bg);
+            self.node.parentNode.appendChild(bg);
 
             if(self.attachDialog.style.left == "") {
                 var elemSize = Divmod.Runtime.theRuntime.getElementSize(self.attachDialog);
@@ -292,7 +299,7 @@ Quotient.Compose.Controller.methods(
             }
         } else {
             self.attachDialog.style.display = "none";
-            document.body.removeChild(document.getElementById("attach-dialog-bg"));
+            self.node.parentNode.removeChild(document.getElementById("attach-dialog-bg"));
         }
     },
 
@@ -418,10 +425,17 @@ Quotient.Compose.Controller.methods(
         }
     },
 
-    function fitMessageBodyToPage(self) {
+    /**
+     * Expand compose widget to take up all the space inside C{node}.
+     * Do this by making the message body textarea taller
+     */
+    function fitInsideNode(self, node) {
         var e = self.nodeByAttribute("class", "message-body");
-        e.style.height = Divmod.Runtime.theRuntime.getPageHeight().h -
-                         Quotient.Common.Util.findPosY(e) - 55 + "px";
+
+        e.style.height = (Divmod.Runtime.theRuntime.getElementSize(node).h -
+                          (Quotient.Common.Util.findPosY(e) -
+                           Quotient.Common.Util.findPosY(self.node)) -
+                          1)+ "px";
     },
 
     function addrAutocompleteKeyDown(self, node, event) {

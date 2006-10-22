@@ -520,20 +520,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     renderer(messageDetail)
 
 
-    def composeLink(self, ctx, data):
-        """
-        If L{compose.Composer} is installed in our store,
-        then render a link to it, otherwise don't
-        """
-        composer = self.store.findUnique(compose.Composer, default=None)
-        if composer is not None:
-            return inevow.IQ(self.docFactory).onePattern(
-                        'compose-link').fillSlots(
-                            'href', self.translator.linkTo(composer.storeID))
-        return ''
-    renderer(composeLink)
-
-
     def spamState(self, request, tag):
         currentMessage = self._currentMessageAtRenderTime
 
@@ -850,6 +836,14 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         cf.docFactory = getLoader(cf.fragmentName)
         return cf
 
+
+    def getComposer(self):
+        """
+        Return an inline L{xquotient.compose.ComposeFragment} instance with
+        empty to address, subject, message body and attacments
+        """
+        return self._composeSomething(None, '', '', '')
+    expose(getComposer)
 
     def replyToMessage(self, messageIdentifier):
         curmsg = self.translator.fromWebID(messageIdentifier)

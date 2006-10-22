@@ -14,6 +14,7 @@ from xmantissa.webapp import PrivateApplication
 from xquotient.exmess import Message
 from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, UndeferTask
 from xquotient.quotientapp import QuotientPreferenceCollection
+from xquotient import compose
 
 class MessageRetrievalTestCase(TestCase):
     """
@@ -296,6 +297,7 @@ class InboxTestCase(TestCase):
         self.viewSelection = dict(self.inboxScreen.viewSelection)
         self.msgs = msgs
         self.msgIds = map(self.translator.toWebID, self.msgs)
+        self.store = s
 
 
     def testLookaheadWithActions(self):
@@ -392,6 +394,21 @@ class InboxTestCase(TestCase):
         self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message, other])
         self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
         self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
+
+    def testGetComposer(self):
+        """
+        Test L{xquotient.inbox.InboxScreen.getComposer}
+        """
+        self._setUpInbox()
+        compose.Composer(store=self.store).installOn(self.store)
+        composer = self.inboxScreen.getComposer()
+
+        self.failIf(composer.toAddress)
+        self.failIf(composer.subject)
+        self.failIf(composer.messageBody)
+        self.failIf(composer.attachments)
+
+        self.failUnless(composer.inline)
 
 
 
@@ -490,4 +507,3 @@ class ReadUnreadTestCase(TestCase):
 
         for msg in self.messages[-1:]:
             self.failUnless(msg.read, "Initial and revealed message should be read.")
-

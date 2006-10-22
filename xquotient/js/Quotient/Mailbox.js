@@ -685,6 +685,64 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * Replace the message detail with a compose widget.
+     *
+     * @param composeInfo: widget info for a L{Quotient.Compose.Controller}.
+     * If not passed, then a new, empty compose widget will be retrieved from
+     * the server
+     *
+     * @param reloadMessage: if true, the currently selected message will be
+     * reloaded and displayed after the compose widget has been dismissed
+     *
+     * @return: L{Divmod.Defer.Deferred} which fires when the compose widget
+     * has been loaded, or after it has been dismissed if C{reloadMessage} is
+     * true
+     */
+    function splatComposeWidget(self, composeInfo/*=undefined*/, reloadMessage/*=false*/) {
+        if(composeInfo) {
+            var result = Divmod.Defer.succeed(composeInfo);
+        } else {
+             var result = self.callRemote("getComposer");
+        }
+
+        result.addCallback(
+            function(composeInfo) {
+                return self.addChildWidgetFromWidgetInfo(composeInfo);
+            });
+        result.addCallback(
+            function(composer) {
+                self.setMessageDetail(composer.node);
+                composer.fitInsideNode(self.messageDetail);
+                return composer;
+            });
+        if(reloadMessage) {
+            result.addCallback(
+                function(composer) {
+                    return self.reloadMessageAfterComposeCompleted(composer);
+                });
+        }
+        return result;
+    },
+
+    /**
+     * Reload the currently selected message after C{composer} has completed
+     * (either been dismissed or sent a message)
+     *
+     * @type composer: L{Quotient.Compose.Controller}
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function reloadMessageAfterComposeCompleted(self, composer) {
+        composer.completionDeferred.addCallback(
+            function() {
+                var selected = self.scrollWidget.getSelectedRow();
+                if(selected != null) {
+                    return self.fastForward(selected.__id__);
+                }
+            });
+        return composer.completionDeferred;
+    },
+
+    /**
      * level = integer between 1 and 3
      * node = the image that represents this complexity level
      * report = boolean - should we persist this change
@@ -1849,7 +1907,20 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.appendChild(node);
     },
 
-    function replyTo(self) {
+    function _doComposeAction(self, remoteMethodName, reloadMessage/*=true*/) {
+         if(reloadMessage == undefined) {
+            reloadMessage = true;
+        }
+        var result = self.callRemote(
+            remoteMethodName, self.scrollWidget.getSelectedRow().__id__);
+        result.addCallback(
+            function(composeInfo) {
+                return self.splatComposeWidget(composeInfo, reloadMessage);
+            });
+        return result;
+    },
+
+    function replyTo(self, reloadMessage/*=undefined*/) {
         /*
          * This brings up a composey widget thing.  When you *send* that
          * message (or save it as a draft or whatever, I suppose), *then* this
@@ -1857,34 +1928,14 @@ Quotient.Mailbox.Controller.methods(
          * archived and possibly removed from the view.  But nothing happens
          * *here*.
          */
-        var result = self.callRemote(
-            "replyToMessage", self.scrollWidget.getSelectedRow().__id__);
-        result.addCallback(
-            function(composeInfo) {
-                return self.addChildWidgetFromWidgetInfo(composeInfo);
-            });
-        result.addCallback(
-            function(compose) {
-                self.setMessageDetail(compose.node);
-            });
-        return result;
+         return self._doComposeAction("replyToMessage", reloadMessage);
     },
 
-    function forward(self, n) {
+    function forward(self, reloadMessage/*=undefined*/) {
         /*
          * See replyTo
          */
-        var result = self.callRemote(
-            "forwardMessage", self.scrollWidget.getSelectedRow().__id__);
-        result.addCallback(
-            function(composeInfo) {
-                return self.addChildWidgetFromWidgetInfo(composeInfo);
-            });
-        result.addCallback(
-            function(compose) {
-                self.setMessageDetail(compose.node);
-            });
-        return result;
+         return self._doComposeAction("forwardMessage", reloadMessage);
     },
 
     /**

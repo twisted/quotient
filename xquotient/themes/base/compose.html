@@ -18,7 +18,6 @@
               right: 10px;
               bottom: 10px;
               background-color: gray;
-              display: none;
               "
         class="progress-message">
   </div>
@@ -87,18 +86,7 @@
       <nevow:attr name="href"><nevow:invisible nevow:render="inboxLink" /></nevow:attr>
     </a>
     <center>
-      <table>
-        <tr>
-          <td style="width: 100%">
-            <table style="width: 100%">
-              <tr valign="bottom">
-                <td colspan="2" width="100%">
-                  <div class="draft-notification" style="height: 1.5em" />
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+      <table cellpadding="0" cellspacing="0" class="compose-table">
         <tr>
           <td>
             <table class="header-table" cellspacing="0">
@@ -128,6 +116,11 @@
                           <img border="0" src="/Quotient/static/images/attach-button.png" />
                           <span style="color: #0099CC">Attach</span>
                         </a>
+                      </div>
+                    </div>
+                    <div style="float: right">
+                      <div class="draft-notification">
+                        <div class="draft-dialog" style="visibility: hidden">I am stretching the height of this node</div>
                       </div>
                     </div>
                   </td>
@@ -179,7 +172,7 @@
         </tr>
         <tr>
           <td>
-            <textarea name="messageBody" class="message-body" cols="80" rows="10"
+            <textarea name="messageBody" class="message-body" cols="79" rows="20"
               ><nevow:slot name="body" /></textarea>
           </td>
         </tr>
