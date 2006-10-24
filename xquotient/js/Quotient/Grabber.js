@@ -31,22 +31,20 @@ Quotient.Grabber.RefillingAction.methods(
             icon);
     });
 
-Quotient.Grabber.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
+Quotient.Grabber.ScrollingWidget = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass(
                                         'Quotient.Grabber.ScrollingWidget');
 
 Quotient.Grabber.ScrollingWidget.methods(
     function __init__(self, node) {
-        self.columnWidths = {"username": "150px",
-                             "domain": "150px",
-                             "status": "200px",
-                             "paused": "90px",
-                             "actions": "100px"};
+        self.columnWidths = {"status": "50%"};
 
         self.actions = [Quotient.Grabber.RefillingAction(
                             "delete", "Delete",
                             "/Mantissa/images/delete.png"),
 
-                        Quotient.Grabber.EditAction("edit", "Edit"),
+                        Quotient.Grabber.EditAction(
+                            "edit", "Edit", null,
+                            "/Quotient/static/images/action-edit.png"),
 
                         Quotient.Grabber.RefillingAction(
                             "pause", "Pause",
@@ -56,7 +54,7 @@ Quotient.Grabber.ScrollingWidget.methods(
                             "resume", "Resume",
                             "/Quotient/static/images/action-resume.png")];
 
-        Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node);
+        Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node, 5);
         self._scrollViewport.style.height = '100px';
         self.node.style.display = "none";
         self.initializationDeferred.addCallback(
@@ -90,13 +88,23 @@ Quotient.Grabber.ScrollingWidget.methods(
             });
     },
 
-    function clickEventForAction(self, actionID, rowData) {
-        if(actionID == "edit") {
-            return function() {
-                Nevow.Athena.Widget.get(this).widgetParent.loadEditForm(rowData["__id__"]);
-                return false;
-            }
-        }
+    /**
+     * This is unfortunate in the extreme.  The actions icons that we use
+     * stretch the height of the row, which needs to exact.  Even if
+     * we did "return self._createRow(0, {...})", the images wouldn't
+     * have time to load in the microsecond that they are in the DOM,
+     * so their heights wouldn't be factored in.  So we include an <img>
+     * with a bum "src" attribute and set its height to be that of the
+     * icons we'll be using.  Probably better than hacking our Action
+     * subclasses to set the height on the <img> elements they make
+     */
+    function _getRowGuineaPig(self) {
+        return MochiKit.DOM.TR(
+                {"class": "scroll-row"},
+                MochiKit.DOM.TD({"class": "scroll-cell"},
+                    MochiKit.DOM.A({"style": "display: block"},
+                        ["HI", MochiKit.DOM.IMG(
+                                {"style": "height: 16px", "src": "#"})])));
     });
 
 Quotient.Grabber.Controller = Nevow.Athena.Widget.subclass('Quotient.Grabber.Controller');
