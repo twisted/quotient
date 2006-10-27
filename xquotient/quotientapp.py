@@ -38,8 +38,10 @@ class MessageSearchProvider(Item, InstallableMixin):
         raise NotImplementedError("No one should ever call count, I think.")
 
 
-    def search(self, term, keywords, count, offset):
-        d = self.indexer.search(term, keywords, count, offset)
+    def search(self, *a, **k):
+        if 'sortAscending' not in k:
+            k['sortAscending'] = False
+        d = self.indexer.search(*a, **k)
         d.addCallback(_mailsearchui.SearchAggregatorFragment, self.store)
         return d
 

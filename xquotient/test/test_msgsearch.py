@@ -63,7 +63,7 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         """
         splitted = splitAddress('john.smith@alum.mit.edu')
         self.assertEqual(splitted, ['john', 'smith', 'alum', 'mit', 'edu'])
-        
+
     def testKeywordSearch(self):
         """
         Test that we get the expected results when searching for messages by

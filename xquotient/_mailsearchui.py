@@ -32,10 +32,15 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
             f = scrolltable.StoreIDSequenceScrollingFragment(
                 self.store,
                 self.searchResults,
-                (exmess.Message.senderDisplay,
-                exmess.Message.subject,
-                exmess.Message.sentWhen,
-                exmess.Message.read))
+                (scrolltable.UnsortableColumn(
+                    exmess.Message.senderDisplay),
+                 scrolltable.UnsortableColumn(
+                     exmess.Message.subject),
+                 scrolltable.UnsortableColumnWrapper(
+                     scrolltable.TimestampAttributeColumn(
+                        exmess.Message.sentWhen)),
+                 scrolltable.UnsortableColumn(
+                     exmess.Message.read)))
             f.jsClass = u'Quotient.Search.SearchResults'
             f.setFragmentParent(self)
             f.docFactory = webtheme.getLoader(f.fragmentName)

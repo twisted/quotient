@@ -58,7 +58,7 @@ def splitAddress(emailString):
     e.g. foo@bar.com => ['foo', 'bar', 'com']
     """
     return senderRE.findall(emailString)
-    
+
 class _TrainingInstruction(item.Item):
     """
     Represents a single user-supplied instruction to teach the spam classifier
