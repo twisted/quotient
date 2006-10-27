@@ -60,7 +60,7 @@ Quotient.Compose.SetDefaultFromAddressAction.methods(
         return !row._default;
     });
 
-Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.ScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
+Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass('Quotient.Compose.FromAddressScrollTable');
 /**
  * Mantissa.ScrollTable.ScrollingWidget subclass for displaying FromAddress
  * items
@@ -145,13 +145,14 @@ Quotient.Compose.FileUploadController.methods(
         self.form.elements.upload.disabled = false;
     });
 
-Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
+Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass(
                                                 'Quotient.Compose.DraftListScrollingWidget');
 
 Quotient.Compose.DraftListScrollingWidget.methods(
     function __init__(self, node) {
         self.columnAliases = {"sentWhen": "Date"};
-        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node);
+        self.columnWidths = {"subject": "50%"};
+        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node, 15);
     },
 
     function massageColumnValue(self, columnName, columnType, columnValue) {
