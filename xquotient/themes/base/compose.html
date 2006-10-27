@@ -1,6 +1,7 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
   nevow:render="liveFragment"
-  style="border-top: solid 1px #0099CC;">
+  style="border-top: solid 1px #0099CC;"
+  class="compose-widget">
 
   <select nevow:pattern="from-select" name="fromAddress">
     <nevow:slot name="options" />
@@ -172,7 +173,7 @@
         </tr>
         <tr>
           <td>
-            <textarea name="messageBody" class="message-body" cols="79" rows="20"
+            <textarea name="messageBody" class="compose-message-body" cols="79" rows="20"
               ><nevow:slot name="body" /></textarea>
           </td>
         </tr>

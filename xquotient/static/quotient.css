@@ -605,10 +605,16 @@ img.collapse-arrow {
     border: solid 1px #000000;
 }
 
-.message-body {
+.compose-message-body {
+    font-family: monospace;
     border-top: none;
     padding: 0px 0px 0px 10px;
     margin: 0px;
+}
+
+.message-body {
+    font-family: monospace;
+    font-size: 1.6em;
 }
 
 /* the header table */
@@ -706,11 +712,6 @@ img.thumbnail { border: none; }
     overflow: auto;
     height: 100%;
     background-color: #FFFFFF;
-}
-
-.message-body {
-    font-family: monospace;
-    font-size: 1.6em;
 }
 
 .attachment, .image-attachment {

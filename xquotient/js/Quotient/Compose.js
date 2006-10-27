@@ -184,7 +184,7 @@ Quotient.Compose.Controller.methods(
             self.toggleFilesForm();
         }
 
-        var mbody = self.firstNodeByAttribute("class", "message-body");
+        var mbody = self.firstNodeByAttribute("class", "compose-message-body");
         /* use a separate js class and/or template if this grows any more */
         if(inline) {
             self.firstNodeByAttribute("class", "cancel-link").style.display = "";
@@ -430,7 +430,7 @@ Quotient.Compose.Controller.methods(
      * Do this by making the message body textarea taller
      */
     function fitInsideNode(self, node) {
-        var e = self.nodeByAttribute("class", "message-body");
+        var e = self.nodeByAttribute("class", "compose-message-body");
 
         e.style.height = (Divmod.Runtime.theRuntime.getElementSize(node).h -
                           (Quotient.Common.Util.findPosY(e) -
