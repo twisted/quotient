@@ -1,7 +1,9 @@
 from twisted.trial.unittest import TestCase
-from twisted.web.microdom import parseString
+from twisted.web.microdom import parseString, getElementsByTagName
+from twisted.web.domhelpers import gatherTextNodes
 
 from xquotient.scrubber import scrub, scrubCIDLinks
+
 
 class ScrubberTestCase(TestCase):
     def test_scrubCIDLinksWithLinks(self):
@@ -105,3 +107,23 @@ class ScrubberTestCase(TestCase):
         self.assertEquals(
                 list(e.attributes['href'] for e in scrubbed.firstChild().childNodes),
                 ['x'])
+
+
+    def test_scrubTrustsSpan(self):
+        """
+        Test that L{xquotient.scrubber.Scrubber} considers span to be a safe
+        tag. Added because of #1641.
+        """
+
+        node = parseString("""
+        <html>
+            <span style='font-weight: bold; font-family:"Book Antiqua"'>
+            Hello
+            </span>
+        </html>
+        """).documentElement
+
+        scrubbed = scrub(node)
+        spans = getElementsByTagName(scrubbed, 'span')
+        self.assertEquals(len(spans), 1)
+        self.assertEquals(gatherTextNodes(spans[0]).strip(), "Hello")

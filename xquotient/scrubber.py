@@ -51,7 +51,8 @@ class Scrubber(object):
         'img': ['width', 'height', 'src'],
         'form': ['action', 'method'],
         'input': ['type', 'name', 'value'],
-        'label': []
+        'label': [],
+        'span': []
         }
 
     _linkAttributes = ('src', 'href')
