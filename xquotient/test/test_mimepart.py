@@ -245,7 +245,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin
         part = mr.feedStringNow(self.multipartMessage)
         self.assertEquals(part.partID, 0)
         partIDs = list(part.store.query(
-                            Part, sort=Part.partID).getColumn('partID'))
+                            Part, sort=Part.partID.ascending).getColumn('partID'))
         self.assertEquals(partIDs, range(len(partIDs)))
 
     alternativeInsideMixed = PartMaker('multipart/mixed', 'mixed',
