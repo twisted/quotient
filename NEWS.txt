@@ -1,3 +1,8 @@
+0.1.23 (2006-10-31):
+  - Sorting in scrolltables now defaults to descending.
+  - A bug causing message font to be too big in complexity 3 has been fixed.
+  - <span> elements are now allowed in scrubbed HTML.
+
 0.1.22 (2006-10-21):
   - Allow deletion of from addresses.
   - The "Perform" button has been removed, and buttons that can act on multiple messages will.
@@ -13,7 +18,7 @@
   - Fixed bug where clicking on an account inthe account list wouldn't do anything.
   - Better looking scrolltables.
   - Fixed issue where urls aren't linked in the first message in the
-    scrolltable, and fixes direction of next message preview. 
+    scrolltable, and fixes direction of next message preview.
 
 0.1.19 (2006-10-05):
   - Defer action has been fixed to use the actual deferral time.
@@ -24,7 +29,7 @@
 
 0.1.18 (2006-09-29):
   - Unarchive and undelete buttons have been added.
-  - Mailing list filtering is now a separate powerup from user-configured 
+  - Mailing list filtering is now a separate powerup from user-configured
     rule filtering.
 
 0.1.17 (2006-09-26):
