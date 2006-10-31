@@ -1,3 +1,10 @@
+0.1.22 (2006-10-21):
+  - Allow deletion of from addresses.
+  - The "Perform" button has been removed, and buttons that can act on multiple messages will.
+  - Escape message-preview subjects properly.
+  - Messages in the "Sent" view now show the address they were sent to.
+  - Message compose UI updated.
+
 0.1.21 (2006-10-17):
   - Added cancellable 'add person' dialog.
   - Reverted Scrolltable due to performance problems.
