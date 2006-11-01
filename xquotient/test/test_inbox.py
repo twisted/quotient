@@ -403,7 +403,7 @@ class InboxTestCase(TestCase):
         compose.Composer(store=self.store).installOn(self.store)
         composer = self.inboxScreen.getComposer()
 
-        self.failIf(composer.toAddress)
+        self.failIf(composer.toAddresses)
         self.failIf(composer.subject)
         self.failIf(composer.messageBody)
         self.failIf(composer.attachments)

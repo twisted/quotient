@@ -85,9 +85,9 @@ class StubComposeFragment(LiveFragment):
     jsClass = ComposeFragment.jsClass
     fragmentName = ComposeFragment.fragmentName
 
-    def __init__(self, composer, toAddress, subject, messageBody, attachments, inline):
+    def __init__(self, composer, toAddresses, subject, messageBody, attachments, inline):
         self.composer = composer
-        self.toAddress = toAddress
+        self.toAddresses = toAddresses
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments

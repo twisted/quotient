@@ -1548,7 +1548,7 @@ Quotient.Test.ControllerTestCase.methods(
                  */
                 self.assertEqual(invokeArguments.length, 1);
 
-                self.assertArraysEqual(invokeArguments[0].toAddress, ['alice@example.com']);
+                self.assertArraysEqual(invokeArguments[0].toAddresses, ['alice@example.com']);
                 self.assertArraysEqual(invokeArguments[0].cc, ['bob@example.com']);
                 self.assertArraysEqual(invokeArguments[0].bcc, ['']);
                 self.assertArraysEqual(invokeArguments[0].subject, ['Test Message']);
@@ -2066,6 +2066,14 @@ Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeC
 Quotient.Test.ComposeController.methods(
     function saveDraft(self, userInitiated) {
         return;
+    },
+
+    function startSavingDrafts(self) {
+        return;
+    },
+
+    function submitSuccess(self, passthrough) {
+        return passthrough;
     });
 
 Quotient.Test.ComposeTestCase = Nevow.Athena.Test.TestCase.subclass('ComposeTestCase');
@@ -2151,6 +2159,52 @@ Quotient.Test.ComposeTestCase.methods(
     }
     );
 
+/**
+ * Tests for roundtripping of recipient addresses
+ */
+Quotient.Test.ComposeToAddressTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ComposeToAddressTestCase');
+Quotient.Test.ComposeToAddressTestCase.methods(
+    /**
+     * Retrieve a compose widget from the server, add it as a child widget
+     *
+     * @param key: unique identifier for the test method
+     * @param fromAddress: comma separated string of email addresses with
+     * which to seed the ComposeFragment.
+     */
+    function setUp(self, key, fromAddress) {
+        var result  = self.callRemote('getComposeWidget', key, fromAddress);
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        result.addCallback(
+            function(widget) {
+                self.scrollingWidget = widget;
+                self.node.appendChild(widget.node);
+                return widget;
+            });
+        return result;
+    },
+
+    /**
+     * Create a compose widget initialized with some from addresses, save a
+     * draft, make sure that the server got the addresses which we specified
+     */
+    function test_roundtrip(self) {
+        var addrs = ['foo@bar', 'bar@baz'];
+        var result = self.setUp('roundtrip', addrs.join(', '));
+        result.addCallback(
+            function(composer) {
+                /* save a draft, but bypass all the dialog/looping stuff */
+                composer.nodeByAttribute("name", "draft").checked = true;
+                return composer.submit();
+            });
+        result.addCallback(
+            function(result) {
+                self.assertArraysEqual(result, addrs);
+            });
+        return result;
+    });
 
 Quotient.Test.MsgDetailTestBase = Nevow.Athena.Test.TestCase.subclass('MsgDetailTestBase');
 Quotient.Test.MsgDetailTestBase.methods(

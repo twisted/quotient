@@ -10,7 +10,7 @@ from axiom import userbase
 
 from xmantissa import webapp
 
-from xquotient import compose, mail
+from xquotient import compose, mail, mimeutil
 
 
 
@@ -142,7 +142,9 @@ class ComposeFragmentTest(SmarthostCompositionTestMixin, unittest.TestCase):
         self.defaultFromAddr.address = u'from@example.com'
         cf = compose.ComposeFragment(self.composer)
         msg = cf.createMessage(self.defaultFromAddr,
-                               u'testuser@example.com',
+                               [mimeutil.EmailAddress(
+                                    'testuser@example.com',
+                                    mimeEncoded=False)],
                                u'Sup dood', u'A body', u'', u'', u'')
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)

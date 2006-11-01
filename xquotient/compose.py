@@ -455,18 +455,22 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
     _savedDraft = None
 
-    def __init__(self, original, toAddress='', subject='', messageBody='',
+    def __init__(self, original, toAddresses='', subject='', messageBody='',
                  attachments=(), inline=False):
         self.original = original
         self.translator = ixmantissa.IWebTranslator(original.store)
+
+        def toEmailAddresses(s):
+            return mimeutil.parseEmailAddresses(s, mimeEncoded=False)
+
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
             parameters=[liveform.Parameter(name='fromAddress',
                                            type=liveform.TEXT_INPUT,
                                            coercer=self.translator.fromWebID),
-                        liveform.Parameter(name='toAddress',
+                        liveform.Parameter(name='toAddresses',
                                            type=liveform.TEXT_INPUT,
-                                           coercer=unicode),
+                                           coercer=toEmailAddresses),
                         liveform.Parameter(name='subject',
                                            type=liveform.TEXT_INPUT,
                                            coercer=unicode),
@@ -482,7 +486,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
-        self.toAddress = toAddress
+        self.toAddresses = toEmailAddresses(toAddresses)
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments
@@ -497,7 +501,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         # we want to allow the javascript to submit an
         # list of filenames of arbitrary length with the form
         coerced['files'] = formPostEmulator.get('files', ())
-        self.callable(**coerced)
+        return self.callable(**coerced)
     expose(invoke)
 
 
@@ -579,7 +583,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                     'id', a.part.storeID).fillSlots(
                                     'name', a.filename or 'No Name'))
 
-            slotData = {'to': self.toAddress,
+            slotData = {'to': mimeutil.flattenEmailAddresses(self.toAddresses),
                         'from': fromStan,
                         'subject': self.subject,
                         'body': self.messageBody,
@@ -588,6 +592,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
         return dictFillSlots(ctx.tag, slotData)
 
+
     def render_fileCabinet(self, ctx, data):
         return inevow.IQ(self.docFactory).onePattern('cabinet-iframe').fillSlots(
                     'src', ixmantissa.IWebTranslator(self.cabinet.store).linkTo(self.cabinet.storeID))
@@ -595,7 +600,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
     def head(self):
         return None
 
-    def createMessage(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
+    def createMessage(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
         from email import (Generator as G, MIMEBase as MB,
                            MIMEMultipart as MMP, MIMEText as MT,
                            Header as MH, Charset as MC, Utils as EU)
@@ -633,7 +638,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 
         m['From'] = encode(fromAddress.address)
-        m['To'] = encode(toAddress)
+        m['To'] = encode(mimeutil.flattenEmailAddresses(toAddresses))
         m['Subject'] = encode(subject)
         m['Date'] = EU.formatdate()
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
@@ -662,11 +667,11 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         return msg
 
     _mxCalc = None
-    def _sendMail(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
+    def _sendMail(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
         # overwrite the previous draft of this message with another draft
-        self._saveDraft(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
+        self._saveDraft(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
-        addresses = [toAddress]
+        addresses = [addr.pseudoFormat() for addr in toAddresses]
         if cc:
             addresses.append(cc)
 
@@ -681,8 +686,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         self._savedDraft.deleteFromStore()
         self._savedDraft = None
 
-    def _saveDraft(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files):
-        msg = self.createMessage(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
+    def _saveDraft(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
+        msg = self.createMessage(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
         msg.draft = True
 
         if self._savedDraft is not None:
@@ -697,12 +702,12 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             self._savedDraft = Draft(store=self.original.store, message=msg)
 
 
-    def _sendOrSave(self, fromAddress, toAddress, subject, messageBody, cc, bcc, files, draft):
+    def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files, draft):
         if draft:
             f = self._saveDraft
         else:
             f = self._sendMail
-        return f(fromAddress, toAddress, subject, messageBody, cc, bcc, files)
+        return f(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)

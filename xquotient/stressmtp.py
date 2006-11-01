@@ -29,7 +29,7 @@ class MessageSendingController:
 
     def next(self):
         try:
-            return file(self.messages.pop(0)).read()
+            return file(self.messages.pop(0), 'rU').read()
         except:
             raise StopIteration
 

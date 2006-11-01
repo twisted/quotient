@@ -184,6 +184,17 @@ def parseEmailAddresses(addresses, mimeEncoded=True):
     return [EmailAddress(address, mimeEncoded=mimeEncoded) for address in rfc822.AddressList(addresses)]
 
 
+def flattenEmailAddresses(addresses):
+    """
+    Turn a list of email addresses into a comma-delimited string of properly
+    formatted, non MIME-encoded email addresses, suitable for use as an RFC
+    822 header
+
+    @param addresses: sequence of L{EmailAddress} instances
+    """
+    return ', '.join(addr.pseudoFormat() for addr in addresses)
+
+
 def formatdate(utctuple):
     """Convert a UTC 9-tuple to an RFC 2822 date.
 

@@ -105,6 +105,17 @@ class EmailAddressTests(unittest.TestCase):
             mimeutil.parseEmailAddresses('  one@t  wo , three <four@five>  '),
             map(mimeutil.EmailAddress, ['one@two', 'three <four@five>']))
 
+    def test_flattenEmailAddresses(self):
+        """
+        Test that L{xquotient.mimeutil.flattenEmailAddresses} works as
+        expected
+        """
+        self.assertEquals(
+            mimeutil.flattenEmailAddresses(
+                (mimeutil.EmailAddress('One <one@two>'),
+                 mimeutil.EmailAddress('two@three'))),
+            'One <one@two>, two@three')
+
     def test_makeHeader(self):
         e = mimeutil.EmailAddress('  =?ISO-8859-1?Q?C=E9sar______?= fu   bar  <cesarfubar@example.com>')
         header = e.makeHeader('To')

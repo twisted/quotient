@@ -824,10 +824,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     composeFragmentFactory = compose.ComposeFragment
 
-    def _composeSomething(self, toAddress, subject, messageBody, attachments=()):
+    def _composeSomething(self, toAddresses, subject, messageBody, attachments=()):
         composer = self.inbox.store.findUnique(compose.Composer)
         cf = self.composeFragmentFactory(composer,
-                                         toAddress=toAddress,
+                                         toAddresses=toAddresses,
                                          subject=subject,
                                          messageBody=messageBody,
                                          attachments=attachments,
