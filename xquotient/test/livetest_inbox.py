@@ -263,6 +263,12 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             spam=False, archived=False, read=True, outgoing=False,
             trash=True, impl=impl)
 
+        m9 = Message(
+            store=inbox.store, sender=self.aliceEmail, subject=u'9th message',
+            receivedWhen=self.sent + offset * 8, sentWhen=self.sent,
+            spam=False, archived=False, read=True, outgoing=False,
+            trash=True, impl=impl)
+
         # Alice
         alice = Person(store=inbox.store, organizer=organizer, name=u"Alice")
         EmailAddress(store=inbox.store, person=alice, address=self.aliceEmail)

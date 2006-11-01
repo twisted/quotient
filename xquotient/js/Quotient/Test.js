@@ -576,6 +576,22 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Check that we are in the "Messages from Alice" view, based on the
+     * subjects of the messages we can see
+     */
+    function _checkInAliceView(self) {
+        var rows = self.collectRows();
+
+        self.assertEquals(
+            rows.length, 4, "Should have been 4 rows in Alice view.");
+
+        self.assertEquals(rows[0]["subject"], "4th message");
+        self.assertEquals(rows[1]["subject"], "3rd message");
+        self.assertEquals(rows[2]["subject"], "2nd message");
+        self.assertEquals(rows[3]["subject"], "1st message");
+    },
+
+    /**
      * Test switching to a view of messages from a particular person.
      */
     function test_personView(self) {
@@ -606,17 +622,73 @@ Quotient.Test.ControllerTestCase.methods(
                  * up.
                  */
                 result.addCallback(function(ignored) {
-                        var rows = self.collectRows();
-
-                        self.assertEquals(
-                            rows.length, 4, "Should have been 4 rows in Alice view.");
-
-                        self.assertEquals(rows[0]["subject"], "4th message");
-                        self.assertEquals(rows[1]["subject"], "3rd message");
-                        self.assertEquals(rows[2]["subject"], "2nd message");
-                        self.assertEquals(rows[3]["subject"], "1st message");
+                        self._checkInAliceView();
                     });
                 return result;
+            });
+        return result;
+    },
+
+    /**
+     * Test that L{Quotient.Mailbox.Controller.choosePerson} switches into the
+     * "All People" view when passed "all" as the person key
+     */
+    function test_personViewAll(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView("trash");
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget.model.totalRowCount(), 3);
+
+                var people = self.controllerWidget.getPeople();
+                self.assertEqual(people[1].name, "Bob");
+
+                return self.controllerWidget.choosePerson(people[1].key);
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget.model.totalRowCount(), 2);
+                    return self.controllerWidget.choosePerson("all");
+                });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    self.controllerWidget.scrollWidget.model.totalRowCount(), 3);
+            });
+        return result;
+    },
+
+    /**
+     * Test switching to a view of messages from a particular person (Alice),
+     * using the DOM-based view changing method
+     */
+    function test_personViewByNode(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('all');
+            });
+        result.addCallback(
+            function(ignored) {
+                var personChooser = self.controllerWidget.firstNodeByAttribute(
+                                        "class", "person-chooser");
+                var aliceNode = Nevow.Athena.FirstNodeByAttribute(
+                                    personChooser, "class", "list-option");
+
+                return self.controllerWidget.choosePersonByNode(aliceNode).addCallback(
+                    function(ignored) {
+                        return aliceNode;
+                    });
+            });
+        result.addCallback(
+            function(aliceNode) {
+                self.assertEqual(aliceNode.className, "selected-list-option");
+                self._checkInAliceView();
             });
         return result;
     },

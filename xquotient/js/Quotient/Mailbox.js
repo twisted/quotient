@@ -1580,7 +1580,7 @@ Quotient.Mailbox.Controller.methods(
     function choosePersonByNode(self, personNode) {
         var personKey = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             personNode, 'class', 'person-key');
-        self._selectListOption(n);
+        self._selectListOption(personNode);
         return self.choosePerson(personKey.firstChild.nodeValue);
     },
 
@@ -1593,6 +1593,9 @@ Quotient.Mailbox.Controller.methods(
      * @return: C{undefined}
      */
     function choosePerson(self, personKey) {
+        if(personKey == 'all') {
+            personKey = null;
+        }
         return self.changeViewSelection("person", personKey);
     },
 

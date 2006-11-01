@@ -221,6 +221,7 @@ Quotient.Common.SenderPerson.methods(
                 });
             return false;
         }
+        return false;
     },
 
     /**

@@ -10,15 +10,16 @@ from axiom.scheduler import Scheduler
 
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
 from xmantissa.webapp import PrivateApplication
+from xmantissa.people import Organizer, Person, EmailAddress
 
 from xquotient.exmess import Message
 from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, UndeferTask
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose
 
-class MessageRetrievalTestCase(TestCase):
+class _MessageRetrievalMixin:
     """
-    Test various methods for finding messages.
+    Provides a useful C{setUp} for test cases that retrieve messages
     """
     def setUp(self):
         """
@@ -44,6 +45,10 @@ class MessageRetrievalTestCase(TestCase):
         self.inbox = InboxScreen(Inbox(store=self.store))
 
 
+class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
+    """
+    Test various methods for finding messages.
+    """
     def test_getInitialArguments(self):
         """
         Test that L{InboxScreen} properly initializes its client-side
@@ -507,3 +512,58 @@ class ReadUnreadTestCase(TestCase):
 
         for msg in self.messages[-1:]:
             self.failUnless(msg.read, "Initial and revealed message should be read.")
+
+
+class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):
+    """
+    Test finding messages by specifying a person who we'd like to see messages
+    from
+    """
+
+    def setUp(self):
+        """
+        Extend L{_MessageRetrievalMixin.setUp} to also install an
+        L{Organizer}, L{Person} and L{EmailAddress}, and an L{Message} from
+        that person
+        """
+        super(MessagesByPersonRetrievalTestCase, self).setUp()
+
+        self.organizer = Organizer(store=self.store)
+        self.organizer.installOn(self.store)
+
+        self.person = Person(store=self.store,
+                             organizer=self.organizer,
+                             name=u'The Person')
+
+        EmailAddress(store=self.store,
+                     address=u'the@person',
+                     person=self.person)
+
+        self.messageFromPerson = Message(store=self.store,
+                                         read=False,
+                                         spam=False,
+                                         receivedWhen=Time(),
+                                         sender=u'the@person')
+
+    def test_initialQueryIncludesPeople(self):
+        """
+        Test that the intial view selection/query includes messages that were
+        sent by a person in the address book
+        """
+        self.assertEquals(
+            self.inbox.scrollingFragment.requestCurrentSize(),
+            len(self.msgs) + 1)
+
+    def test_countChangesIfQueryChanges(self):
+        """
+        Test that the number of messages in the model changes when the view
+        selection/query specifies only messages from a particular person
+        """
+        viewSelection = self.inbox.scrollingFragment.viewSelection.copy()
+        viewSelection['person'] = self.webTranslator.toWebID(self.person)
+
+        self.inbox.scrollingFragment.setViewSelection(viewSelection)
+
+        self.assertEquals(
+            self.inbox.scrollingFragment.requestCurrentSize(),
+            1)
