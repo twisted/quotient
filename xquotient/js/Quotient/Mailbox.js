@@ -1111,9 +1111,10 @@ Quotient.Mailbox.Controller.methods(
                         var unreadTouchedCount = counts[1];
 
                         if (isDestructive) {
-                            var result = self._removeRows(self.scrollWidget.selectedGroup);
-                            self.scrollWidget.selectedGroup = null;
-                            return result;
+                            return self.scrollWidget.emptyAndRefill().addCallback(
+                                function(ignored) {
+                                    return self.scrollWidget._selectFirstRow();
+                                });;
                         }
                         return null;
 

@@ -1096,6 +1096,48 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test the batch deletion of all messages in the current view.
+     */
+    function test_deleteAllBatch(self) {
+        var model;
+        var scroller;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                scroller = self.controllerWidget.scrollWidget;
+                model = scroller.model;
+
+                rowIdentifiers = [
+                    model.getRowData(0).__id__,
+                    model.getRowData(1).__id__];
+
+                self.controllerWidget.changeBatchSelection("all");
+                return self.controllerWidget.trash(null);
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Model and view should be completely empty at this point.
+                 */
+                self.assertEqual(model.rowCount(), 0);
+                self.assertEqual(scroller._scrollViewport.childNodes.length, 1);
+                self.assertEqual(scroller._scrollViewport.childNodes[0].style.height, "0px");
+
+                return self.callRemote(
+                    'deletedFlagsByWebIDs',
+                    rowIdentifiers[0],
+                    rowIdentifiers[1]);
+            });
+        result.addCallback(
+            function(deletedFlags) {
+                self.assertArraysEqual(
+                    deletedFlags,
+                    [true, true]);
+            });
+        return result;
+    },
+
+    /**
      * Test archiving the currently selected message batch.
      */
     function test_archiveBatch(self) {
@@ -1900,6 +1942,84 @@ Quotient.Test.ControllerTestCase.methods(
      */
 
     );
+
+
+
+/**
+ * Test controller behaviors in the presence of a more than a complete visible
+ * page of messages.
+ */
+Quotient.Test.FullControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.Test.FullControllerTestCase');
+Quotient.Test.FullControllerTestCase.methods(
+    /**
+     * Test deletion of all messages using batch selection.
+     */
+    function test_deleteAllBatch(self) {
+        var result = self.callRemote('getFullControllerWidget');
+        result.addCallback(function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        result.addCallback(
+            function(widget) {
+                self.controller = widget;
+                self.node.appendChild(widget.node);
+                return widget.initializationDeferred;
+            });
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Sanity check - make sure there are fewer rows in the model
+                 * than the server knows about.
+                 */
+                self.failIf(self.controller.scrollWidget.model.rowCount() >= 20);
+
+                /*
+                 * Batch select everything and delete it.
+                 */
+                self.controller.changeBatchSelection("all");
+                return self.controller.trash(null);
+            });
+        result.addCallback(
+            function(ignored) {
+                var scroller = self.controller.scrollWidget;
+                self.assertEqual(
+                    scroller.model.rowCount(),
+                    0,
+                    "Too many rows in model.");
+                self.assertEqual(
+                    scroller.placeholderModel.getPlaceholderCount(),
+                    1,
+                    "Too many placeholders in model.");
+
+                /*
+                 * The existence of this placeholder is not strictly necessary.
+                 * However, it exists with the current implementation, and I
+                 * really want to assert something about placeholders, so I am
+                 * going to assert that it covers an empty range.  If the
+                 * placeholder implementation changes at some future point,
+                 * then perhaps these asserts should be changed as well.
+                 */
+                var placeholder = scroller.placeholderModel.getPlaceholderWithIndex(0);
+                self.assertEqual(placeholder.start, 0);
+                self.assertEqual(placeholder.stop, 0);
+
+                /*
+                 * Fucked up.  Asserting against a string to determine the
+                 * height of something?  Garbage.  Asserting against a style to
+                 * make sure that there's nothing visible?  Equally fucked up.
+                 */
+                self.assertEqual(
+                    scroller._scrollViewport.childNodes.length,
+                    1,
+                    "Too many rows in view.");
+                self.assertEqual(
+                    scroller._scrollViewport.childNodes[0].style.height,
+                    "0px",
+                    "View too tall.");
+            });
+        return result;
+    });
 
 
 Quotient.Test.EmptyInitialViewControllerTestCase = Nevow.Athena.Test.TestCase.subclass(

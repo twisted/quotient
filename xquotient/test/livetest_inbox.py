@@ -407,3 +407,29 @@ class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
         fragment.setFragmentParent(self)
         return fragment
     expose(getEmptyControllerWidget)
+
+
+class FullControllerTestCase(testcase.TestCase, _ControllerMixin):
+    jsClass = u'Quotient.Test.FullControllerTestCase'
+
+    def getFullControllerWidget(self):
+        """
+        Retrieve the Controller widget for a mailbox with twenty messages in
+        it.
+        """
+        inbox = self.getInbox()
+        inbox.uiComplexity = 3
+
+        impl = _Part(store=inbox.store)
+        for i in range(20):
+            Message(
+                store=inbox.store, sender=self.aliceEmail,
+                subject=u'message %d' % (i,), receivedWhen=self.sent,
+                sentWhen=self.sent2, spam=False, archived=False,
+                read=False, impl=impl)
+
+        fragment = InboxScreen(inbox)
+        fragment.composeFragmentFactory = StubComposeFragment
+        fragment.setFragmentParent(self)
+        return fragment
+    expose(getFullControllerWidget)
