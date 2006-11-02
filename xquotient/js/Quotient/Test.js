@@ -2539,34 +2539,82 @@ Quotient.Test.MsgDetailInitArgsTestCase.methods(
 
 Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.PostiniConfigurationTestCase');
+/**
+ * Tests for the Postini configuration form on the the Settings page.
+ * See L{Quotient.Spam}.
+ */
 Quotient.Test.PostiniConfigurationTestCase.methods(
-    function run(self) {
-        /**
-         * Test that the postini configuration form is rendered with a checkbox
-         * and a text field and that the checkbox defaults to unchecked and the
-         * text field to "0.5".
-         */
-        var postiniConfig = self.childWidgets[0].childWidgets[0];
-        var usePostiniScore = postiniConfig.nodeByAttribute(
-            'name', 'usePostiniScore');
-        var postiniThreshhold = postiniConfig.nodeByAttribute(
-            'name', 'postiniThreshhold');
+    function setUp(self) {
+        var d = self.callRemote('setUp');
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.postiniConfig = widget.childWidgets[0];
+                self.usePostiniScore = self.postiniConfig.nodeByAttribute(
+                    'name', 'usePostiniScore');
+                self.postiniThreshhold = self.postiniConfig.nodeByAttribute(
+                    'name', 'postiniThreshhold');
+                self.node.appendChild(widget.node);
+            });
+        return d;
+    },
 
-        self.assertEquals(usePostiniScore.checked, false);
-        self.assertEquals(postiniThreshhold.value, '0.5');
+    /**
+     * Test that the postini configuration form is rendered with a checkbox
+     * and a text field and that the checkbox defaults to unchecked and the
+     * text field to "0.03".
+     */
+    function test_defaults(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function (ignored) {
+                self.assertEquals(self.usePostiniScore.checked, false);
+                self.assertEquals(self.postiniThreshhold.value, '0.03');
+            });
+        return d;
+    },
 
-        /**
-         * Submit the form with different values and make sure they end up
-         * changed on the server.
-         */
-        usePostiniScore.checked = true;
-        postiniThreshhold.value = '5.0';
-
-        return postiniConfig.submit().addCallback(
+    /**
+     * Test that submitting the form with changed values changes the
+     * configuration on the server
+     */
+    function test_submitChangesSettings(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function (ignored) {
+                self.usePostiniScore.checked = true;
+                self.postiniThreshhold.value = '5.0';
+                return self.postiniConfig.submit();
+            });
+        d.addCallback(
             function() {
                 return self.callRemote('checkConfiguration');
             });
+        return d;
+    },
+
+    /**
+     * Test that submitting the form preserves the new values on the form.
+     */
+    function test_submitPreservesFormValues(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function (ignored) {
+                self.usePostiniScore.checked = true;
+                self.postiniThreshhold.value = '5.0';
+                return self.postiniConfig.submit();
+            });
+        d.addCallback(
+            function() {
+                self.assertEquals(self.usePostiniScore.checked, true);
+                self.assertEquals(self.postiniThreshhold.value, '5.0');
+            });
+        return d;
     });
+
 
 Quotient.Test.AddGrabberTestCase = Nevow.Athena.Test.TestCase.subclass(
                                         'Quotient.Test.AddGrabberTestCase');
