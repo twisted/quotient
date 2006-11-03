@@ -55,7 +55,7 @@ class Filter(item.Item, item.InstallableMixin):
     postiniThreshhold = attributes.ieee754_double(doc="""
     A C{float} between 0 and 100 indicating at what Postini level messages are
     considered spam.
-    """, default=0.03)
+    """, default=0.5)
 
     _filters = attributes.inmemory()
 
@@ -232,7 +232,6 @@ class HamFilterFragment(ThemedFragment):
                                 u'Score below which to consider messages spam.',
                                 default=self.filter.postiniThreshhold)],
             description='Configure Postini')
-        f.jsClass = u"Quotient.Spam.PostiniSettings"
         f.setFragmentParent(self)
         f.docFactory = getLoader('liveform-compact')
         return ctx.tag[f]

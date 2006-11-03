@@ -14,14 +14,23 @@ class PostiniConfigurationTestCase(TestCase):
     """
     jsClass = u'Quotient.Test.PostiniConfigurationTestCase'
 
-    def setUp(self):
+    docFactory = stan(
+        div(render=directive('liveTest'))[
+            'Postini Configuration Test Case',
+            div(render=directive('postiniConfig'))])
+
+
+    def __init__(self, *a, **kw):
+        super(PostiniConfigurationTestCase, self).__init__(*a, **kw)
         self.store = Store()
         self.filter = Filter(store=self.store)
-        self.widget = HamFilterFragment(self.filter)
-        self.widget.setFragmentParent(self)
-        return self.widget;
-    expose(setUp)
-        
+
+
+    def render_postiniConfig(self, ctx, data):
+        f = HamFilterFragment(self.filter)
+        f.setFragmentParent(self)
+        return f
+
 
     def checkConfiguration(self):
         """
