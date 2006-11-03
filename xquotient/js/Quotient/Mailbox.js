@@ -283,7 +283,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var data = [MochiKit.Base.filter(null, cells)];
         if(0 < rowData["attachments"]) {
             data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
-                                        "style": "float: right; border: none; height: 16px"}));
+                                        "class": "paperclip-icon"}));
         }
         return MochiKit.DOM.TR(
             {"class": "q-scroll-row",
