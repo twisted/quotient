@@ -1933,15 +1933,7 @@ Quotient.Test.ControllerTestCase.methods(
                     curmsg.__id__);
             });
         return result;
-    }
-
-    /**
-     * XXX TODO
-     *
-     * - Test Controller.touchSelectedGroup including selected message
-     */
-
-    );
+    });
 
 
 
@@ -1952,10 +1944,12 @@ Quotient.Test.ControllerTestCase.methods(
 Quotient.Test.FullControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.FullControllerTestCase');
 Quotient.Test.FullControllerTestCase.methods(
-    /**
-     * Test deletion of all messages using batch selection.
+    /* Retrieve a fully controller widget from the server, add it to the
+     * document and return its initialization deferred
+     *
+     * @type: L{Divmod.Defer.Deferred}
      */
-    function test_deleteAllBatch(self) {
+    function setUp(self) {
         var result = self.callRemote('getFullControllerWidget');
         result.addCallback(function(widgetInfo) {
                 return self.addChildWidgetFromWidgetInfo(widgetInfo);
@@ -1966,6 +1960,15 @@ Quotient.Test.FullControllerTestCase.methods(
                 self.node.appendChild(widget.node);
                 return widget.initializationDeferred;
             });
+        return result;
+    },
+
+    /**
+     * Test deletion of all messages using batch selection.
+     */
+    function test_deleteAllBatch(self) {
+        var result = self.setUp();
+
         result.addCallback(
             function(ignored) {
                 /*
@@ -2017,6 +2020,50 @@ Quotient.Test.FullControllerTestCase.methods(
                     scroller._scrollViewport.childNodes[0].style.height,
                     "0px",
                     "View too tall.");
+            });
+        return result;
+    },
+
+    /**
+     * Test group actions when the rows have been fetched out of order
+     */
+    function test_groupActionsOutOfOrderRows(self) {
+        var result = self.setUp();
+
+        result.addCallback(
+            function(ignored) {
+                /* get a row near the end */
+                return self.controller.scrollWidget.requestRowRange(18, 19);
+            });
+
+        result.addCallback(
+            function(ignored) {
+                /* get some row before it */
+                return self.controller.scrollWidget.requestRowRange(15, 16);
+            });
+
+        result.addCallback(
+            function(ignored) {
+                /* add the last row to the group selection */
+                var webID = self.controller.scrollWidget.model.getRowData(18).__id__;
+                self.controller.scrollWidget.groupSelectRow(webID);
+                /* and archive it */
+                result = self.controller.archive();
+                return result.addCallback(
+                    function(ignored) {
+                        return webID;
+                    });
+            });
+
+        result.addCallback(
+            function(webID) {
+                /* if we got here, we're good, but lets test some junk anyway */
+                self.failIf(self.controller.scrollWidget.selectedGroup);
+                self.assertThrows(
+                    Mantissa.ScrollTable.NoSuchWebID,
+                    function() {
+                        self.controller.scrollWidget.model.findIndex(webID);
+                    });
             });
         return result;
     });
