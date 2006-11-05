@@ -18,6 +18,99 @@ from xmantissa import ixmantissa
 def msg(s):
     return '\r\n'.join(s.splitlines())
 
+
+class TestHeaderBodyParse(unittest.TestCase):
+    to = 'bob@example.com'
+    subject = 'a test message, comma separated'
+
+    # An email address with a bad header. The 'to' header is bad because it
+    # does not have a space after its colon.
+    badHeader = msg("""\
+From: alice@example.com
+To:%s
+Subject: %s
+Date: Tue, 11 Oct 2005 14:25:12 GMT
+Junk\xa0Header: value
+References: <one@domain>\t<two@domain>\x20
+\t<three@domain>
+
+Hello Bob,
+  How are you?
+-A
+""" % (to, subject))
+
+
+    # An email with a couple of abnormal headers. These have spaces and colons
+    # in possibly confusing arrangments.
+    confusingSubject = "bar:baz"
+    confusingFoo = "bar: baz"
+    confusingHeader = msg("""\
+From: alice@example.com
+To: bob@example.com
+Subject:%s
+Date: Tue, 11 Oct 2005 14:25:12 GMT
+Foo:%s
+Junk\xa0Header: value
+
+Hello Bob,
+  How are you?
+-A
+""" % (confusingSubject, confusingFoo))
+
+
+    def setUp(self):
+        self.part = mimepart.MIMEPart()
+        # This *can't* be HeaderBodyParser, because the class is abstract.
+        # It calls but does not define a parse_body method on itself.
+        self.parser = mimepart.MIMEMessageParser(self.part, None)
+
+
+    def parse(self, message):
+        """
+        Given a raw message, parse it using C{self.parser}, which should be a
+        L{HeaderBodyParser}.
+        """
+        begin = end = 0
+        for line in message.splitlines():
+            end += len(line) + 1
+            self.parser.lineReceived(line, begin, end)
+            begin = end
+        return self.part
+
+
+    def test_badHeader(self):
+        """
+        Check that the parser keeps going after encountering bad headers. In
+        particular, check that the bad header and any headers which appear
+        after the bad header are parsed.
+        """
+        part = self.parse(self.badHeader)
+        self.assertEquals(part.getHeader(u'to'), self.to)
+        self.assertEquals(part.getHeader(u'subject'), self.subject)
+
+
+    def test_confusingHeaders(self):
+        """
+        Check that confusing headers like 'foo:bar:baz' and 'foo:bar: baz' are
+        parsed correctly.
+        """
+        part = self.parse(self.confusingHeader)
+        self.assertEquals(part.getHeader(u'subject'), self.confusingSubject)
+        self.assertEquals(part.getHeader(u'foo'), self.confusingFoo)
+
+
+    def test_trivialMessage(self):
+        """
+        Test that a trivial message can be parsed and its headers retrieved.
+        """
+        # Control test to make sure L{TestHeaderBodyParse.parse} works.
+        # Other tests in this module check that trivialMessage can be parsed
+        # properly.
+        part = self.parse(MessageTestMixin.trivialMessage)
+        self.assertEquals(part.getHeader(u'from'), 'alice@example.com')
+
+
+
 class MessageTestMixin:
     trivialMessage = msg("""\
 From: alice@example.com

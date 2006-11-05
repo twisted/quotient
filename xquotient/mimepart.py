@@ -424,7 +424,8 @@ class HeaderBodyParser(object):
                 self.part.addHeader(self.prevheader, decodedValue)
         self.prevheader = self.prevvalue = None
 
-    def parseHeaders(self, line, linebegin, lineend, hdrValueDelim=re.compile(":[ \t]")):
+    def parseHeaders(self, line, linebegin, lineend,
+                     hdrValueDelim=re.compile(":[ \t]?")):
         if not line:
             self.finishHeader()
             self.startBody(linebegin, lineend)
