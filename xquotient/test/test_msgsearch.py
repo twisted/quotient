@@ -1,5 +1,5 @@
 from twisted.application.service import IService
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import TestCase, SkipTest
 
 from axiom.store import Store
 
@@ -11,7 +11,21 @@ from xmantissa import ixmantissa
 
 from xquotient.quotientapp import INDEXER_TYPE
 from xquotient.exmess import Message, splitAddress
-from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
+from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
+                                 ThemedFragmentWrapper)
+
+
+def _checkForPyLucene(indexer):
+    """
+    Raise L{SkipTest} if PyLucene isn't available.
+    """
+    try:
+        writer = indexer.openWriteIndex()
+    except NotImplementedError:
+        raise SkipTest("PyLucene not available")
+    else:
+        writer.close()
+
 
 class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
@@ -19,6 +33,7 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
                              (indexingBenefactorFactory,))
 
         self.indexer = self.mimeReceiver.store.findUnique(INDEXER_TYPE)
+        _checkForPyLucene(self.indexer)
 
     def _indexSomething(self, thing):
         writer = self.indexer.openWriteIndex()
@@ -87,11 +102,15 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         self.assertEqual(list(reader.search(u'', {u'sender': u'osgood'})),
                          [msg.storeID])
 
+
+
 class ViewTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
                                 (indexingBenefactorFactory,))
         self.indexer = self.mimeReceiver.store.findUnique(INDEXER_TYPE)
+        _checkForPyLucene(self.indexer)
+
 
     def testNoResults(self):
         """
