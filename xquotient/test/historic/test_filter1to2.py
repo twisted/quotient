@@ -13,4 +13,4 @@ class FilterTestCase(StubbedTest):
         filter = self.store.findUnique(Filter)
         self.assertEquals(filter.installedOn, self.store)
         self.assertEquals(filter.usePostiniScore, False)
-        self.assertEquals(filter.postiniThreshhold, 0.5)
+        self.assertEquals(filter.postiniThreshhold, 0.03)
