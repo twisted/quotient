@@ -193,6 +193,10 @@ class HamFilterFragment(ThemedFragment):
 
 
     def __init__(self, filter, fragmentParent=None):
+        """
+        @type filter: L{xquotient.spam.Filter}
+        @param filter: The ham filter to be configured.
+        """
         ThemedFragment.__init__(self, fragmentParent)
         self.filter = filter
 

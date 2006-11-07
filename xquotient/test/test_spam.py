@@ -155,6 +155,7 @@ class FilterTestCase(TestCase):
         self.failUnless(msg.spam)
         self.failUnless(msg.trained)
 
+
     def test_processTrainingInstructions(self):
         """
         When a user trains a message, a _TrainingInstruction item gets
@@ -165,3 +166,31 @@ class FilterTestCase(TestCase):
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
         ti = _TrainingInstruction(store=self.store, spam=True)
         f.processItem(ti)
+
+
+    def test_postiniWithoutHeaderSpamFiltering(self):
+        """
+        Check that when postini filtering is enabled but a message has no
+        postini header then the other filter is consulted.
+        """
+        self.store = Store()
+        msg = Message(impl=Part())
+        msg.trained = False
+        f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
+        TestFilter(store=self.store, result=True).installOn(f)
+        f.processItem(msg)
+        self.failUnless(msg.spam)
+
+
+    def test_postiniWithoutHeaderHamFiltering(self):
+        """
+        Check that when postini filtering is enabled but a message has no
+        postini header then the other filter is consulted.
+        """
+        self.store = Store()
+        msg = Message(impl=Part())
+        msg.trained = False
+        f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
+        TestFilter(store=self.store, result=False).installOn(f)
+        f.processItem(msg)
+        self.failIf(msg.spam)
