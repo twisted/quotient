@@ -1,3 +1,20 @@
+0.1.24 (2006-11-08):
+  - Fixed issue where the subject header would be clobbered if an extra
+    newline is in the address field of the compose form.
+  - Fixed issue where messages delivered with stresssmtp would sometimes have
+    malformed headers.
+  - The "People" section of the inbox view filter works again.
+  - The message list view is now emptied and refilled whenever a batch action
+    is performed.
+  - The default Postini threshold is now 0.03.
+  - The Postini config form now preserves changes.
+  - Paperclip icon is now visible next to rows for messages that have
+    attachments.
+  - Fixed issue with out of order scrolltable row indices which was affecting
+    quotient group actions.
+  - Messages with no whitespace after the colon in a header are parsed
+    correctly now.
+
 0.1.23 (2006-10-31):
   - Sorting in scrolltables now defaults to descending.
   - A bug causing message font to be too big in complexity 3 has been fixed.
