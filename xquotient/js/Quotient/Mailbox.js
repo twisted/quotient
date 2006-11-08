@@ -792,6 +792,9 @@ Quotient.Mailbox.Controller.methods(
      */
     function selectionChanged(self, webID) {
         if (webID == null) {
+            if (self.scrollWidget.model.rowCount() == 0) {
+                self.updateMessagePreview(null);
+            }
             self.clearMessageDetail();
             return Divmod.Defer.succeed(null);
         } else {
@@ -2102,11 +2105,8 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
 
-        var clearNodes = [self.messageDetail, self.nextMessagePreview];
-        for (var i = 0; i < clearNodes.length; ++i) {
-            while (clearNodes[i].firstChild) {
-                clearNodes[i].removeChild(clearNodes[i].firstChild);
-            }
+        while (self.messageDetail.firstChild) {
+            self.messageDetail.removeChild(self.messageDetail.firstChild);
         }
     },
 
@@ -2136,6 +2136,26 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
+     * @param nextMessagePreview: An object with a subject property giving the
+     * subject of the next message. See L{setMessageContent}. null if there is
+     * no next message.
+     */
+    function updateMessagePreview(self, nextMessagePreview) {
+        var pattern;
+        if (nextMessagePreview != null) {
+            /* so this is a message, not a compose fragment
+             */
+            pattern = self.onePattern('next-message');
+            pattern = pattern.fillSlots('subject',
+                                        nextMessagePreview['subject']);
+        } else {
+            pattern = self.onePattern('no-more-messages');
+        }
+        Divmod.Runtime.theRuntime.setNodeContent(self.nextMessagePreview,
+                                                 pattern);
+    },
+
+    /**
      * @param nextMessagePreview: An object with a subject property giving
      * the subject of the next message.  This value is not necessarily HTML;
      * HTML entities should not be escaped and markup will not be
@@ -2158,19 +2178,9 @@ Quotient.Mailbox.Controller.methods(
                  * highlight the extracts in that case.  it won't do any harm
                  * if there isn't actually a message body, as
                  * highlightExtracts() knows how to handle that */
-
                 self.highlightExtracts();
-                var pattern;
-                if (nextMessagePreview != null) {
-                    /* so this is a message, not a compose fragment
-                     */
-                    pattern = self.onePattern('next-message');
-                    pattern = pattern.fillSlots('subject',
-                                      nextMessagePreview['subject']);
-                } else {
-                    pattern = self.onePattern('no-more-messages');
-                }
-                Divmod.Runtime.theRuntime.setNodeContent(self.nextMessagePreview, pattern);
+
+                self.updateMessagePreview(nextMessagePreview);
 
                 /* if this is the "no more messages" pseudo-message,
                    then there won't be any message body */

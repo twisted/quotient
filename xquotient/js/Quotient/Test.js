@@ -2142,16 +2142,7 @@ Quotient.Test.EmptyControllerTestCase.methods(
             });
         result.addCallback(function(widget) {
                 self.controllerWidget = widget;
-
-                /*
-                 * XXX
-                 */
-                widget.selectionChanged = function selectionChanged() {
-                    return Divmod.Defer.succeed(null);
-                };
-
                 self.node.appendChild(widget.node);
-
                 return widget.initializationDeferred;
             });
         return result;
@@ -2191,6 +2182,22 @@ Quotient.Test.EmptyControllerTestCase.methods(
                     "No rows exist, so none should have been selected.");
             });
         return result;
+    },
+
+    /**
+     * Test that loading an empty mailbox displays 'No more messages' in
+     * the next message preview bar. Check the same after switching to
+     * an empty view.
+     */
+    function test_messagePreview(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                var node = self.controllerWidget.nextMessagePreview;
+                self.assertEqual(MochiKit.DOM.scrapeText(node),
+                                 'No more messages.');
+            });
+        return d;
     }
     );
 
