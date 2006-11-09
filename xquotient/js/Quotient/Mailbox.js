@@ -92,6 +92,11 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * they will most likely change the height of our rows.
      */
     function _getRowGuineaPig(self) {
+        /* unset row height so the guinea pig row doesn't have its height
+         * constrained in any way, as we are using it to try and figure out
+         * what the height should be!  (see code in L{makeRowElement})
+         */
+        self._rowHeight = undefined;
         return self._createRow(
                     0, {"sender": "FOO@BAR",
                         "senderDisplay": "FOO",
@@ -274,8 +279,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * XXX - should be template changes.
      */
     function makeRowElement(self, rowOffset, rowData, cells) {
-        /* box model includes padding mumble and we don't need to */
-        var height = (self._rowHeight - 11) + "px";
+        var height;
+        if(self._rowHeight != undefined) {
+            /* box model includes padding mumble and we don't need to */
+            height = "height: " + (self._rowHeight - 11) + "px";
+        } else {
+            height = "";
+        }
         var style = "";
         if(!rowData["read"]) {
             style += ";font-weight: bold";
@@ -302,7 +312,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
              "style": style,
             }, MochiKit.DOM.TD(null,
                 /* height doesn't work as expected on a <td> */
-                MochiKit.DOM.DIV({"style": "height: " + height}, data)));
+                MochiKit.DOM.DIV({"style": height}, data)));
     },
 
     /**

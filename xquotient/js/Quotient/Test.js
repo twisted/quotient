@@ -268,8 +268,23 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                     self.scrollingWidget.selectedGroup, null,
                     "Expected the selected group to be null.");
             });
-    }
-    );
+    },
+
+    /**
+     * Test that the height of the node returned by
+     * L{Quotient.Mailbox.ScrollingWidget._getRowGuineaPig} isn't set
+     */
+    function test_guineaPigHeight(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                var row = self.scrollingWidget._getRowGuineaPig();
+                self.failIf(row.style.height);
+                var div = row.getElementsByTagName("div")[0];
+                self.failIf(div.style.height);
+            });
+        return result;
+    });
 
 
 Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ControllerTestCase');
