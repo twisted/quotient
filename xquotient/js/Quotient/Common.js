@@ -27,12 +27,12 @@ Quotient.Common.Util.showNodeAsDialog = function(node) {
     /* add our cloned node after it */
     document.body.appendChild(node);
 
-    node.style.position = "absolute";
-    node.style.display = "";
     var elemSize = Divmod.Runtime.theRuntime.getElementSize(node);
 
+    node.style.position = "absolute";
     node.style.left = Math.floor((pageSize.w / 2) - (elemSize.w / 2)) + "px";
     node.style.top  = Math.floor((pageSize.h / 2) - (elemSize.h / 2)) + "px";
+    node.style.display = "";
 
     var hidden = false;
 
@@ -55,19 +55,6 @@ Quotient.Common.Util.showNodeAsDialog = function(node) {
         }, 0);
 
     return {node: node, hide: hide};
-}
-
-Quotient.Common.Util.showSimpleWarningDialog = function(text) {
-    var node = document.createElement("div");
-    node.setAttribute("class", "simple-warning-dialog");
-    node.setAttribute("style", "display: none");
-    var title = document.createElement("div");
-    title.setAttribute("class", "simple-warning-dialog-title");
-    title.appendChild(document.createTextNode("Warning"));
-    node.appendChild(title);
-    node.appendChild(document.createTextNode(text));
-    document.body.appendChild(node);
-    return Quotient.Common.Util.showNodeAsDialog(node);
 }
 
 /**

@@ -2,7 +2,6 @@
 from datetime import datetime, timedelta
 
 from twisted.trial.unittest import TestCase
-from twisted.internet import defer
 
 from epsilon.extime import Time
 
@@ -299,8 +298,7 @@ class InboxTestCase(TestCase):
                         for i in xrange(5))
         msgs.reverse()
 
-        self.inbox = Inbox(store=s)
-        self.inboxScreen = InboxScreen(self.inbox)
+        self.inboxScreen = InboxScreen(Inbox(store=s))
         self.viewSelection = dict(self.inboxScreen.viewSelection)
         self.msgs = msgs
         self.msgIds = map(self.translator.toWebID, self.msgs)
@@ -318,81 +316,28 @@ class InboxTestCase(TestCase):
         """
         self._setUpInbox()
 
-        def makeCountChecker(readCount, unreadCount):
-            def _check((_readCount, _unreadCount)):
-                self.assertEquals(readCount, _readCount)
-                self.assertEquals(unreadCount, _unreadCount)
-            return _check
-
-        def makeArchiver(msgs):
-            def _archive(ign):
-                return self.inboxScreen.actOnMessageIdentifierList(
-                            'archive', msgs)
-            return _archive
-
-        D = defer.Deferred()
-
         for i in range(len(self.msgs) - 2):
-            D.addCallback(makeArchiver([self.msgIds[i]]))
-            D.addCallback(makeCountChecker(1, 0))
+            readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+                'archive',
+                [self.msgIds[i]])
 
-        D.addCallback(makeArchiver([self.msgIds[i + 1]]))
-        D.addCallback(makeCountChecker(1, 0))
+            self.assertEquals(readCount, 1)
+            self.assertEquals(unreadCount, 0)
 
-        D.addCallback(makeArchiver([self.msgIds[i + 2]]))
-        D.addCallback(makeCountChecker(1, 0))
+        readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+            'archive',
+            [self.msgIds[i + 1]])
 
-        D.callback(None)
-        return D
+        self.assertEquals(readCount, 1)
+        self.assertEquals(unreadCount, 0)
+
+        readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
+            'archive',
+            [self.msgIds[i + 2]])
+
+        self.assertEquals(readCount, 1)
+        self.assertEquals(unreadCount, 0)
     testLookaheadWithActions.todo = "read/unread flag not managed properly yet."
-
-
-    def test_performMany(self):
-        """
-        Test L{Inbox.performMany} does what we tell it, and returns the
-        correct read/unread counts
-        """
-        self._setUpInbox()
-        D = self.inbox.performMany("archive", [m.storeID for m in self.msgs])
-
-        def check((readCount, unreadCount)):
-            for m in self.msgs:
-                self.failUnless(m.archived)
-
-            self.assertEquals(readCount, 1)
-            self.assertEquals(unreadCount, len(self.msgs)-1)
-
-        D.addCallback(check)
-        return D
-
-
-    def test_peformManyDeletions(self):
-        """
-        Test L{Inbox.performMany} with the delete action
-        """
-        self._setUpInbox()
-        D = self.inbox.performMany("delete", [m.storeID for m in self.msgs])
-
-        def check((readCount, unreadCount)):
-            for m in self.msgs:
-                self.failUnless(m.deleted)
-
-            self.assertEquals(readCount, 1)
-            self.assertEquals(unreadCount, len(self.msgs)-1)
-
-        D.addCallback(check)
-        return D
-
-
-    def test_performManyError(self):
-        """
-        Test that L{Inbox.performMany} properly forwards errors which happen
-        inside the generator passed to the cooperator.
-        """
-        self._setUpInbox()
-        D = self.inbox.performMany("delete", [-543])
-        self.assertFailure(D, KeyError)
-        return D
 
 
     def test_fastForward(self):
@@ -406,10 +351,10 @@ class InboxTestCase(TestCase):
         self.failUnless(self.msgs[2].read)
 
 
-    def test_storeIDsForBatchType(self):
+    def test_messagesForBatchType(self):
         """
         Test that the correct messages are returned from
-        L{Inbox.storeIDsForBatchType}.
+        L{Inbox.messagesForBatchType}.
         """
         store = Store()
         inbox = Inbox(store=store)
@@ -424,7 +369,7 @@ class InboxTestCase(TestCase):
         # empty list).
         for batchType in ("read", "unread", "all"):
             self.assertEquals(
-                list(inbox.storeIDsForBatchType(batchType, viewSelection)),
+                list(inbox.messagesForBatchType(batchType, viewSelection)),
                 [])
 
         # Make one message and assert that it only comes back from queries for
@@ -432,28 +377,28 @@ class InboxTestCase(TestCase):
         message = Message(store=store, spam=False)
 
         message.read = False
-        self.assertEquals(list(inbox.storeIDsForBatchType("read", viewSelection)), [])
-        self.assertEquals(list(inbox.storeIDsForBatchType("unread", viewSelection)), [message.storeID])
-        self.assertEquals(list(inbox.storeIDsForBatchType("all", viewSelection)), [message.storeID])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
 
         message.read = True
-        self.assertEquals(list(inbox.storeIDsForBatchType("read", viewSelection)), [message.storeID])
-        self.assertEquals(list(inbox.storeIDsForBatchType("unread", viewSelection)), [])
-        self.assertEquals(list(inbox.storeIDsForBatchType("all", viewSelection)), [message.storeID])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
 
         # Make one more and make sure the batch is correct with various
         # combinations of states between the two.
         other = Message(store=store, spam=False)
 
         other.read = False
-        self.assertEquals(list(inbox.storeIDsForBatchType("read", viewSelection)), [message.storeID])
-        self.assertEquals(list(inbox.storeIDsForBatchType("unread", viewSelection)), [other.storeID])
-        self.assertEquals(list(inbox.storeIDsForBatchType("all", viewSelection)), [message.storeID, other.storeID])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [other])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
 
         other.read = True
-        self.assertEquals(list(inbox.storeIDsForBatchType("read", viewSelection)), [message.storeID, other.storeID])
-        self.assertEquals(list(inbox.storeIDsForBatchType("unread", viewSelection)), [])
-        self.assertEquals(list(inbox.storeIDsForBatchType("all", viewSelection)), [message.storeID, other.storeID])
+        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message, other])
+        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
+        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
 
     def testGetComposer(self):
         """
@@ -558,19 +503,15 @@ class ReadUnreadTestCase(TestCase):
         """
         screen = InboxScreen(self.inbox)
 
-        D = screen.actOnMessageIdentifierList(
-                'archive',
-                [self.translator.toWebID(self.messages[-1])])
+        screen.actOnMessageIdentifierList(
+            'archive',
+            [self.translator.toWebID(self.messages[-1])])
 
-        def check():
-            for msg in self.messages[:-1]:
-                self.failIf(msg.read, "Subsequent messages should be unread.")
+        for msg in self.messages[:-1]:
+            self.failIf(msg.read, "Subsequent messages should be unread.")
 
-            for msg in self.messages[-1:]:
-                self.failUnless(msg.read, "Initial and revealed message should be read.")
-
-        D.addCallback(lambda ign: check())
-        return D
+        for msg in self.messages[-1:]:
+            self.failUnless(msg.read, "Initial and revealed message should be read.")
 
 
 class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):

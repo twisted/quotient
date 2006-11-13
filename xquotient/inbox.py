@@ -1,10 +1,10 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
 import re
+from itertools import chain, imap
 
 from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
-from twisted.internet import defer
 
 from nevow import tags as T, inevow, athena
 from nevow.flat import flatten
@@ -12,7 +12,6 @@ from nevow.page import renderer
 from nevow.athena import expose
 
 from epsilon.extime import Time
-from epsilon import cooperator
 
 from axiom.item import Item, InstallableMixin, transacted, declareLegacyItem
 from axiom import attributes, tags, iaxiom
@@ -206,12 +205,12 @@ class Inbox(Item, InstallableMixin):
         return comp
 
 
-    def storeIDsForBatchType(self,
+    def messagesForBatchType(self,
                              batchType,
                              viewSelection):
         """
-        Return a list of storeIDs for L{exmess.Message} items which belong to
-        the specified batch.
+        Return a list of L{exmess.Message} instances which belong to the
+        specified batch.
 
         @param batchType: A string defining a particular batch.  For example,
         C{"read"} or C{"unread"}.
@@ -220,8 +219,7 @@ class Inbox(Item, InstallableMixin):
         """
         return self.store.query(
             Message,
-            self.getComparisonForBatchType(
-                batchType, viewSelection)).getColumn('storeID')
+            self.getComparisonForBatchType(batchType, viewSelection))
 
 
     def action_archive(self, message):
@@ -281,51 +279,6 @@ class Inbox(Item, InstallableMixin):
         ham.
         """
         message.train(False)
-
-
-    def _getActionMethod(self, actionName):
-        return getattr(self, 'action_' + actionName)
-
-
-    def performMany(self, actionName, storeIDs, args=None):
-        """
-        Perform the action with name C{actionName} on the messages represented
-        by the storeIDs in C{storeIDs}, passing C{args} as extra arguments to
-        the action method
-
-        @param actionName: name of an action, e.g. "archive".
-        @type actionName: C{str}
-
-        @param storeIDs: the storeIDs of the messages that should be acted on
-        @type storeIDs: sequence of C{long}
-
-        @param args: extra arguments to pass to the action method
-        @type args: None or a C{dict}
-
-        @return: the number of affected messages which have been read and the
-        number of affected messages which haven't
-        @rtype: pair
-        """
-        if args is None:
-            args = {}
-
-        action = self._getActionMethod(actionName)
-        D = defer.Deferred()
-
-        def act():
-            readCount = 0
-
-            for storeID in storeIDs:
-                message = self.store.getItemByID(storeID)
-                if message.read:
-                    readCount += 1
-                yield action(message, **args)
-            D.callback((readCount, len(storeIDs)-readCount))
-
-        coopDeferred = cooperator.iterateInReactor(act())
-        coopDeferred.addErrback(D.errback)
-
-        return D
 
 
 
@@ -798,11 +751,33 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                 self._squish(self._currentAsFragment(currentMessage)),
                 self._currentMessageData(currentMessage))
 
+    def _getActionMethod(self, actionName):
+        return getattr(self.inbox, 'action_' + actionName)
+
+    def _performMany(self, actionName, messages=(), webIDs=(), args=None):
+
+        extra = {}
+        for k, v in (args or {}).iteritems():
+            extra[k.encode('ascii')] = v
+
+        readCount = 0
+        unreadCount = 0
+        action = self._getActionMethod(actionName)
+        for message in chain(messages, imap(self.translator.fromWebID, webIDs)):
+            if message.read:
+                readCount += 1
+            else:
+                unreadCount += 1
+            action(message, **extra)
+        return readCount, unreadCount
+
+
     def _messagePreview(self, msg):
         if msg is not None:
             return {
                 u'subject': msg.subject}
         return None
+
 
     def actOnMessageIdentifierList(self, action, messageIdentifiers, extraArguments=None):
         """
@@ -825,13 +800,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         @param extraArguments: Additional keyword arguments to pass on to the
         action handler.
         """
-        messages = map(self.translator.linkFrom, messageIdentifiers)
-
-        if extraArguments is not None:
-            extraArguments = dict((k.encode('ascii'), v)
-                                    for (k, v) in extraArguments.iteritems())
-
-        return self.inbox.performMany(action, messages, args=extraArguments)
+        messages = map(self.translator.fromWebID, messageIdentifiers)
+        return self._performMany(action, messages, args=extraArguments)
     expose(actOnMessageIdentifierList)
 
 
@@ -841,19 +811,14 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         characteristic or which are specifically included but not specifically
         excluded.
         """
-        storeIDs = set(
-            self.inbox.storeIDsForBatchType(
+        messages = set(
+            self.inbox.messagesForBatchType(
                 batchType, viewSelection))
-        more = set(map(self.translator.linkFrom, include))
-        less = set(map(self.translator.linkFrom, exclude))
+        more = set(map(self.translator.fromWebID, include))
+        less = set(map(self.translator.fromWebID, exclude))
 
-        targets = (storeIDs | more) - less
-
-        if extraArguments is not None:
-            extraArguments = dict((k.encode('ascii'), v)
-                                    for (k, v) in extraArguments.iteritems())
-
-        return self.inbox.performMany(action, targets, args=extraArguments)
+        targets = (messages | more) - less
+        return self._performMany(action, targets, args=extraArguments)
     expose(actOnMessageBatch)
 
 

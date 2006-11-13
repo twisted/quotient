@@ -1,3 +1,4 @@
+
 /**
  *
  * XXX TODO -
@@ -24,78 +25,6 @@
 // import Quotient.Common
 // import Quotient.Throbber
 // import Quotient.Message
-
-/**
- * Object which controls the display of status messages to the user
- */
-Quotient.Mailbox.Status = Divmod.Class.subclass("Quotient.Mailbox.Status");
-Quotient.Mailbox.Status.methods(
-    function __init__(self, node) {
-        self.throbber = Quotient.Throbber.Throbber(
-                            Nevow.Athena.FirstNodeByAttribute(
-                                node, "class", "throbber"));
-
-        self.statusNode = Nevow.Athena.FirstNodeByAttribute(
-                            node, "class", "mailbox-status");
-
-        self._waitingOn = null;
-    },
-
-    function _setStatus(self, message) {
-        self.statusNode.appendChild(
-            document.createTextNode(message));
-    },
-
-    function _clearStatus(self) {
-        while(self.statusNode.firstChild) {
-            self.statusNode.removeChild(
-                self.statusNode.firstChild);
-        }
-    },
-
-    /**
-     * @return: the status message currently being displayed
-     * @rtype: C{String}
-     */
-    function getCurrentStatus(self) {
-        if(1 == self.statusNode.childNodes.length) {
-            return self.statusNode.firstChild.nodeValue;
-        }
-        return null;
-    },
-
-    /**
-     * Show C{message} to the user until C{deferred} fires
-     *
-     * @type deferred: C{Divmod.Defer.Deferred}
-     * @param message: user-facing text describing what is being waited on
-     * @type message: C{String}
-     */
-    function showStatusUntilFires(self, deferred, message) {
-        /* XXX to be useful in any kind of general way, there should be a way
-         * to show the status of a short task (e.g. "Message deleted") while
-         * the status of a long-running task is being displayed, and a way to
-         * show the status of concurrent long-running tasks
-         */
-        if(self._waitingOn != null) {
-            throw new Error("already waiting on a deferred");
-        }
-        self._waitingOn = deferred;
-
-        self.throbber.startThrobbing();
-
-        self._setStatus(message);
-
-        deferred.addBoth(
-            function(passthrough) {
-                self._waitingOn = null;
-
-                self._clearStatus();
-                self.throbber.stopThrobbing();
-
-                return passthrough;
-            });
-    });
 
 /**
  * Enhanced scrolling widget which suports the notion of one or more selected
@@ -674,7 +603,6 @@ Quotient.Mailbox.Controller.methods(
 
         self.complexityLevel = complexityLevel;
         self._batchSelection = null;
-        self._longRunningActionDeferred = null;
 
         /*
          * Fired when the initial load has finished.
@@ -774,10 +702,6 @@ Quotient.Mailbox.Controller.methods(
         self.actions = self._getActionButtons();
 
         self._setupActionButtonsForView(self.scrollWidget.viewSelection['view']);
-
-        self.status = Quotient.Mailbox.Status(
-                        self.firstNodeByAttribute(
-                            "class", "mailbox-status-container"));
 
         self.delayedLoad(self.complexityLevel);
     },
@@ -1184,56 +1108,16 @@ Quotient.Mailbox.Controller.methods(
         return result;
     },
 
-    /**
-     * Show a dialog alerting the user that we are currently performing a
-     * long-running action, and so can't start another one
-     */
-    function _showBusyActionDialog(self) {
-        Quotient.Common.Util.showSimpleWarningDialog(
-            "Cannot perform a long running action as one is currently in progress");
-    },
-
-    /**
-     * Construct the scaffolding necessary to perform a long running action
-     *
-     * @param f: thunk returning a deferred firing when the action is
-     * complete.  Will only be called if another long running action is not
-     * underway at the time this method is called
-     *
-     * @param message: user-facing message describing the action
-     *
-     * @return: the deferred returned from C{f} if the action is performed,
-     * otherwise null
-     */
-    function _wrapLongRunningAction(self, f, message) {
-        if(self._longRunningActionDeferred != null) {
-            self._showBusyActionDialog();
-            return null;
-        }
-        var result = self.withReducedMessageDetailOpacity(f);
-        self._longRunningActionDeferred = result;
-        result.addCallback(
-            function(passthrough) {
-                self._longRunningActionDeferred = null;
-                return passthrough;
-            });
-
-        self.status.showStatusUntilFires(result, message);
-
-        return result;
-    },
-
     function touchBatch(self, action, isDestructive, extraArguments) {
-        return self._wrapLongRunningAction(
-            function() {
-                var exceptions = self.getBatchExceptions();
-                var include = exceptions[0];
-                var exclude = exceptions[1];
+        var exceptions = self.getBatchExceptions();
+        var include = exceptions[0];
+        var exclude = exceptions[1];
 
+        var result = self.withReducedMessageDetailOpacity(
+            function() {
                 var acted = self.callRemote(
                     "actOnMessageBatch", action, self.scrollWidget.viewSelection,
                     self._batchSelection, include, exclude, extraArguments);
-
                 acted.addCallback(
                     function(counts) {
                         var readTouchedCount = counts[0];
@@ -1243,13 +1127,14 @@ Quotient.Mailbox.Controller.methods(
                             return self.scrollWidget.emptyAndRefill().addCallback(
                                 function(ignored) {
                                     return self.scrollWidget._selectFirstRow();
-                                });
+                                });;
                         }
                         return null;
-                    });
 
+                    });
                 return acted;
-            }, "Performing a batch action");
+            });
+        return result;
     },
 
     /**
@@ -1858,13 +1743,12 @@ Quotient.Mailbox.Controller.methods(
      *                       group being acted upon.
      */
     function touchSelectedGroup(self, action, isDestructive, extraArguments) {
-        return self._wrapLongRunningAction(
+        var result = self.withReducedMessageDetailOpacity(
             function() {
                 var acted = self.callRemote(
                     "actOnMessageIdentifierList", action,
                     Divmod.dir(self.scrollWidget.selectedGroup),
                     extraArguments);
-
                 acted.addCallback(
                     function(counts) {
                         var readTouchedCount = counts[0];
@@ -1879,9 +1763,9 @@ Quotient.Mailbox.Controller.methods(
                         }
 
                     });
-
                 return acted;
-            }, "Performing a group action");
+            });
+        return result;
     },
 
     /**

@@ -1,33 +1,3 @@
-.simple-warning-dialog {
-    background-color: #FFFFFF;
-    border: 3px double #000000;
-    padding: 14px 14px 14px 52px;
-    font-size: 110%;
-    text-align: center;
-    background-image: url(/Quotient/static/images/warning.png);
-    background-repeat: no-repeat;
-    background-position: 2px 50%;
-    min-height: 44px;
-}
-
-.simple-warning-dialog-title {
-    font-size: 130%;
-    font-weight: bold;
-    border-bottom: solid 1px #000000;
-    text-align: left;
-    margin-bottom: 4px;
-}
-
-.mailbox-status-container .mailbox-status {
-    padding-right: 4px;
-    font-style: italic;
-}
-
-.mailbox-status-container img {
-    position: relative;
-    top: 4px;
-}
-
 .content-table-container {
     padding-left: 50px;
 }
@@ -104,7 +74,7 @@ table.tdb > tbody > tr > td { cursor: pointer; }
 }
 
 .msg-detail-sent-date {
-    padding: 4px 4px 0px 0px;
+    padding-right: 4px;
     float: right;
 }
 
@@ -192,7 +162,6 @@ ul.file-list, ul.file-list li {
     background-color: #7FCCE5;
     border-bottom: solid 1px #0099CC;
     width: 100%;
-    height: 23px;
 }
 
 .extract-text > span {
