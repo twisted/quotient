@@ -56,6 +56,70 @@ Quotient.Test.TestThrobber.methods(
     });
 
 
+/**
+ * Tests for L{Quotient.Mailbox.Status}
+ */
+Quotient.Test.MailboxStatusTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.MailboxStatusTestCase');
+Quotient.Test.MailboxStatusTestCase.methods(
+    /**
+     * Make a node that contains the stuff that the status widget wants, and
+     * return a status widget
+     */
+    function setUp(self) {
+        var node = document.createElement('div'),
+            throbber = document.createElement('div'),
+            status = document.createElement('div');
+
+        throbber.className = 'throbber';
+        throbber.style.display = 'none';
+        node.appendChild(throbber);
+
+        status.className = 'mailbox-status';
+        node.appendChild(status);
+
+        self.node.appendChild(node);
+
+        self.throbberNode = throbber;
+        self.statusNode = status;
+
+        return Quotient.Mailbox.Status(node);
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Status.showStatusUntilFires}
+     */
+    function test_showStatusUntilFires(self) {
+        var statusWidget = self.setUp();
+
+        self.assertEqual(self.throbberNode.style.display, "none");
+        self.assertEqual(self.statusNode.childNodes.length, 0);
+
+        var deferred = Divmod.Defer.Deferred();
+
+        var STATUS_MSG = "A message";
+
+        statusWidget.showStatusUntilFires(deferred, STATUS_MSG);
+
+        self.assertEqual(self.throbberNode.style.display, "");
+        self.assertEqual(self.statusNode.childNodes.length, 1);
+        self.assertEqual(self.statusNode.firstChild.nodeValue, STATUS_MSG);
+
+        var CALLBACK_VALUE = 624;
+
+        deferred.addCallback(
+            function(result) {
+                self.assertEqual(result, CALLBACK_VALUE);
+
+                self.assertEqual(self.throbberNode.style.display, "none");
+                self.assertEqual(self.statusNode.childNodes.length, 0);
+            });
+
+        deferred.callback(CALLBACK_VALUE);
+        return deferred;
+    });
+
+
+
 Quotient.Test.ScrollTableTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ScrollTableTestCase');
 Quotient.Test.ScrollTableTestCase.methods(
     /**
@@ -1946,6 +2010,85 @@ Quotient.Test.ControllerTestCase.methods(
                 self.assertEqual(
                     self.controllerWidget.scrollWidget.getSelectedRow().__id__,
                     curmsg.__id__);
+            });
+        return result;
+    },
+
+    /**
+     * Test that L{Quotient.Mailbox.Controller._wrapLongRunningAction} does
+     * the right thing with regard to concurrent long running actions
+     */
+    function test_wrapLongRunningActionConcurrent(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                var D = Divmod.Defer.Deferred(),
+                    called = 0,
+                    longRunningAction = function() {
+                        called++;
+                        return D;
+                    },
+                    controller = self.controllerWidget,
+                    ACTION_STATUS = "Thing One",
+                    actionResult = controller._wrapLongRunningAction(
+                                        longRunningAction, ACTION_STATUS);
+
+                self.failUnless(actionResult instanceof Divmod.Defer.Deferred);
+                self.assertEqual(called, 1);
+
+                actionResult = controller._wrapLongRunningAction(
+                                    longRunningAction, "Thing Two");
+
+                self.assertEqual(actionResult, null);
+                self.assertEqual(called, 1);
+
+                self.assertEqual(controller.status.getCurrentStatus(), ACTION_STATUS);
+            });
+        return result;
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Controller._wrapLongRunningAction} makes the UI
+     * changes we expect (transparent message detail, status message, etc)
+     */
+    function test_wrapLongRunningActionUI(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                var D = Divmod.Defer.Deferred(),
+                    longRunningAction = function() {
+                        return D;
+                    },
+                    initialOpacity = self.controllerWidget.messageDetail.style.opacity,
+                    ACTION_STATUS = "Nice message",
+                    actionResult = self.controllerWidget._wrapLongRunningAction(
+                                        longRunningAction, ACTION_STATUS);
+
+                /* check that the UI stuff appears correct */
+                self.failUnless(
+                    self.controllerWidget.messageDetail.style.opacity < initialOpacity);
+                self.assertNotEqual(
+                    self.controllerWidget.messageDetail.style.opacity, null);
+
+                self.assertEqual(
+                    self.controllerWidget.status.getCurrentStatus(),
+                    ACTION_STATUS);
+
+                var DEFERRED_RESULT = 617;
+
+                D.addCallback(
+                    function(result) {
+                        self.assertEqual(result, DEFERRED_RESULT);
+                        self.assertEqual(
+                            self.controllerWidget.messageDetail.style.opacity,
+                            initialOpacity);
+
+                        self.assertEqual(
+                            self.controllerWidget.status.getCurrentStatus(), null);
+                    });
+
+                D.callback(DEFERRED_RESULT);
+                return D;
             });
         return result;
     });

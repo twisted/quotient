@@ -3,6 +3,7 @@ import time
 
 from nevow.livetrial import testcase
 from nevow.athena import LiveFragment, expose
+from nevow import tags
 
 from epsilon.extime import Time
 
@@ -433,3 +434,9 @@ class FullControllerTestCase(testcase.TestCase, _ControllerMixin):
         fragment.setFragmentParent(self)
         return fragment
     expose(getFullControllerWidget)
+
+class MailboxStatusTestCase(testcase.TestCase):
+    """
+    Tests for Quotient.Mailbox.Status
+    """
+    jsClass = u'Quotient.Test.MailboxStatusTestCase'
