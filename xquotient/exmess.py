@@ -400,12 +400,13 @@ class PartDisplayer(ItemGrabber):
         @param scrubberFunction: function
         """
         try:
-            dom = microdom.parseString(content.encode('utf-8'), beExtremelyLenient=True)
+            dom = microdom.parseString(content.encode('utf-8'),
+                                       beExtremelyLenient=True)
         except ParseError:
             return None
         else:
             scrubberFunction(dom)
-            return dom.toxml()[len('<?xml version="1.0"?>'):]
+            return dom.documentElement.toxml()
 
 
     def scrubbedHTML(self, content):

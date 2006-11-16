@@ -159,7 +159,7 @@ class PartTestCase(TestCase):
         Pass a completely malformed document to L{PartDisplay.scrubbedHTML}
         and assert that it returns C{None} instead of raising an exception.
         """
-        self.assertIdentical(None, self.partDisplayer.scrubbedHTML('<foo / bar>'))
+        self.assertIdentical(None, self.partDisplayer.scrubbedHTML(''))
 
 
     def test_scrubbingSimpleDocument(self):
