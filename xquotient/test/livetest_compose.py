@@ -180,3 +180,11 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
         f.docFactory = getLoader(f.fragmentName)
         return f
     expose(getFromAddressScrollTable)
+
+
+class ComposeAutoCompleteTestCase(testcase.TestCase):
+    """
+    Tests for compose autocomplete
+    """
+
+    jsClass = u'Quotient.Test.ComposeAutoCompleteTestCase'

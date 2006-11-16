@@ -2397,8 +2397,9 @@ Quotient.Test.ComposeTestCase = Nevow.Athena.Test.TestCase.subclass('ComposeTest
 Quotient.Test.ComposeTestCase.methods(
     /**
      * Test the name completion method
-     * L{Quotient.Compose.Controller.reconstituteAddress} generates the correct
-     * address lists for various inputs.
+     * L{Quotient.Compose.EmailAddressAutoCompleteModel.complete} (when called
+     * via L{Quotient.Compose.Controller}) generates the correct address lists
+     * for various inputs
      */
     function test_addressCompletion(self) {
         /* get the ComposeController */
@@ -2407,10 +2408,6 @@ Quotient.Test.ComposeTestCase.methods(
                                 self.node.parentNode,
                                 "athena:class",
                                 "Quotient.Test.ComposeController"));
-
-        var richAssertEquals = function(x, y, msg) {
-            self.assertEquals(MochiKit.Base.compare(x, y), 0, msg || (x + " != " + y));
-        }
 
         /* these are the pairs of [displayName, emailAddress] that we expect
          * the controller to have received from getPeople() */
@@ -2427,14 +2424,11 @@ Quotient.Test.ComposeTestCase.methods(
          * is a pair containing [displayName, emailAddress]
          */
         var assertCompletionsAre = function(addr, completions) {
-            var _completions = controller.completeCurrentAddr(addr);
-            richAssertEquals(_completions, completions,
-                             "completions for " +
-                             addr +
-                             " are " +
-                             _completions +
-                             " instead of " +
-                             completions);
+            var _completions = controller.autoCompleteController.model.complete(addr);
+            self.assertArraysEqual(_completions, completions,
+                                   function(a, b) {
+                                        self.assertArraysEqual(a, b);
+                                    });
         }
 
         /* map email address prefixes to lists of expected completions */
@@ -2456,25 +2450,156 @@ Quotient.Test.ComposeTestCase.methods(
         for(var k in completionResults) {
             assertCompletionsAre(k, completionResults[k]);
         }
+    },
 
-        /* map each [displayName, emailAddress] pair to the result
-         * we expect from ComposeController.reconstituteAddress(),
-         * when passed the pair */
+    /**
+     * Test that
+     * L{Quotient.Compose.EmailAddressAutoCompleteView._reconstituteAddress}
+     * (when called via L{Quotient.Compose.Controller}) does the right thing.
+     */
+    function test_reconstituteAddresses(self) {
+        var controller = Quotient.Test.ComposeController.get(
+                            Nevow.Athena.NodeByAttribute(
+                                self.node.parentNode,
+                                "athena:class",
+                                "Quotient.Test.ComposeController"));
+
+        /* map each [displayName, emailAddress] pair to the result we expect
+         * from ComposeController.reconstituteAddress(), when passed the pair */
         var reconstitutedAddresses = [
-            [moe, '"Moe Aboulkheir" <maboulkheir@divmod.com>'],
-            [tobias, '"Tobias Knight" <localpart@domain>'],
-            [madonna, '"Madonna" <madonna@divmod.com>'],
-            [kilroy, '<kilroy@foo>']
+            [["Moe Aboulkheir", "maboulkheir@divmod.com"],
+             '"Moe Aboulkheir" <maboulkheir@divmod.com>'],
+            [["Tobias Knight", "localpart@domain"],
+             '"Tobias Knight" <localpart@domain>'],
+            [["Madonna", "madonna@divmod.com"],
+             '"Madonna" <madonna@divmod.com>'],
+            [["", "kilroy@foo"], '<kilroy@foo>']
         ];
+
+        var view = controller.autoCompleteController.view;
 
         /* check they match up */
         for(var i = 0; i < reconstitutedAddresses.length; i++) {
             self.assertEquals(
-                controller.reconstituteAddress(reconstitutedAddresses[i][0]),
+                view._reconstituteAddress(reconstitutedAddresses[i][0]),
                 reconstitutedAddresses[i][1]);
         }
-    }
-    );
+    });
+
+/**
+ * Tests for compose autocomplete
+ */
+Quotient.Test.ComposeAutoCompleteTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ComposeAutoCompleteTestCase');
+Quotient.Test.ComposeAutoCompleteTestCase.methods(
+    /**
+     * Make a L{Quotient.AutoComplete.Controller} with a
+     * L{Quotient.Compose.EmailAddressAutoCompleteModel} and a
+     * L{Quotient.Compose.EmailAddressAutoCompleteView}
+     */
+    function _setUp(self) {
+        self.textbox = document.createElement("textarea");
+        self.node.appendChild(self.textbox);
+        self.completionsNode = document.createElement("div");
+        self.node.appendChild(self.completionsNode);
+
+        self.controller = Quotient.AutoComplete.Controller(
+                            Quotient.Compose.EmailAddressAutoCompleteModel(
+                                [['Larry', 'larry@host'],
+                                 ['Larry Joey', 'larryjoey@host'],
+                                 ['Xavier A.', 'other@host']]),
+                            Quotient.Compose.EmailAddressAutoCompleteView(
+                                self.textbox, self.completionsNode),
+                            function(f, when) {
+                                f();
+                            });
+    },
+
+    /**
+     * Send a fake keypress event for key C{keyCode} to C{node}
+     *
+     * @param node: node with C{onkeypress} handler
+     * @type keyCode: C{Number}
+     */
+    function _fakeAKeypressEvent(self, node, keyCode) {
+        node.onkeypress({keyCode: keyCode});
+    },
+
+    /**
+     * Check that the DOM inside C{self.completionsNode} looks like the right
+     * DOM for the list of completions C{completions}
+     *
+     * @type completions: C{Array} of C{String}
+     */
+    function _checkDOMCompletions(self, completions) {
+        self.assertEquals(completions.length,
+                          self.completionsNode.childNodes.length);
+
+        for(var i = 0; i < completions.length; i++) {
+            self.assertEquals(
+                completions[i],
+                self.completionsNode.childNodes[i].firstChild.nodeValue);
+        }
+    },
+
+    /**
+     * Test L{Quotient.Compose.EmailAddressAutoCompleteModel.isCompletion}
+     */
+    function test_isCompletion(self) {
+        self._setUp();
+
+        var model = self.controller.model,
+            nameAddr = ['XXX Joe', 'xyz@host'];
+
+        self.failUnless(model.isCompletion('jo', nameAddr));
+        self.failUnless(model.isCompletion('xy', nameAddr));
+        self.failUnless(model.isCompletion('xx', nameAddr));
+    },
+
+    /**
+     * Negative tests for
+     * L{Quotient.Compose.EmailAddressAutoCompleteModel.isCompletion}
+     */
+    function(self) {
+        self._setUp();
+
+        var model = self.controller.model,
+            nameAddr = ['XXX Joe', 'xyz@host'];
+
+        self.failIf(model.isCompletion('host', nameAddr));
+        self.failIf(model.isCompletion(' ', nameAddr));
+        self.failIf(model.isCompletion('', nameAddr));
+    },
+
+    /**
+     * Test that a list of completions is visible when appropriate
+     */
+    function test_visibleCompletions(self) {
+        self._setUp();
+
+        self.controller.view.setValue('Larry');
+        /* 0 is the keycode for all alphanumeric keypresses with onkeypress */
+        self._fakeAKeypressEvent(self.textbox, 0);
+
+        self.assertEquals(self.completionsNode.style.display, "");
+        self._checkDOMCompletions(['"Larry" <larry@host>',
+                                   '"Larry Joey" <larryjoey@host>']);
+    },
+
+    /**
+     * Test that the completions node isn't visible when there are no
+     * completions
+     */
+     function test_invisibleCompletions(self) {
+        self._setUp();
+
+        self.controller.view.setValue('Z');
+        self._fakeAKeypressEvent(self.textbox, 0);
+
+        self.assertEquals(self.completionsNode.style.display, "none");
+        self._checkDOMCompletions([]);
+    });
+
+
 
 /**
  * Tests for roundtripping of recipient addresses
