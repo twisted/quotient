@@ -169,10 +169,245 @@ Quotient.Compose.DraftListScrollingWidget.methods(
 
     });
 
-Quotient.Compose.Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose.Controller');
+/**
+ * Base class for composery things
+ */
+Quotient.Compose._Controller = Mantissa.LiveForm.FormWidget.subclass('Quotient.Compose._Controller');
+Quotient.Compose._Controller.methods(
+    /**
+     * @param inline: are we currently being displayed inline?
+     * @type inline: C{Boolean}
+     *
+     * @param allPeople: C{Array} of 2-C{Arrays} of [name, email address] for
+     * each person in the address book.  Used for autocomplete
+     *
+     * @ivar completionDeferred: L{Divmod.Defer.Deferred} firing when we are
+     * doing working (i.e. when L{cancel} has been called)
+     */
+    function __init__(self, node, inline, allPeople) {
+        Quotient.Compose._Controller.upcall(self, "__init__", node);
+
+        self.allPeople = allPeople;
+
+        if(inline) {
+            self.firstNodeByAttribute("class", "cancel-link").style.display = "";
+            self.firstNodeByAttribute("class", "compose-table").style.width = "100%";
+            self.node.style.borderTop = "";
+        }
+
+        self.inline = inline;
+
+        self.completions = self.nodeByAttribute("class", "address-completions");
+
+        self.completionDeferred = Divmod.Defer.Deferred();
+    },
+
+    /**
+     * Called when the message-sending operating has been cancelled, or when a
+     * message has been sent.
+     *
+     * Remove our node from its parent, and callback
+     * C{self.completionDeferred}
+     */
+    function cancel(self) {
+        self.node.parentNode.removeChild(self.node);
+        self.completionDeferred.callback(null);
+    },
+
+    /**
+     * Called when the user presses a key while the "to addresses" textarea is
+     * focused.  Responsible for delegating to the various other autocomplete
+     * methods on this object, depending on which key was pressed
+     *
+     * @param node: the "to addresses" textarea node
+     * @param event: the event object for the key down event
+     */
+    function addrAutocompleteKeyDown(self, node, event) {
+        var TAB = 9, ENTER = 13, UP = 38, DOWN = 40;
+
+        if(event.keyCode < 32 ||
+            (event.keyCode >= 33 && event.keyCode <= 46) ||
+            (event.keyCode >= 112 && event.keyCode <= 123)) {
+
+            if(self.completions.style.display == "none") {
+                return true;
+            }
+            if(event.keyCode == ENTER || event.keyCode == TAB) {
+                if(0 < self.completions.childNodes.length) {
+                    self.appendAddrCompletionToList(self.selectedAddrCompletion());
+                }
+                return false;
+            } else if(event.keyCode == DOWN) {
+                self.shiftAddrCompletionHighlightDown();
+            } else if(event.keyCode == UP) {
+                self.shiftAddrCompletionHighlightUp();
+            } else {
+                self.emptyAndHideAddressCompletions();
+            }
+        } else {
+            setTimeout(
+                function() {
+                    self.completeCurrentAddr(node.value);
+                }, 0);
+        }
+        return true;
+    },
+
+    /**
+     * Highlight the address completion which appears in the completions list
+     * immediately after the currently selected completion, and deselect the
+     * currently selected completion
+     */
+    function shiftAddrCompletionHighlightDown(self) {
+        var selectedOffset = self.selectedAddrCompletion();
+        if(selectedOffset == self.completions.childNodes.length-1)
+            return;
+        var currentCompletion = self.completions.childNodes[selectedOffset];
+        currentCompletion.className = "";
+        currentCompletion.nextSibling.className = "selected-address-completion";
+    },
+
+    /**
+     * As L{shiftAddrCompletionHighlightDown}, but highlights the address
+     * completion immediately above the currently selected completion
+     */
+    function shiftAddrCompletionHighlightUp(self) {
+        var selectedOffset = self.selectedAddrCompletion();
+        if(selectedOffset == 0)
+            return;
+        var currentCompletion = self.completions.childNodes[selectedOffset];
+        currentCompletion.className = "";
+        currentCompletion.previousSibling.className = "selected-address-completion";
+    },
+
+    /**
+     * Highlight the first address which appears in the email address
+     * completions list
+     */
+    function highlightFirstAddrCompletion(self) {
+        self.completions.firstChild.className = "selected-address-completion";
+    },
+
+    /**
+     * @return: the index of the currently selected email address completion
+     * @type: C{Number}
+     */
+    function selectedAddrCompletion(self) {
+        for(var i = 0; i < self.completions.childNodes.length; i++)
+            if(self.completions.childNodes[i].className == "selected-address-completion")
+                return i;
+        return null;
+    },
+
+    /**
+     * Remove all entries from the completion list and hide it
+     */
+    function emptyAndHideAddressCompletions(self) {
+        while(self.completions.firstChild) {
+            self.completions.removeChild(self.completions.firstChild);
+        }
+        self.completions.style.display = "none";
+    },
+
+    /**
+     * Take the address at position C{offset} in the email completions list
+     * and append it to the "to addresses" textarea
+     */
+    function appendAddrCompletionToList(self, offset) {
+        var input = self.nodeByAttribute("class", "compose-to-address");
+        var addrs = input.value.split(/,/);
+        var lastAddr = Quotient.Common.Util.stripLeadingTrailingWS(addrs[addrs.length - 1]);
+        var word = self.completions.childNodes[offset].firstChild.nodeValue;
+        // truncate the value of the text box so it includes all addresses up to
+        // but not including the last one
+        input.value = input.value.slice(0, input.value.length - lastAddr.length);
+        // then replace it with the completion
+        input.value += word + ", ";
+        self.emptyAndHideAddressCompletions();
+    },
+
+    /**
+     * For a pair C{nameaddr} containing [displayName, emailAddress], return something
+     * of the form '"displayName" <emailAddress>'.  If displayName is the empty
+     * string, return '<emailAddress>'.
+     */
+    function reconstituteAddress(self, nameaddr) {
+        var addr;
+        if(0 < nameaddr[0].length) {
+            addr = '"' + nameaddr[0] + '" ';
+        } else {
+            addr = "";
+        }
+        return addr + '<' + nameaddr[1] + '>';
+    },
+
+    /**
+     * @return: a sequence of possible completions for the last email address
+     * in the comma-delimited string of email address C{addresses}
+     */
+    function completeCurrentAddr(self, addresses) {
+        addresses = addresses.split(/,/);
+
+        if(addresses.length == 0)
+            return;
+
+        var lastAddress = Quotient.Common.Util.stripLeadingTrailingWS(addresses[addresses.length - 1]);
+        while(self.completions.firstChild) {
+            self.completions.removeChild(
+                self.completions.firstChild);
+        }
+
+        if(lastAddress.length == 0)
+            return;
+
+        /**
+         * Given an email address C{addr}, and a pair containing [displayName,
+         * emailAddress], return a boolean indicating whether emailAddress or
+         * any of the words in displayName is a prefix of C{addr}
+         */
+        function nameOrAddressStartswith(addr, nameaddr) {
+            var strings = nameaddr[0].split(/\s+/).concat(nameaddr);
+            for(var i = 0; i < strings.length; i++) {
+                if(Quotient.Common.Util.startswith(addr, strings[i])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        var completions = MochiKit.Base.filter(
+            MochiKit.Base.partial(nameOrAddressStartswith, lastAddress),
+            self.allPeople);
+
+
+        var attrs = null;
+
+        for(i = 0; i < completions.length; i++) {
+            attrs = {"href": "#",
+                     "onclick": function() {
+                        self.appendAddrCompletionToList(this.firstChild.nodeValue);
+                        return false;
+                     },
+                     "style": "display: block"};
+            self.completions.appendChild(
+                MochiKit.DOM.A(attrs, self.reconstituteAddress(completions[i])));
+        }
+
+        if(0 < completions.length) {
+            var input = self.nodeByAttribute("class", "compose-to-address");
+            MochiKit.DOM.setDisplayForElement("", self.completions);
+            self.completions.style.top  = Quotient.Common.Util.findPosY(input) +
+                                          Divmod.Runtime.theRuntime.getElementSize(input).h + "px";
+            self.completions.style.left = Quotient.Common.Util.findPosX(input) + "px";
+            self.highlightFirstAddrCompletion();
+        }
+        return completions;
+    });
+
+Quotient.Compose.Controller = Quotient.Compose._Controller.subclass('Quotient.Compose.Controller');
 Quotient.Compose.Controller.methods(
     function __init__(self, node, inline, allPeople) {
-        Quotient.Compose.Controller.upcall(self, "__init__", node);
+        Quotient.Compose.Controller.upcall(self, "__init__", node, inline, allPeople);
 
         var cc = self.firstNodeByAttribute("name", "cc");
         if(0 < cc.value.length) {
@@ -187,17 +422,8 @@ Quotient.Compose.Controller.methods(
 
         var mbody = self.firstNodeByAttribute("class", "compose-message-body");
         /* use a separate js class and/or template if this grows any more */
-        if(inline) {
-            self.firstNodeByAttribute("class", "cancel-link").style.display = "";
-            self.firstNodeByAttribute("class", "compose-table").style.width = "100%";
-            self.node.style.borderTop = "";
-        }
-
-        self.inline = inline;
-        self.allPeople = allPeople;
 
         self.draftNotification = self.nodeByAttribute("class", "draft-notification");
-        self.completions = self.nodeByAttribute("class", "address-completions");
 
         self.attachDialog = self.nodeByAttribute("class", "attach-dialog");
         self.autoSaveInterval = 30000; /* 30 seconds */
@@ -206,8 +432,6 @@ Quotient.Compose.Controller.methods(
         self.startSavingDrafts();
 
         self.makeFileInputs();
-
-        self.completionDeferred = Divmod.Defer.Deferred();
     },
 
     /**
@@ -249,12 +473,8 @@ Quotient.Compose.Controller.methods(
     },
 
     function cancel(self) {
+        Quotient.Compose.Controller.upcall(self, "cancel");
         self.stopSavingDrafts();
-        self.node.parentNode.removeChild(self.node);
-        self.completionDeferred.callback(null);
-        /*
-         * XXX Remove this from Athena's widget map, too.
-         */
     },
 
     function toggleFilesForm(self) {
@@ -439,157 +659,6 @@ Quotient.Compose.Controller.methods(
                           1)+ "px";
     },
 
-    function addrAutocompleteKeyDown(self, node, event) {
-        var TAB = 9, ENTER = 13, UP = 38, DOWN = 40;
-
-        if(event.keyCode < 32 ||
-            (event.keyCode >= 33 && event.keyCode <= 46) ||
-            (event.keyCode >= 112 && event.keyCode <= 123)) {
-
-            if(self.completions.style.display == "none") {
-                return true;
-            }
-            if(event.keyCode == ENTER || event.keyCode == TAB) {
-                if(0 < self.completions.childNodes.length) {
-                    self.appendAddrCompletionToList(self.selectedAddrCompletion());
-                }
-                return false;
-            } else if(event.keyCode == DOWN) {
-                self.shiftAddrCompletionHighlightDown();
-            } else if(event.keyCode == UP) {
-                self.shiftAddrCompletionHighlightUp();
-            } else {
-                self.emptyAndHideAddressCompletions();
-            }
-        } else {
-            setTimeout(
-                function() {
-                    self.completeCurrentAddr(node.value);
-                }, 0);
-        }
-        return true;
-    },
-
-    function shiftAddrCompletionHighlightDown(self) {
-        var selectedOffset = self.selectedAddrCompletion();
-        if(selectedOffset == self.completions.childNodes.length-1)
-            return;
-        var currentCompletion = self.completions.childNodes[selectedOffset];
-        currentCompletion.className = "";
-        currentCompletion.nextSibling.className = "selected-address-completion";
-    },
-
-    function highlightFirstAddrCompletion(self) {
-        self.completions.firstChild.className = "selected-address-completion";
-    },
-
-    function shiftAddrCompletionHighlightUp(self) {
-        var selectedOffset = self.selectedAddrCompletion();
-        if(selectedOffset == 0)
-            return;
-        var currentCompletion = self.completions.childNodes[selectedOffset];
-        currentCompletion.className = "";
-        currentCompletion.previousSibling.className = "selected-address-completion";
-    },
-
-    function selectedAddrCompletion(self) {
-        for(var i = 0; i < self.completions.childNodes.length; i++)
-            if(self.completions.childNodes[i].className == "selected-address-completion")
-                return i;
-        return null;
-    },
-
-    function emptyAndHideAddressCompletions(self) {
-        with(MochiKit.DOM) {
-            replaceChildNodes(self.completions);
-            hideElement(self.completions);
-        }
-    },
-
-    function appendAddrCompletionToList(self, offset) {
-        var input = self.nodeByAttribute("class", "compose-to-address");
-        var addrs = input.value.split(/,/);
-        var lastAddr = Quotient.Common.Util.stripLeadingTrailingWS(addrs[addrs.length - 1]);
-        var word = self.completions.childNodes[offset].firstChild.nodeValue;
-        // truncate the value of the text box so it includes all addresses up to
-        // but not including the last one
-        input.value = input.value.slice(0, input.value.length - lastAddr.length);
-        // then replace it with the completion
-        input.value += word + ", ";
-        self.emptyAndHideAddressCompletions();
-    },
-
-    /**
-     * For a pair C{nameaddr} containing [displayName, emailAddress], return something
-     * of the form '"displayName" <emailAddress>'.  If displayName is the empty
-     * string, return '<emailAddress>'.
-     */
-    function reconstituteAddress(self, nameaddr) {
-        var addr;
-        if(0 < nameaddr[0].length) {
-            addr = '"' + nameaddr[0] + '" ';
-        } else {
-            addr = "";
-        }
-        return addr + '<' + nameaddr[1] + '>';
-    },
-
-    function completeCurrentAddr(self, addresses) {
-        addresses = addresses.split(/,/);
-
-        if(addresses.length == 0)
-            return;
-
-        var lastAddress = Quotient.Common.Util.stripLeadingTrailingWS(addresses[addresses.length - 1]);
-        MochiKit.DOM.replaceChildNodes(self.completions);
-
-        if(lastAddress.length == 0)
-            return;
-
-        /**
-         * Given an email address C{addr}, and a pair containing [displayName,
-         * emailAddress], return a boolean indicating whether emailAddress or
-         * any of the words in displayName is a prefix of C{addr}
-         */
-        function nameOrAddressStartswith(addr, nameaddr) {
-            var strings = nameaddr[0].split(/\s+/).concat(nameaddr);
-            for(var i = 0; i < strings.length; i++) {
-                if(Quotient.Common.Util.startswith(addr, strings[i])) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        var completions = MochiKit.Base.filter(
-            MochiKit.Base.partial(nameOrAddressStartswith, lastAddress),
-            self.allPeople);
-
-
-        var attrs = null;
-
-        for(i = 0; i < completions.length; i++) {
-            attrs = {"href": "#",
-                     "onclick": function() {
-                        self.appendAddrCompletionToList(this.firstChild.nodeValue);
-                        return false;
-                     },
-                     "style": "display: block"};
-            self.completions.appendChild(
-                MochiKit.DOM.A(attrs, self.reconstituteAddress(completions[i])));
-        }
-
-        if(0 < completions.length) {
-            var input = self.nodeByAttribute("class", "compose-to-address");
-            MochiKit.DOM.setDisplayForElement("", self.completions);
-            self.completions.style.top  = Quotient.Common.Util.findPosY(input) +
-                                          Divmod.Runtime.theRuntime.getElementSize(input).h + "px";
-            self.completions.style.left = Quotient.Common.Util.findPosX(input) + "px";
-            self.highlightFirstAddrCompletion();
-        }
-        return completions;
-    },
-
     function setAttachment(self, input) {
         MochiKit.DOM.hideElement(input);
         MochiKit.DOM.appendChildNodes(input.parentNode,
@@ -631,6 +700,51 @@ Quotient.Compose.Controller.methods(
         if(!self.savingADraft) {
             return Quotient.Compose.Controller.upcall(self, "submitSuccess", result);
         }
-    }
+    });
 
-    );
+/**
+ * Class for controlling the redirection of emails
+ *
+ * XXX: Interfaces, or something.  We need to act sort of like an
+ * L{Quotient.Compose.Controller} some of the time, because
+ * L{Quotient.Mailbox.Controller} thinks we are one.
+ */
+Quotient.Compose.RedirectingController = Quotient.Compose._Controller.subclass('Quotient.Compose.RedirectingController');
+Quotient.Compose.RedirectingController.methods(
+    /**
+     * @param allPeople: an array of 2-arrays of [name, email address] for
+     * each person in the addressbook.  This is used for autocomplete
+     */
+    function __init__(self, node, allPeople) {
+        Quotient.Compose.RedirectingController.upcall(
+            self, "__init__", node, true, allPeople);
+        self.firstNodeByAttribute(
+            "class", "draft-button-container").style.display = "none";
+    },
+
+    /**
+     * Unlike L{Quotient.Compose.Controller}, we don't need to do any special
+     * work to fit inside our parent node.
+     */
+    function fitInsideNode(self) {
+    },
+
+    /**
+     * Override default implementation to reject concurrent submissions, and
+     * to call C{cancel} when we're done
+     */
+    function submit(self) {
+        if(self._submitting) {
+            throw new Error("Concurrent submission rejected.");
+        }
+        self._submitting = true;
+
+        var D = Quotient.Compose.RedirectingController.upcall(self, "submit");
+        D.addCallback(
+            function(passthrough) {
+                self._submitting = false;
+                self.cancel();
+                return passthrough;
+            });
+        return D;
+    });

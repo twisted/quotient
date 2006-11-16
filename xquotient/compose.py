@@ -24,7 +24,7 @@ from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, equotient, renderers, mimeutil
-from xquotient.exmess import Message
+from xquotient.exmess import Message, MessageDetail
 from xquotient.mimestorage import Header, Part
 
 
@@ -334,15 +334,8 @@ class Composer(item.Item, item.InstallableMixin):
         G.Generator(s).flatten(m)
         s.seek(0)
 
-        def createMessage():
-            # this doesn't seem to get called (yet?)
-            mr = iquotient.IMIMEDelivery(
-                    self.store).createMIMEReceiver(
-                                'sent://' + FromAddress.findDefault(self.store).address)
-            for L in s:
-                mr.lineReceived(L.rstrip('\n'))
-            mr.messageDone()
-        self.store.transact(createMessage)
+        self.createMessageAndQueueIt(
+            FromAddress.findDefault(self.store).address, s)
 
 
     def messageSent(self, toAddress, msg):
@@ -350,6 +343,64 @@ class Composer(item.Item, item.InstallableMixin):
         print 'DELIVERY PROBABLY!!!!!!!!!!!!!!!!!!'
         print 'Z' * 50
 
+
+    def createMessageAndQueueIt(self, fromAddress, s):
+        """
+        Create a message out of C{s}, from C{fromAddress}
+
+        @param fromAddress: address from which to send the email
+        @type fromAddress: C{unicode}
+        @param s: message to send
+        @type s: line iterable
+
+        @rtype: L{xquotient.exmess.Message}
+        """
+        def txn():
+            mr = iquotient.IMIMEDelivery(self.store).createMIMEReceiver(
+                                'sent://' + fromAddress)
+            for L in s:
+                mr.lineReceived(L.rstrip('\n'))
+            mr.messageDone()
+            return mr.message
+        return self.store.transact(txn)
+
+
+    def createRedirectedMessage(self, fromAddress, toAddresses, message):
+        """
+        Create a L{Message} item based on C{message}, with the C{Resent-From}
+        and C{Resent-To} headers set
+
+        @type fromAddress: L{FromAddress}
+
+        @type toAddresses: sequence of L{mimeutil.EmailAddress}
+
+        @type message: L{Message}
+
+        @rtype: L{Message}
+        """
+        from email import Header as MH, Parser as MP, Generator as G
+
+        m = MP.Parser().parse(message.impl.source.open())
+        m['Resent-From'] = MH.Header(fromAddress.address).encode()
+        m['Resent-To']  = MH.Header(mimeutil.flattenEmailAddresses(toAddresses)).encode()
+
+        s = MP.StringIO()
+        G.Generator(s).flatten(m)
+        s.seek(0)
+
+        return self.createMessageAndQueueIt(fromAddress.address, s)
+
+
+    def redirect(self, fromAddress, toAddresses, message):
+        """
+        Redirect C{message} from C{fromAddress} to C{toAddresses}.
+        Parameters the same as for L{createRedirectedMessage}
+
+        @rtype: C{None}
+        """
+        msg = self.createRedirectedMessage(fromAddress, toAddresses, message)
+        addresses = [addr.email for addr in toAddresses]
+        self.sendMessage(fromAddress, addresses, msg)
 
 
 def upgradeCompose1to2(oldComposer):
@@ -445,23 +496,83 @@ class FileCabinetPage(rend.Page):
 
 registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
 
-class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin):
+class _ComposeFragmentMixin:
+    """
+    Mixin which provides some stuff that might be useful to fragments which do
+    composey things.
+
+    Assumes it is mixed-in to something where C{self.composer} is a
+    L{Composer}
+    """
+
+    def _coerceEmailAddressString(self, s):
+        """
+        Turn a string representation of one or more email addresses into a
+        list of L{mimetuil.EmailAddress} instances
+
+        @param s: non mime-encoded string
+        @type s: C{str}
+
+        @return: L{mimeutil.EmailAddress} instances
+        @rtype: sequence
+        """
+        return mimeutil.parseEmailAddresses(s, mimeEncoded=False)
+
+    def _getFromAddressStan(self):
+        """
+        Turn the L{FromAddress} items in the L{Composer}'s store into some
+        stan, using the C{from-select} and C{from-select-option} patterns from
+        the template
+        """
+        fromAddrs = []
+        for fromAddress in self.composer.store.query(FromAddress):
+            if fromAddress._default:
+                fromAddrs.insert(0, fromAddress)
+            else:
+                fromAddrs.append(fromAddress)
+
+        iq = inevow.IQ(self.docFactory)
+        return iq.onePattern('from-select').fillSlots(
+                        'options', [iq.onePattern(
+                                    'from-select-option').fillSlots(
+                                        'address', addr.address).fillSlots(
+                                        'value', self.translator.toWebID(addr))
+                                        for addr in fromAddrs])
+
+
+
+    def getPeople(self):
+        """
+        @return: a sequence of pairs (name, email) for each Person in the
+        store of my L{Composer}, where name is the person's display name, and
+        email is their email address.  omits people without a display name or
+        email address
+        """
+        peeps = []
+        for person in self.composer.store.query(people.Person):
+            email = person.getEmailAddress()
+            if email is None:
+                email = u''
+            name = person.getDisplayName()
+            if name or email:
+                peeps.append((name, email))
+        return peeps
+    expose(getPeople)
+
+
+
+class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin, _ComposeFragmentMixin):
     implements(ixmantissa.INavigableFragment)
 
-    fragmentName = 'compose'
-    live = 'athena'
     jsClass = u'Quotient.Compose.Controller'
-    title = ''
+    fragmentName = 'compose'
 
     _savedDraft = None
 
-    def __init__(self, original, toAddresses='', subject='', messageBody='',
+    def __init__(self, composer, toAddresses='', subject='', messageBody='',
                  attachments=(), inline=False):
-        self.original = original
-        self.translator = ixmantissa.IWebTranslator(original.store)
-
-        def toEmailAddresses(s):
-            return mimeutil.parseEmailAddresses(s, mimeEncoded=False)
+        self.composer = composer
+        self.translator = ixmantissa.IWebTranslator(composer.store)
 
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
@@ -470,7 +581,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                            coercer=self.translator.fromWebID),
                         liveform.Parameter(name='toAddresses',
                                            type=liveform.TEXT_INPUT,
-                                           coercer=toEmailAddresses),
+                                           coercer=self._coerceEmailAddressString),
                         liveform.Parameter(name='subject',
                                            type=liveform.TEXT_INPUT,
                                            coercer=unicode),
@@ -486,7 +597,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
-        self.toAddresses = toEmailAddresses(toAddresses)
+        self.toAddresses = self._coerceEmailAddressString(toAddresses)
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments
@@ -494,7 +605,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         self.inline = inline
 
         self.docFactory = None
-        self.cabinet = self.original.store.findOrCreate(FileCabinet)
+        self.cabinet = self.composer.store.findOrCreate(FileCabinet)
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
@@ -505,31 +616,15 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
     expose(invoke)
 
 
-    def getPeople(self):
-        """
-        @return: a sequence of pairs (name, email) for each Person in the store of
-                 my L{Composer}, where name is the person's display name, and email
-                 is their email address.  omits people without a display name or
-                 email address
-        """
-        peeps = []
-        for person in self.original.store.query(people.Person):
-            email = person.getEmailAddress()
-            if email is None:
-                email = u''
-            name = person.getDisplayName()
-            if name or email:
-                peeps.append((name, email))
-        return peeps
-    expose(getPeople)
-
-
     def getInitialArguments(self):
         return (self.inline, self.getPeople())
 
+    def render_attachButton(self, ctx, data):
+        return inevow.IQ(self.docFactory).onePattern('attach-button')
+
     def render_inboxLink(self, ctx, data):
         from xquotient.inbox import Inbox
-        return self.translator.linkTo(self.original.store.findUnique(Inbox).storeID)
+        return self.translator.linkTo(self.composer.store.findUnique(Inbox).storeID)
 
     def render_compose(self, ctx, data):
         req = inevow.IRequest(ctx)
@@ -539,19 +634,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         attachmentPattern = iq.patternGenerator('attachment')
         attachments = []
 
-        fromAddrs = []
-        for fromAddress in self.original.store.query(FromAddress):
-            if fromAddress._default:
-                fromAddrs.insert(0, fromAddress)
-            else:
-                fromAddrs.append(fromAddress)
-
-        fromStan = iq.onePattern('from-select').fillSlots(
-                        'options', [iq.onePattern(
-                                    'from-select-option').fillSlots(
-                                        'address', addr.address).fillSlots(
-                                        'value', self.translator.toWebID(addr))
-                                        for addr in fromAddrs])
+        bodyPattern = iq.onePattern('message-body')
+        subjectPattern = iq.onePattern('subject')
 
         if draftWebID is not None:
             draft = self.translator.fromWebID(draftWebID)
@@ -569,9 +653,11 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                     'name', f.name))
 
             slotData = {'to': draft.message.recipient,
-                        'from': fromStan,
-                        'subject': draft.message.subject,
-                        'body': txt.getBody(decode=True),
+                        'from': self._getFromAddressStan(),
+                        'subject': subjectPattern.fillSlots(
+                                        'subject', draft.message.subject),
+                        'message-body': bodyPattern.fillSlots(
+                                            'body', txt.getBody(decode=True)),
                         'cc': cc,
                         'attachments': attachments}
 
@@ -584,9 +670,11 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
                                     'name', a.filename or 'No Name'))
 
             slotData = {'to': mimeutil.flattenEmailAddresses(self.toAddresses),
-                        'from': fromStan,
-                        'subject': self.subject,
-                        'body': self.messageBody,
+                        'from': self._getFromAddressStan(),
+                        'subject': subjectPattern.fillSlots(
+                                    'subject', self.subject),
+                        'message-body': bodyPattern.fillSlots(
+                                            'body', self.messageBody),
                         'cc': '',
                         'attachments': attachments}
 
@@ -621,7 +709,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         if files:
             attachmentParts = []
             for storeID in files:
-                a = self.original.store.getItemByID(long(storeID))
+                a = self.composer.store.getItemByID(long(storeID))
                 if isinstance(a, Part):
                     a = self.cabinet.createFileItem(
                             a.getParam('filename',
@@ -649,16 +737,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
         G.Generator(s).flatten(m)
         s.seek(0)
 
-        def createMessageAndQueueIt():
-            mr = iquotient.IMIMEDelivery(
-                        self.original.store).createMIMEReceiver(
-                                'sent://' + fromAddress.address)
-            for L in s:
-                mr.lineReceived(L.rstrip('\n'))
-            mr.messageDone()
-            return mr.message
-
-        msg = self.original.store.transact(createMessageAndQueueIt)
+        msg = self.composer.createMessageAndQueueIt(fromAddress.address, s)
         # there is probably a better way than this, but there
         # isn't a way to associate the same file item with multiple
         # messages anyway, so there isn't a need to reflect that here
@@ -676,7 +755,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             addresses.append(cc)
 
         # except we are going to send this draft
-        self.original.sendMessage(fromAddress, addresses, self._savedDraft.message)
+        self.composer.sendMessage(fromAddress, addresses, self._savedDraft.message)
         # and then make it not a draft anymore
         self._savedDraft.message.draft = False
 
@@ -699,7 +778,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
             oldmsg.deleteFromStore()
             self._savedDraft.message = msg
         else:
-            self._savedDraft = Draft(store=self.original.store, message=msg)
+            self._savedDraft = Draft(store=self.composer.store, message=msg)
 
 
     def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files, draft):
@@ -711,6 +790,87 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin)
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
+
+
+
+class RedirectingComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin, _ComposeFragmentMixin):
+    """
+    A fragment which provides UI for redirecting email messages
+    """
+    implements(ixmantissa.INavigableFragment)
+
+    jsClass = u'Quotient.Compose.RedirectingController'
+    fragmentName = 'compose'
+
+    def __init__(self, composer, message):
+        """
+        @type composer: L{Composer}
+
+        @param message: the message being redirected
+        @type message: L{Message}
+        """
+        self.composer = composer
+        self.message = message
+
+        self.translator = ixmantissa.IWebTranslator(composer.store)
+
+        super(RedirectingComposeFragment, self).__init__(
+            callable=self.redirect,
+            parameters=(liveform.Parameter(name='fromAddress',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=self.translator.fromWebID),
+                        liveform.Parameter(name='toAddresses',
+                                           type=liveform.TEXT_INPUT,
+                                           coercer=self._coerceEmailAddressString)))
+
+
+    def render_attachButton(self, ctx, data):
+        """
+        The template contains an "attachButton" render directive.  Return the
+        empty string, as we don't want an attach button for redirected
+        messages
+        """
+        return ''
+
+
+    def _getMessageBody(self):
+        f = MessageDetail(self.message)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+
+
+    def render_compose(self, ctx, data):
+        """
+        Only fill in the C{from} and C{message-body} slots with anything
+        useful - the stuff that L{ComposeFragment} puts in the rest of slots
+        will be apparent from the L{MessageDetail} fragment we put in
+        C{message-body}
+        """
+        return dictFillSlots(ctx.tag,
+                {'to': '',
+                 'from': self._getFromAddressStan(),
+                 'subject': '',
+                 'message-body': self._getMessageBody(),
+                 'cc': '',
+                 'attachments': ''})
+
+
+    def getInitialArguments(self):
+        return (self.getPeople(),)
+
+
+    def redirect(self, fromAddress, toAddresses):
+        """
+        Ask L{Composer} to redirect C{self.message}
+
+        @param fromAddress: the address to send from
+        @type fromAddress: L{FromAddress}
+
+        @param toAddresses: L{mimeutil.EmailAddress} instances
+        @type toAddresses: sequence
+        """
+        self.composer.redirect(fromAddress, toAddresses, self.message)
 
 
 

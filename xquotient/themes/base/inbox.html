@@ -188,14 +188,13 @@
               reply
             </nevow:invisible>
           </span>
-          <span class="print-button">
-            <nevow:invisible
-               nevow:render="button"
-               onclick="Quotient.Mailbox.Controller.get(this).printable(); return false"
-               href="#">
-              print
-            </nevow:invisible>
-          </span>
+          <select class="more-actions">
+            <athena:handler event="onchange" handler="methodCallFromSelect" />
+            <option class="more-actions-option">More Actions...</option>
+            <option value="printable">Printable Version</option>
+            <option value="messageSource">Message Source</option>
+            <option value="redirect">Redirect</option>
+          </select>
           <!-- in IE the defer select is taller than the buttons, and when we hide it
                 in certain views, things get a bit fucked up.  there is probably a better
                 way to fix this -->

@@ -568,6 +568,15 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
             return self.patterns['scrubbed-dialog']()
         return ''
 
+    def _getRedirectHeaderStan(self):
+        try:
+            resentFrom = self.original.impl.getHeader(u'Resent-From')
+        except equotient.NoSuchHeader:
+            return ''
+        resentTo = self.original.impl.getHeader(u'Resent-To')
+        return (self.patterns['redirected-from'].fillSlots('address', resentFrom),
+                self.patterns['redirected-to'].fillSlots('address', resentTo))
+
     def render_headerPanel(self, ctx, data):
         if self.organizer is not None:
             personStan = SenderPersonFragment(self.original)
@@ -607,7 +616,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                      'subject': self.original.subject,
                      'sent': sentWhenTerse,
                      'sent-detailed': sentWhenDetailed,
-                     'received-detailed': receivedWhenDetailed})
+                     'received-detailed': receivedWhenDetailed,
+                     'redirect-headers': self._getRedirectHeaderStan()})
 
     def _childLink(self, webItem, item):
         return '/' + webItem.prefixURL + '/' + self.translator.toWebID(item)

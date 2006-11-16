@@ -23,6 +23,7 @@
         <td class="msg-detail-field-name">To:</td>
         <td class="msg-detail-field-body"><nevow:slot name="recipient" /></td>
       </tr>
+      <nevow:slot name="redirect-headers" />
       <nevow:slot name="cc-detailed" />
       <tr style="display: none" class="detailed-row">
         <td class="msg-detail-field-name">From:</td>
@@ -71,9 +72,5 @@
   </div>
 
   <nevow:invisible nevow:render="imagePanel" />
-
-  <div class="message-source-container">
-    <nevow:invisible nevow:render="messageSourceLink" />
-  </div>
 
 </div>

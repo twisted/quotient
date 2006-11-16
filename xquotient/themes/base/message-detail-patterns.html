@@ -1,5 +1,15 @@
 <nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 
+  <tr nevow:pattern="redirected-from">
+    <td class="msg-detail-field-name">Resent From:</td>
+    <td class="msg-detail-field-body"><nevow:slot name="address" /></td>
+  </tr>
+
+  <tr nevow:pattern="redirected-to">
+    <td class="msg-detail-field-name">Resent To:</td>
+    <td class="msg-detail-field-body"><nevow:slot name="address" /></td>
+  </tr>
+
   <div nevow:pattern="scrubbed-dialog" class="scrubbed-dialog">
     <div>Message HTML has been modified for your safety.</div>
     <a href="#"

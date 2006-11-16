@@ -1,4 +1,5 @@
 from twisted.trial import unittest
+from twisted.python.filepath import FilePath
 
 from email import Parser
 
@@ -10,11 +11,11 @@ from axiom import userbase
 
 from xmantissa import webapp
 
-from xquotient import compose, mail, mimeutil
+from xquotient import compose, mail, mimeutil, exmess
 
 
 
-class SmarthostCompositionTestMixin(object):
+class CompositionTestMixin(object):
     """
     A mixin for setting up an appropriately-factored composition
     environment.
@@ -24,7 +25,7 @@ class SmarthostCompositionTestMixin(object):
     * Sets up a C{reactor} attribute on your test case to a
       L{Reactor} that will collect data about connectTCP calls (made
       by the ESMTP-sending code in compose.py; FIXME: make it work
-      for the non-smarthost case too.
+      for the non-smarthost case too).
     * Set up a composer object
     * Set up 2 from addresses
     """
@@ -72,7 +73,7 @@ class StubStoredMessageAndImplAndSource(item.Item):
     """
     outgoing = attributes.boolean()
     impl = property(lambda s: s)
-    source = property(lambda s: s)
+    source = property(lambda s: FilePath(__file__))
 
     def open(self):
         return "HI DUDE"
@@ -90,7 +91,7 @@ class Reactor(object):
 
 
 
-class ComposeFromTest(SmarthostCompositionTestMixin, unittest.TestCase):
+class ComposeFromTest(CompositionTestMixin, unittest.TestCase):
 
     def test_sendmailSendsToAppropriatePort(self):
         """
@@ -117,7 +118,79 @@ class ComposeFromTest(SmarthostCompositionTestMixin, unittest.TestCase):
 
 
 
-class ComposeFragmentTest(SmarthostCompositionTestMixin, unittest.TestCase):
+class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
+    """
+    Tests for mail redirection
+    """
+    def setUp(self):
+        CompositionTestMixin.setUp(self, dbdir=self.mktemp())
+        mail.DeliveryAgent(store=self.store).installOn(self.store)
+
+    def test_createRedirectedMessage(self):
+        """
+        Test that L{compose.Composer.createRedirectedMessage} sets the right
+        headers
+        """
+        message = StubStoredMessageAndImplAndSource(store=self.store)
+        msg = self.composer.createRedirectedMessage(
+                self.defaultFromAddr,
+                [mimeutil.EmailAddress(
+                    u'testuser@localhost',
+                    mimeEncoded=False)],
+                message)
+        m = Parser.Parser().parse(msg.impl.source.open())
+        self.assertEquals(m['Resent-To'], 'testuser@localhost')
+        self.assertEquals(m['Resent-From'], self.defaultFromAddr.address)
+
+
+    def test_redirect(self):
+        """
+        Test L{compose.Composer.redirect}
+        """
+        message = StubStoredMessageAndImplAndSource(store=self.store)
+        msg = self.composer.redirect(
+                self.defaultFromAddr,
+                [mimeutil.EmailAddress(
+                    u'testuser@localhost',
+                    mimeEncoded=False)],
+                message)
+
+        self.assertEquals(
+            str(self.reactor.factory.fromEmail),
+            self.defaultFromAddr.address)
+
+        self.assertEquals(
+            list(self.reactor.factory.toEmail),
+            ['testuser@localhost'])
+
+        m = Parser.Parser().parse(
+                self.store.findUnique(
+                    exmess.Message).impl.source.open())
+
+        self.assertEquals(m['Resent-From'], self.defaultFromAddr.address)
+        self.assertEquals(m['Resent-To'], 'testuser@localhost')
+
+    def test_redirectNameAddr(self):
+        """
+        Test that L{compose.Composer.redirect} removes the display name
+        portion of an email address if present before trying to deliver
+        directed mail to it
+        """
+        message= StubStoredMessageAndImplAndSource(store=self.store)
+        msg = self.composer.redirect(
+                self.defaultFromAddr,
+                [mimeutil.EmailAddress(
+                    u'Joe <joe@nowhere>',
+                    mimeEncoded=False)],
+                message)
+
+        self.assertEquals(
+            list(self.reactor.factory.toEmail),
+            ['joe@nowhere'])
+
+
+
+class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
     """
     Test the L{ComposeFragment}.
     """
@@ -127,7 +200,7 @@ class ComposeFragmentTest(SmarthostCompositionTestMixin, unittest.TestCase):
         Create an *on-disk* store (XXX This is hella slow) and set up
         some dependencies that ComposeFragment needs.
         """
-        SmarthostCompositionTestMixin.setUp(self, dbdir=self.mktemp())
+        CompositionTestMixin.setUp(self, dbdir=self.mktemp())
 
         webapp.PrivateApplication(store=self.store).installOn(self.store)
         da = mail.DeliveryAgent(store=self.store)

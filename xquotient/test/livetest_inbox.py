@@ -3,6 +3,7 @@ import time
 
 from nevow.livetrial import testcase
 from nevow.athena import LiveFragment, expose
+from nevow import inevow
 
 from epsilon.extime import Time
 
@@ -120,12 +121,18 @@ class StubComposeFragment(LiveFragment):
         Fill the slots the template requires to be filled in order to be
         rendered.
         """
+        iq = inevow.IQ(self.docFactory)
         ctx.fillSlots('from', 'bob@example')
         ctx.fillSlots('to', 'alice@example.com')
         ctx.fillSlots('cc', 'bob@example.com')
-        ctx.fillSlots('subject', 'Test Message')
+        ctx.fillSlots(
+            'subject',
+            iq.onePattern('subject').fillSlots('subject', 'Test Message'))
         ctx.fillSlots('attachments', '')
-        ctx.fillSlots('body', 'message body text')
+        ctx.fillSlots(
+            'message-body',
+            iq.onePattern('message-body').fillSlots(
+                'body', 'message body text'))
         return LiveFragment.rend(self, ctx, data)
 
 

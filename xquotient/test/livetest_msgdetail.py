@@ -15,6 +15,7 @@ from xmantissa import people
 from xquotient.exmess import Message, MessageDetail
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient.inbox import Inbox
+from xquotient import equotient
 
 _headers = {'cc': u'cc@host'}
 
@@ -22,7 +23,10 @@ class _Part(Item):
     z = attributes.integer()
 
     def getHeader(self, k):
-        return _headers[k]
+        try:
+            return _headers[k]
+        except KeyError:
+            raise equotient.NoSuchHeader()
 
     def walkMessage(self, *junk):
         return ()

@@ -12,6 +12,27 @@
     <nevow:slot name="address" />
   </option>
 
+  <tr nevow:pattern="subject">
+    <td class="header-table-first-col">Subject:</td>
+    <td class="header-table-last-col">
+      <input type="text" name="subject" style="width: 98%"
+        ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input>
+    </td>
+  </tr>
+
+  <textarea nevow:pattern="message-body"
+    name="messageBody"
+    class="compose-message-body" cols="79" rows="20"
+    ><nevow:slot name="body" /></textarea>
+
+  <a nevow:pattern="attach-button"
+    style="float: left"
+    href="#"
+    onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
+    <img border="0" src="/Quotient/static/images/attach-button.png" />
+    <span style="color: #0099CC">Attach</span>
+  </a>
+
   <div style="display: none;
               position: absolute;
               top: 10px;
@@ -108,15 +129,14 @@
                             Send
                           </a>
                         </nevow:invisible>
-                        <nevow:invisible nevow:render="button">
-                          <a href="#" onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false;">
-                            Save Draft
-                          </a>
-                        </nevow:invisible>
-                        <a style="float: left" href="#" onclick="Quotient.Compose.Controller.get(this).toggleAttachDialog(this); return false">
-                          <img border="0" src="/Quotient/static/images/attach-button.png" />
-                          <span style="color: #0099CC">Attach</span>
-                        </a>
+                        <span class="draft-button-container">
+                          <nevow:invisible nevow:render="button">
+                            <a href="#" onclick="Quotient.Compose.Controller.get(this).saveDraft(true); return false;">
+                              Save Draft
+                            </a>
+                          </nevow:invisible>
+                        </span>
+                        <nevow:invisible nevow:render="attachButton" />
                       </div>
                     </div>
                     <div style="float: right">
@@ -153,12 +173,7 @@
                     <input type="hidden" name="bcc" />
                   </td>
                 </tr>
-                <tr>
-                  <td class="header-table-first-col">Subject:</td>
-                  <td class="header-table-last-col">
-                    <input type="text" name="subject" style="width: 98%"
-                      ><nevow:attr name="value"><nevow:slot name="subject" /></nevow:attr></input></td>
-                </tr>
+                <nevow:slot name="subject" />
                 <tr class="files-form" style="display: none">
                   <td class="header-table-first-col">Files:</td>
                   <td class="header-table-last-col">
@@ -173,8 +188,7 @@
         </tr>
         <tr>
           <td>
-            <textarea name="messageBody" class="compose-message-body" cols="79" rows="20"
-              ><nevow:slot name="body" /></textarea>
+            <nevow:slot name="message-body" />
           </td>
         </tr>
       </table>

@@ -823,13 +823,13 @@ Quotient.Mailbox.Controller.methods(
     function _getActionButtons(self) {
         var buttonInfo = {
             "all": ["defer", "delete", "forward",
-                    "reply", "print", "train-spam", "unarchive"],
+                    "reply", "train-spam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
-                      "forward", "reply", "print", "train-spam"],
+                      "forward", "reply", "train-spam"],
             "spam": ["delete", "train-ham"],
-            "deferred": ["forward", "reply", "print"],
-            "sent": ["delete", "forward", "reply", "print"],
-            "trash": ["forward" ,"reply", "print", "undelete"]};
+            "deferred": ["forward", "reply"],
+            "sent": ["delete", "forward", "reply"],
+            "trash": ["forward" ,"reply", "undelete"]};
 
         /*
          * Compute list of all button names from the buttonInfo structured.
@@ -997,6 +997,33 @@ Quotient.Mailbox.Controller.methods(
         var selectNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             self.node, 'name', 'batch-type');
         return self.changeBatchSelection(selectNode.value);
+    },
+
+    /**
+     * Call a method on this object, extracting the method name from the value
+     * of the currently selected <option> of the <select> node C{selectNode}
+     * and returning the result of the selected method.  The first option in
+     * the <select> is selected after the method returns.
+     *
+     * @type selectNode: a <select> node
+     * @return: the return value of the method, or null if the currently
+     * selected <option> doesn't have a "value" attribute
+     *
+     */
+    function methodCallFromSelect(self, selectNode) {
+        var opts = selectNode.getElementsByTagName("option"),
+            opt = opts[selectNode.selectedIndex];
+        if(opt.value == "") {
+            return null;
+        }
+        try {
+            var result = self[opt.value]();
+        } catch(e) {
+            selectNode.selectedIndex = 0;
+            throw e;
+        }
+        selectNode.selectedIndex = 0;
+        return result;
     },
 
     /**
@@ -1960,6 +1987,10 @@ Quotient.Mailbox.Controller.methods(
          return self._doComposeAction("replyToMessage", reloadMessage);
     },
 
+    function redirect(self, reloadMessage/*=undefined*/) {
+        return self._doComposeAction("redirectMessage", reloadMessage);
+    },
+
     function forward(self, reloadMessage/*=undefined*/) {
         /*
          * See replyTo
@@ -2099,13 +2130,30 @@ Quotient.Mailbox.Controller.methods(
         }
     },
 
-    /** Fragment-boundary-crossing proxy for
+    /**
+     * Return the L{Quotient.Message.MessageDetail} instance for the message
+     * currently loaded into the inbox
+     */
+    function _getMessageDetail(self) {
+        return Quotient.Message.MessageDetail.get(
+                self.firstWithClass(
+                    self.messageDetail, "message-detail-fragment"));
+    },
+
+    /**
+     * Fragment-boundary-crossing proxy for
      * L{Quotient.Message.MessageDetail.printable}
      */
     function printable(self) {
-        Quotient.Message.MessageDetail.get(
-            self.firstWithClass(
-                self.messageDetail, "message-detail-fragment")).printable();
+        return self._getMessageDetail().printable();
+    },
+
+    /**
+     * Fragment-boundary-crossing proxy for
+     * L{Quotient.Message.MessageDetail.messageSource}
+     */
+    function messageSource(self) {
+        return self._getMessageDetail().messageSource();
     },
 
     /**

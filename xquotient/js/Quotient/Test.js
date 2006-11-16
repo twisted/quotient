@@ -1021,8 +1021,7 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForInbox(self) {
         return self._actionTest(
             "inbox",
-            ["archive", "defer", "delete", "forward",
-             "reply", "print", "train-spam"],
+            ["archive", "defer", "delete", "forward", "reply", "train-spam"],
             ["archive", "delete", "train-spam"]);
     },
 
@@ -1032,8 +1031,7 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForAll(self) {
         return self._actionTest(
             "all",
-            ["unarchive", "defer", "delete", "forward",
-             "reply", "print", "train-spam"],
+            ["unarchive", "defer", "delete", "forward", "reply", "train-spam"],
             ["unarchive", "delete", "train-spam"]);
     },
 
@@ -1043,7 +1041,7 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForTrash(self) {
         return self._actionTest(
             "trash",
-            ["undelete", "forward", "reply", "print"],
+            ["undelete", "forward", "reply"],
             ["undelete"]);
     },
 
@@ -1063,7 +1061,7 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForDeferred(self) {
         return self._actionTest(
             "deferred",
-            ["forward", "reply", "print"],
+            ["forward", "reply"],
             []);
     },
 
@@ -1073,7 +1071,7 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForSent(self) {
         return self._actionTest(
             "sent",
-            ["delete", "forward", "reply", "print"],
+            ["delete", "forward", "reply"],
             ["delete"]);
     },
 
@@ -1638,6 +1636,31 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test that selecting the redirect action for a message brings up a
+     * compose widget
+     */
+    function test_redirect(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.redirect(false);
+            });
+        result.addCallback(
+            function(ignored) {
+                var children = self.controllerWidget.childWidgets;
+                var lastChild = children[children.length - 1];
+                self.failUnless(lastChild instanceof Quotient.Compose.RedirectingController);
+
+                var parentNode = lastChild.node;
+                while(parentNode != null && parentNode != self.node) {
+                    parentNode = parentNode.parentNode;
+                }
+                self.assertEqual(parentNode, self.node);
+            });
+        return result;
+    },
+
+    /**
      * Test that the send button on the compose widget returns the view to its
      * previous state.
      */
@@ -1946,6 +1969,39 @@ Quotient.Test.ControllerTestCase.methods(
                 self.assertEqual(
                     self.controllerWidget.scrollWidget.getSelectedRow().__id__,
                     curmsg.__id__);
+            });
+        return result;
+    },
+
+    /**
+     * Tests for L{Quotient.Mailbox.Controller.methodCallFromSelect}
+     */
+    function test_methodCallFromSelect(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                var called = 0;
+                self.controllerWidget.__counterMethod = function() {
+                    called++;
+                    return "HI!";
+                }
+
+                var select = document.createElement("select");
+                var option = document.createElement("option");
+                option.value = "__counterMethod";
+                select.appendChild(option);
+
+                self.assertEqual(
+                    self.controllerWidget.methodCallFromSelect(select),
+                    "HI!");
+                self.assertEqual(called, 1);
+
+                option.removeAttribute("value");
+
+                self.assertEqual(
+                    self.controllerWidget.methodCallFromSelect(select),
+                    null);
+                self.assertEqual(called, 1);
             });
         return result;
     });

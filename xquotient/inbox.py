@@ -866,6 +866,18 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     expose(replyToMessage)
 
 
+    def redirectMessage(self, messageIdentifier):
+        msg = self.translator.fromWebID(messageIdentifier)
+
+        composer = self.inbox.store.findUnique(compose.Composer)
+
+        redirect = compose.RedirectingComposeFragment(composer, msg)
+        redirect.setFragmentParent(self)
+        redirect.docFactory = getLoader(redirect.fragmentName)
+        return redirect
+    expose(redirectMessage)
+
+
     def forwardMessage(self, messageIdentifier):
         curmsg = self.translator.fromWebID(messageIdentifier)
 
