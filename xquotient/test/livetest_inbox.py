@@ -300,11 +300,11 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
     expose(getControllerWidget)
 
 
-    def getMessageDetail(self):
+    def getMessageDetail(self, key):
         """
-        Return the MessageDetail widget for a random message.
+        Return the MessageDetail widget with the given webID.
         """
-        detail = MessageDetail(self.messages.values()[0])
+        detail = MessageDetail(self.messages[key])
         detail.setFragmentParent(self)
         return detail
     expose(getMessageDetail)

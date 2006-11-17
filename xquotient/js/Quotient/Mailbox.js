@@ -1414,7 +1414,7 @@ Quotient.Mailbox.Controller.methods(
         return self.withReducedMessageDetailOpacity(
             function() {
                 return self.callRemote("fastForward", self.scrollWidget.viewSelection, toMessageID).addCallback(
-                    function(messageData) {
+                    function(newCurrentMessage) {
                         var rowData = null;
                         try {
                             rowData = self.scrollWidget.model.findRowData(toMessageID);
@@ -1430,7 +1430,7 @@ Quotient.Mailbox.Controller.methods(
                         }
                         if (rowData != null) {
                             rowData.read = true;
-                            return self.setMessageContent(messageData[0], messageData[1]);
+                            return self.setMessageContent(toMessageID, newCurrentMessage);
                         }
                     });
             });
@@ -2213,6 +2213,52 @@ Quotient.Mailbox.Controller.methods(
                                                  pattern);
     },
 
+
+    /**
+     * Return the row data which should be used for the preview display, if the
+     * given webID is currently being displayed.
+     */
+    function _findPreviewRow(self, webID) {
+        var previewData = undefined;
+        var messageIndex = self.scrollWidget.model.findIndex(webID);
+        /*
+         * Look after it
+         */
+        try {
+            previewData = self.scrollWidget.model.getRowData(messageIndex + 1);
+        } catch (err) {
+            if (!(err instanceof Divmod.IndexError)) {
+                throw err;
+            }
+            try {
+                /*
+                 * Look before it
+                 */
+                previewData = self.scrollWidget.model.getRowData(messageIndex - 1);
+            } catch (err) {
+                if (!(err instanceof Divmod.IndexError)) {
+                    throw err;
+                }
+                /*
+                 * No preview data for you.
+                 */
+            }
+        }
+
+        if (previewData === undefined) {
+            return null;
+        } else {
+            return previewData;
+        }
+    },
+
+    /**
+     * Extract the data relevant for a message preview from the given data row.
+     */
+    function _getPreviewData(self, row) {
+        return {"subject": row["subject"]};
+    },
+
     /**
      * @param nextMessagePreview: An object with a subject property giving
      * the subject of the next message.  This value is not necessarily HTML;
@@ -2223,7 +2269,7 @@ Quotient.Mailbox.Controller.methods(
      * to be displayed in the message detail area of this controller.
      *
      */
-    function setMessageContent(self, nextMessagePreview, currentMessageDisplay) {
+    function setMessageContent(self, toMessageID, currentMessageDisplay) {
         self.messageDetail.scrollTop = 0;
         self.messageDetail.scrollLeft = 0;
 
@@ -2238,7 +2284,12 @@ Quotient.Mailbox.Controller.methods(
                  * highlightExtracts() knows how to handle that */
                 self.highlightExtracts();
 
-                self.updateMessagePreview(nextMessagePreview);
+                var preview = self._findPreviewRow(toMessageID);
+                if (preview !== null) {
+                    self.updateMessagePreview(self._getPreviewData(preview));
+                } else {
+                    self.updateMessagePreview(null);
+                }
 
                 /* if this is the "no more messages" pseudo-message,
                    then there won't be any message body */

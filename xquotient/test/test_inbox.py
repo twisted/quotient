@@ -64,78 +64,6 @@ class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
         self.assertEqual(complexity, 2)
 
 
-    def testGetLastMessage(self):
-        """
-        Test that InboxScreen.getLastMessage returns the last message, ordered
-        by received time.
-        """
-        self.assertIdentical(self.msgs[-1], self.inbox.getLastMessage())
-
-
-    def testGetMessageAfter(self):
-        """
-        Test that the next message, chronologically, is returned by
-        InboxScreen.getMessageAfter.  Also test that None is returned if there
-        is no such message.
-        """
-        self.assertIdentical(
-            self.msgs[1],
-            self.inbox.getMessageAfter(self.inbox.viewSelection,
-                                       self.msgs[0]))
-        self.assertIdentical(
-            None,
-            self.inbox.getMessageAfter(self.inbox.viewSelection,
-                                       self.msgs[-1]))
-
-
-    def testGetMessageBefore(self):
-        """
-        Test that the previous message, chronologically, is returned by
-        InboxScreen.getMessageBefore.  Also test that None is returned if there
-        is no such message.
-        """
-        self.assertIdentical(
-            self.msgs[-2],
-            self.inbox.getMessageBefore(self.inbox.viewSelection,
-                                        self.msgs[-1]))
-        self.assertIdentical(
-            None,
-            self.inbox.getMessageBefore(self.inbox.viewSelection,
-                                        self.msgs[0]))
-
-
-    def testGetLastMessageWithFlags(self):
-        """
-        Test that messages which do not satisfy the view requirements of the
-        inbox are not considered for return by InboxScreen.getLastMessage.
-        """
-        self.msgs[-1].archived = True
-        self.assertIdentical(self.msgs[-2], self.inbox.getLastMessage())
-
-
-    def testGetMessageAfterWithFlags(self):
-        """
-        Test that messages which do not satisfy the view requirements of the
-        inbox are not considered for return by InboxScreen.getMessageAfter.
-        """
-        self.msgs[1].archived = True
-        self.assertIdentical(
-            self.msgs[2],
-            self.inbox.getMessageAfter(self.inbox.viewSelection, self.msgs[0]))
-
-
-    def testGetMessageBeforeWithFlags(self):
-        """
-        Test that messages which do not satisfy the view requirements of the
-        inbox are not considered for return by InboxScreen.getMessageAfter.
-        """
-        self.msgs[-2].archived = True
-        self.assertIdentical(
-            self.msgs[-3],
-            self.inbox.getMessageBefore(self.inbox.viewSelection,
-                                        self.msgs[-1]))
-
-
 
 class InboxTestCase(TestCase):
     def testControlChars(self):
@@ -342,12 +270,11 @@ class InboxTestCase(TestCase):
 
     def test_fastForward(self):
         """
-        Test fast forwarding to a particular message by id.
+        Test fast forwarding to a particular message by id sets that message
+        to read.
         """
         self._setUpInbox()
-
-        preview, fragment = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
-        self.assertEquals(preview[u'subject'], self.msgs[3].subject)
+        fragment = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
         self.failUnless(self.msgs[2].read)
 
 

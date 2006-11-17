@@ -1831,21 +1831,75 @@ Quotient.Test.ControllerTestCase.methods(
 
 
     /**
-     * Test that values passed to setMessageContent show up in the display.
+     * Test that the private helper method _findPreviewRow returns the correct
+     * row data.
      */
-    function test_setMessageContent(self) {
+    function test_findPreviewRow(self) {
+        var controller;
+        var model;
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.callRemote('getMessageDetail');
+                controller = self.controllerWidget;
+                model = controller.scrollWidget.model;
+                self.assertEqual(
+                    controller._findPreviewRow(model.getRowData(0).__id__).__id__,
+                    model.getRowData(1).__id__);
+                self.assertEqual(
+                    controller._findPreviewRow(model.getRowData(1).__id__).__id__,
+                    model.getRowData(0).__id__);
+
+                /*
+                 * Switch to a view with only one message to test that case.
+                 */
+                return controller.chooseMailView('spam');
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(
+                    controller._findPreviewRow(model.getRowData(0).__id__),
+                    null);
+            });
+        return result;
+    },
+
+
+    /**
+     * Test that all of the correct information for a preview is extracted from
+     * a data row by the private helper method _getPreviewData.
+     */
+    function test_getPreviewData(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var rowData = self.controllerWidget.scrollWidget.model.getRowData(0);
+                var preview = self.controllerWidget._getPreviewData(rowData);
+                self.assertArraysEqual(Divmod.dir(preview), ["subject"]);
+                self.assertEqual(preview.subject, "2nd message");
+            });
+        return result;
+    },
+
+    /**
+     * Test that values passed to setMessageContent show up in the display.
+     */
+    function test_setMessageContent(self) {
+        var webID;
+        var controller;
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                controller = self.controllerWidget;
+                model = controller.scrollWidget.model;
+                webID = model.getRowData(0).__id__;
+                return self.callRemote('getMessageDetail', webID);
             });
         result.addCallback(
             function(messageDetailInfo) {
-                var subject = 'test subject string';
-                self.controllerWidget.setMessageContent(
-                    {subject: subject},
-                    messageDetailInfo);
-                self.assertNotEqual(self.controllerWidget.node.innerHTML.indexOf(subject), -1);
+                var subject = model.getRowData(1).subject;
+                controller.setMessageContent(webID, messageDetailInfo);
+                self.assertNotEqual(controller.node.innerHTML.indexOf(subject), -1);
 
             });
         return result;
@@ -1856,19 +1910,30 @@ Quotient.Test.ControllerTestCase.methods(
      * is properly escaped if necessary.
      */
     function test_setPreviewQuoting(self) {
+        var webID;
+        var controller;
+        var model;
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.callRemote('getMessageDetail');
+                controller = self.controllerWidget;
+                model = controller.scrollWidget.model;
+                webID = model.getRowData(0).__id__;
+                return self.callRemote('getMessageDetail', webID);
             });
         result.addCallback(
             function(messageDetailInfo) {
                 var subject = 'test <subject> & string';
                 var escaped = 'test &lt;subject&gt; &amp; string';
-                self.controllerWidget.setMessageContent(
-                    {subject: subject},
-                    messageDetailInfo);
-                self.assertNotEqual(self.controllerWidget.node.innerHTML.indexOf(escaped), -1);
+
+                /*
+                 * Cheat a little bit.  Jam the subject we're testing into the
+                 * model so it'll get used to populate the view.
+                 */
+                model.getRowData(1).subject = subject;
+
+                controller.setMessageContent(webID, messageDetailInfo);
+                self.assertNotEqual(controller.node.innerHTML.indexOf(escaped), -1);
 
             });
         return result;

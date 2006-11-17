@@ -398,9 +398,13 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             self.store, inbox.getBaseComparison, self.viewSelection)
         self.scrollingFragment.setFragmentParent(self)
 
-        currentMessage, nextMessage = self._resetCurrentMessage(self.viewSelection)
-        self._currentMessageAtRenderTime = currentMessage
-        self._nextMessageAtRenderTime = nextMessage
+        messages = self.scrollingFragment.performQuery(0, 2)
+        while len(messages) < 2:
+            messages.append(None)
+        self._currentMessageAtRenderTime = messages[0]
+        self._nextMessageAtRenderTime = messages[1]
+        if self._currentMessageAtRenderTime is not None:
+            self._currentMessageAtRenderTime.read = True
 
 
     def _createScrollingFragment(self, store, viewResolver, viewSelection):
@@ -437,61 +441,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         Return the initial view complexity for the mailbox.
         """
         return (self.inbox.uiComplexity,)
-
-
-    def _resetCurrentMessage(self, viewSelection):
-        """
-        Return the first two messages for the given view, as a two-tuple.
-        """
-        currentMessage = self.getLastMessage()
-        if currentMessage is not None:
-            currentMessage.read = True
-            nextMessage = self.getMessageBefore(viewSelection, currentMessage)
-        else:
-            nextMessage = None
-        return currentMessage, nextMessage
-
-
-    def getLastMessage(self):
-        """
-        Retrieve the message which was received after all other messages.
-        """
-        return self.inbox.store.findFirst(
-            Message,
-            self.inbox.getBaseComparison(self.viewSelection),
-            sort=Message.receivedWhen.descending)
-
-
-    def getMessageBefore(self, viewSelection, whichMessage):
-        """
-        Retrieve the first message which was received before the given time.
-
-        @type whichMessage: L{exmess.Message}
-        """
-        sort = Message.receivedWhen.desc
-        comparison = attributes.AND(
-            self.inbox.getBaseComparison(viewSelection),
-            Message.receivedWhen < whichMessage.receivedWhen)
-        return self.inbox.store.findFirst(Message,
-                                          comparison,
-                                          default=None,
-                                          sort=sort)
-
-
-    def getMessageAfter(self, viewSelection, whichMessage):
-        """
-        Retrieve the first message which was received after the given time.
-
-        @type whichMessage: L{exmess.Message}
-        """
-        sort = Message.receivedWhen.asc
-        comparison = attributes.AND(
-            self.inbox.getBaseComparison(viewSelection),
-            Message.receivedWhen > whichMessage.receivedWhen)
-        return self.inbox.store.findFirst(Message,
-                                          comparison,
-                                          default=None,
-                                          sort=sort)
 
 
     def _messageFragment(self, message):
@@ -692,14 +641,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         message as read.
         """
         currentMessage = self.translator.fromWebID(webID)
-        nextMessage = self.getMessageBefore(viewSelection, currentMessage)
-
         currentMessage.read = True
-
-        return [
-            self._messagePreview(nextMessage),
-            self._messageFragment(currentMessage),
-            ]
+        return self._messageFragment(currentMessage)
     expose(fastForward)
 
     fastForward = transacted(fastForward)
