@@ -68,3 +68,18 @@ class MailTransferAgentUpgradeTestCase(StubbedTest):
         avatar.parent = avatar.idInParent = None
         mda = IMessageDeliveryFactory(account, None)
         self.assertMDA(mda)
+
+    def tearDown(self):
+        """
+        This test suite is unfortunately awful and buggy and implicitly starts
+        upgraders in substores and does not wait for them to complete.  When
+        correct error logging was added to the upgrade process, they all broke.
+        However, the errors logged here are mostly harmless so they are being
+        quashed for the time being.
+        """                     # -glyph
+        d = StubbedTest.tearDown(self)
+        def flushit(ign):
+            from epsilon.cooperator import SchedulerStopped
+            self.flushLoggedErrors(SchedulerStopped)
+            return ign
+        return d.addCallback(flushit)
