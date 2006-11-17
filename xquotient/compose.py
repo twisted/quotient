@@ -688,10 +688,29 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
     def head(self):
         return None
 
+    def _fileItemToEmailPart(self, fileItem):
+        """
+        Convert a L{File} item into an appropriate MIME part object
+        understandable by the stdlib's C{email} package
+        """
+        from email import MIMEBase as MB, Parser as P
+
+        (majorType, minorType) = fileItem.type.split('/')
+        if majorType == 'multipart':
+            part = P.Parser().parse(fileItem.body.open())
+        else:
+            part = MB.MIMEBase(majorType, minorType)
+            if majorType == 'message':
+                part.set_payload([P.Parser().parse(fileItem.body.open())])
+            else:
+                part.set_payload(fileItem.body.getContent())
+        part.add_header('content-disposition', 'attachment', filename=fileItem.name)
+        return part
+
     def createMessage(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
-        from email import (Generator as G, MIMEBase as MB,
-                           MIMEMultipart as MMP, MIMEText as MT,
-                           Header as MH, Charset as MC, Utils as EU)
+        from email import (Generator as G, MIMEMultipart as MMP,
+                           MIMEText as MT, Header as MH, Charset as MC,
+                           Utils as EU)
         import StringIO as S
 
         MC.add_charset('utf-8', None, MC.QP, 'utf-8')
@@ -718,10 +737,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                             unicode(a.getContentType()),
                             a.getBody(decode=True))
                 fileItems.append(a)
-                part = MB.MIMEBase(*a.type.split('/'))
-                part.set_payload(a.body.getContent())
-                part.add_header('content-disposition', 'attachment', filename=a.name)
-                attachmentParts.append(part)
+                attachmentParts.append(
+                    self._fileItemToEmailPart(a))
 
             m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
 

@@ -12,6 +12,7 @@ from axiom import userbase
 from xmantissa import webapp
 
 from xquotient import compose, mail, mimeutil, exmess
+from xquotient.test.util import PartMaker
 
 
 
@@ -205,6 +206,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         webapp.PrivateApplication(store=self.store).installOn(self.store)
         da = mail.DeliveryAgent(store=self.store)
         da.installOn(self.store)
+        self.cabinet = compose.FileCabinet(store=self.store)
 
 
     def test_createMessageHonorsSmarthostFromAddress(self):
@@ -222,6 +224,89 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)
         self.assertEquals(msg["from"], 'from@example.com')
+
+    def _createMessageWithFiles(self, files):
+        """
+        Make an L{xquotient.compose.ComposeFragment}, use it to create a
+        message with attachments corresponding to the
+        L{xquotient.compose.File} items C{files}
+        """
+        cf = compose.ComposeFragment(self.composer)
+        return cf.createMessage(self.defaultFromAddr,
+                                [mimeutil.EmailAddress(
+                                    'testuser@example.com',
+                                    mimeEncoded=False)],
+                                u'subject', u'body', u'', u'',
+                                files=list(f.storeID for f in files))
+
+    def _assertFilenameParamEquals(self, part, filename):
+        """
+        Assert that the C{filename} parameter of the C{content-disposition}
+        header of the L{xquotient.mimestorage.Part} C{part} is equal to
+        C{filename}
+
+        @type part: L{xquotient.mimestorage.Part}
+        @type filename: C{unicode}
+        """
+        self.assertEquals(
+            part.getParam(
+                u'filename', header=u'content-disposition'),
+                filename)
+
+
+    def test_createMessageAttachment(self):
+        """
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is an
+        attachment
+        """
+        fileItem = self.cabinet.createFileItem(
+                    u'the filename', u'text/plain', 'some text/plain')
+        msg = self._createMessageWithFiles((fileItem,))
+        (_, attachment) = msg.walkMessage()
+        self.assertEquals(attachment.part.getBody(), 'some text/plain\n')
+        self.assertEquals(attachment.type, 'text/plain')
+        self._assertFilenameParamEquals(attachment.part, 'the filename')
+
+    def test_createMessageWithMessageAttachment(self):
+        """
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
+        an attachment of type message/rfc822
+        """
+        fileItem = self.cabinet.createFileItem(
+                    u'a message', u'message/rfc822',
+                    PartMaker('text/plain', 'some text/plain').make())
+        msg = self._createMessageWithFiles((fileItem,))
+        rfc822part = list(msg.impl.walk())[-2]
+        self.assertEquals(rfc822part.getContentType(), 'message/rfc822')
+        self._assertFilenameParamEquals(rfc822part, 'a message')
+
+        (_, textPlainPart) = rfc822part.walk()
+        self.assertEquals(textPlainPart.getContentType(), 'text/plain')
+        self.assertEquals(textPlainPart.getBody(), 'some text/plain\n')
+
+    def test_createMessageWithMultipartAttachment(self):
+        """
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
+        a multipart attachment
+        """
+        fileItem = self.cabinet.createFileItem(
+                    u'a multipart', u'multipart/mixed',
+                    PartMaker('multipart/mixed', 'mixed',
+                        PartMaker('text/plain', 'text/plain #1'),
+                        PartMaker('text/plain', 'text/plain #2')).make())
+        msg = self._createMessageWithFiles((fileItem,))
+        multipart = list(msg.impl.walk())[-3]
+        self.assertEquals(multipart.getContentType(), 'multipart/mixed')
+        self._assertFilenameParamEquals(multipart, 'a multipart')
+
+        (_, textPlain1, textPlain2) = multipart.walk()
+        self.assertEquals(textPlain1.getContentType(), 'text/plain')
+        self.assertEquals(textPlain1.getBody(), 'text/plain #1\n')
+
+        self.assertEquals(textPlain2.getContentType(), 'text/plain')
+        self.assertEquals(textPlain2.getBody(), 'text/plain #2\n')
+
+
 
 class FromAddressConfigFragmentTest(unittest.TestCase):
     """
