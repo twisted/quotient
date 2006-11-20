@@ -1,3 +1,7 @@
+0.1.26 (2006-11-20):
+  - Fixed bug with outgoing attachments which have container types (multipart/,
+    message/).
+
 0.1.25 (2006-11-17):
   - Next-message preview fixed to show "No More Messages" consistently at the last message.
   - Fixed issue where row heights would get progressively smaller when switching in and out
