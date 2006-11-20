@@ -14,6 +14,7 @@ from xmantissa.people import Person, EmailAddress
 from xquotient import compose
 from xquotient.inbox import Inbox
 from xquotient.exmess import Message
+from xquotient.test.test_inbox import testMessageFactory
 
 class _ComposeTestMixin:
     def _getComposeFragment(
@@ -131,13 +132,14 @@ class DraftsTestCase(testcase.TestCase):
         drafts.installOn(s)
 
         for i in xrange(5):
-            compose.Draft(store=s,
-                          message=Message(store=s,
-                                          spam=False,
-                                          draft=True,
-                                          subject=unicode(i),
-                                          receivedWhen=Time(),
-                                          sentWhen=Time()))
+            compose.Draft(
+                store=s,
+                message=testMessageFactory(store=s,
+                                           spam=False,
+                                           draft=True,
+                                           subject=unicode(i),
+                                           receivedWhen=Time(),
+                                           sentWhen=Time()))
 
         f = compose.DraftsScreen(drafts)
         f.setFragmentParent(self)

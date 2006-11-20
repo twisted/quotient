@@ -1,12 +1,12 @@
 
 import StringIO
 
+from datetime import timedelta
+
 from twisted.trial import unittest
 from twisted.internet import defer, error
 from twisted.mail import pop3
 from twisted.cred import error as ecred
-
-from twisted.test.proto_helpers import StringTransport
 
 from epsilon import structlike, extime
 
@@ -27,6 +27,13 @@ class AbortableStringIO(StringIO.StringIO):
 
 class StubMessage:
     sentWhen = extime.Time()
+    _wasArchived = False
+
+    def archive(self):
+        """
+        Emulate L{Message.archive}.
+        """
+        self._wasArchived = True
 
 
 
@@ -390,6 +397,17 @@ class PersistentControllerTestCase(unittest.TestCase):
             self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
                                          (51, '51')]),
             [(49, '49'), (51, '51')])
+
+
+    def test_markSuccessArchivesOldmessages(self):
+        """
+        Verify that 'sufficiently old' messages are archived automatically by
+        the POP grabber as they are retrieved.
+        """
+        msg = StubMessage()
+        msg.sentWhen = self.grabber.created - timedelta(days=1, seconds=1)
+        self.grabber.markSuccess('50', msg)
+        self.failUnless(msg._wasArchived)
 
 
     def testMarkFailure(self):

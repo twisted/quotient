@@ -1,6 +1,12 @@
 # -*- test-case-name: xquotient.test.test_compose -*-
 import datetime
 
+from email import (Parser as P, Generator as G, MIMEMultipart as MMP,
+                   MIMEText as MT, MIMEMessage as MM, MIMEBase as MB,
+                   Header as MH, Charset as MC, Utils as EU)
+
+import StringIO as S
+
 from zope.interface import implements
 
 from twisted.python.components import registerAdapter
@@ -25,7 +31,7 @@ from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, equotient, renderers, mimeutil
 from xquotient.exmess import Message, MessageDetail
-from xquotient.mimestorage import Header, Part
+from xquotient.mimestorage import Part
 
 
 
@@ -223,8 +229,8 @@ class _NeedsDelivery(item.Item):
 
     def run(self):
         """
-        Try to reliably deliver this message. If errors are
-        encountered, try harder.
+        Try to reliably deliver this message. If errors are encountered, try
+        harder.
         """
         sch = iaxiom.IScheduler(self.store)
         if self.tries < len(self.RETRANS_TIMES):
@@ -296,7 +302,7 @@ class Composer(item.Item, item.InstallableMixin):
             coerced to L{smtp.Address}es).
         @param msg: The L{exmess.Message} to send.
         """
-        msg.outgoing = True
+        msg.startedSending()
         for toAddress in toAddresses:
             _NeedsDelivery(
                 store=self.store,
@@ -307,9 +313,6 @@ class Composer(item.Item, item.InstallableMixin):
 
 
     def messageBounced(self, log, toAddress, msg):
-        from email import Parser as P, Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEMessage as MM
-        import StringIO as S
-
         bounceText = (
             'Your message to %(recipient)s, subject "%(subject)s", '
             'could not be delivered.')
@@ -334,8 +337,7 @@ class Composer(item.Item, item.InstallableMixin):
         G.Generator(s).flatten(m)
         s.seek(0)
 
-        self.createMessageAndQueueIt(
-            FromAddress.findDefault(self.store).address, s)
+        self.createMessageAndQueueIt(FromAddress.findDefault(self.store).address, s, False)
 
 
     def messageSent(self, toAddress, msg):
@@ -344,7 +346,7 @@ class Composer(item.Item, item.InstallableMixin):
         print 'Z' * 50
 
 
-    def createMessageAndQueueIt(self, fromAddress, s):
+    def createMessageAndQueueIt(self, fromAddress, s, draft):
         """
         Create a message out of C{s}, from C{fromAddress}
 
@@ -352,17 +354,24 @@ class Composer(item.Item, item.InstallableMixin):
         @type fromAddress: C{unicode}
         @param s: message to send
         @type s: line iterable
+        @type draft: C{bool}
+        @param draft: Flag indicating whether this is a draft message or not
+        (eg, a bounce message).
 
         @rtype: L{xquotient.exmess.Message}
         """
-        def txn():
-            mr = iquotient.IMIMEDelivery(self.store).createMIMEReceiver(
-                                'sent://' + fromAddress)
+        def deliverMIMEMessage():
+            # this doesn't seem to get called (yet?)
+            md = iquotient.IMIMEDelivery(self.store)
+            if draft:
+                mr = md._createMIMEDraftReceiver('sent://' + fromAddress)
+            else:
+                mr = md.createMIMEReceiver('sent://' + fromAddress)
             for L in s:
                 mr.lineReceived(L.rstrip('\n'))
             mr.messageDone()
             return mr.message
-        return self.store.transact(txn)
+        return self.store.transact(deliverMIMEMessage)
 
 
     def createRedirectedMessage(self, fromAddress, toAddresses, message):
@@ -378,17 +387,15 @@ class Composer(item.Item, item.InstallableMixin):
 
         @rtype: L{Message}
         """
-        from email import Header as MH, Parser as MP, Generator as G
-
-        m = MP.Parser().parse(message.impl.source.open())
+        m = P.Parser().parse(message.impl.source.open())
         m['Resent-From'] = MH.Header(fromAddress.address).encode()
         m['Resent-To']  = MH.Header(mimeutil.flattenEmailAddresses(toAddresses)).encode()
 
-        s = MP.StringIO()
+        s = S.StringIO()
         G.Generator(s).flatten(m)
         s.seek(0)
 
-        return self.createMessageAndQueueIt(fromAddress.address, s)
+        return self.createMessageAndQueueIt(fromAddress.address, s, True)
 
 
     def redirect(self, fromAddress, toAddresses, message):
@@ -693,8 +700,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         Convert a L{File} item into an appropriate MIME part object
         understandable by the stdlib's C{email} package
         """
-        from email import MIMEBase as MB, Parser as P
-
         (majorType, minorType) = fileItem.type.split('/')
         if majorType == 'multipart':
             part = P.Parser().parse(fileItem.body.open())
@@ -707,12 +712,9 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         part.add_header('content-disposition', 'attachment', filename=fileItem.name)
         return part
 
-    def createMessage(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
-        from email import (Generator as G, MIMEMultipart as MMP,
-                           MIMEText as MT, Header as MH, Charset as MC,
-                           Utils as EU)
-        import StringIO as S
 
+    def createMessage(self, fromAddress, toAddresses, subject, messageBody,
+                      cc, bcc, files):
         MC.add_charset('utf-8', None, MC.QP, 'utf-8')
 
         encode = lambda s: MH.Header(s).encode()
@@ -754,7 +756,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         G.Generator(s).flatten(m)
         s.seek(0)
 
-        msg = self.composer.createMessageAndQueueIt(fromAddress.address, s)
+        msg = self.composer.createMessageAndQueueIt(fromAddress.address, s, True)
         # there is probably a better way than this, but there
         # isn't a way to associate the same file item with multiple
         # messages anyway, so there isn't a need to reflect that here
@@ -763,7 +765,8 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         return msg
 
     _mxCalc = None
-    def _sendMail(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
+    def _sendMail(self, fromAddress, toAddresses, subject, messageBody,
+                  cc, bcc, files):
         # overwrite the previous draft of this message with another draft
         self._saveDraft(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
@@ -773,8 +776,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
         # except we are going to send this draft
         self.composer.sendMessage(fromAddress, addresses, self._savedDraft.message)
-        # and then make it not a draft anymore
-        self._savedDraft.message.draft = False
 
         # once the user has sent a message, we'll consider all subsequent
         # drafts in the lifetime of this fragment as being drafts of a
@@ -782,23 +783,51 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         self._savedDraft.deleteFromStore()
         self._savedDraft = None
 
-    def _saveDraft(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files):
-        msg = self.createMessage(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
-        msg.draft = True
-
+    def _saveDraft(self, fromAddress, toAddresses, subject, messageBody,
+                   cc, bcc, files):
+        msg = self.createMessage(fromAddress, toAddresses, subject,
+                                 messageBody, cc, bcc, files)
         if self._savedDraft is not None:
             oldmsg = self._savedDraft.message
-            for p in oldmsg.store.query(Part, Part.message == oldmsg):
-                p.deleteFromStore()
-            for h in oldmsg.store.query(Header, Header.message == oldmsg):
-                h.deleteFromStore()
             oldmsg.deleteFromStore()
             self._savedDraft.message = msg
         else:
             self._savedDraft = Draft(store=self.composer.store, message=msg)
 
 
-    def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody, cc, bcc, files, draft):
+    def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody,
+                    cc, bcc, files, draft):
+        """
+        This method is called interactively from the browser via a liveform in
+        response to clicking 'send' or 'save draft'.
+
+        @param fromAddress: a L{FromAddress} item.
+
+        @param toAddresses: a list of L{mimeutil.EmailAddress} objects,
+        representing the people to send this to.
+
+        @param subject: freeform string
+        @type subject: L{unicode}
+
+        @param messageBody: the message's body, a freeform string.
+        @type messageBody: L{unicode}
+
+        @param cc: a string, likely an rfc2822-formatted list of addresses
+        (not validated between the client and here, XXX FIXME)
+        @type cc: L{unicode}
+
+        @param bcc: a string, likely an rfc2822-formatted list of addresses
+        (not validated between the client and here, XXX FIXME)
+        @type bcc: L{unicode}
+
+        @param files: a sequence of stringified storeIDs which should point at
+        L{File} items.
+
+        @param draft: a boolean, indicating whether the message represented by
+        the other arguments to this function should be saved as a draft or sent
+        as an outgoing message.  True for save, False for send.
+        """
+
         if draft:
             f = self._saveDraft
         else:
@@ -1165,11 +1194,14 @@ class DraftsScreen(ScrollingFragment):
     jsClass = u'Quotient.Compose.DraftListScrollingWidget'
 
     def __init__(self, original):
+        from xquotient.exmess import MailboxSelector, DRAFT_STATUS
+        sq = MailboxSelector(original.store)
+        sq.refineByStatus(DRAFT_STATUS)
         ScrollingFragment.__init__(
             self,
             original.store,
             Message,
-            Message.draft == True,
+            sq._getComparison(),
             (Message.recipient, Message.subject, Message.sentWhen),
             defaultSortColumn=Message.sentWhen,
             defaultSortAscending=False)

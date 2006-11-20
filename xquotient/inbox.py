@@ -7,22 +7,21 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 
 from nevow import tags as T, inevow, athena
-from nevow.flat import flatten
 from nevow.page import renderer
-from nevow.athena import expose
-
-from epsilon.extime import Time
+from nevow.athena import expose, LiveElement
 
 from axiom.item import Item, InstallableMixin, transacted, declareLegacyItem
-from axiom import attributes, tags, iaxiom
+from axiom import tags
+from axiom import attributes
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
 
 from xmantissa import ixmantissa, webnav, people, webtheme
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
-from xmantissa.scrolltable import ScrollingFragment
+from xmantissa.scrolltable import Scrollable, ScrollableView
 
-from xquotient.exmess import Message, getMessageSources, addMessageSource
+from xquotient.exmess import Message, getMessageSources, MailboxSelector
+from xquotient.exmess import READ_STATUS, UNREAD_STATUS, CLEAN_STATUS
 from xquotient import mimepart, equotient, compose, renderers
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
@@ -66,25 +65,42 @@ def replyTo(m):
         recipient = m.sender
     return recipient
 
-
-class UndeferTask(Item):
+def _viewSelectionToMailboxSelector(store, viewSelection):
     """
-    Created when a message is deferred.  When run, I undefer
-    the message, mark it as unread, and delete myself from the
-    database
+    Convert a 'view selection' object, sent from the client, into a MailboxSelector
+    object which will be used to view the mailbox.
+
+    @param store: an L{axiom.store.Store} that contains some messages.
+
+    @param viewSelection: a dictionary with 4 keys: 'view', 'tag', 'person',
+    'account'.  This dictionary represents the selections that users have
+    made in the 4-section 'complexity 3' filtering UI.  Each key may have a
+    string value, or None.  If the value is None, the user has selected
+    'All' for that key in the UI; if the value is a string, the user has
+    selected that string.
+
+    @return: a L{MailboxSelector} object.
     """
-    message = attributes.reference(reftype=Message,
-                                   whenDeleted=attributes.reference.CASCADE,
-                                   allowNone=False)
-    deferredUntil = attributes.timestamp(allowNone=False)
+    view, tag, personWebID, account = map(
+        viewSelection.__getitem__,
+        [u"view", u"tag", u"person", u"account"])
 
-    def run(self):
-        self.message.deferred = False
-        if not self.message.everDeferred:
-            self.message.everDeferred = True
-        self.message.read = False
-        self.deleteFromStore()
+    sq = MailboxSelector(store)
+    sq.setLimit(None)
+    sq.setNewestFirst()
+    if view == u'all':
+        view = CLEAN_STATUS
 
+    sq.refineByStatus(view) # 'view' is really a status!  and the names
+                            # even line up!
+    if tag is not None:
+        sq.refineByTag(tag)
+    if account is not None:
+        sq.refineBySource(account)
+    if personWebID is not None:
+        person = ixmantissa.IWebTranslator(store).fromWebID(personWebID)
+        sq.refineByPerson(person)
+    return sq
 
 
 class Inbox(Item, InstallableMixin):
@@ -105,17 +121,11 @@ class Inbox(Item, InstallableMixin):
     # loaded with the "More Detail" pane expanded.
     showMoreDetail = attributes.boolean(default=False)
 
-    catalog = attributes.reference(doc="""
-    A reference to an L{axiom.tags.Catalog} Item.  This will be used to
-    determine which tags should be displayed to the user and to create new
-    tags.  If no catalog is specified at creation time, one will be found in
-    the database or created if none exists at all.
-    """)
+    catalog = attributes.reference(
+        doc="An unused reference.  Hopefully will be deleted soon.")
 
     def __init__(self, **kw):
         super(Inbox, self).__init__(**kw)
-        if self.catalog is None:
-            self.catalog = self.store.findOrCreate(tags.Catalog)
 
 
     def getTabs(self):
@@ -132,63 +142,20 @@ class Inbox(Item, InstallableMixin):
         """
         Return an IComparison to be used as the basic restriction for a view
         onto the mailbox with the given parameters.
+
+        @param viewSelection: a dictionary with 4 keys: 'view', 'tag', person',
+        'account'.  This dictionary represents the selections that users have
+        made in the 4-section 'complexity 3' filtering UI.  Each key may have a
+        string value, or None.  If the value is None, the user has selected
+        'All' for that key in the UI; if the value is a string, the user has
+        selected that string.
+
+        @return: an IComparison which can be used to generate a query for
+        messages matching the selection represented by the viewSelection
+        criterea.
         """
-        view, tag, person, account = map(
-            viewSelection.__getitem__,
-            [u"view", u"tag", u"person", u"account"])
-
-        # XXX This is a pretty bad place to be doing this translation.
-        if person is not None:
-            person = ixmantissa.IWebTranslator(self.store).fromWebID(person)
-
-        inTrashView = view == 'trash'
-        inDeferredView = view == 'deferred'
-        inSentView = view == 'sent'
-        inAllView = view == 'all'
-        inSpamView = view == 'spam'
-
-        comparison = [
-            Message.trash == inTrashView,
-            Message.draft == False,
-            Message.deferred == inDeferredView]
-
-        if not inTrashView:
-            comparison.append(Message.outgoing == inSentView)
-
-        if not (inAllView or inTrashView or inSpamView):
-            comparison.append(Message.archived == False)
-
-        if not (inSentView or inTrashView):
-            # Note - Message.spam defaults to None, and inSpamView will
-            # always be either True or False.  This means messages which
-            # haven't been processed by the spam filtering system will never
-            # show up in any query!  Is this a problem?  It depends how
-            # responsive the spam filtering system ends up being, I suppose.
-            # Currently, it should be fast enough so as not to make much of
-            # a difference, but that may not always be the case.  However,
-            # ultimately we are going to need to support updating messages
-            # views without doing a complete page re-load, at which point
-            # delivered but unfiltered messages will just show up on the
-            # page, which should result in this minor inequity being more or
-            # less irrelevant.
-            comparison.append(Message.spam == inSpamView)
-
-
-        if tag is not None:
-            comparison.extend((
-                tags.Tag.object == Message.storeID,
-                tags.Tag.name == tag))
-
-        if account is not None:
-            comparison.append(Message.source == account)
-
-        if person is not None:
-            comparison.extend((
-                Message.sender == people.EmailAddress.address,
-                people.EmailAddress.person == people.Person.storeID,
-                people.Person.storeID == person.storeID))
-
-        return attributes.AND(*comparison)
+        return _viewSelectionToMailboxSelector(self.store,
+                                               viewSelection)._getComparison()
 
 
     def getComparisonForBatchType(self,
@@ -199,15 +166,13 @@ class Inbox(Item, InstallableMixin):
         batch of messages from a view onto the mailbox with the given
         parameters.
         """
-        comp = self.getBaseComparison(viewSelection)
-        if batchType in ("read", "unread"):
-            comp = attributes.AND(comp, Message.read == (batchType == "read"))
-        return comp
+        sq = _viewSelectionToMailboxSelector(self.store, viewSelection)
+        if batchType in (UNREAD_STATUS, READ_STATUS):
+            sq.refineByStatus(batchType)
+        return sq._getComparison()
 
 
-    def messagesForBatchType(self,
-                             batchType,
-                             viewSelection):
+    def messagesForBatchType(self, batchType, viewSelection):
         """
         Return a list of L{exmess.Message} instances which belong to the
         specified batch.
@@ -217,37 +182,37 @@ class Inbox(Item, InstallableMixin):
 
         @rtype: C{list}
         """
-        return self.store.query(
-            Message,
-            self.getComparisonForBatchType(batchType, viewSelection))
-
+        comp = self.getComparisonForBatchType(batchType, viewSelection)
+        q = self.store.query(Message, comp)
+        lq = list(q)
+        return lq
 
     def action_archive(self, message):
         """
         Move the given message to the archive.
         """
-        message.archived = True
+        message.archive()
 
 
     def action_unarchive(self, message):
         """
         Move the given message out of the archive.
         """
-        message.archived = False
+        message.unarchive()
 
 
     def action_delete(self, message):
         """
         Move the given message to the trash.
         """
-        message.trash = True
+        message.moveToTrash()
 
 
     def action_undelete(self, message):
         """
         Move the given message out of the trash.
         """
-        message.trash = False
+        message.removeFromTrash()
 
 
     def action_defer(self, message, days, hours, minutes):
@@ -255,22 +220,14 @@ class Inbox(Item, InstallableMixin):
         Change the state of the given message to Deferred and schedule it to
         be changed back after the given interval has elapsed.
         """
-        message.deferred = True
-        task = UndeferTask(store=self.store,
-                           message=message,
-                           deferredUntil=Time() + timedelta(days=days,
-                                                            hours=hours,
-                                                            minutes=minutes))
-        iaxiom.IScheduler(self.store).schedule(task, task.deferredUntil)
-        return task
-
+        return message.deferFor(timedelta(days=days, hours=hours, minutes=minutes))
 
     def action_trainSpam(self, message):
         """
         Train the message filter using the given message as an example of
         spam.
         """
-        message.train(True)
+        message.trainSpam()
 
 
     def action_trainHam(self, message):
@@ -278,7 +235,7 @@ class Inbox(Item, InstallableMixin):
         Train the message filter using the given message as an example of
         ham.
         """
-        message.train(False)
+        message.trainClean()
 
 
 
@@ -291,11 +248,7 @@ def upgradeInbox1to2(oldInbox):
     newInbox = oldInbox.upgradeVersion(
         'quotient_inbox', 1, 2,
         installedOn=oldInbox.installedOn,
-        uiComplexity=oldInbox.uiComplexity,
-        catalog=oldInbox.catalog)
-
-    for source in s.query(Message).getColumn("source").distinct():
-        addMessageSource(s, source)
+        uiComplexity=oldInbox.uiComplexity)
     return newInbox
 registerUpgrader(upgradeInbox1to2, 'quotient_inbox', 1, 2)
 
@@ -307,22 +260,29 @@ declareLegacyItem(Inbox.typeName, 2,
 registerAttributeCopyingUpgrader(Inbox, 2, 3)
 
 
-class MailboxScrollingFragment(ScrollingFragment):
+class MailboxScrollingFragment(Scrollable, ScrollableView, LiveElement):
     """
     Specialized ScrollingFragment which supports client-side requests to alter
     the query constraints.
-
-    @ivar viewResolver: A callable which takes several keyword arguments which
-    will return a new IComparison based on those arguments.
     """
-
     jsClass = u'Quotient.Mailbox.ScrollingWidget'
 
-    def __init__(self, store, viewResolver, viewSelection, itemType, *a, **kw):
-        self.viewResolver = viewResolver
-        self.viewSelection = viewSelection
-        baseConstraint = viewResolver(viewSelection)
-        super(MailboxScrollingFragment, self).__init__(store, itemType, baseConstraint, *a, **kw)
+    def __init__(self, store):
+        Scrollable.__init__(self, ixmantissa.IWebTranslator(store, None),
+                            columns=(Message.sender,
+                                     Message.senderDisplay,
+                                     Message.recipient,
+                                     Message.subject,
+                                     Message.receivedWhen,
+                                     Message.read,
+                                     Message.sentWhen,
+                                     Message.attachments,
+                                     Message.everDeferred),
+                            defaultSortColumn=Message.receivedWhen,
+                            defaultSortAscending=False)
+        LiveElement.__init__(self)
+        self.store = store
+        self.setViewSelection({u"view": "inbox", u"tag": None, u"person": None, u"account": None})
 
 
     def setViewSelection(self, viewSelection):
@@ -330,7 +290,8 @@ class MailboxScrollingFragment(ScrollingFragment):
             (k.encode('ascii'), v)
             for (k, v)
             in viewSelection.iteritems())
-        self.baseConstraint = self.viewResolver(self.viewSelection)
+        self.statusQuery = _viewSelectionToMailboxSelector(
+            self.store, viewSelection)
 
 
     def getTableMetadata(self, viewSelection):
@@ -339,9 +300,33 @@ class MailboxScrollingFragment(ScrollingFragment):
     expose(getTableMetadata)
 
 
+    def performQuery(self, rangeBegin, rangeEnd):
+        """
+        This scrolling fragment should perform queries using MailboxSelector, not
+        the normal store query machinery, because it is more efficient.
+
+        @param rangeBegin: an integer, the start of the range to retrieve.
+
+        @param rangeEnd: an integer, the end of the range to retrieve.
+        """
+        return self.statusQuery.offsetQuery(rangeBegin, rangeEnd-rangeBegin)
+
+
+    def performCount(self):
+        """
+        This scrolling fragment should perform counts using MailboxSelector, not the
+        normal store query machinery, because it is more efficient.
+
+        NB: it isn't actually more efficient.  But it could at least be changed
+        to be.
+        """
+        return self.statusQuery.count()
+
+
     def requestRowRange(self, viewSelection, firstRow, lastRow):
         self.setViewSelection(viewSelection)
-        return super(MailboxScrollingFragment, self).requestRowRange(firstRow, lastRow)
+        return super(MailboxScrollingFragment, self).requestRowRange(
+            firstRow, lastRow)
     expose(requestRowRange)
 
 
@@ -394,8 +379,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             "person": None,
             "account": None}
 
-        self.scrollingFragment = self._createScrollingFragment(
-            self.store, inbox.getBaseComparison, self.viewSelection)
+        self.scrollingFragment = self._createScrollingFragment()
         self.scrollingFragment.setFragmentParent(self)
 
         messages = self.scrollingFragment.performQuery(0, 2)
@@ -404,34 +388,14 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         self._currentMessageAtRenderTime = messages[0]
         self._nextMessageAtRenderTime = messages[1]
         if self._currentMessageAtRenderTime is not None:
-            self._currentMessageAtRenderTime.read = True
+            self._currentMessageAtRenderTime.markRead()
 
 
-    def _createScrollingFragment(self, store, viewResolver, viewSelection):
+    def _createScrollingFragment(self):
         """
         Create a Fragment which will display a mailbox.
-
-        @param viewResolver: A one-argument callable which can turn a view
-        selection into an IComparison. (Generally this will be getBaseComparison)
-
-        @param viewSelection: The initial view selection state.
         """
-        f = MailboxScrollingFragment(
-            store,
-            viewResolver,
-            viewSelection,
-            Message,
-            (Message.sender,
-             Message.senderDisplay,
-             Message.recipient,
-             Message.subject,
-             Message.receivedWhen,
-             Message.read,
-             Message.sentWhen,
-             Message.attachments,
-             Message.everDeferred),
-            defaultSortColumn=Message.receivedWhen,
-            defaultSortAscending=False)
+        f = MailboxScrollingFragment(self.store)
         f.docFactory = getLoader(f.fragmentName)
         return f
 
@@ -455,35 +419,9 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return self._messageFragment(currentMessage)
 
 
-    def _currentMessageData(self, currentMessage):
-        if currentMessage is not None:
-            return {
-                u'identifier': self.translator.toWebID(currentMessage).decode('ascii'),
-                u'spam': currentMessage.spam,
-                u'trained': currentMessage.trained,
-                }
-        return {}
-
     def messageDetail(self, request, tag):
         return self._currentAsFragment(self._currentMessageAtRenderTime)
     renderer(messageDetail)
-
-
-    def spamState(self, request, tag):
-        currentMessage = self._currentMessageAtRenderTime
-
-        if currentMessage is None:
-            return tag['????']
-        if currentMessage.trained:
-            confidence = 'definitely'
-        else:
-            confidence = 'probably'
-        if currentMessage.spam:
-            modifier = ''
-        else:
-            modifier = 'not'
-        return tag[confidence + ' ' + modifier]
-    renderer(spamState)
 
 
     def scroller(self, request, tag):
@@ -491,11 +429,11 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     renderer(scroller)
 
 
-    def getTags(self):
+    def getUserTagNames(self):
         """
         Return a list of unique tag names as unicode strings.
         """
-        return list(self.inbox.catalog.tagNames())
+        return list(self.inbox.store.findOrCreate(tags.Catalog).tagNames())
 
 
     def viewPane(self, request, tag):
@@ -539,14 +477,21 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return select
     renderer(personChooser)
 
+    # This is the largest unread count allowed.  Counts larger than this will
+    # not be reported, to save on database work.  This is, I hope, a temporary
+    # feature which will be replaced once counts can be done truly efficiently,
+    # by saving the intended results in the DB.
+    countLimit = 1000
+
     def getUnreadMessageCount(self, viewSelection):
         """
         @return: number of unread messages in current view
         """
-        return self.inbox.store.count(
-            Message,
-            attributes.AND(self.inbox.getBaseComparison(viewSelection),
-                           Message.read == False))
+        sq = _viewSelectionToMailboxSelector(self.inbox.store, viewSelection)
+        sq.refineByStatus(UNREAD_STATUS)
+        sq.setLimit(self.countLimit)
+        lsq = sq.count()
+        return lsq
 
     def mailViewChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('mailViewChooser')
@@ -575,7 +520,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         select = inevow.IQ(self.docFactory).onePattern('tagChooser')
         option = inevow.IQ(select).patternGenerator('tagChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedTagChoice')
-        for tag in [None] + self.getTags():
+        for tag in [None] + self.getUserTagNames():
             if tag == self.viewSelection["tag"]:
                 p = selectedOption
             else:
@@ -641,7 +586,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         message as read.
         """
         currentMessage = self.translator.fromWebID(webID)
-        currentMessage.read = True
+        currentMessage.markRead()
         return self._messageFragment(currentMessage)
     expose(fastForward)
 
@@ -655,44 +600,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             counts[v] = self.getUnreadMessageCount(viewSelection)
         return counts
 
-
-    def _updatedViewState(self, currentMessage, nextMessage):
-        """
-        Retrieve state relevant to the view: the number of messages in the
-        current view, the current message body, and the number of messages in
-        the other views.  This is returned as a three-tuple.
-
-        The first two elements are always present but the third element may be
-        None.  This will be the case when it would be too expensive to compute.
-        """
-        return (self.getMessageCount(),
-                self._current(currentMessage, nextMessage),
-                None) # self.mailViewCounts()
-
-
-    def getMessageCount(self):
-        return self.inbox.store.count(Message, self.inbox.getBaseComparison(self.viewSelection))
-    expose(getMessageCount)
-
-    def getMessages(self, **k):
-        return self.inbox.store.query(Message, self.inbox.getBaseComparison(self.viewSelection), **k)
-
-    def _squish(self, thing):
-        # replacing &nbsp with &#160 in renderers.SpacePreservingStringRenderer
-        # fixed all issues with calling setNodeContent on flattened message
-        # details for all messages in the test pool.  but there might be
-        # other things that will break also.
-
-        #for eref in set(_entityReference.findall(text)):
-        #    entity = getattr(entities, eref, None)
-        #    if entity is not None:
-        #        text = text.replace('&' + eref + ';', '&#' + entity.num + ';')
-        return replaceControlChars(unicode(flatten(thing), 'utf-8'))
-
-    def _current(self, currentMessage, nextMessage):
-        return (self._squish(self._nextMessagePreview(currentMessage, nextMessage)),
-                self._squish(self._currentAsFragment(currentMessage)),
-                self._currentMessageData(currentMessage))
 
     def _getActionMethod(self, actionName):
         return getattr(self.inbox, 'action_' + actionName)
@@ -748,7 +655,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     expose(actOnMessageIdentifierList)
 
 
-    def actOnMessageBatch(self, action, viewSelection, batchType, include, exclude, extraArguments=None):
+    def actOnMessageBatch(self, action, viewSelection, batchType, include,
+                          exclude, extraArguments=None):
         """
         Perform an action on a set of messages defined by a common
         characteristic or which are specifically included but not specifically

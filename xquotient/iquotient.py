@@ -119,3 +119,47 @@ class IFilteringAction(Interface):
         @param extraData: The third element of the tuple returned by
         C{rule.applyTo}.
         """
+
+
+class IMessageData(Interface):
+    """
+    Representation-agnostic methods for uniform access to types of message data.
+    """
+
+    def relatedAddresses():
+        """
+        Get email addresses mentioned in the contents of the message.
+
+        @return: a list of 2-tuples of (relation, L{EmailAddress}) objects
+        corresponding to the sender and all the known recipients of this
+        message.
+
+        'relation' is a short string.
+
+        Note: in the future the L{EmailAddress} specification of the second
+        element of the tuple will likely be expanded to include other types of
+        addresses for other types of messages.
+        """
+
+    def associateWithMessage(message):
+        """
+        Associate this message data with an L{xquotient.exmess.Message} object.
+
+        This is a hook to provide a point where implementors may include things
+        like: inserting this message data into the same store as the given
+        message, or creating associated metadata for the message.
+
+        @param message: the message to associate with.  This will be a
+        L{Message} instance already inserted into its store (and thus with a
+        storeID), but with no other fields yet filled out.
+        """
+
+    def guessSentTime(default=None):
+        """
+        Try to determine what time this message was sent by looking at its
+        contents.
+
+        @param default: the object to return if the sent time is not guessable.
+        """
+
+
