@@ -75,10 +75,10 @@ class MessageDelivery(object):
             userbase.Preauthenticated(addr), None, iquotient.IMIMEDelivery)
         def loggedIn((iface, avatar, logout)):
             logout() # XXX???
-            def receiverCreator():
+            def createMIMEReceiver():
                 return avatar.createMIMEReceiver(
                     u"smtp://%s@%s" % (user.dest.local, user.dest.domain))
-            return receiverCreator
+            return createMIMEReceiver
         def notLoggedIn(err):
             err.trap(userbase.NoSuchUser)
             return defer.fail(smtp.SMTPBadRcpt(user))
@@ -140,11 +140,8 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
         super(DeliveryAgent, self).installOn(other)
         other.powerUp(self, iquotient.IMIMEDelivery)
 
-    def _createMIMESourceFile(self):
-        """
-        @return: an L{AtomicFile} with a pathname appropriate to a message that was
-        just delivered.
-        """
+
+    def createMIMEReceiver(self, source):
         today = datetime.date.today()
         fObj = self.installedOn.newFile(
             'messages',
@@ -154,27 +151,8 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
             str(self.messageCount % 100),
             str(self.messageCount))
         self.messageCount += 1
-        return fObj
-
-
-    def createMIMEReceiver(self, source):
-        """
-        Basic implementation of L{iquotient.IMIMEDelivery.createMIMEReceiver}.
-        """
         return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
-            self.installedOn, self._createMIMESourceFile(), source))
-
-    def _createMIMEDraftReceiver(self, source):
-        """
-        Temporary hack so that the composer does not deliver messages to the
-        inbox.
-
-        This should really be refactored ASAP to separate the steps of MIME
-        message parsing and message delivery.
-        """
-        return mimestorage.MIMEMessageStorer(
-            self.installedOn, self._createMIMESourceFile(), source,
-            draft=True)
+            self.installedOn, fObj, source))
 
 
 

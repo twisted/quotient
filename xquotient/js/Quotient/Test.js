@@ -286,8 +286,8 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
         return result;
     });
 
-Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
-    'Quotient.Test.ControllerTestCase');
+
+Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ControllerTestCase');
 Quotient.Test.ControllerTestCase.methods(
     /**
      * Utility method to extract data from display nodes and return it as an
@@ -1325,8 +1325,6 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
 
                 model = self.controllerWidget.scrollWidget.model;
-                // Let's sanity check before we assert in the next method...
-                self.assertEqual(model.rowCount(), 2);
 
                 rowIdentifiers = [
                     model.getRowData(0).__id__,
@@ -1783,6 +1781,19 @@ Quotient.Test.ControllerTestCase.methods(
     function test_senderColumn(self) {
         var model = self.controllerWidget.scrollWidget.model;
         self.failUnless(model.getRowData(0).sender);
+    },
+
+    /**
+     * Test that the node generated for the "senderDisplay" column of the
+     * first row
+     */
+    function test_cellNode(self) {
+        var view = self.controllerWidget.scrollWidget;
+        var rowData = view.model.getRowData(0);
+        var cell = view.makeCellElement("senderDisplay", rowData);
+        self.assertEqual(cell.title, rowData["sender"]);
+        self.assertEqual(cell.firstChild.nodeValue, rowData["senderDisplay"]);
+        self.assertEqual(cell.className, "sender");
     },
 
     /**
@@ -2436,7 +2447,7 @@ Quotient.Test.FromAddressScrollTableTestCase.methods(
 Quotient.Test.ComposeController = Quotient.Compose.Controller.subclass('ComposeController');
 Quotient.Test.ComposeController.methods(
     function saveDraft(self, userInitiated) {
-        return Divmod.Defer.succeed(null);
+        return;
     },
 
     function startSavingDrafts(self) {

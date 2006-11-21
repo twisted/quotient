@@ -1,5 +1,3 @@
-# -*- test-case-name: xquotient.test.test_qpeople -*-
-
 from zope.interface import implements
 
 from nevow import rend, inevow, tags
@@ -14,11 +12,9 @@ from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import dictFillSlots
 
-from xquotient import extract, mail, exmess, gallery
+from xquotient import extract, mail, exmess, equotient, mimeutil, gallery
 
 from xmantissa.scrolltable import UnsortableColumn, AttributeColumn, TYPE_FRAGMENT
-
-from xquotient.exmess import MailboxSelector, CLEAN_STATUS
 
 def makePersonExtracts(store, person):
     def queryMessageSenderPerson(typ):
@@ -26,11 +22,11 @@ def makePersonExtracts(store, person):
         # need some kind of notification thing that fires each time
         # an email address is associated with a Person item so we
         # can update the attribute
-        sq = MailboxSelector(store)
-        sq.refineByPerson(person)
+
         return store.query(typ, attributes.AND(
-                typ.message == exmess.Message.storeID,
-                sq._getComparison()))
+                                    typ.message == exmess.Message.storeID,
+                                    exmess.Message.sender == people.EmailAddress.address,
+                                    people.EmailAddress.person == person))
 
     for etyp in extract.extractTypes.itervalues():
         for e in queryMessageSenderPerson(etyp):
@@ -75,10 +71,25 @@ class CorrespondentExtractor(Item, InstallableMixin):
 
 
     def processItem(self, item):
-        """
-        This was dead code.  It has been deleted.  (This is only here to avoid
-        breaking old databases.)
-        """
+        for (relation, address) in ((u'sender', item.sender),
+                                    (u'recipient', item.recipient)):
+
+            if address:
+                exmess.Correspondent(store=self.store,
+                                     message=item,
+                                     relation=relation,
+                                     address=address)
+
+        try:
+            copied = item.impl.getHeader(u'cc')
+        except equotient.NoSuchHeader:
+            pass
+        else:
+            for address in mimeutil.parseEmailAddresses(copied, mimeEncoded=False):
+                exmess.Correspondent(store=self.store,
+                                     message=item,
+                                     relation=u'copy',
+                                     address=address.email)
 
 class PersonFragmentColumn(UnsortableColumn):
     person = None
@@ -171,13 +182,19 @@ class MessageLister(Item, InstallableMixin):
                  each one a message either to or from C{person}, ordered
                  descendingly by received date.
         """
+        # probably the slowest query in the world.
+        return self.store.query(exmess.Message,
+                                attributes.AND(
+                                    attributes.OR(
+                                        exmess.Message.sender == people.EmailAddress.address,
+                                        exmess.Message.recipient == people.EmailAddress.address),
+                                    people.EmailAddress.person == person,
+                                    exmess.Message.trash == False,
+                                    exmess.Message.draft == False,
+                                    exmess.Message.spam == False),
+                                sort=exmess.Message.receivedWhen.desc,
+                                limit=n)
 
-        sq = MailboxSelector(self.store)
-        sq.refineByStatus(CLEAN_STATUS)
-        sq.refineByPerson(person)
-        sq.setLimit(n)
-        sq.setNewestFirst()
-        return list(sq)
 
 class ImageLister(Item):
     typeName = 'quotient_image_lister_plugin'

@@ -1,11 +1,10 @@
 
-import os
+import time
 
+from twisted.internet import reactor
 from twisted.trial import unittest
 
 from axiom import store, userbase
-
-from xquotient.exmess import SPAM_STATUS, CLEAN_STATUS
 
 from xquotient import spam
 from xquotient.mimestorage import MIMEMessageStorer
@@ -72,8 +71,6 @@ class DSPAMTestCase(unittest.TestCase):
     def setUp(self):
         self.homedir = self.mktemp()
 
-
-class ClassificationAndTrainingTestCase(DSPAMTestCase):
     def testMessageClassification(self):
         d = dspam.startDSPAM("test", self.homedir)
         dspam.classifyMessage(d, "test", self.homedir,
@@ -88,17 +85,6 @@ class ClassificationAndTrainingTestCase(DSPAMTestCase):
         dspam.trainMessageFromError(d, "test", self.homedir,
                                     MESSAGE, dspam.DSR_ISSPAM)
 
-STDERR = 2
-
-class APIManglingTestCase(DSPAMTestCase):
-    def setUp(self):
-        """
-        Catch C fprintf(stderr, ...) that dspam does when you abuse its API.
-        """
-        DSPAMTestCase.setUp(self)
-        self._savedStderrHandle = os.dup(STDERR)
-        os.close(STDERR)
-
     def testAPIAbuse(self):
         d = dspam.startDSPAM("test", self.homedir)
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage,
@@ -108,14 +94,6 @@ class APIManglingTestCase(DSPAMTestCase):
                           EMPTY_MESSAGE, True)
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage, d, "test", self, unicode(MESSAGE), True)
         self.assertRaises(ctypes.ArgumentError, dspam.classifyMessage, d, u"test", self, MESSAGE, True)
-
-    def tearDown(self):
-        """
-        Restore stderr.
-        """
-        os.dup2(self._savedStderrHandle, STDERR)
-        os.close(self._savedStderrHandle)
-
 
 
 class MessageCreationMixin:
@@ -164,8 +142,7 @@ class FilterTestCase(unittest.TestCase, MessageCreationMixin):
         """
         m = self._message()
         self.f.processItem(m)
-        self.failUnless(m.hasStatus(SPAM_STATUS)
-                        or m.hasStatus(CLEAN_STATUS))
+        self.assertNotEqual(m.spam, None)
 
     def testGlobalMessageClassification(self):
         m = self._message()

@@ -383,14 +383,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
             return MochiKit.DOM.DIV(attrs, content);
         } else if(colName == "subject") {
             attrs["class"] = "subject";
-        } else if(colName == "sentWhen") {
-            attrs["class"] = "date";
         } else {
-            attrs["class"] = "unknown-inbox-column-"+colName;
-            /* It _SHOULD_ be the following, but that makes certain test
-             * fixtures break.
-             */
-            // throw new Error("invalid column name: " + colName);
+            attrs["class"] = "date";
         }
 
         return MochiKit.DOM.DIV(attrs, massage(colName));

@@ -59,155 +59,46 @@ class EmailAddressTests(unittest.TestCase):
         self.assertEquals(mimeutil.EmailAddress('bleh <Fu@bAr>'), mimeutil.EmailAddress(('  bleh  ', '  fu  @ bar  ')))
         self.assertNotEquals(mimeutil.EmailAddress('bleh <Fu@bAr>'), mimeutil.EmailAddress('  fu  @ bar  '))
 
-    def _parseTestCase(self, input, display, email, anyDisplayName, pseudoFormat, localpart, domain):
-        """
-        Parse the given input and assert that the attributes of the resulting
-        L{mimeutil.EmailAddress} are equal to the given values.
-        """
-        e = mimeutil.EmailAddress(input)
-        self.assertEquals(e.display, display)
-        self.failUnless(isinstance(e.display, unicode))
-        self.assertEquals(e.email, email)
-        self.failUnless(isinstance(e.email, unicode))
-        self.assertEquals(e.anyDisplayName(), anyDisplayName)
-        self.failUnless(isinstance(e.anyDisplayName(), unicode))
-        self.assertEquals(e.pseudoFormat(), pseudoFormat)
-        self.failUnless(isinstance(e.pseudoFormat(), unicode))
-        self.assertEquals(e.localpart, localpart)
-        self.failUnless(isinstance(e.localpart, unicode))
-        self.assertEquals(e.domain, domain)
-        self.failUnless(isinstance(e.domain, unicode))
+    def test_parsing(self):
+        e = mimeutil.EmailAddress(' SoMe  NaMe   <SoMeNaMe@example.com>')
+        self.assertEquals(e.display, 'SoMe NaMe')
+        self.assertEquals(e.email, 'somename@example.com')
+        self.assertEquals(e.anyDisplayName(), 'SoMe NaMe')
+        self.assertEquals(e.pseudoFormat(), 'SoMe NaMe <somename@example.com>')
+        self.assertEquals(e.localpart, 'somename')
+        self.assertEquals(e.domain, 'example.com')
 
+        e = mimeutil.EmailAddress(('  SoMe  NaMe  ', 'SoMeNaMe@example.com'))
+        self.assertEquals(e.display, 'SoMe NaMe')
+        self.assertEquals(e.email, 'somename@example.com')
+        self.assertEquals(e.anyDisplayName(), 'SoMe NaMe')
+        self.assertEquals(e.pseudoFormat(), 'SoMe NaMe <somename@example.com>')
+        self.assertEquals(e.localpart, 'somename')
+        self.assertEquals(e.domain, 'example.com')
 
-    def test_normalString(self):
-        """
-        Test that a string of the common form, one with a display name and an
-        email address, separated by whitespace, parses properly.
-        """
-        self._parseTestCase(
-            input=' SoMe  NaMe   <SoMeNaMe@example.com>',
-            display=u'SoMe NaMe',
-            email=u'somename@example.com',
-            anyDisplayName=u'SoMe NaMe',
-            pseudoFormat=u'SoMe NaMe <somename@example.com>',
-            localpart=u'somename',
-            domain=u'example.com')
+        e = mimeutil.EmailAddress(' n o  name  @ examplE.com  ')
+        self.assertEquals(e.display, '')
+        self.assertEquals(e.email, 'noname@example.com')
+        self.assertEquals(e.anyDisplayName(), 'noname@example.com')
+        self.assertEquals(e.pseudoFormat(), 'noname@example.com')
+        self.assertEquals(e.localpart, 'noname')
+        self.assertEquals(e.domain, 'example.com')
 
+        e = mimeutil.EmailAddress('    ')
+        self.assertEquals(e.display, '')
+        self.assertEquals(e.email, '')
+        self.assertEquals(e.anyDisplayName(), 'Nobody')
+        self.assertEquals(e.pseudoFormat(), '')
+        self.assertEquals(e.localpart, '')
+        self.assertEquals(e.domain, '')
 
-    def test_parseTuple(self):
-        """
-        Test that a two-tuple of a display name and an email address is parsed
-        properly.
-        """
-        self._parseTestCase(
-            input=('  SoMe  NaMe  ', 'SoMeNaMe@example.com'),
-            display=u'SoMe NaMe',
-            email=u'somename@example.com',
-            anyDisplayName=u'SoMe NaMe',
-            pseudoFormat=u'SoMe NaMe <somename@example.com>',
-            localpart=u'somename',
-            domain=u'example.com')
-
-
-    def test_parseUnicodeDisplayName(self):
-        """
-        Test that a two-tuple of a unicode string giving display name and a
-        byte string giving an email address is parsed properly.
-
-        Possibly this is not a desirable feature of this API, but for the time
-        being we will test to make sure it works.  Maybe later on we will want
-        to deprecate/eliminate it.
-        """
-        self._parseTestCase(
-            input=(u'  SoMe  NaMe  ', 'SoMeNaMe@example.com'),
-            display=u'SoMe NaMe',
-            email=u'somename@example.com',
-            anyDisplayName=u'SoMe NaMe',
-            pseudoFormat=u'SoMe NaMe <somename@example.com>',
-            localpart=u'somename',
-            domain=u'example.com')
-
-
-    def test_parseUnicodeEmail(self):
-        """
-        Test that a two-tuple of a byte string giving display name and a
-        unicode string giving an email address is parsed properly.
-
-        Possibly this is not a desirable feature of this API, but for the time
-        being we will test to make sure it works.  Maybe later on we will want
-        to deprecate/eliminate it.
-        """
-        self._parseTestCase(
-            input=('  SoMe  NaMe  ', u'SoMeNaMe@example.com'),
-            display=u'SoMe NaMe',
-            email=u'somename@example.com',
-            anyDisplayName=u'SoMe NaMe',
-            pseudoFormat=u'SoMe NaMe <somename@example.com>',
-            localpart=u'somename',
-            domain=u'example.com')
-
-
-    def test_parseUnicodeTuple(self):
-        """
-        Test that a two-tuple of unicode strings giving a display name and an
-        email address is parsed properly.
-
-        Possibly this is not a desirable feature of this API, but for the time
-        being we will test to make sure it works.  Maybe later on we will want
-        to deprecate/eliminate it.
-        """
-        self._parseTestCase(
-            input=(u'  SoMe  NaMe  ', u'SoMeNaMe@example.com'),
-            display=u'SoMe NaMe',
-            email=u'somename@example.com',
-            anyDisplayName=u'SoMe NaMe',
-            pseudoFormat=u'SoMe NaMe <somename@example.com>',
-            localpart=u'somename',
-            domain=u'example.com')
-
-
-    def test_parseWithoutDisplay(self):
-        """
-        Test the parsing of an address without a display part.
-        """
-        self._parseTestCase(
-            input=' n o  name  @ examplE.com  ',
-            display=u'',
-            email=u'noname@example.com',
-            anyDisplayName=u'noname@example.com',
-            pseudoFormat=u'noname@example.com',
-            localpart=u'noname',
-            domain=u'example.com')
-
-
-    def test_emptyAddress(self):
-        """
-        Test the parsing of pure whitespace.
-        """
-        self._parseTestCase(
-            input='    ',
-            display=u'',
-            email=u'',
-            anyDisplayName=u'Nobody',
-            pseudoFormat=u'',
-            localpart=u'',
-            domain=u'')
-
-
-    def test_Q(self):
-        """
-        Test the parsing of an address with MIME Header Q encoded characters in the
-        display part. (RFC 2047, Section 4, 4.2)
-        """
-        self._parseTestCase(
-            input='  =?ISO-8859-1?Q?C=E9sar______?= fu   bar  <cesarfubar@example.com>',
-            display=u'C\u00e9sar fu bar',
-            email=u'cesarfubar@example.com',
-            anyDisplayName=u'C\u00e9sar fu bar',
-            pseudoFormat=u'C\u00e9sar fu bar <cesarfubar@example.com>',
-            localpart=u'cesarfubar',
-            domain=u'example.com')
-
+        e = mimeutil.EmailAddress('  =?ISO-8859-1?Q?C=E9sar______?= fu   bar  <cesarfubar@example.com>')
+        self.assertEquals(e.display, u'C\u00e9sar fu bar')
+        self.assertEquals(e.email, 'cesarfubar@example.com')
+        self.assertEquals(e.anyDisplayName(), u'C\u00e9sar fu bar')
+        self.assertEquals(e.pseudoFormat(), u'C\u00e9sar fu bar <cesarfubar@example.com>')
+        self.assertEquals(e.localpart, 'cesarfubar')
+        self.assertEquals(e.domain, 'example.com')
 
     def test_parseEmailAddresses(self):
         self.assertEquals(

@@ -86,23 +86,20 @@ class MIMEReceiverMixin:
     def setUpMailStuff(self, extraBenefactors=()):
         sitedir = self.mktemp()
         s = store.Store(sitedir)
-        def tx1():
-            loginSystem = LoginSystem(store=s)
-            loginSystem.installOn(s)
+        loginSystem = LoginSystem(store=s)
+        loginSystem.installOn(s)
 
-            account = loginSystem.addAccount(u'testuser', u'example.com', None)
-            substore = account.avatars.open()
-            self.dbdir = substore.dbdir.path
+        account = loginSystem.addAccount(u'testuser', u'example.com', None)
+        substore = account.avatars.open()
+        self.dbdir = substore.dbdir.path
 
-            installOffering(s, quotientOffering, {})
+        installOffering(s, quotientOffering, {})
 
-            endowBene = lambda b: b.instantiate().endow(None, substore)
+        endowBene = lambda b: b.instantiate().endow(None, substore)
 
-            def tx2():
-                endowBene(quotientBenefactorFactory)
-                for bene in extraBenefactors:
-                    endowBene(bene)
-                self.deliveryAgent = substore.findUnique(DeliveryAgent)
-                return self.createMIMEReceiver()
-            return substore.transact(tx2)
-        return s.transact(tx1)
+        endowBene(quotientBenefactorFactory)
+        for bene in extraBenefactors:
+            endowBene(bene)
+
+        self.deliveryAgent = substore.findUnique(DeliveryAgent)
+        return self.createMIMEReceiver()

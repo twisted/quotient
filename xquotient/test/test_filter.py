@@ -85,8 +85,7 @@ class HeaderRuleTest(unittest.TestCase):
 
     def testMailingListFilter(self):
         """
-        Ensures that mailing list messages are not handled by
-        RuleFilteringPowerup but are handled by MailingListFilteringPowerup.
+        Ensures that mailing list messages are not handled by RuleFilteringPowerup but are handled by MailingListFilteringPowerup.
         """
         self.tagcatalog = tags.Catalog(store=self.store)
         scheduler.Scheduler(store=self.store).installOn(self.store)
@@ -98,9 +97,10 @@ class HeaderRuleTest(unittest.TestCase):
         part.addHeader(u'X-Mailman-Version', u"2.1.5")
         part.addHeader(u'List-Id',
                        u"Some mailing list <some-list.example.com>")
-        part.source = FilePath(self.storepath).child("files").child("x")
-        msg = Message.createIncoming(self.store, part,
-                                     u'test://test_mailing_list_filter')
+        msg = Message(store=self.store)
+        part._addToStore(self.store, msg, FilePath(self.storepath
+                                                   ).child("files"
+                                                   ).child("x"))
         rfb.endow(None, self.store)
         rfp = self.store.findUnique(filter.RuleFilteringPowerup)
         rfp.processItem(msg)

@@ -17,18 +17,12 @@ from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
+from xmantissa.test.livetest_scrolltable import ScrollElement
 
-from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
-
+from xquotient.inbox import Inbox, UndeferTask, InboxScreen, MailboxScrollingFragment
 from xquotient.exmess import Message, MessageDetail
-from xquotient.exmess import _UndeferTask as UndeferTask
-from xquotient.exmess import (ARCHIVE_STATUS, TRASH_STATUS, SPAM_STATUS,
-                              DEFERRED_STATUS, TRAINED_STATUS)
-
 from xquotient.compose import Composer, ComposeFragment
 from xquotient.quotientapp import QuotientPreferenceCollection
-
-from xquotient.test.test_inbox import testMessageFactory
 
 
 class ThrobberTestCase(testcase.TestCase):
@@ -48,9 +42,9 @@ class ScrollingWidgetTestCase(testcase.TestCase):
     def getScrollingWidget(self, howManyElements=0):
         store = Store()
         PrivateApplication(store=store).installOn(store)
-        for n in xrange(howManyElements):
-            testMessageFactory(store, spam=False)
-        f = MailboxScrollingFragment(store)
+        elements = [ScrollElement(store=store) for n in xrange(howManyElements)]
+        columns = [ScrollElement.column]
+        f = MailboxScrollingFragment(store, lambda view: None, None, ScrollElement, columns)
         f.docFactory = getLoader(f.fragmentName)
         f.setFragmentParent(self)
         return f
@@ -85,16 +79,6 @@ class _Part(Item):
 
     def getHeader(self, *z):
         return u'hi!\N{WHITE SMILING FACE}<>'
-
-    def associateWithMessage(self, message):
-        pass
-
-    def relatedAddresses(self):
-        return []
-
-    def guessSentTime(self, default):
-        return Time()
-
 
 
 
@@ -237,56 +221,56 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         impl = _Part(store=inbox.store)
 
         # Inbox messages
-        m1 = testMessageFactory(
+        m1 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'1st message',
             receivedWhen=self.sent, sentWhen=self.sent2, spam=False,
             archived=False, read=False, impl=impl)
         catalog.tag(m1, u"foo")
 
-        m2 = testMessageFactory(
+        m2 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'2nd message',
             receivedWhen=self.sent + offset, sentWhen=self.sent,
             spam=False, archived=False, read=False, impl=impl)
         catalog.tag(m2, u"bar")
 
         # Archive messages
-        m3 = testMessageFactory(
+        m3 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'3rd message',
             receivedWhen=self.sent + offset * 2, sentWhen=self.sent,
             spam=False, archived=True, read=True, impl=impl)
 
-        m4 = testMessageFactory(
+        m4 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'4th message',
             receivedWhen=self.sent + offset * 3, sentWhen=self.sent,
             spam=False, archived=True, read=True, impl=impl)
 
         # Spam message
-        m5 = testMessageFactory(
+        m5 = Message(
             store=inbox.store, sender=self.bobEmail, subject=u'5th message',
             receivedWhen=self.sent + offset * 4, sentWhen=self.sent,
             spam=True, archived=False, read=False, impl=impl)
 
         # Sent message
-        m6 = testMessageFactory(
+        m6 = Message(
             store=inbox.store, sender=self.bobEmail, subject=u'6th message',
             receivedWhen=self.sent + offset * 5, sentWhen=self.sent,
             spam=False, archived=False, read=True, outgoing=True,
             recipient=self.aliceEmail, impl=impl)
 
         # Trash messages
-        m7 = testMessageFactory(
+        m7 = Message(
             store=inbox.store, sender=self.bobEmail, subject=u'7th message',
             receivedWhen=self.sent + offset * 6, sentWhen=self.sent,
             spam=False, archived=False, read=True, outgoing=False,
             trash=True, impl=impl)
 
-        m8 = testMessageFactory(
+        m8 = Message(
             store=inbox.store, sender=self.bobEmail, subject=u'8th message',
             receivedWhen=self.sent + offset * 7, sentWhen=self.sent,
             spam=False, archived=False, read=True, outgoing=False,
             trash=True, impl=impl)
 
-        m9 = testMessageFactory(
+        m9 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'9th message',
             receivedWhen=self.sent + offset * 8, sentWhen=self.sent,
             spam=False, archived=False, read=True, outgoing=False,
@@ -338,18 +322,15 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         """
         Return the deleted flag of the messages with the given webIDs.
         """
-        return [self.messages[id].hasStatus(TRASH_STATUS) for id in ids]
+        return [self.messages[id].trash for id in ids]
     expose(deletedFlagsByWebIDs)
 
 
     def archivedFlagsByWebIDs(self, *ids):
         """
         Return the archived flag of the messages with the given webIDs.
-
-        XXX: This is a gross hack, as there is no longer a public 'archived'
-        flag.
         """
-        return [self.messages[id].hasStatus(ARCHIVE_STATUS) for id in ids]
+        return [self.messages[id].archived for id in ids]
     expose(archivedFlagsByWebIDs)
 
 
@@ -358,14 +339,14 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
         Return a dictionary describing the spam training state of the messages
         with the given webID.
         """
-        return [{u'trained': self.messages[id].hasStatus(TRAINED_STATUS),
-                 u'spam': self.messages[id].hasStatus(SPAM_STATUS)}
+        return [{u'trained': self.messages[id].trained,
+                 u'spam': self.messages[id].spam}
                 for id in ids]
     expose(trainedStateByWebIDs)
 
 
     def _getDeferredState(self, msg):
-        if msg.hasStatus(DEFERRED_STATUS):
+        if msg.deferred:
             # XXX UndeferTask should remember the amount of time, not just the
             # ultimate undefer time.
             t = msg.store.findUnique(UndeferTask, UndeferTask.message == msg)
@@ -402,12 +383,12 @@ class EmptyInitialViewControllerTestCase(testcase.TestCase, _ControllerMixin):
         impl = _Part(store=inbox.store)
 
         # Archive messages
-        m1 = testMessageFactory(
+        m1 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'1st message',
             receivedWhen=self.sent, sentWhen=self.sent, spam=False,
             archived=True, read=False, impl=impl)
 
-        m2 = testMessageFactory(
+        m2 = Message(
             store=inbox.store, sender=self.aliceEmail, subject=u'2nd message',
             receivedWhen=self.sent + offset, sentWhen=self.sent,
             spam=False, archived=True, read=False, impl=impl)
@@ -448,7 +429,7 @@ class FullControllerTestCase(testcase.TestCase, _ControllerMixin):
 
         impl = _Part(store=inbox.store)
         for i in range(20):
-            testMessageFactory(
+            Message(
                 store=inbox.store, sender=self.aliceEmail,
                 subject=u'message %d' % (i,), receivedWhen=self.sent,
                 sentWhen=self.sent2, spam=False, archived=False,

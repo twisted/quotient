@@ -3,29 +3,22 @@
 import itertools
 import quopri, binascii, rfc822
 
-from zope.interface import implements
-
 from twisted.python import log
 
 from epsilon.extime import Time
 
 from axiom import item, attributes, iaxiom
 
-from xquotient import mimepart, equotient, mimeutil, exmess, iquotient
+from xquotient import mimepart, equotient, mimeutil, exmess
 
 
 class Header(item.Item):
-    """
-    Database resident representation of a MIME header.
-    """
     typeName = 'quotient_mime_header'
     schemaVersion = 1
 
     message = attributes.reference(
         "A reference to the stored top-level L{xquotient.exmess.Message} "
-        "object to which this header pertains.",
-        reftype=exmess.Message,
-        whenDeleted=attributes.reference.CASCADE)
+        "object to which this header pertains.")
     part = attributes.reference(
         "A reference to the stored MIME part object to which this header "
         "directly pertains.")
@@ -48,12 +41,6 @@ class Header(item.Item):
 
 
 class Part(item.Item):
-    """
-    Database resident representation of a MIME-part (including the top level
-    part, the message itself).
-    """
-    implements(iquotient.IMessageData)
-
     typeName = 'quotient_mime_part'
     schemaVersion = 1
 
@@ -61,9 +48,7 @@ class Part(item.Item):
         "A reference to another Part object, or None for the top-level part.")
     message = attributes.reference(
         "A reference to the stored top-level L{xquotient.exmess.Message} "
-        "object to which this part pertains.",
-        reftype=exmess.Message,
-        whenDeleted=attributes.reference.CASCADE)
+        "object to which this part pertains.")
     partID = attributes.integer(
         "A unique identifier for this Part within the context of its L{message}.")
 
@@ -140,8 +125,6 @@ class Part(item.Item):
     def getHeaders(self, name, _limit=None):
         name = name.lower()
         if self.store is not None:
-            if not isinstance(name, unicode):
-                name = name.decode("ascii")
             return self.store.query(
                 Header,
                 attributes.AND(Header.part == self,
@@ -183,6 +166,10 @@ class Part(item.Item):
         self.message = message
         self.store = store
 
+        if self.parent is None:
+            assert self.message.impl is None, "two top-level parts?!"
+            self.message.impl = self
+
         if hasattr(self, '_headers'):
             for hdr in self._headers:
                 hdr.part = self
@@ -194,23 +181,10 @@ class Part(item.Item):
                 child.parent = self
                 child._addToStore(store, message, sourcepath)
 
+        if self.parent is None:
+            message.attachments = len(list(self.walkAttachments()))
+
         del self._headers, self._children
-
-    def associateWithMessage(self, message):
-        """
-        Implement L{IMessageData.associateWithMessage} to add this part and all
-        of its subparts and headers to the same store as the given message, and
-        set all of their headers.
-
-        This will only be called on the top-level part.
-
-        @param message: a L{exmess.Message}.
-        """
-        # XXX: we expect our 'source' attribute to be set, since it is set by
-        # the delivery code below before the part is handed over to the Message
-        # object for processing... this is kind of ugly.
-
-        self._addToStore(message.store, message, self.source)
 
     # implementation of IMessageIterator
 
@@ -450,75 +424,9 @@ class Part(item.Item):
                              default=default,
                              header=u'content-disposition')
 
-    def relatedAddresses(self):
-        """
-        Implement L{IMessageData.relatedAddresses} by looking at relevant
-        RFC2822 headers for sender and recipient addresses.
-        """
-        for header in (u'from', u'sender', u'reply-to'):
-            try:
-                v = self.getHeader(header)
-            except equotient.NoSuchHeader:
-                continue
-
-            email = mimeutil.EmailAddress(v, mimeEncoded=False)
-            yield (exmess.SENDER_RELATION, email)
-            break
-
-        for header, relationship in [
-            (u'cc', exmess.COPY_RELATION),
-            (u'to', exmess.RECIPIENT_RELATION),
-            (u'bcc', exmess.BLIND_COPY_RELATION)]:
-            try:
-                v = self.getHeader(header)
-            except equotient.NoSuchHeader:
-                pass
-            else:
-                for addressObject in mimeutil.parseEmailAddresses(v, mimeEncoded=False):
-                    yield (relationship, addressObject)
-
-
-    def guessSentTime(self, default=None):
-        """
-        Try to determine the time this message claims to have been sent by
-        analyzing various headers.
-
-        @return: a L{Time} instance, or C{None}, if we don't have a guess.
-        """
-
-        try:
-            sentHeader = self.getHeader(u'date')
-        except equotient.NoSuchHeader:
-            sentHeader = None
-        else:
-            try:
-                return Time.fromRFC2822(sentHeader)
-            except ValueError:
-                pass
-
-        for received in list(self.getHeaders(u'received'))[::-1]:
-            lines = received.value.splitlines()
-            if lines:
-                lastLine = lines[-1]
-                parts = lastLine.split('; ')
-                if parts:
-                    date = parts[-1]
-                    try:
-                        when = rfc822.parsedate(date)
-                        if when is None:
-                            continue
-                    except ValueError:
-                        pass
-                    else:
-                        return Time.fromStructTime(when)
-
-        return default
-
-
-
 
 class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
-    def __init__(self, store, fObj, source, draft=False):
+    def __init__(self, store, fObj, source):
         partCounter = itertools.count().next
         super(MIMEMessageStorer, self).__init__(
             fObj,
@@ -528,24 +436,43 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                                   **kw))
         self.store = store
         self.source = source
-        self._isDraft = draft
 
 
     def messageDone(self):
         r = super(MIMEMessageStorer, self).messageDone()
-        self.part.source = self.file.finalpath
+        self.message = exmess.Message(store=self.store, receivedWhen=Time())
 
-        if self._isDraft:
-            self.message = exmess.Message.createDraft(self.store, self.part,
-                                                      self.source)
+        try:
+            sent = self.part.getHeader(u'date')
+        except equotient.NoSuchHeader:
+            sent = None
         else:
-            self.message = exmess.Message.createIncoming(self.store, self.part,
-                                                         self.source)
+            try:
+                sent = Time.fromRFC2822(sent)
+            except ValueError:
+                sent = None
 
-        ##### XXX XXX XXX this should really be stuff that Message does but the
-        ##### ambiguity of the purpose of the 'recipients' field makes me
-        ##### reluctant to remove it until there is some better coverage for
-        ##### that.  -glyph
+        if sent is None:
+            for received in list(self.part.getHeaders(u'received'))[::-1]:
+                lines = received.value.splitlines()
+                if lines:
+                    lastLine = lines[-1]
+                    parts = lastLine.split('; ')
+                    if parts:
+                        date = parts[-1]
+                        try:
+                            when = rfc822.parsedate(date)
+                            if when is None:
+                                continue
+                        except ValueError:
+                            pass
+                        else:
+                            sent = Time.fromStructTime(when)
+                            break
+
+        if sent is None:
+            sent = self.message.receivedWhen
+        self.message.sentWhen = sent
 
         try:
             to = self.part.getHeader(u'to')
@@ -561,9 +488,26 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
         else:
             self.message.subject = subject
 
+        for header in (u'from', u'sender', u'reply-to'):
+            try:
+                v = self.part.getHeader(header)
+            except equotient.NoSuchHeader:
+                continue
 
-        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1,
-                userstore=self.store)
+            email = mimeutil.EmailAddress(v, mimeEncoded=False)
+            self.message.sender = unicode(email.email)
+            self.message.senderDisplay = unicode(email.anyDisplayName())
+            break
+        else:
+            self.message.sender = self.message.senderDisplay = u'<No Sender>'
+
+        # XXX These next two things should really happen together, but that
+        # would be a lot harder. -exarkun
+        self.message.source = self.source
+        exmess.addMessageSource(self.store, self.source)
+
+        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1, userstore=self.store)
+        self.part._addToStore(self.store, self.message, self.file.finalpath)
         return r
     messageDone = item.transacted(messageDone)
 

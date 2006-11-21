@@ -331,27 +331,9 @@ class POP3Grabber(item.Item):
 
 
     def markSuccess(self, uid, msg):
-        """
-        Mark the retrieval of a message as successful with a particular UID.
-
-        This grabber will no longer retrieve the message with that UID from the
-        server.
-
-        Archive that message if its sent date indicates it was sent more than
-        one day before this grabber was created.
-
-        @param uid: a POP3 UID specified by the server
-        @type uid: L{str}
-
-        @param msg: a L{xquotient.exmess.Message} which corresponds to that
-        UID.
-
-        @return: None
-        """
         if msg.sentWhen + datetime.timedelta(days=1) < self.created:
-            msg.archive()
-        log.msg(interface=iaxiom.IStatEvent, stat_messages_grabbed=1,
-                userstore=self.store)
+            msg.archived = True
+        log.msg(interface=iaxiom.IStatEvent, stat_messages_grabbed=1, userstore=self.store)
         POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
         if self._pop3uids is not None:
             self._pop3uids.add(uid)
@@ -644,11 +626,9 @@ class POP3GrabberFactory(protocol.ClientFactory):
 
 
 
-# This might be useful when we get an IMAP grabber online.
-
-# grabberTypes = {
-#     'POP3': POP3Grabber,
-#     }
+grabberTypes = {
+    'POP3': POP3Grabber,
+    }
 
 
 class GrabberConfigFragment(athena.LiveFragment):
@@ -682,7 +662,6 @@ class GrabberConfigFragment(athena.LiveFragment):
                                 liveform.PASSWORD_INPUT,
                                 unicode,
                                 u'Repeat Password'),
-# Along with the above, this might be useful if we had an IMAP grabber.
 #              liveform.Parameter('protocol',
 #                                 liveform.Choice(grabberTypes.keys()),
 #                                 lambda value: grabberTypes[value],

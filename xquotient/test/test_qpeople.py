@@ -6,9 +6,7 @@ from axiom.store import Store
 
 from xmantissa.people import Organizer, Person, EmailAddress
 from xquotient.qpeople import MessageLister
-
-from xquotient.test.test_inbox import testMessageFactory
-
+from xquotient.exmess import Message
 
 class MessageListerTestCase(TestCase):
     def testMostRecentMessages(self):
@@ -29,20 +27,17 @@ class MessageListerTestCase(TestCase):
 
         def makeMessages(n, email):
             return list(reversed(list(
-                        testMessageFactory(store=s,
-                                           subject=u'Message %d' % (i,),
-                                           sender=email,
-                                           spam=False,
-                                           receivedWhen=Time())
-                        for i in xrange(n))))
+                        Message(store=s,
+                                sender=email,
+                                spam=False,
+                                receivedWhen=Time()) for i in xrange(n))))
 
         p11messages = makeMessages(11, u'11@person')
         p2messages  = makeMessages(2, u'2@person')
 
         lister = MessageLister(store=s)
 
-        getMessages = lambda person, count: list(
-            lister.mostRecentMessages(person, count))
+        getMessages = lambda person, count: list(lister.mostRecentMessages(person, count))
 
         self.assertEquals(getMessages(p2, 3), p2messages)
         self.assertEquals(getMessages(p2, 2), p2messages)
@@ -52,17 +47,14 @@ class MessageListerTestCase(TestCase):
         self.assertEquals(getMessages(p11, 11), p11messages)
         self.assertEquals(getMessages(p11, 10), p11messages[:-1])
 
-        p11messages[0].trainSpam()
+        p11messages[0].spam = True
 
         self.assertEquals(getMessages(p11, 11), p11messages[1:])
 
-        # Used to be:
-        # p11messages[1].draft = True
-        # but this is now a nonsensical transition.
-        p11messages[1].trainSpam()
+        p11messages[1].draft = True
 
         self.assertEquals(getMessages(p11, 11), p11messages[2:])
 
-        p11messages[2].moveToTrash()
+        p11messages[2].trash = True
 
         self.assertEquals(getMessages(p11, 11), p11messages[3:])

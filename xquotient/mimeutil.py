@@ -28,21 +28,24 @@ def headerToUnicode(header, fallbackEncoding='utf-8'):
 class EmailAddress(object):
     """An email address, and maybe an associated display name.
 
-    @type email: unicode
     @ivar email: just the address part, like 'fu@example.com'. Always lowercase
     and stripped.
 
-    @type localpart: unicode
     @ivar localpart: Just the part of C{email} before the '@', or all of
     C{email} if it does not contain an '@'.
 
-    @type domain: unicode
     @ivar domain: Just the part of C{email} after '@', or '' if C{email}
     does not contain an '@'.
 
-    @type display: unicode
     @ivar display: the display name part, like u'John Smith'. Always a unicode
     string and stripped, with whitespace normalized to one space.
+
+    @ivar person: the Person instance coresponding to this address. This
+    attribute is None until findInAddressbook is called.
+
+    A flattener is registered for this class which will render the address and
+    display name prettily. It will also call the 'findInAddressbook' method,
+    which might set self.person.
 
     It is unwise to set attributes of an EmailAddress directly since this
     circumvents the whitespace normalization that normally takes place in
@@ -51,6 +54,8 @@ class EmailAddress(object):
     mimeEncoded=False.
     """
 
+    person = None
+
     def __init__(self, address, mimeEncoded=True):
         """
         @param address: an rfc822 formatted address or a (displayname, address)
@@ -58,16 +63,12 @@ class EmailAddress(object):
         decoded as specified by MIME for headers. Otherwise, any strings must
         be ascii or unicode objects.
         """
+
         if isinstance(address, tuple):
             display = address[0]
             emailaddress = email.Utils.parseaddr(address[1])[1]
         else:
             display, emailaddress = email.Utils.parseaddr(address)
-
-        # XXX This blows.  At some future point, accept one or the other, not
-        # both.
-        if isinstance(emailaddress, str):
-            emailaddress = emailaddress.decode('ascii')
 
         if mimeEncoded:
             decode = headerToUnicode
@@ -79,31 +80,26 @@ class EmailAddress(object):
 
         # This could be smarter (also, correct, perhaps) someday.
         if u'@' in self.email:
-            self.localpart, self.domain = self.email.split(u'@', 1)
+            self.localpart, self.domain = self.email.split('@', 1)
         else:
-            self.localpart, self.domain = self.email, u''
-
-        assert isinstance(self.localpart, unicode)
-        assert isinstance(self.domain, unicode)
-        assert isinstance(self.display, unicode)
-        assert isinstance(self.email, unicode)
+            self.localpart, self.domain = self.email, ''
 
 
     def anyDisplayName(self):
         """Return some sort of display name, in any case.
 
+        - if self.person is set (see findInAddressbook method), return self.person.name.
         - try to return the display name provided in the address, a unicode string
         - if there is no display name, return the email address, a string
         - if there is no email address, return 'Nobody'
         """
-        return self.display or self.email or u'Nobody'
+        return (self.person and self.person.name) or self.display or self.email or 'Nobody'
 
     def pseudoFormat(self):
-        """
-        Return an RFC-822ish format of self.
+        """Return an rfc-822ish format of self.
 
-        The returned unicode string is an rfc-822 header except that it is not
-        MIME encoded.
+        The returned (possibly unicode) string is an rfc-822 header except that
+        it is not MIME encoded.
         """
         return email.Utils.formataddr((self.display, self.email))
 
@@ -146,12 +142,20 @@ class EmailAddress(object):
         else:
             header.append(self.email+',')
 
-
     def __cmp__(self, other):
         if not isinstance(other, EmailAddress):
             return cmp(self.__class__, getattr(other, '__class__', type(other)))
         return cmp((self.email, self.display), (other.email, other.display))
 
+    def findInAddressbook(self, addressbook):
+        """Look for a person matching this address in an addressbook.
+
+        If this person is not in the addressbook, KeyError is raised.
+        Otherwise, self.person will be set to the person instance.
+        """
+        from quotient.addressbook import EmailIndex
+        self.person = addressbook.addressPool.getIndexItem(EmailIndex, self.email)
+        return self.person
 
     def __nonzero__(self):
         return bool(self.display or self.email)
