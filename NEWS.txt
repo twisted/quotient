@@ -1,3 +1,7 @@
+0.1.27 (2006-11-22):
+  - Extensively refactored the message API to explicitly describe the Quotient
+    message pipeline and workflow, rather than leaving it defined by the behaviour of the inbox UI.
+
 0.1.26 (2006-11-20):
   - Fixed bug with outgoing attachments which have container types (multipart/,
     message/).
