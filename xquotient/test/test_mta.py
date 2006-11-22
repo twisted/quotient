@@ -163,7 +163,7 @@ class MailTests(unittest.TestCase):
         IListeningPort for encrypted communication when it is started.
         """
         certfile = self.mktemp()
-        certcreate.main(['--filename', certfile])
+        certcreate.main(['--filename', certfile, '--quiet'])
 
         mta = mail.MailTransferAgent(store=self.store,
                                      portNumber=None,
@@ -420,8 +420,9 @@ class MailTests(unittest.TestCase):
         """
         account = self.login.accountByAddress(recipientLocal, recipientDomain)
         avatar = account.avatars.open()
-        messages = list(avatar.query(exmess.Message,
-                                     exmess.Message.outgoing == False))
+        sq = exmess.MailboxSelector(avatar)
+        sq.refineByStatus(exmess.INCOMING_STATUS)
+        messages = list(sq)
         self.assertEquals(len(messages), 1)
         self.assertIn(
             'Goodbye.',

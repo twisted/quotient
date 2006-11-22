@@ -24,6 +24,7 @@ from xquotient.equotient import NoSuchHeader
 
 try:
     from xquotient import dspam
+    dspam                       # shut up, pyflakes
 except ImportError:
     dspam = None
 
@@ -31,8 +32,8 @@ SPAM_THRESHHOLD = 0.3
 
 class Filter(item.Item, item.InstallableMixin):
     """
-    Aggregates message classification tools and assigns the
-    L{exmess.Message.spam} attribute according to their results.
+    Aggregates message classification tools and calls appropriate methods on
+    Message objects according to their results.
 
     Items will power this up for L{iquotient.IHamFilter} to participate in the
     spam/ham classification process.  Only one Filter is currently supported.
@@ -109,15 +110,16 @@ class Filter(item.Item, item.InstallableMixin):
 
 
     def _classify(self, msg):
-        # Allow Postini to override anything we might determine, if the user
-        # has indicated that is desirable.
-        if msg.trained:
-            log.msg("Skipping classification of message already user-specified as " + (msg.spam and "spam" or "ham"))
+        if not msg.shouldBeClassified:
+            log.msg("Skipping classification of message already user-specified as "
+                    + msg.spamStatus())
             return
 
+        # Allow Postini to override anything we might determine, if the user
+        # has indicated that is desirable.
         if self.usePostiniScore:
             try:
-                postiniHeader = msg.impl.getHeader('X-pstn-levels')
+                postiniHeader = msg.impl.getHeader(u'X-pstn-levels')
             except NoSuchHeader:
                 pass
             else:
@@ -125,10 +127,10 @@ class Filter(item.Item, item.InstallableMixin):
                 if postiniLevels is not None:
                     postiniScore = postiniLevels['S']
                     if float(postiniScore) < self.postiniThreshhold:
-                        msg.spam = True
+                        msg.classifySpam()
                         log.msg("Postini classified message as spam")
                     else:
-                        msg.spam = False
+                        msg.classifyClean()
                         log.msg("Postini classified message as clean")
                     return
 
@@ -136,12 +138,16 @@ class Filter(item.Item, item.InstallableMixin):
         if len(_filters) > 1:
             raise NotImplementedError("multiple spam filters not yet supported")
         if not _filters:
-            msg.spam = False # well, we can't say it _is_ spam
+            msg.classifyClean()
+            log.msg("Message classified as clean due to an absence of filters")
             return
 
         isSpam, score = _filters[0].classify(msg)
-        msg.spam = isSpam
-        log.msg("spam batch processor scored message at %0.2f: %r" % (score, msg.spam))
+        if isSpam:
+            msg.classifySpam()
+        else:
+            msg.classifyClean()
+        log.msg("spam batch processor scored message at %0.2f: %r" % (score, isSpam))
 
 
     def reclassify(self):
@@ -168,19 +174,20 @@ class Filter(item.Item, item.InstallableMixin):
         for f in filters:
             f.forgetTraining()
 
-        work = iter(list(self.store.query(exmess.Message, attributes.AND(exmess.Message.trained == True,
-                                                                         exmess.Message.spam != None),
-                                          sort=exmess.Message.storeID.descending)))
+        sq = exmess.MailboxSelector(self.store)
+        sq.setLimit(5000)
+        sq.refineByStatus(exmess.TRAINED_STATUS)
+        work = iter(list(sq))
 
         # XXX This really should use in-database state, otherwise a restart in
         # the middle will muck things up.
         def go():
             for msg in work:
                 for f in filters:
-                    f.train(msg.spam, msg)
+                    f.train(msg._spam, msg)
                 yield None
             self.reclassify()
-        cooperator.iterateInReactor(go())
+        return cooperator.iterateInReactor(go())
 
 registerAttributeCopyingUpgrader(Filter, 1, 2)
 

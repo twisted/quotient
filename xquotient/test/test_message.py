@@ -6,13 +6,12 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text, inmemory
 
-from nevow import context
 from nevow.testutil import AccumulatingFakeRequest as makeRequest
 from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
 from xmantissa.prefs import PreferenceAggregator
-from xquotient.exmess import Message, MessageDetail, PartDisplayer, addMessageSource, getMessageSources
+from xquotient.exmess import Message, MessageDetail, PartDisplayer, _addMessageSource, getMessageSources
 from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.quotientapp import QuotientPreferenceCollection
 
@@ -26,9 +25,9 @@ class UtilityTestCase(TestCase):
         retrieved with L{getMessageSources} in alphabetical order.
         """
         s = Store()
-        addMessageSource(s, u"one")
-        addMessageSource(s, u"two")
-        addMessageSource(s, u"three")
+        _addMessageSource(s, u"one")
+        _addMessageSource(s, u"two")
+        _addMessageSource(s, u"three")
         self.assertEquals(
             list(getMessageSources(s)),
             [u"one", u"three", u"two"])
@@ -40,8 +39,8 @@ class UtilityTestCase(TestCase):
         L{getMessageSources}.
         """
         s = Store()
-        addMessageSource(s, u"a")
-        addMessageSource(s, u"a")
+        _addMessageSource(s, u"a")
+        _addMessageSource(s, u"a")
         self.assertEquals(list(getMessageSources(s)), [u"a"])
 
 

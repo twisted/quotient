@@ -17,6 +17,8 @@ from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 from xquotient.qpeople import MessageList, MessageLister
 
+from xquotient.test.test_workflow import DummyMessageImplementation
+from xquotient.test.test_inbox import testMessageFactory
 
 def makeMessage(receiver, parts, impl):
     """
@@ -26,12 +28,12 @@ def makeMessage(receiver, parts, impl):
     if impl is None:
         return receiver.feedStringNow(parts)
     else:
-        return Message(store=impl.store,
-                       receivedWhen=Time(),
-                       sentWhen=Time(),
-                       spam=False,
-                       subject=u'',
-                       impl=impl)
+        return testMessageFactory(store=impl.store,
+                                  receivedWhen=Time(),
+                                  sentWhen=Time(),
+                                  spam=False,
+                                  subject=u'',
+                                  impl=impl)
 
 
 
@@ -95,9 +97,12 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         messages in it.
         """
         def deliverMessages():
-            msg = self.store.findUnique(Message)
+            from xquotient.mail import DeliveryAgent
+            cmr = self.store.findUnique(
+                DeliveryAgent).createMIMEReceiver
             for i in xrange(5):
-                makeMessage(None, None, msg.impl)
+                makeMessage(cmr(u'test://' + self.dbdir),
+                            self.aBunchOfRelatedParts, None)
         self.store.transact(deliverMessages)
 
         inbox = self.store.findUnique(Inbox)
@@ -121,11 +126,11 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
                      address=u'bob@internet')
 
         for i in xrange(5):
-            Message(store=self.store,
-                    subject=unicode(str(i)),
-                    receivedWhen=Time(),
-                    spam=False,
-                    sender=u'bob@internet')
+            testMessageFactory(store=self.store,
+                               subject=unicode(str(i)),
+                               receivedWhen=Time(),
+                               spam=False,
+                               sender=u'bob@internet')
 
 
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
@@ -137,10 +142,10 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         """
         for i in xrange(5):
             compose.Draft(store=self.store,
-                          message=Message(store=self.store,
-                                          draft=True,
-                                          spam=False,
-                                          subject=u'Foo'))
+                          message=Message.createDraft(
+                    self.store,
+                    DummyMessageImplementation(store=self.store),
+                    u'test://test/draft/render'))
 
         compose.Composer(store=self.store)
         drafts = compose.Drafts(store=self.store)

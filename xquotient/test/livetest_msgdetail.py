@@ -32,6 +32,15 @@ class _Part(Item):
         return ()
     walkAttachments = walkMessage
 
+    def associateWithMessage(self, message):
+        pass
+
+    def relatedAddresses(self):
+        return []
+
+    def guessSentTime(self, default):
+        return Time()
+
 def _docFactoryFactory(testName, renderMethod='msgDetail'):
     return loaders.stan(tags.div[
                 tags.div(render=tags.directive('liveTest'))[testName],

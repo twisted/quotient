@@ -7,12 +7,21 @@ from twisted.trial.unittest import TestCase
 
 from axiom.store import Store
 from axiom.item import Item
-from axiom.attributes import boolean
+from axiom.attributes import boolean, inmemory, integer
+from axiom.iaxiom import IScheduler
 
 from xquotient.iquotient import IHamFilter
 from xquotient.spam import Filter
 from xquotient.mimestorage import Part
-from xquotient.exmess import Message, _TrainingInstruction
+from xquotient.exmess import (Message, _TrainingInstruction, SPAM_STATUS,
+                              TRAINED_STATUS, CLEAN_STATUS)
+
+from xquotient.mail import MessageSource
+
+from xquotient.test.test_workflow import (DummyMessageImplementation,
+                                          FakeScheduler)
+
+
 
 
 class TestFilter(Item):
@@ -22,7 +31,12 @@ class TestFilter(Item):
     """
     implements(IHamFilter)
 
-    result = boolean(allowNone=False)
+    result = boolean(default=False, allowNone=False)
+    test = inmemory()
+
+    forgotTraining = boolean(default=False)
+
+    trainCount = integer(default=0)
 
     def installOn(self, other):
         other.powerUp(self, IHamFilter)
@@ -31,9 +45,63 @@ class TestFilter(Item):
     def classify(self, item):
         return self.result, 0
 
+    def forgetTraining(self):
+        self.forgotTraining = True
 
+    def train(self, spam, message):
+        self.trainCount += 1
+        # We're only ever called in the context of retraining, so let's make
+        # sure that what we're being told matches the message that we've been
+        # given.
+        if spam:
+            self.test.failUnless(message.hasStatus(SPAM_STATUS))
+        else:
+            self.test.failUnless(message.hasStatus(CLEAN_STATUS))
+        self.test.failUnless(message.hasStatus(TRAINED_STATUS))
+
+def _spamState(messageObject, spamFlag, trainFlag):
+    """
+    Call methods to train or classify as spam or clean based on a pair of flags.
+
+    @param spamFlag: a flag indicating whether this message
+
+    @param trainFlag: a flag, true if the message should be trained, false if
+    it should be classified.
+    """
+    # XXX the fact that I needed to write this method worries me... It bothers
+    # me that such a method was necessary, but it only seems helpful from the
+    # tests.  In the actual application code I found I did want to use the
+    # separate methods provided.  If we start running into that use-case in
+    # application code we should revisit it.  There's no ticket yet because
+    # it's not clear that cleaning this up is necessary or desirable. --glyph
+
+    methodName = ''
+    if trainFlag:
+        methodName += 'train'
+    else:
+        methodName += 'classify'
+    if spamFlag:
+        methodName += 'Spam'
+    else:
+        methodName += 'Clean'
+    getattr(messageObject, methodName)()
 
 class FilterTestCase(TestCase):
+
+    def fakeSchedule(self, runnable, when):
+        pass
+
+
+    def setUp(self):
+        self.store = Store()
+         # XXX implicit dependency: needed for MessageSource
+        self.scheduler = FakeScheduler(store=self.store, test=self)
+        self.store.powerUp(self.scheduler, IScheduler)
+
+        # XXX implicit dependency: needed for Filter.
+        MessageSource(store=self.store)
+
+
     def test_postiniHeaderParsing(self):
         """
         Test that Postini's spam levels header can be parsed and structured
@@ -57,6 +125,45 @@ class FilterTestCase(TestCase):
              'M': Decimal('99.5542'),
              'C': Decimal('79.5348')})
 
+
+    def test_retrain(self):
+        """
+        Verify that retraining a few messages will tell our new test filter to
+        learn about a bunch of new messages.
+        """
+        f = Filter(store=self.store)
+        f.installOn(self.store)
+        tf = TestFilter(store=self.store, test=self)
+        tf.installOn(f)
+        COUNT = 10
+        for j in range(2):
+            for x in range(COUNT):
+                msg = Message.createIncoming(
+                    self.store,
+                    DummyMessageImplementation(store=self.store),
+                    u'test://retrain')
+                _spamState(msg, (x % 2), j)
+
+        # This isn't quite correct.  We're relying on the fact that the batch
+        # processor is supposed to run in a subprocess (which isn't going) so
+        # the callback is only going to be triggered for our set of messages
+        # during the test.  Bleah.
+
+        def _(ign):
+            self.assertEquals(tf.trainCount, COUNT)
+        return f.retrain().addCallback(_)
+
+    def test_reclassify(self):
+        """
+        Verify that reclassification will start classifying from the beginning
+        of the inbox again.
+        """
+        # Didn't write a test for this because I wasn't changing the code, but
+        # I did notice it wasn't covered.
+        self.fail()
+
+    test_reclassify.todo = "Write a test for this."
+
     def test_postiniHeaderWithWhitespace(self):
         """
         Test that a Postini header with leading or trailing whitespace can
@@ -77,8 +184,11 @@ class FilterTestCase(TestCase):
 
     def _messageWithPostiniHeader(self, header):
         part = Part()
-        part.addHeader(u'X-pstn-levels', header)
-        msg = Message(impl=part)
+        part.addHeader(u'X-pstn-levels', unicode(header))
+        msg = Message(store=self.store)
+        # part._addToStore(self.store, msg, None)
+        part.associateWithMessage(msg)
+        msg.impl = part
         return msg
 
 
@@ -90,10 +200,9 @@ class FilterTestCase(TestCase):
         """
         msg = self._messageWithPostiniHeader(
             u'(S: 0.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        msg.trained = False
         f = Filter(usePostiniScore=True, postiniThreshhold=1.0)
         f.processItem(msg)
-        self.failUnless(msg.spam)
+        self.failUnless(msg.hasStatus(SPAM_STATUS))
 
 
     def test_postiniHeaderHamFiltering(self):
@@ -104,10 +213,9 @@ class FilterTestCase(TestCase):
         """
         msg = self._messageWithPostiniHeader(
             u'(S:90.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        msg.trained = False
         f = Filter(usePostiniScore=True, postiniThreshhold=1.0)
         f.processItem(msg)
-        self.failIf(msg.spam)
+        self.failIf(msg.hasStatus(SPAM_STATUS))
 
 
     def test_disablePostiniSpamFiltering(self):
@@ -115,14 +223,12 @@ class FilterTestCase(TestCase):
         Test that if C{usePostiniScore} is False the header is ignored and
         another filter is consulted.
         """
-        self.store = Store()
         msg = self._messageWithPostiniHeader(
             u'(S:90.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        msg.trained = False
         f = Filter(store=self.store, usePostiniScore=False, postiniThreshhold=None)
         TestFilter(store=self.store, result=True).installOn(f)
         f.processItem(msg)
-        self.failUnless(msg.spam)
+        self.failUnless(msg.hasStatus(SPAM_STATUS))
 
 
     def test_disablePostiniHamFiltering(self):
@@ -130,14 +236,12 @@ class FilterTestCase(TestCase):
         Test that if C{usePostiniScore} is False the header is ignored and
         another filter is consulted.
         """
-        self.store = Store()
         msg = self._messageWithPostiniHeader(
             u'(S: 0.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        msg.trained = False
         f = Filter(store=self.store, usePostiniScore=False, postiniThreshhold=None)
         TestFilter(store=self.store, result=False).installOn(f)
         f.processItem(msg)
-        self.failIf(msg.spam)
+        self.failIf(msg.hasStatus(SPAM_STATUS))
 
 
     def test_postiniRespectsTraining(self):
@@ -145,15 +249,13 @@ class FilterTestCase(TestCase):
         If a user trains a message as ham or spam, the postini code should not
         clobber that value, even though postini is not really trainable itself.
         """
-        self.store = Store()
         msg = self._messageWithPostiniHeader(
             u'(S:99.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        msg.trained = True
-        msg.spam = True
+        msg.trainSpam()
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
         f.processItem(msg)
-        self.failUnless(msg.spam)
-        self.failUnless(msg.trained)
+        self.failUnless(msg.hasStatus(SPAM_STATUS))
+        self.failIf(msg.shouldBeClassified)
 
 
     def test_processTrainingInstructions(self):
@@ -162,7 +264,6 @@ class FilterTestCase(TestCase):
         created to signal the batch processor to do the training. Make
         that gets run OK.
         """
-        self.store = Store()
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
         ti = _TrainingInstruction(store=self.store, spam=True)
         f.processItem(ti)
@@ -173,13 +274,14 @@ class FilterTestCase(TestCase):
         Check that when postini filtering is enabled but a message has no
         postini header then the other filter is consulted.
         """
-        self.store = Store()
-        msg = Message(impl=Part())
-        msg.trained = False
+        msg = Message.createIncoming(
+            self.store,
+            Part(),
+            u'test://postiniWithoutHeaderSpamFiltering')
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
         TestFilter(store=self.store, result=True).installOn(f)
         f.processItem(msg)
-        self.failUnless(msg.spam)
+        self.assertIn(SPAM_STATUS, list(msg.iterStatuses()))
 
 
     def test_postiniWithoutHeaderHamFiltering(self):
@@ -187,10 +289,11 @@ class FilterTestCase(TestCase):
         Check that when postini filtering is enabled but a message has no
         postini header then the other filter is consulted.
         """
-        self.store = Store()
-        msg = Message(impl=Part())
-        msg.trained = False
+        msg = Message.createIncoming(
+            self.store,
+            Part(),
+            u'test://postiniWithoutHeaderHamFiltering')
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
         TestFilter(store=self.store, result=False).installOn(f)
         f.processItem(msg)
-        self.failIf(msg.spam)
+        self.assertNotIn(SPAM_STATUS, list(msg.iterStatuses()))

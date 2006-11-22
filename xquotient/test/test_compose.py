@@ -72,13 +72,16 @@ class StubStoredMessageAndImplAndSource(item.Item):
        but the code that triggers the usage of that protocol isn't triggered
        by the following tests.
     """
-    outgoing = attributes.boolean()
+
+    calledStartedSending = attributes.boolean(default=False)
     impl = property(lambda s: s)
     source = property(lambda s: FilePath(__file__))
 
     def open(self):
         return "HI DUDE"
 
+    def startedSending(self):
+        self.calledStartedSending = True
 
 
 class Reactor(object):
@@ -114,6 +117,7 @@ class ComposeFromTest(CompositionTestMixin, unittest.TestCase):
         message = StubStoredMessageAndImplAndSource(store=self.store)
         self.composer.sendMessage(
             self.defaultFromAddr, [u'targetuser@example.com'], message)
+        self.failUnless(message.calledStartedSending)
         self.assertEquals(str(self.reactor.factory.fromEmail),
                           self.defaultFromAddr.address)
 
@@ -207,6 +211,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         da = mail.DeliveryAgent(store=self.store)
         da.installOn(self.store)
         self.cabinet = compose.FileCabinet(store=self.store)
+        self.cf = compose.ComposeFragment(self.composer)
 
 
     def test_createMessageHonorsSmarthostFromAddress(self):
@@ -215,12 +220,12 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         address we give to it
         """
         self.defaultFromAddr.address = u'from@example.com'
-        cf = compose.ComposeFragment(self.composer)
-        msg = cf.createMessage(self.defaultFromAddr,
-                               [mimeutil.EmailAddress(
-                                    'testuser@example.com',
-                                    mimeEncoded=False)],
-                               u'Sup dood', u'A body', u'', u'', u'')
+        msg = self.cf.createMessage(
+            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+                    'testuser@example.com',
+                    mimeEncoded=False)],
+            u'Sup dood', u'A body', u'', u'', u'')
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)
         self.assertEquals(msg["from"], 'from@example.com')
@@ -305,6 +310,77 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
         self.assertEquals(textPlain2.getContentType(), 'text/plain')
         self.assertEquals(textPlain2.getBody(), 'text/plain #2\n')
+
+
+
+
+    def test_createMessageNotIncoming(self):
+        """
+        Verify that a message composed via the compose form does not deposit
+        anything into the 'incoming' state, so the spam filter will not be
+        triggered.
+        """
+        sq = exmess.MailboxSelector(self.store)
+        msg = self.cf.createMessage(
+            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+                    'testuser@example.com',
+                    mimeEncoded=False)],
+            u'Sup dood', u'A body', u'', u'', u'')
+        sq.refineByStatus(exmess.INCOMING_STATUS)
+        self.assertEquals(list(sq), [])
+        self.assertEquals(msg.hasStatus(exmess.CLEAN_STATUS), False)
+        self.failIf(msg.shouldBeClassified)
+
+
+    def test_clientFacingAPIDraft(self):
+        """
+        Verify that the client-facing '_sendOrSave' method, invoked by the
+        liveform, generates a draft message when told to save the message.
+
+        This is a white-box test.
+        """
+        self.cf._sendOrSave(
+            fromAddress=self.defaultFromAddr,
+            toAddresses=[mimeutil.EmailAddress(
+                    u'testuser@127.0.0.1',
+                    mimeEncoded=False)],
+            subject=u'The subject of the message.',
+            messageBody=u'The body of the message.',
+            cc=u'',
+            bcc=u'',
+            files=[],
+            draft=True)
+        m = self.store.findUnique(exmess.Message)
+        self.assertEquals(set(m.iterStatuses()),
+                          set([exmess.UNREAD_STATUS, exmess.DRAFT_STATUS]))
+        self.assertEquals(list(self.store.query(compose._NeedsDelivery)),
+                          [])
+
+
+    def test_clientFacingAPISend(self):
+        """
+        Verify that the client-facing '_sendOrSave' method, invoked by the
+        liveform, generates a sent message when told to send the message.
+
+        This is a white-box test.
+        """
+        self.cf._sendOrSave(
+            fromAddress=self.defaultFromAddr,
+            toAddresses=[mimeutil.EmailAddress(
+                    u'testuser@127.0.0.1',
+                    mimeEncoded=False)],
+            subject=u'The subject of the message.',
+            messageBody=u'The body of the message.',
+            cc=u'',
+            bcc=u'',
+            files=[],
+            draft=False)
+        m = self.store.findUnique(exmess.Message)
+        self.assertEquals(set(m.iterStatuses()),
+                          set([exmess.UNREAD_STATUS, exmess.SENT_STATUS]))
+        nd = self.store.findUnique(compose._NeedsDelivery)
+        self.assertIdentical(nd.message, m)
 
 
 

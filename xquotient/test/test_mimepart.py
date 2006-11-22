@@ -1,5 +1,6 @@
 
 import os
+import email.quopriMIME
 
 from twisted.trial import unittest
 from twisted.python import filepath
@@ -12,6 +13,8 @@ from xquotient import mimepart
 from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
+from xquotient.exmess import (
+    SENDER_RELATION, RECIPIENT_RELATION, COPY_RELATION, BLIND_COPY_RELATION)
 
 from xmantissa import ixmantissa
 
@@ -298,16 +301,25 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
 
 
 
-class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin):
+
+class PersistenceMixin(MIMEReceiverMixin):
     def _messageTest(self, source, assertMethod):
         mr = self.setUpMailStuff()
         msg = mr.feedStringNow(source)
         assertMethod(msg)
 
 
+
+class PersistenceTestCase(unittest.TestCase, MessageTestMixin, PersistenceMixin):
     def assertIndexability(self, msg):
         fi = ixmantissa.IFulltextIndexable(msg.message)
         self.assertEquals(fi.uniqueIdentifier(), unicode(msg.message.storeID))
+        # XXX: the following success fixtures are sketchy.  the
+        # 'alice@example.com' token appears twice because it is both the
+        # 'senderDisplay' and the 'sender' of this message.  That strikes me as
+        # wrong; it should eliminate the duplicate, and not rely on the details
+        # of the attributes of Message, since ideally those attributes would be
+        # accessed through the Correspondent item anyway. --glyph
         self.assertEquals(sorted(fi.textParts()), [
             u'Hello Bob,\n  How are you?\n-A\n',
             u'a test message, comma separated',
@@ -332,6 +344,7 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, MIMEReceiverMixin
                 self.assertNotEquals(att.part.bodyLength, None)
         self._messageTest(messageWithEmbeddedMessage, checkAttachments)
         self._messageTest(truncatedMultipartMessage, checkAttachments)
+
 
     def testPartIDs(self):
         mr = self.setUpMailStuff()
@@ -664,3 +677,212 @@ class MessageTestCase(unittest.TestCase):
         msg.connectionLost()
         self.failUnless(fObj.aborted, "Underlying message file not aborted on lost connection.")
 
+
+
+relatedAddressesMessage = """\
+Received: from example.com (example.com [127.0.0.1])
+          by example.org (example.org [127.0.0.1])
+          for <alice@example.com>; Mon, 13 Nov 2006 16:04:04 GMT
+Message-ID: <0@example.com>
+%(from)s%(sender)s%(reply-to)s%(cc)s%(to)s%(bcc)s
+
+Hello.
+"""
+
+class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
+    """
+    Test the L{IMessageData} implementation provided by L{Part}.
+    """
+
+    fromDisplay = u'\N{LATIN CAPITAL LETTER A WITH GRAVE}lice'
+    fromEmail = u'alice@example.com'
+    fromAddress = u'%s <%s>' % (fromDisplay, fromEmail)
+
+    senderDisplay = u'B\N{LATIN SMALL LETTER O WITH GRAVE}b'
+    senderEmail = u'bob@example.com'
+    senderAddress = u'%s <%s>' % (senderDisplay, senderEmail)
+
+    replyToDisplay = u'C\N{LATIN SMALL LETTER A WITH GRAVE}rol'
+    replyToEmail = u'carol@example.com'
+    replyToAddress = u'%s <%s>' % (replyToDisplay, replyToEmail)
+
+    toDisplay = u'Dav\N{LATIN SMALL LETTER A WITH GRAVE}'
+    toEmail = u'dave@example.com'
+    toAddress = u'%s <%s>' % (toDisplay, toEmail)
+
+    ccDisplay = u'\N{LATIN CAPITAL LETTER E WITH GRAVE}ve'
+    ccEmail = u'eve@example.com'
+    ccAddress = u'%s <%s>' % (ccDisplay, ccEmail)
+
+    bccDisplay = u'Is\N{LATIN SMALL LETTER A WITH GRAVE}ac'
+    bccEmail = u'isaac@example.com'
+    bccAddress = u'%s <%s>' % (bccDisplay, bccEmail)
+
+
+    def _header(self, name, value):
+        return (
+            name +
+            ': ' +
+            email.quopriMIME.header_encode(value) +
+            '\n').encode('ascii')
+
+
+    def _relationTest(self, headers, relation, email, display):
+        msgSource = msg(relatedAddressesMessage % headers)
+
+        def checkRelatedAddresses(part):
+            for (kind, addr) in part.relatedAddresses():
+                if kind == relation:
+                    self.assertEqual(addr.email, email)
+                    self.assertEqual(addr.display, display)
+                    break
+            else:
+                self.fail("Did not find %r" % (relation,))
+
+        self._messageTest(msgSource, checkRelatedAddresses)
+
+
+    def test_senderAddressWithFrom(self):
+        """
+        Test that L{Part.relatedAddresses} yields a sender address taken from
+        the C{From} header of a message, if that header is present.
+        """
+        self._relationTest({
+                'from': self._header('From', self.fromAddress),
+                'sender': self._header('Sender', self.senderAddress),
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           SENDER_RELATION,
+                           self.fromEmail,
+                           self.fromDisplay)
+
+
+    def test_senderAddressWithSender(self):
+        """
+        Test that L{Part.relatedAddresses} yields a sender address taken from
+        the C{Sender} header of a message, if that header is present and the
+        C{From} header is not.
+        """
+        self._relationTest({
+                'from': '',
+                'sender': self._header('Sender', self.senderAddress),
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           SENDER_RELATION,
+                           self.senderEmail,
+                           self.senderDisplay)
+
+
+    def test_senderAddressWithReplyTo(self):
+        """
+        Test that L{Part.relatedAddresses} yields a sender address taken from
+        the C{Reply-To} header of a message, if that header is present and the
+        C{From} and C{Sender} headers are not.
+        """
+        self._relationTest({
+                'from': '',
+                'sender': '',
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           SENDER_RELATION,
+                           self.replyToEmail,
+                           self.replyToDisplay)
+
+
+    def test_recipientRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields a recipient address taken
+        from the C{To} header of the message, if that header is present.
+        """
+        self._relationTest({
+                'from': self._header('From', self.fromAddress),
+                'sender': self._header('Sender', self.senderAddress),
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           RECIPIENT_RELATION,
+                           self.toEmail,
+                           self.toDisplay)
+
+
+    def test_copyRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields a recipient address taken
+        from the C{Cc} header of the message, if that header is present.
+        """
+        self._relationTest({
+                'from': self._header('From', self.fromAddress),
+                'sender': self._header('Sender', self.senderAddress),
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           COPY_RELATION,
+                           self.ccEmail,
+                           self.ccDisplay)
+
+
+    def test_multiRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields multiple recipient addresses
+        taken from the C{Cc} header of the message, if multiples were found.
+        """
+        msgSource = msg(relatedAddressesMessage % {
+                'sender': self._header('Sender', self.senderAddress),
+                'from': self._header('From', self.fromAddress),
+                'to': self._header('To', self.toAddress),
+                'cc': self._header('Cc', self.ccAddress + u", " +
+                                   self.bccAddress),
+                'reply-to': '',
+                'bcc': ''})
+
+        def checkRelations(msg):
+            ccAddrs = [(addr.email, addr.display) for (kind, addr) in msg.relatedAddresses()
+                       if kind == COPY_RELATION]
+            self.assertEqual([(self.ccEmail, self.ccDisplay),
+                              (self.bccEmail, self.bccDisplay)], ccAddrs)
+
+        self._messageTest(msgSource, checkRelations)
+
+
+    def test_blindCopyRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields a recipient address taken
+        from the C{Bcc} header of the message, if that header is present.
+        """
+        self._relationTest({
+                'from': self._header('From', self.fromAddress),
+                'sender': self._header('Sender', self.senderAddress),
+                'reply-to': self._header('Reply-To', self.replyToAddress),
+                'cc': self._header('Cc', self.ccAddress),
+                'to': self._header('To', self.toAddress),
+                'bcc': self._header('Bcc', self.bccAddress)},
+                           BLIND_COPY_RELATION,
+                           self.bccEmail,
+                           self.bccDisplay)
+
+
+    def test_noRelations(self):
+        """
+        Test that L{Part.relatedAddresses} gives back an empty iterator if
+        there are no usable headers in the message.
+        """
+        msgSource = msg(relatedAddressesMessage % {
+                'from': '',
+                'sender': '',
+                'reply-to': '',
+                'cc': '',
+                'to': '',
+                'bcc': ''})
+
+        def checkRelations(msg):
+            self.assertEqual(list(msg.relatedAddresses()), [])
+
+        self._messageTest(msgSource, checkRelations)
