@@ -1,5 +1,6 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
   nevow:render="liveFragment"
+  xmlns:athena="http://divmod.org/ns/athena/0.7"
   style="border-top: solid 1px #0099CC;"
   class="compose-widget">
 
@@ -153,10 +154,6 @@
                 <tr valign="top">
                   <td class="header-table-first-col">
                     To:<br />
-                    <a href="#" class="cc-link"
-                      onclick="Quotient.Compose.Controller.get(this).toggleCCForm(this); return false">
-                      + Cc
-                    </a>
                   </td>
                   <td class="header-table-last-col">
                     <textarea
@@ -165,16 +162,30 @@
                       style="width: 98%"
                       rows="2"><nevow:slot name="to" /></textarea></td>
                 </tr>
-                <tr class="cc-form" style="display: none">
-                  <td class="header-table-first-col">Cc:</td>
+                <nevow:slot name="subject" />
+                <tr>
+                  <td colspan="2" style="text-align: center">
+                    <a href="#" class="more-options-disclose">
+                      <athena:handler event="onclick" handler="toggleMoreOptions" />
+                      <span class="closed-label">More Options...</span>
+                      <span class="open-label" style="display: none">Less Options</span>
+                    </a>
+                  </td>
+                </tr>
+                <tr class="more-options" style="display: none">
+                  <td class="header-table-first-col">CC:</td>
                   <td class="header-table-last-col">
                     <input type="text" name="cc" style="width: 98%">
                       <nevow:attr name="value"><nevow:slot name="cc" /></nevow:attr>
                     </input>
-                    <input type="hidden" name="bcc" />
                   </td>
                 </tr>
-                <nevow:slot name="subject" />
+                <tr class="more-options" style="display: none">
+                  <td class="header-table-first-col">BCC:</td>
+                  <td class="header-table-last-col">
+                    <input type="text" name="bcc" style="width: 98%" />
+                  </td>
+                </tr>
                 <tr class="files-form" style="display: none">
                   <td class="header-table-first-col">Files:</td>
                   <td class="header-table-last-col">
