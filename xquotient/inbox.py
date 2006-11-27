@@ -22,7 +22,7 @@ from xmantissa.scrolltable import Scrollable, ScrollableView
 
 from xquotient.exmess import Message, getMessageSources, MailboxSelector
 from xquotient.exmess import READ_STATUS, UNREAD_STATUS, CLEAN_STATUS
-from xquotient import mimepart, equotient, compose, renderers
+from xquotient import mimepart, equotient, compose, renderers, mimeutil
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
 
@@ -59,11 +59,28 @@ def reSubject(m, pfx='Re: '):
 
 
 def replyTo(m):
+    """
+    Figure out the address(es) that a reply to the message C{m} should be sent to.
+
+    @type m: L{xquotient.exmess.Message}
+    @rtype: sequence of L{xquotient.mimeutil.EmailAddress}
+    """
+    # FIXME this should be a method on Message or something
     try:
         recipient = m.impl.getHeader(u'reply-to')
     except equotient.NoSuchHeader:
         recipient = m.sender
-    return recipient
+    return mimeutil.parseEmailAddresses(recipient, mimeEncoded=False)
+
+def replyToAll(m):
+    """
+    Figure out the address(es) that a reply to all people involved in message
+    C{m} should be sent to.
+
+    @type m: L{xquotient.exmess.Message}
+    @rtype: sequene of L{xquotient.mimeutil.EmailAddress}
+    """
+    return set(addr for (rel, addr) in m.impl.relatedAddresses())
 
 def _viewSelectionToMailboxSelector(store, viewSelection):
     """
@@ -693,28 +710,55 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         Return an inline L{xquotient.compose.ComposeFragment} instance with
         empty to address, subject, message body and attacments
         """
-        return self._composeSomething(None, '', '', '')
+        return self._composeSomething(None, (), '', '')
     expose(getComposer)
 
-    def replyToMessage(self, messageIdentifier):
-        curmsg = self.translator.fromWebID(messageIdentifier)
+    def _getBodyForReply(self, msg):
+        """
+        Figure out helpful default body text for a reply to C{msg}
 
-        if curmsg.sender is not None:
-            origfrom = curmsg.sender
+        @type msg: L{xquotient.exmess.Message}
+        @rtype: C{unicode}
+        """
+        # XXX this method probably doesn't belong on InboxScreen
+        if msg.sender is not None:
+            origfrom = msg.sender
         else:
             origfrom = "someone who chose not to be identified"
 
-        if curmsg.sentWhen is not None:
-            origdate = curmsg.sentWhen.asHumanly()
+        if msg.sentWhen is not None:
+            origdate = msg.sentWhen.asHumanly()
         else:
             origdate = "an indeterminate time in the past"
 
         replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
 
+        return '\n\n\n' + replyhead + '\n> '.join(quoteBody(msg))
+
+    def replyToMessage(self, messageIdentifier):
+        curmsg = self.translator.fromWebID(messageIdentifier)
         return self._composeSomething(replyTo(curmsg),
                                       reSubject(curmsg),
-                                      '\n\n\n' + replyhead + '\n> '.join(quoteBody(curmsg)))
+                                      self._getBodyForReply(curmsg))
     expose(replyToMessage)
+
+
+    def replyAllToMessage(self, messageIdentifier):
+        """
+        Return a L{xquotient.compose.ComposeFragment} loaded with presets that
+        might be useful for sending a reply to the message identified by
+        C{messageIdentifier} to all of the people involved in it
+
+        @param messageIdentifier: web ID
+        @type messageIdentifier: C{unicode}
+
+        @rtype: L{xquotient.compose.ComposeFragment}
+        """
+        curmsg = self.translator.fromWebID(messageIdentifier)
+        return self._composeSomething(replyToAll(curmsg),
+                                      reSubject(curmsg),
+                                      self._getBodyForReply(curmsg))
+    expose(replyAllToMessage)
 
 
     def redirectMessage(self, messageIdentifier):
@@ -744,7 +788,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
         currentMessageDetail = self._messageFragment(curmsg)
 
-        return self._composeSomething('',
+        return self._composeSomething((),
                                       reSubject(curmsg, 'Fwd: '),
                                       '\n\n' + '\n> '.join(reply),
                                       currentMessageDetail.attachmentParts)

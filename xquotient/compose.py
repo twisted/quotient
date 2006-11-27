@@ -576,8 +576,33 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
     _savedDraft = None
 
-    def __init__(self, composer, toAddresses='', subject='', messageBody='',
+    def __init__(self, composer, toAddresses=(), subject=u'', messageBody=u'',
                  attachments=(), inline=False):
+        """
+        @type composer: L{Composer}
+
+        @param toAddresses: email addresses of the recipients of this message
+        @type toAddresses: sequence of L{xquotient.mimeutil.EmailAddress}
+        instances
+
+        @param subject: the subject of this message
+        @type subject: C{unicode}
+
+        @param messageBody: the body of this message
+        @type messageBody: C{unicode}
+
+        @param attachments: the attachments of this message
+        @type attachments: sequence of L{xquotient.mimepart.AttachmentPart}
+        instances
+
+        @param inline: whether the compose widget is being displayed inline,
+        e.g. as a child of another widget
+        @type inline: boolean
+
+        C{toAddresses}, C{subject}, C{messageBody} and C{attachments} should
+        be considered as presets - their values can be manipulated via the
+        user interface
+        """
         self.composer = composer
         self.translator = ixmantissa.IWebTranslator(composer.store)
 
@@ -604,7 +629,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
-        self.toAddresses = self._coerceEmailAddressString(toAddresses)
+        self.toAddresses = toAddresses
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments

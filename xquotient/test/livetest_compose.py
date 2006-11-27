@@ -11,7 +11,7 @@ from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Person, EmailAddress
 
-from xquotient import compose
+from xquotient import compose, mimeutil
 from xquotient.inbox import Inbox
 from xquotient.exmess import Message
 from xquotient.test.test_inbox import testMessageFactory
@@ -95,18 +95,21 @@ class ComposeToAddressTestCase(testcase.TestCase, _ComposeTestMixin):
         testcase.TestCase.__init__(self)
         self.perTestData = {}
 
-    def getComposeWidget(self, key, toAddress):
+    def getComposeWidget(self, key, toAddresses):
         """
         @param key: unique identifier for the test method
-        @param toAddress: comma separated C{str} of email addresses which
-        should be passed to the L{ComposeFragment} constructor.  This string
-        will be used as the initial content of the client-side toAddresses
-        form input when the fragment is rendered
+        @param toAddresses: sequence of C{unicode} email addresses which
+        should be wrapped in L{xquotient.mimeutil.EmailAddress} instances and
+        passed to the L{ComposeFragment} constructor.  These will be used as
+        the initial content of the client-side toAddresses form input when the
+        fragment is rendered
         @rtype: L{AddrPassthroughComposeFragment}
         """
         def composeFragFactory(composer):
             return AddrPassthroughComposeFragment(
-                        composer, toAddresses=toAddress)
+                        composer,
+                        toAddresses=[mimeutil.EmailAddress(e, False)
+                                        for e in toAddresses])
 
         (s, frag) = self._getComposeFragment(
                         composeFragFactory=composeFragFactory)
