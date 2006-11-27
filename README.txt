@@ -44,7 +44,7 @@ information about SSL certificates.
 
 2. Install the Quotient Offering
 
- * Browse to http://127.0.0.1:8080/private 
+ * Browse to http://localhost:8080/private 
  * Login as admin@localhost, providing the password you gave in Step 1.
  * Click on the "Quotient" offering. The red border should turn yellow, then
    green.
@@ -69,8 +69,9 @@ access to the Quotient offering.
  * Log in as the new user
 
 
-Note that you *must* point your browser to 127.0.0.1, not localhost. This is
-because Mantissa expects domains to contain at least one '.'. See ticket #1656
-for more information.
+Note that you *must* point your browser to "localhost".  This is because you
+created a user "admin@localhost", from which Mantissa derived the fact that
+"localhost" is a domain which it is responsible for.  Signup is only allowed
+for domains Mantissa believes itself to be responsible.
 
 You should see Quotient running in your browser. 
