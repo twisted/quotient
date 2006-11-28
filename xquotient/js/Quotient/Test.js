@@ -2734,62 +2734,49 @@ Quotient.Test.ComposeToAddressTestCase.methods(
         return result;
     });
 
-Quotient.Test.MsgDetailTestBase = Nevow.Athena.Test.TestCase.subclass('MsgDetailTestBase');
-Quotient.Test.MsgDetailTestBase.methods(
+Quotient.Test.MessageDetailTestHelper = Divmod.Class.subclass('Quotient.Test.MessageDetailTestHelper');
+/**
+ * A helper class which wraps a message detail and provides some utility
+ * methods for checking various things about it
+ */
+Quotient.Test.MessageDetailTestHelper.methods(
+    function __init__(self, widget) {
+        self.widget = widget;
+    },
+
     /**
-     * Assert that the msg detail header fields that belong
-     * inside the "More Detail" panel are visible or not
+     * Assert that the msg detail header fields that belong inside the "More
+     * Detail" panel are visible or not
      *
-     * @param visible: boolean
-     * @return: undefined
+     * @param failureFunction: function to call with a descriptive string if
+     * we find something inconsistent
+     * @type failureFunction: function
+     *
+     * @param visible: do we expect "More Detail" to be visible or not?
+     * @type visible: boolean
      */
-    function assertMoreDetailVisibility(self, visible) {
-        var rows = Nevow.Athena.NodesByAttribute(
-                    self.node.parentNode, "class", "detailed-row");
+    function checkMoreDetailVisibility(self, failureFunction, visible) {
+        var rows = self.widget.nodesByAttribute(
+                    "class", "detailed-row");
         if(rows.length == 0) {
-            self.fail("expected at least one 'More Detail' row");
+            failureFunction("expected at least one 'More Detail' row");
         }
         for(var i = 0; i < rows.length; i++) {
-            self.assertEquals(rows[i].style.display != "none", visible);
+            if(visible != (rows[i].style.display != "none")) {
+                failureFunction("one of the 'More Detail' rows has the wrong visibility");
+            }
         }
     },
 
-    function getMsgDetailWidget(self) {
-        if(!self.widget) {
-            self.widget = Quotient.Message.MessageDetail.get(
-                            Nevow.Athena.NodeByAttribute(
-                                self.node.parentNode,
-                                "athena:class",
-                                "Quotient.Message.MessageDetail"));
-        }
-        return self.widget;
-    },
-
     /**
-     * Find out the current value of the C{showMoreDetail} setting
-     * @return: string
+     * Collect the names/values of the headers being displayed by our
+     * L{Quotient.Message.MessageDetail} widget, by looking at its DOM
+     *
+     * @return: mapping of header names to values
+     * @type: C{Object}
      */
-     function getMoreDetailSetting(self) {
-        return self.getMsgDetailWidget().callRemote("getMoreDetailSetting");
-    },
-
-    /**
-     * Wrapper for the C{toggleMoreDetail} method on the
-     * L{Quotient.Message.MessageDetail} widget that's associated with
-     * this test.
-     */
-    function toggleMoreDetail(self) {
-        return self.getMsgDetailWidget().toggleMoreDetail();
-    });
-
-/**
- * Check that the message detail renders correctly
- */
-Quotient.Test.MsgDetailTestCase = Quotient.Test.MsgDetailTestBase.subclass('MsgDetailTestCase');
-Quotient.Test.MsgDetailTestCase.methods(
-    function run(self) {
-        var hdrs = Nevow.Athena.FirstNodeByAttribute(
-                        self.node.parentNode, "class", "msg-header-table");
+    function collectHeaders(self) {
+        var hdrs = self.widget.firstNodeByAttribute("class", "msg-header-table");
         var fieldvalues = {};
         var rows = hdrs.getElementsByTagName("tr");
         var cols, fieldname;
@@ -2803,75 +2790,206 @@ Quotient.Test.MsgDetailTestCase.methods(
             fieldname = fieldname.toLowerCase().slice(0, -1);
             fieldvalues[fieldname] = cols[1].firstChild.nodeValue;
         }
-        var assertFieldsEqual = function(answers) {
-            for(var k in answers) {
-                self.assertEquals(fieldvalues[k], answers[k]);
-            }
-        }
-
-        assertFieldsEqual(
-            {from: '"Sender" <sender@host>',
-             to: "recipient@host",
-             subject: "the subject",
-             sent: "Wed, 31 Dec 1969 19:00:00 -0500",
-             received: "Wed, 31 Dec 1969 19:00:01 -0500"});
-
-        return self.getMoreDetailSetting().addCallback(
-            function(moreDetail) {
-                self.assertEquals(moreDetail, false);
-                self.assertMoreDetailVisibility(false);
-                return self.toggleMoreDetail();
-        }).addCallback(
-            function() {
-                return self.getMoreDetailSetting();
-        }).addCallback(
-            function(moreDetail) {
-                self.assertEquals(moreDetail, true);
-                self.assertMoreDetailVisibility(true);
-                return self.toggleMoreDetail();
-        }).addCallback(
-            function() {
-                return self.getMoreDetailSetting();
-        }).addCallback(
-            function(moreDetail) {
-                self.assertEquals(moreDetail, false);
-                self.assertMoreDetailVisibility(false);
-        });
+        return fieldvalues;
     });
 
-Quotient.Test.MsgDetailAddPersonTestCase = Quotient.Test.MsgDetailTestBase.subclass(
-                                                'MsgDetailAddPersonTestCase');
 
+/**
+ * Check that the message detail renders correctly
+ */
+Quotient.Test.MsgDetailTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.MsgDetailTestCase');
+Quotient.Test.MsgDetailTestCase.methods(
+    function setUp(self) {
+        var d = self.callRemote('setUp');
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+                self.testHelper = Quotient.Test.MessageDetailTestHelper(widget);
+            });
+        return d;
+    },
+
+    /**
+     * Test that the headers in the DOM reflect the headers of the message
+     * that is being rendered
+     */
+    function test_headers(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var fieldvalues = self.testHelper.collectHeaders();
+
+                var assertFieldsEqual = function(answers) {
+                    for(var k in answers) {
+                        self.assertEquals(fieldvalues[k], answers[k]);
+                    }
+                }
+
+                assertFieldsEqual(
+                    {from: '"Sender" <sender@host>',
+                     to: "recipient@host",
+                     subject: "the subject",
+                     sent: "Wed, 31 Dec 1969 19:00:00 -0500",
+                     received: "Wed, 31 Dec 1969 19:00:01 -0500"});
+            });
+        return result;
+    },
+
+    /**
+     * Tests for the "More Detail" feature of
+     * L{Quotient.Message.MessageDetail}
+     */
+    function test_moreDetail(self) {
+        var result = self.setUp(),
+            failureFunc = function(m) {
+                self.fail(m);
+            },
+            checkAndToggle = function(value) {
+                return function(ignored) {
+                    self.testHelper.checkMoreDetailVisibility(
+                        failureFunc, value);
+                    var result = self.msgDetail.callRemote("getMoreDetailSetting");
+                    result.addCallback(
+                        function(setting) {
+                            self.assertEquals(setting, value);
+                            return self.msgDetail.toggleMoreDetail();
+                        });
+                    return result;
+                }
+            };
+
+        result.addCallback(checkAndToggle(false));
+        result.addCallback(checkAndToggle(true));
+        result.addCallback(checkAndToggle(false));
+        return result;
+    });
+
+Quotient.Test.MsgDetailAddPersonTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                                'Quotient.Test.MsgDetailAddPersonTestCase');
+
+/**
+ * Test case for the interaction between L{Quotient.Common.SenderPerson} and
+ * L{Quotient.Message.MessageDetail}
+ */
 Quotient.Test.MsgDetailAddPersonTestCase.methods(
+    function setUp(self, key) {
+        var d = self.callRemote('setUp', key);
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+            });
+        return d;
+    },
+
     /**
      * Test showing Add Person dialog, and adding a person
      */
     function test_addPerson(self) {
-        var msg = self.getMsgDetailWidget();
-        var sp = Nevow.Athena.Widget.get(
-                    msg.firstNodeByAttribute(
-                        "athena:class",
-                        "Quotient.Common.SenderPerson"));
-        sp.showAddPerson();
-
-        self.assertEquals(sp.dialog.node.style.display, "");
-        self.assertEquals(sp.dialog.node.style.position, "absolute");
-
-        var dialogLiveForm = Nevow.Athena.Widget.get(sp.dialog.node.getElementsByTagName("form")[0]);
-
-        return dialogLiveForm.submit().addCallback(
+        var result = self.setUp('addPerson');
+        result.addCallback(
             function() {
-                return self.callRemote("verifyPerson");
+                var sp = Nevow.Athena.Widget.get(
+                            self.msgDetail.firstNodeByAttribute(
+                                "athena:class",
+                                "Quotient.Common.SenderPerson"));
+                sp.showAddPerson();
+
+                self.assertEquals(sp.dialog.node.style.display, "");
+                self.assertEquals(sp.dialog.node.style.position, "absolute");
+
+                var dialogLiveForm = Nevow.Athena.Widget.get(
+                                        sp.dialog.node.getElementsByTagName(
+                                            "form")[0]);
+
+                return dialogLiveForm.submit().addCallback(
+                    function() {
+                        return self.callRemote("verifyPerson", "addPerson");
+                    });
             });
+        return result;
     });
 
-Quotient.Test.MsgDetailInitArgsTestCase = Quotient.Test.MsgDetailTestBase.subclass(
-                                                'MsgDetailInitArgsTestCase');
+Quotient.Test.MsgDetailInitArgsTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                                'Quotient.Test.MsgDetailInitArgsTestCase');
+/**
+ * Tests for the initArgs for L{Quotient.Message.MessageDetail}
+ */
 Quotient.Test.MsgDetailInitArgsTestCase.methods(
-    function run(self) {
-        self.assertMoreDetailVisibility(true);
+    function setUp(self) {
+        var d = self.callRemote('setUp');
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+                self.testHelper = Quotient.Test.MessageDetailTestHelper(widget);
+            });
+        return d;
+    },
+
+    /**
+     * Our python class returns True for the initial visibility of the "More
+     * Detail" panel.  Make sure that this is reflected client-side
+     */
+    function test_moreDetailInitArg(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                self.testHelper.checkMoreDetailVisibility(
+                    function(m) {
+                        self.fail(m);
+                    }, true);
+            });
+        return result;
     });
 
+Quotient.Test.MsgDetailHeadersTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                            'Quotient.Test.MsgDetailHeadersTestCase');
+/**
+ * Tests for rendering of messages with various combinations of headers
+ */
+Quotient.Test.MsgDetailHeadersTestCase.methods(
+    function setUp(self, headers) {
+        var d = self.callRemote('setUp', headers);
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+                self.testHelper = Quotient.Test.MessageDetailTestHelper(widget);
+            });
+        return d;
+    },
+
+    /**
+     * Test rendering of a message with a Resent-From header but no Resent-To
+     */
+    function test_resentFromNoResentTo(self) {
+        var result = self.setUp({'Resent-From': 'user@host'});
+        result.addCallback(
+            function(ignored) {
+                var headers = self.testHelper.collectHeaders();
+                self.assertEquals(headers['resent from'], 'user@host');
+                self.assertEquals(headers['resent to'], undefined);
+            });
+        return result;
+    });
 
 Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.PostiniConfigurationTestCase');

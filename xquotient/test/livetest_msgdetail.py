@@ -17,16 +17,20 @@ from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient.inbox import Inbox
 from xquotient import equotient
 
-_headers = {'cc': u'cc@host'}
+class _Header(Item):
+    part = attributes.reference()
+    name = attributes.text()
+    value = attributes.text()
 
 class _Part(Item):
     z = attributes.integer()
 
     def getHeader(self, k):
-        try:
-            return _headers[k]
-        except KeyError:
-            raise equotient.NoSuchHeader()
+        for hdr in self.store.query(
+            _Header, attributes.AND(_Header.part == self,
+                                    _Header.name == k.lower())):
+            return hdr.value
+        raise equotient.NoSuchHeader(k)
 
     def walkMessage(self, *junk):
         return ()
@@ -46,15 +50,17 @@ def _docFactoryFactory(testName, renderMethod='msgDetail'):
                 tags.div(render=tags.directive('liveTest'))[testName],
                 tags.div(render=tags.directive('msgDetail'))])
 
-class MsgDetailTestCase(testcase.TestCase):
+class _MsgDetailTestMixin:
     """
-    Tests for L{xquotient.exmess.MessageDetail}
+    Mixin which provides some methods for setting up stores and messages
     """
-    jsClass = u'Quotient.Test.MsgDetailTestCase'
-
-    docFactory = _docFactoryFactory('MsgDetailTestCase')
-
     def _setUpStore(self):
+        """
+        Create a store and install the items required by a
+        L{xquotient.exmess.Message}
+
+        @rtype: L{axiom.store.Store}
+        """
         s = Store()
         PrivateApplication(store=s).installOn(s)
         QuotientPreferenceCollection(store=s).installOn(s)
@@ -62,6 +68,11 @@ class MsgDetailTestCase(testcase.TestCase):
         return s
 
     def _setUpMsg(self):
+        """
+        Install an innocuous incoming message in a newly-created store
+
+        @rtype: L{xquotient.exmess.Message}
+        """
         s = self._setUpStore()
 
         return Message(store=s,
@@ -73,51 +84,106 @@ class MsgDetailTestCase(testcase.TestCase):
                        sentWhen=Time.fromPOSIXTimestamp(0),
                        receivedWhen=Time.fromPOSIXTimestamp(1))
 
-    def render_msgDetail(self, ctx, data):
+class MsgDetailTestCase(testcase.TestCase, _MsgDetailTestMixin):
+    """
+    Tests for L{xquotient.exmess.MessageDetail}
+    """
+    jsClass = u'Quotient.Test.MsgDetailTestCase'
+
+    def setUp(self):
         """
-        Setup & populate a store, and render a L{xquotient.exmess.MessageDetail}
+        Setup & populate a store, and render a
+        L{xquotient.exmess.MessageDetail}
         """
         f = MessageDetail(self._setUpMsg())
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
+    expose(setUp)
 
-class MsgDetailAddPersonTestCase(MsgDetailTestCase):
+class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
     """
     Test adding a person from the msg detail
     """
     jsClass = u'Quotient.Test.MsgDetailAddPersonTestCase'
 
-    docFactory = _docFactoryFactory('MsgDetailAddPersonTestCase')
+    def __init__(self, *a, **k):
+        super(MsgDetailAddPersonTestCase, self).__init__(*a, **k)
+        self._stores = {}
 
     def _setUpStore(self):
-        s = MsgDetailTestCase._setUpStore(self)
+        s = super(MsgDetailAddPersonTestCase, self)._setUpStore()
         people.Organizer(store=s).installOn(s)
-        self.store = s
         return s
 
-    def verifyPerson(self):
+    def verifyPerson(self, key):
         """
         Called from the client after a person has been added.  Verifies that
         there is only one person, and that his details match those of the
         sender of the single message in our store
         """
-        p = self.store.findUnique(people.Person)
+        p = self._stores[key].findUnique(people.Person)
         self.assertEquals(p.getEmailAddress(), 'sender@host')
         self.assertEquals(p.getDisplayName(), 'Sender')
     expose(verifyPerson)
 
+    def setUp(self, key):
+        """
+        Setup & populate a store, and render a
+        L{xquotient.exmess.MessageDetail}
+        """
+        msg = self._setUpMsg()
+        self._stores[key] = msg.store
+        f = MessageDetail(msg)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)
 
-class MsgDetailInitArgsTestCase(MsgDetailTestCase):
+class MsgDetailInitArgsTestCase(testcase.TestCase, _MsgDetailTestMixin):
     """
     Test for L{xquotient.exmess.MessageDetail}'s initargs
     """
-
     jsClass = u'Quotient.Test.MsgDetailInitArgsTestCase'
-
-    docFactory = _docFactoryFactory('MsgDetailInitArgsTestCase')
 
     def _setUpMsg(self):
         m = super(MsgDetailInitArgsTestCase, self)._setUpMsg()
         m.store.findUnique(Inbox).showMoreDetail = True
         return m
+
+    def setUp(self):
+        """
+        Setup & populate a store, and render a
+        L{xquotient.exmess.MessageDetail}
+        """
+        f = MessageDetail(self._setUpMsg())
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)
+
+
+class MsgDetailHeadersTestCase(testcase.TestCase, _MsgDetailTestMixin):
+    """
+    Test for the rendering of messages which have various headers set
+    """
+    jsClass = u'Quotient.Test.MsgDetailHeadersTestCase'
+
+    def setUp(self, headers):
+        """
+        Setup & populate a store with a L{xquotient.exmess.Message} which has
+        the headers in C{headers} set to the given values
+
+        @type headers: C{dict} of C{unicode}
+        """
+        msg = self._setUpMsg()
+        for (k, v) in headers.iteritems():
+            _Header(store=msg.store,
+                    part=msg.impl,
+                    name=k.lower(),
+                    value=v)
+        f = MessageDetail(msg)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)

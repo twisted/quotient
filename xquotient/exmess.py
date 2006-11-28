@@ -1616,14 +1616,15 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
 
     def _getRedirectHeaderStan(self):
-        try:
-            resentFrom = self.original.impl.getHeader(u'Resent-From')
-        except equotient.NoSuchHeader:
-            return ''
-        resentTo = self.original.impl.getHeader(u'Resent-To')
-        return (self.patterns['redirected-from'].fillSlots('address', resentFrom),
-                self.patterns['redirected-to'].fillSlots('address', resentTo))
-
+        for (header, pattern) in ((u'Resent-From', 'redirected-from'),
+                                  (u'Resent-To', 'redirected-to')):
+            try:
+                value = self.original.impl.getHeader(header)
+            except equotient.NoSuchHeader:
+                value = ''
+            else:
+                value = self.patterns[pattern].fillSlots('address', value)
+            yield value
 
     def render_headerPanel(self, ctx, data):
         if self.organizer is not None:
