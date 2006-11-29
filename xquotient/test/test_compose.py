@@ -11,7 +11,7 @@ from axiom import userbase
 
 from xmantissa import webapp
 
-from xquotient import compose, mail, mimeutil, exmess, equotient
+from xquotient import compose, mail, mimeutil, exmess
 from xquotient.test.util import PartMaker
 
 
@@ -225,67 +225,10 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             [mimeutil.EmailAddress(
                     'testuser@example.com',
                     mimeEncoded=False)],
-            u'Sup dood', u'A body', (), (), u'')
+            u'Sup dood', u'A body', u'', u'', u'')
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)
         self.assertEquals(msg["from"], 'from@example.com')
-
-    def test_createMessageHonorsBCC(self):
-        """
-        Sending a message through the compose UI should honor the BCC
-        addresses we give to it
-        """
-        self.cf._sendMail(
-            self.defaultFromAddr,
-            [mimeutil.EmailAddress(
-                'to@example.com',
-                mimeEncoded=False)],
-            u'', u'', [],
-            [mimeutil.EmailAddress(
-                'bcc1@example.com',
-                 mimeEncoded=False),
-             mimeutil.EmailAddress(
-                'bcc2@example.com',
-                mimeEncoded=False)],
-            u'')
-        self.assertEquals(
-            list(self.store.query(compose._NeedsDelivery).getColumn('toAddress')),
-            ['to@example.com', 'bcc1@example.com', 'bcc2@example.com'])
-
-    def _createBCCMessage(self):
-        """
-        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
-        message with a BCC
-        """
-        return self.cf.createMessage(
-            self.defaultFromAddr,
-            [mimeutil.EmailAddress(
-                'to@example.com',
-                mimeEncoded=False)],
-            u'', u'', [],
-            [mimeutil.EmailAddress(
-                'bcc@example.com',
-                mimeEncoded=False)],
-            u'')
-
-    def test_noBCCInTo(self):
-        """
-        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
-        stick the BCC address it's passed into the "To" header
-        """
-        msg = self._createBCCMessage()
-        (addr,) = mimeutil.parseEmailAddresses(msg.impl.getHeader(u'To'))
-        self.assertEquals(addr.email, 'to@example.com')
-
-    def test_noBCCHeader(self):
-        """
-        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
-        result in a BCC header on the message it makes, when it's passed a BCC
-        address
-        """
-        msg = self._createBCCMessage()
-        self.assertRaises(
-            equotient.NoSuchHeader, lambda: msg.impl.getHeader(u'bcc'))
 
     def _createMessageWithFiles(self, files):
         """
@@ -298,7 +241,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                                 [mimeutil.EmailAddress(
                                     'testuser@example.com',
                                     mimeEncoded=False)],
-                                u'subject', u'body', (), (),
+                                u'subject', u'body', u'', u'',
                                 files=list(f.storeID for f in files))
 
     def _assertFilenameParamEquals(self, part, filename):
@@ -404,8 +347,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                     mimeEncoded=False)],
             subject=u'The subject of the message.',
             messageBody=u'The body of the message.',
-            cc=[],
-            bcc=[],
+            cc=u'',
+            bcc=u'',
             files=[],
             draft=True)
         m = self.store.findUnique(exmess.Message)
@@ -429,8 +372,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                     mimeEncoded=False)],
             subject=u'The subject of the message.',
             messageBody=u'The body of the message.',
-            cc=[],
-            bcc=[],
+            cc=u'',
+            bcc=u'',
             files=[],
             draft=False)
         m = self.store.findUnique(exmess.Message)

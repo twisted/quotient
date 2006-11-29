@@ -2450,17 +2450,6 @@ Quotient.Test.ComposeController.methods(
 Quotient.Test.ComposeTestCase = Nevow.Athena.Test.TestCase.subclass('ComposeTestCase');
 Quotient.Test.ComposeTestCase.methods(
     /**
-     * Get a L{Quotient.Test.ComposeController} instance
-     */
-    function getController(self) {
-        return Quotient.Test.ComposeController.get(
-                    Nevow.Athena.NodeByAttribute(
-                        self.node.parentNode,
-                        "athena:class",
-                        "Quotient.Test.ComposeController"));
-    },
-
-    /**
      * Test the name completion method
      * L{Quotient.Compose.EmailAddressAutoCompleteModel.complete} (when called
      * via L{Quotient.Compose.Controller}) generates the correct address lists
@@ -2468,7 +2457,11 @@ Quotient.Test.ComposeTestCase.methods(
      */
     function test_addressCompletion(self) {
         /* get the ComposeController */
-        var controller = self.getController();
+        var controller = Quotient.Test.ComposeController.get(
+                            Nevow.Athena.NodeByAttribute(
+                                self.node.parentNode,
+                                "athena:class",
+                                "Quotient.Test.ComposeController"));
 
         /* these are the pairs of [displayName, emailAddress] that we expect
          * the controller to have received from getPeople() */
@@ -2519,7 +2512,11 @@ Quotient.Test.ComposeTestCase.methods(
      * (when called via L{Quotient.Compose.Controller}) does the right thing.
      */
     function test_reconstituteAddresses(self) {
-        var controller = self.getController();
+        var controller = Quotient.Test.ComposeController.get(
+                            Nevow.Athena.NodeByAttribute(
+                                self.node.parentNode,
+                                "athena:class",
+                                "Quotient.Test.ComposeController"));
 
         /* map each [displayName, emailAddress] pair to the result we expect
          * from ComposeController.reconstituteAddress(), when passed the pair */
@@ -2541,51 +2538,6 @@ Quotient.Test.ComposeTestCase.methods(
                 view._reconstituteAddress(reconstitutedAddresses[i][0]),
                 reconstitutedAddresses[i][1]);
         }
-    },
-
-    /**
-     * Test that L{Quotient.Compose.Controller.toggleMoreOptions} toggles the
-     * visibility of the "more options" nodes
-     */
-    function test_toggleMoreOptions(self) {
-        var controller = self.getController();
-        var nodes = controller.nodesByAttribute("class", "more-options");
-        self.failUnless(0 < nodes.length);
-
-        for(var i = 0; i < nodes.length; i++) {
-            self.assertEquals(nodes[i].style.display, "none");
-        }
-        controller.toggleMoreOptions();
-        for(i = 0; i < nodes.length; i++) {
-            self.assertEquals(nodes[i].style.display, "");
-        }
-    },
-
-    /**
-     * TestL{Quotient.Compose.Controller._toggleDisclosureLabels}
-     */
-    function test_toggleDisclosureLabels(self) {
-        var controller = self.getController(),
-            node = document.createElement("div"),
-            l1 = document.createElement("div"),
-            l2 = document.createElement("div");
-
-        l1.className = "closed-label";
-        l2.className = "open-label";
-
-        l2.style.display = "none";
-        node.appendChild(l1);
-        node.appendChild(l2);
-
-        controller._toggleDisclosureLabels(node);
-
-        self.assertEquals(l1.style.display, "none");
-        self.assertEquals(l2.style.display, "");
-
-        controller._toggleDisclosureLabels(node);
-
-        self.assertEquals(l1.style.display, "");
-        self.assertEquals(l2.style.display, "none");
     });
 
 /**
