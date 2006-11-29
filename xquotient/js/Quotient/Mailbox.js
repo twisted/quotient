@@ -1993,15 +1993,6 @@ Quotient.Mailbox.Controller.methods(
          return self._doComposeAction("replyToMessage", reloadMessage);
     },
 
-    /**
-     * Load a compose widget with the "To" field set to all of the addresses
-     * in the "From", "To", "CC" and "BCC" headers of the message we're
-     * looking at
-     */
-    function replyToAll(self, reloadMessage/*=undefined*/) {
-        return self._doComposeAction("replyAllToMessage", reloadMessage);
-    },
-
     function redirect(self, reloadMessage/*=undefined*/) {
         return self._doComposeAction("redirectMessage", reloadMessage);
     },
