@@ -1,4 +1,3 @@
-
 from zope.interface import implements
 
 from twisted.trial import unittest
@@ -14,13 +13,14 @@ from twisted.python import failure
 from epsilon.scripts import certcreate
 
 from axiom import store, userbase, scheduler
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item
 from axiom.attributes import text, reference
 from axiom.test.util import getPristineStore
+from axiom.dependency import installOn
 
 from xquotient import mail, exmess
-from xquotient.quotientapp import QuotientBenefactor
-from xquotient.compose import ComposeBenefactor
+from xquotient.compose import Composer
+from xquotient.inbox import Inbox
 from xquotient.iquotient import IMessageSender
 
 
@@ -40,13 +40,9 @@ def createStore(testCase):
         which will be used as the origin and destination of various test
         messages.
         """
-        scheduler.Scheduler(store=s).installOn(s)
+        installOn(scheduler.Scheduler(store=s), s)
         login = userbase.LoginSystem(store=s)
-        login.installOn(s)
-
-        benefactors = [
-            QuotientBenefactor(store=s),
-            ComposeBenefactor(store=s)]
+        installOn(login, s)
 
         for (localpart, domain, internal) in [
             ('testuser', 'localhost', True),
@@ -56,8 +52,8 @@ def createStore(testCase):
             account = login.addAccount(localpart, domain, None, internal=internal)
             subStore = account.avatars.open()
             def endow():
-                for b in benefactors:
-                    b.endow(None, subStore)
+                installOn(Inbox(store=subStore), subStore)
+                installOn(Composer(store=subStore), subStore)
             subStore.transact(endow)
     s.transact(initializeStore)
 
@@ -85,18 +81,14 @@ class _DeliveryRecord(Item):
 
 
 
-class StubSender(Item, InstallableMixin):
+class StubSender(Item):
     """
     Testable L{IMessageSender} implementation.
     """
     implements(IMessageSender)
 
-    installedOn = reference()
-
-    def installOn(self, other):
-        super(StubSender, self).installOn(other)
-        other.powerUp(self, IMessageSender)
-
+    attr = reference(doc="placeholder attribute")
+    powerupInterfaces = (IMessageSender)
 
     def sendMessage(self, toAddresses, message):
         for addr in toAddresses:
@@ -141,7 +133,7 @@ class MailTests(unittest.TestCase):
         gets started itself.
         """
         mta = mail.MailTransferAgent(store=self.store)
-        mta.installOn(self.store)
+        installOn(mta, self.store)
         self.failUnless(mta.running)
 
 
@@ -151,7 +143,7 @@ class MailTests(unittest.TestCase):
         cleartext communication when it is started.
         """
         mta = mail.MailTransferAgent(store=self.store)
-        mta.installOn(self.store)
+        installOn(mta, self.store)
 
         self.failIfEqual(mta.port, None)
         self.assertEquals(mta.securePort, None)
@@ -169,7 +161,7 @@ class MailTests(unittest.TestCase):
                                      portNumber=None,
                                      securePortNumber=0,
                                      certificateFile=certfile)
-        mta.installOn(self.store)
+        installOn(mta, self.store)
 
         self.assertEqual(mta.port, None)
         self.failIfEqual(mta.securePort, None)
@@ -183,7 +175,7 @@ class MailTests(unittest.TestCase):
         minimally functional.
         """
         mta = mail.MailTransferAgent(store=self.store)
-        mta.installOn(self.store)
+        installOn(mta, self.store)
         factory = smtp.IMessageDeliveryFactory(self.store)
         delivery = factory.getMessageDelivery()
         self.failUnless(smtp.IMessageDelivery.providedBy(delivery))
@@ -207,7 +199,7 @@ class MailTests(unittest.TestCase):
         delivery.
         """
         factory = mail.MailTransferAgent(store=self.store)
-        factory.installOn(self.store)
+        installOn(factory, self.store)
         delivery = factory.getMessageDelivery()
         d = delivery.validateFrom(
             ('home.example.net', '192.168.1.1'),
@@ -221,7 +213,7 @@ class MailTests(unittest.TestCase):
         authenticating first is accepted.
         """
         factory = mail.MailTransferAgent(store=self.store)
-        factory.installOn(self.store)
+        installOn(factory, self.store)
         delivery = factory.getMessageDelivery()
 
         addr = smtp.Address('testuser@example.com')
@@ -274,7 +266,7 @@ class MailTests(unittest.TestCase):
         authenticating is accepted.
         """
         factory = mail.MailTransferAgent(store=self.store)
-        factory.installOn(self.store)
+        installOn(factory, self.store)
         delivery = factory.getMessageDelivery()
 
         addr = smtp.Address('someone.else@example.com')
@@ -295,7 +287,7 @@ class MailTests(unittest.TestCase):
         authenticating is rejected.
         """
         factory = mail.MailTransferAgent(store=self.store)
-        factory.installOn(self.store)
+        installOn(factory, self.store)
         delivery = factory.getMessageDelivery()
 
         addr = smtp.Address('someone.else@example.com')
@@ -316,7 +308,7 @@ class MailTests(unittest.TestCase):
         would exist locally if it existed at all is rejected.
         """
         factory = mail.MailTransferAgent(store=self.store)
-        factory.installOn(self.store)
+        installOn(factory, self.store)
         delivery = factory.getMessageDelivery()
 
         addr = smtp.Address('someone.else@example.com')
@@ -488,7 +480,7 @@ class MailTests(unittest.TestCase):
         # Put in a new stub IMessageSender which we can use to assert things
         # about the sending behavior in this case.
         newSender = StubSender(store=avatar)
-        newSender.installOn(avatar)
+        installOn(newSender, avatar)
         return newSender
 
 
@@ -584,7 +576,7 @@ class ProtocolTestCase(unittest.TestCase):
         Create a store with a LoginSystem and a portal wrapped around it.
         """
         self.store = store.Store()
-        userbase.LoginSystem(store=self.store).installOn(self.store)
+        installOn(userbase.LoginSystem(store=self.store), self.store)
         realm = portal.IRealm(self.store)
         checker = checkers.ICredentialsChecker(self.store)
         self.portal = portal.Portal(realm, [checker])
@@ -598,7 +590,7 @@ class ProtocolTestCase(unittest.TestCase):
         """
         mta = mail.MailTransferAgent(
             store=self.store, portNumber=None, securePortNumber=None)
-        mta.installOn(self.store)
+        installOn(mta, self.store)
         mta.privilegedStartService()
         factory = mta.factory
         protocol = factory.buildProtocol(('192.168.1.1', 12345))

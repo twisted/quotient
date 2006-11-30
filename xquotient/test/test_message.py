@@ -5,6 +5,7 @@ from twisted.trial.unittest import TestCase
 from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text, inmemory
+from axiom.dependency import installOn
 
 from nevow.testutil import AccumulatingFakeRequest as makeRequest
 from nevow.test.test_rend import deferredRender
@@ -113,7 +114,7 @@ class WebTestCase(TestCase):
                       be added to the PartDisplayer request
         """
         s = Store()
-        PrivateApplication(store=s).installOn(s)
+        installOn(PrivateApplication(store=s), s)
 
         part = PartItem(store=s,
                         contentType=u'text/html',
@@ -163,8 +164,8 @@ class WebTestCase(TestCase):
         Test L{xquotient.exmess.MessageDetail._getZipFileName}
         """
         s = Store()
-        PrivateApplication(store=s).installOn(s)
-        QuotientPreferenceCollection(store=s).installOn(s)
+        installOn(PrivateApplication(store=s), s)
+        installOn(QuotientPreferenceCollection(store=s), s)
         md = MessageDetail(Message(store=s, subject=u'a/b/c', sender=u'foo@bar'))
         self.assertEqual(md.zipFileName, 'foo@bar-abc-attachments.zip')
 
@@ -176,8 +177,9 @@ class WebTestCase(TestCase):
         m = Message(store=s)
         impl = PartItem(store=s)
         m.impl = impl
-        PreferenceAggregator(store=s).installOn(s)
-        MessageDisplayPreferenceCollection(store=s).installOn(s)
+        installOn(PreferenceAggregator(store=s), s)
+        mdp = MessageDisplayPreferenceCollection(store=s)
+        installOn(mdp, s)
         m.walkMessage()
         self.assertEqual(impl.preferred, 'text/html')
 

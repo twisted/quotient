@@ -12,13 +12,15 @@ from twisted.python import reflect, components
 
 from nevow import inevow, athena
 
-from axiom import item, attributes, tags
+from axiom import item, attributes
+from axiom.tags import Catalog
+from axiom.dependency import dependsOn, installOn
 
 from xmantissa import ixmantissa, webnav, webtheme, liveform
 
 from xquotient import iquotient, mail
 
-class RuleFilteringPowerup(item.Item, item.InstallableMixin):
+class RuleFilteringPowerup(item.Item):
     """
     Filters messages according to a set of user-defined filtering
     rules.
@@ -28,21 +30,18 @@ class RuleFilteringPowerup(item.Item, item.InstallableMixin):
     Avatar which this powers up.
     """)
 
-    tagCatalog = attributes.reference(doc="""
+    tagCatalog = dependsOn(Catalog, doc="""
     The catalog in which to tag items to which this action is applied.
     """)
 
     filters = attributes.inmemory()
-
+    powerupInterfaces = (ixmantissa.INavigableElement)
     def activate(self):
         self.filters = None
 
 
-    def installOn(self, other):
-        super(RuleFilteringPowerup, self).installOn(other)
+    def installed(self):
         self.store.findUnique(mail.MessageSource).addReliableListener(self)
-        other.powerUp(self, ixmantissa.INavigableElement)
-
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.2, children=
@@ -61,7 +60,7 @@ class RuleFilteringPowerup(item.Item, item.InstallableMixin):
                 break
 
 
-class RuleFilterBenefactor(item.Item, item.InstallableMixin):
+class RuleFilterBenefactor(item.Item):
     """
     Endows users with RuleFilteringPowerup.
     """
@@ -72,23 +71,7 @@ class RuleFilterBenefactor(item.Item, item.InstallableMixin):
     installedOn = attributes.reference()
     endowed = attributes.integer(default=0)
 
-    def installOn(self, other):
-        super(RuleFilterBenefactor, self).installOn(other)
-        other.powerUp(self, ixmantissa.IBenefactor)
-
-
-    def endow(self, ticket, avatar):
-        self.endowed += 1
-        catalog = avatar.findOrCreate(tags.Catalog)
-        avatar.findOrCreate(RuleFilteringPowerup, tagCatalog=catalog).installOn(avatar)
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(RuleFilteringPowerup).deleteFromStore()
-
-
-
-class MailingListFilterBenefactor(item.Item, item.InstallableMixin):
+class MailingListFilterBenefactor(item.Item):
     """
     Endows users with MailingListFilteringPowerup.
     """
@@ -96,21 +79,6 @@ class MailingListFilterBenefactor(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
     endowed = attributes.integer(default=0)
-
-    def installOn(self, other):
-        super(MailingListFilterBenefactor, self).installOn(other)
-        other.powerUp(self, ixmantissa.IBenefactor)
-
-
-    def endow(self, ticket, avatar):
-        self.endowed += 1
-        catalog = avatar.findOrCreate(tags.Catalog)
-        avatar.findOrCreate(MailingListFilteringPowerup, tagCatalog=catalog).installOn(avatar)
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(MailingListFilteringPowerup).deleteFromStore()
-
 
 
 class FixedTagAction(item.Item):
@@ -238,29 +206,6 @@ class HeaderRule(item.Item):
     def applyTo(self, item):
         return self.applyToHeaders(item.impl.getHeaders(self.headerName))
 
-class MailingListFilteringPowerup(item.Item, item.InstallableMixin):
-    """
-    Filters mail according to the mailing list it was sent from.
-    """
-    tagCatalog = attributes.reference(doc="""
-    The catalog in which to tag items to which this action is applied.
-    """)
-    mailingListRule = attributes.reference(doc="""
-    The mailing list filter used by this powerup.
-    """)
-
-    def installOn(self, other):
-        super(MailingListFilteringPowerup, self).installOn(other)
-        self.mailingListRule = self.store.findOrCreate(MailingListRule)
-        self.store.findUnique(mail.MessageSource).addReliableListener(self)
-
-    def processItem(self, item):
-        matched, proceed, extraData = self.mailingListRule.applyTo(item)
-        if matched:
-            self.mailingListRule.getAction().actOn(self, self.mailingListRule,
-                                                   item, extraData)
-
-
 class MailingListRule(item.Item):
     implements(iquotient.IFilteringRule)
 
@@ -374,6 +319,27 @@ class MailingListRule(item.Item):
                 return True, True, {"mailingListName": tag}
         return False, True, None
 
+
+class MailingListFilteringPowerup(item.Item):
+    """
+    Filters mail according to the mailing list it was sent from.
+    """
+    tagCatalog = dependsOn(Catalog, doc="""
+    The catalog in which to tag items to which this action is applied.
+    """)
+
+    mailingListRule = dependsOn(MailingListRule, doc="""
+    The mailing list filter used by this powerup.
+    """)
+    messageSource = dependsOn(mail.MessageSource)
+    def installed(self):
+        self.messageSource.addReliableListener(self)
+
+    def processItem(self, item):
+        matched, proceed, extraData = self.mailingListRule.applyTo(item)
+        if matched:
+            self.mailingListRule.getAction().actOn(self, self.mailingListRule,
+                                                   item, extraData)
 
 
 class FilteringConfigurationFragment(athena.LiveFragment):

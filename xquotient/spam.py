@@ -14,12 +14,16 @@ from nevow import athena
 from epsilon import cooperator
 
 from axiom import iaxiom, item, attributes, userbase
+from axiom.scheduler import SubScheduler
 from axiom.upgrade import registerAttributeCopyingUpgrader
+from axiom.dependency import dependsOn, installOn
 
 from xmantissa import ixmantissa, liveform
 from xmantissa.webtheme import ThemedFragment, getLoader
 
-from xquotient import mail, iquotient, exmess
+from xquotient import iquotient
+from xquotient.mail import MessageSource
+from xquotient.exmess import _TrainingInstructionSource, _TrainingInstruction, Message
 from xquotient.equotient import NoSuchHeader
 
 try:
@@ -30,7 +34,7 @@ except ImportError:
 
 SPAM_THRESHHOLD = 0.3
 
-class Filter(item.Item, item.InstallableMixin):
+class Filter(item.Item):
     """
     Aggregates message classification tools and calls appropriate methods on
     Message objects according to their results.
@@ -59,16 +63,16 @@ class Filter(item.Item, item.InstallableMixin):
     """, default=0.03)
 
     _filters = attributes.inmemory()
-
-    def installOn(self, other):
-        super(Filter, self).installOn(other)
-        self.store.findUnique(mail.MessageSource).addReliableListener(self, style=iaxiom.REMOTE)
-        self.store.findOrCreate(exmess._TrainingInstructionSource).addReliableListener(self, style=iaxiom.REMOTE)
-
+    scheduler = dependsOn(SubScheduler)
+    messageSource = dependsOn(MessageSource)
+    tiSource = dependsOn(_TrainingInstructionSource)
+    def installed(self):
+        self.messageSource.addReliableListener(self, style=iaxiom.REMOTE)
+        self.tiSource.addReliableListener(self, style=iaxiom.REMOTE)
 
     def processItem(self, item):
-        assert isinstance(item, (exmess._TrainingInstruction, exmess.Message))
-        if isinstance(item, exmess._TrainingInstruction):
+        assert isinstance(item, (_TrainingInstruction, Message))
+        if isinstance(item, _TrainingInstruction):
             self._train(item)
         else:
             self._classify(item)
@@ -170,7 +174,7 @@ class Filter(item.Item, item.InstallableMixin):
 
         This should only be called in the batch process.
         """
-        filters = list(self.powerupsFor(iquotient.IHamFilter))
+        filters = list(self.store.powerupsFor(iquotient.IHamFilter))
         for f in filters:
             f.forgetTraining()
 
@@ -178,6 +182,7 @@ class Filter(item.Item, item.InstallableMixin):
         sq.setLimit(5000)
         sq.refineByStatus(exmess.TRAINED_STATUS)
         work = iter(list(sq))
+
 
         # XXX This really should use in-database state, otherwise a restart in
         # the middle will muck things up.
@@ -261,7 +266,7 @@ class HamFilterFragment(ThemedFragment):
 components.registerAdapter(HamFilterFragment, Filter, ixmantissa.INavigableFragment)
 
 
-class DSPAMFilter(item.Item, item.InstallableMixin):
+class DSPAMFilter(item.Item):
     """
     libdspam-based L{iquotient.IHamFilter} powerup.
     """
@@ -272,11 +277,11 @@ class DSPAMFilter(item.Item, item.InstallableMixin):
     username = attributes.inmemory()
     lib = attributes.inmemory()
     globalPath = attributes.bytes()
+    filter = dependsOn(Filter)
 
-    def installOn(self, other):
-        super(DSPAMFilter, self).installOn(other)
-        other.powerUp(self, iquotient.IHamFilter)
-        self.globalPath = other.installedOn.parent.newFilePath("dspam").path
+    powerupInterfaces = (iquotient.IHamFilter)
+    def installed(self):
+        self.globalPath = self.store.parent.newFilePath("dspam").path
 
     def _homePath(self):
         return self.store.newFilePath('dspam-%d' % (self.storeID,))
@@ -305,7 +310,7 @@ class DSPAMFilter(item.Item, item.InstallableMixin):
         if p.exists():
             p.remove()
 
-class SpambayesFilter(item.Item, item.InstallableMixin):
+class SpambayesFilter(item.Item):
     """
     Spambayes-based L{iquotient.IHamFilter} powerup.
     """
@@ -315,10 +320,10 @@ class SpambayesFilter(item.Item, item.InstallableMixin):
 
     classifier = attributes.inmemory()
     guesser = attributes.inmemory()
+    filter = dependsOn(Filter)
 
-    def installOn(self, other):
-        super(SpambayesFilter, self).installOn(other)
-        other.powerUp(self, iquotient.IHamFilter)
+    powerupInterfaces = (iquotient.IHamFilter)
+
 
 
     def _classifierPath(self):
@@ -385,21 +390,5 @@ class SpambayesFilter(item.Item, item.InstallableMixin):
 class SpambayesBenefactor(item.Item):
     endowed = attributes.integer(default=0)
 
-    def endow(self, ticket, avatar):
-        avatar.findOrCreate(SpambayesFilter).installOn(avatar.findUnique(Filter))
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(SpambayesFilter).deleteFromStore()
-
-
 class DSPAMBenefactor(item.Item):
     endowed = attributes.integer(default=0)
-
-    def endow(self, ticket, avatar):
-        avatar.findOrCreate(DSPAMFilter).installOn(avatar.findUnique(Filter))
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(DSPAMFilter).deleteFromStore()
-

@@ -33,6 +33,7 @@ from epsilon import sslverify
 from axiom import item, attributes, userbase, batch
 from axiom.upgrade import registerUpgrader
 from axiom.errors import MissingDomainPart
+from axiom.dependency import dependsOn
 
 from xmantissa.stats import BandwidthMeasuringFactory
 
@@ -122,7 +123,7 @@ class SafeMIMEParserWrapper(object):
 
 
 
-class DeliveryAgent(item.Item, item.InstallableMixin):
+class DeliveryAgent(item.Item):
     """
     Entrypoint for MIME-formatted content into a Quotient-enabled Store.
 
@@ -136,9 +137,7 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
     installedOn = attributes.reference()
     messageCount = attributes.integer(default=0)
 
-    def installOn(self, other):
-        super(DeliveryAgent, self).installOn(other)
-        other.powerUp(self, iquotient.IMIMEDelivery)
+    powerupInterfaces = (iquotient.IMIMEDelivery)
 
     def _createMIMESourceFile(self):
         """
@@ -146,7 +145,7 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
         just delivered.
         """
         today = datetime.date.today()
-        fObj = self.installedOn.newFile(
+        fObj = self.store.newFile(
             'messages',
             str(today.year),
             str(today.month),
@@ -162,7 +161,8 @@ class DeliveryAgent(item.Item, item.InstallableMixin):
         Basic implementation of L{iquotient.IMIMEDelivery.createMIMEReceiver}.
         """
         return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
-            self.installedOn, self._createMIMESourceFile(), source))
+
+            self.store, self._createMIMESourceFile(), source))
 
     def _createMIMEDraftReceiver(self, source):
         """
@@ -234,7 +234,7 @@ class ESMTPFactory(protocol.ServerFactory):
 
 
 
-class MailTransferAgent(item.Item, item.InstallableMixin,
+class MailTransferAgent(item.Item,
                         service.Service, DeliveryFactoryMixin):
     """
     Service responsible for binding server ports for SMTP and SMTP/SSL
@@ -244,6 +244,8 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
 
     typeName = "mantissa_mta"
     schemaVersion = 2
+
+    powerupInterfaces = (service.IService, smtp.IMessageDeliveryFactory)
 
     messageCount = attributes.integer(
         "The number of messages which have been delivered through this agent.",
@@ -267,6 +269,7 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
         "The canonical name of this host.  Used when greeting SMTP clients.",
         default=None)
 
+    userbase = dependsOn(userbase.LoginSystem)
     # These are for the Service stuff
     parent = attributes.inmemory()
     running = attributes.inmemory()
@@ -288,15 +291,8 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
         self.securePort = None
 
 
-    def installOn(self, other):
-        super(MailTransferAgent, self).installOn(other)
-        other.powerUp(self, service.IService)
-        other.powerUp(self, smtp.IMessageDeliveryFactory)
-        if self.store.parent is None:
-            other.powerUp(self, service.IService)
-            if self.parent is None:
-                self.setServiceParent(other)
-
+    def installed(self):
+        self.setServiceParent(self.store)
 
     def privilegedStartService(self):
         if SSL is None and self.securePortNumber is not None:
@@ -315,20 +311,8 @@ class MailTransferAgent(item.Item, item.InstallableMixin,
         else:
             certOpts = None
 
-        realm = portal.IRealm(self.installedOn, None)
-        if realm is None:
-            raise MailConfigurationError(
-                "No realm: "
-                "you need to install a userbase before using this service.")
-
-        chk = checkers.ICredentialsChecker(self.installedOn, None)
-        if chk is None:
-            raise MailConfigurationError(
-                "No checkers: "
-                "you need to install a userbase before using this service.")
-
         self.portal = portal.Portal(
-            realm, [chk, checkers.AllowAnonymousAccess()])
+            self.userbase, [self.userbase, checkers.AllowAnonymousAccess()])
         self.factory = ESMTPFactory(
             self.portal,
             self.domain,
@@ -381,8 +365,8 @@ def upgradeMailTransferAgent1to2(oldMTA):
         return newMTA
     else:
         mda = MailDeliveryAgent(store=oldMTA.store)
-        mda.installOn(mda.store)
-        oldMTA.installedOn.powerDown(oldMTA, smtp.IMessageDeliveryFactory)
+        installOn(mda, mda.store)
+        oldMTA.store.powerDown(oldMTA, smtp.IMessageDeliveryFactory)
         oldMTA.deleteFromStore()
         # The MTA was deleted, there's no sensible Item to return here.
         return mda
@@ -461,7 +445,7 @@ class OutgoingMessageWrapper(object):
 
 
 
-class MailDeliveryAgent(item.Item, item.InstallableMixin):
+class MailDeliveryAgent(item.Item):
     """
     Class responsible for authenticated delivery.
     """
@@ -469,9 +453,7 @@ class MailDeliveryAgent(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
-    def installOn(self, other):
-        super(MailDeliveryAgent, self).installOn(other)
-        other.powerUp(self, smtp.IMessageDeliveryFactory)
+    powerupInterfaces = (smtp.IMessageDeliveryFactory)
 
 
     def getMessageDelivery(self):

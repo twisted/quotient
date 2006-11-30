@@ -3,6 +3,7 @@ from nevow.athena import expose
 
 from axiom.store import Store
 from axiom.scheduler import Scheduler
+from axiom.dependency import installOn
 
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
@@ -18,11 +19,9 @@ class AddGrabberTestCase(TestCase):
 
     def getWidgetDocument(self):
         s = Store()
-        Scheduler(store=s).installOn(s)
-        PrivateApplication(store=s).installOn(s)
 
         grabberConfig = grabber.GrabberConfiguration(store=s)
-        grabberConfig.installOn(s)
+        installOn(grabberConfig, s)
 
         f = grabber.GrabberConfigFragment(grabberConfig)
         f.setFragmentParent(self)
@@ -38,11 +37,9 @@ class GrabberListTestCase(TestCase):
 
     def getWidgetDocument(self):
         s = Store()
-        Scheduler(store=s).installOn(s)
-        PrivateApplication(store=s).installOn(s)
 
         grabberConfig = grabber.GrabberConfiguration(store=s)
-        grabberConfig.installOn(s)
+        installOn(grabberConfig, s)
 
         self.grabber = grabber.POP3Grabber(
                             store=s,

@@ -8,11 +8,11 @@ from epsilon.extime import Time
 
 from axiom.store import Store
 from axiom.scheduler import Scheduler
+from axiom.dependency import installOn
 
 from axiom.tags import Catalog
 
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
-from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
 
 from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
@@ -22,7 +22,6 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               EVER_DEFERRED_STATUS)
 
 from xquotient.inbox import Inbox, InboxScreen, replaceControlChars
-from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose
 from xquotient.test.test_workflow import DummyMessageImplementation, QueryCounter
 
@@ -99,9 +98,9 @@ class _MessageRetrievalMixin:
         """
         self.store = Store()
 
-        # Inbox requires but does not provide IWebTranslator.
-        self.privateApplication = PrivateApplication(store=self.store)
-        self.privateApplication.installOn(self.store)
+        inboxItem = Inbox(store=self.store)
+        installOn(inboxItem, self.store)
+        self.privateApplication = inboxItem.privateApplication
         self.webTranslator = IWebTranslator(self.store)
 
         baseTime = datetime(year=2001, month=3, day=6)
@@ -113,7 +112,8 @@ class _MessageRetrievalMixin:
                         spam=False,
                         receivedWhen=Time.fromDatetime(
                             baseTime + timedelta(seconds=i))))
-        self.inbox = InboxScreen(Inbox(store=self.store))
+
+        self.inbox = InboxScreen(inboxItem)
 
 
 class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
@@ -149,8 +149,8 @@ class InboxTestCase(TestCase):
         be displayed on a webpage.
         """
         s = Store()
-        PrivateApplication(store=s).installOn(s)
         inbox = Inbox(store=s)
+        installOn(inbox, s)
         self.assertNotIdentical(INavigableFragment(inbox, None), None)
 
 
@@ -180,8 +180,6 @@ class InboxTestCase(TestCase):
         for i in xrange(6):
             testMessageFactory(store=s, read=True, spam=False, receivedWhen=Time())
 
-        PrivateApplication(store=s).installOn(s) # IWebTranslator
-
         # *seems* like we shouldn't have to adapt Inbox, but
         # the view state variables (inAllView, inSpamView, etc)
         # seem pretty clearly to belong on InboxScreen, carrying
@@ -189,6 +187,7 @@ class InboxTestCase(TestCase):
 
         # we're in the "Inbox" view
         inbox = Inbox(store=s)
+        installOn(inbox, s)
         inboxScreen = InboxScreen(inbox)
         viewSelection = dict(inboxScreen.viewSelection)
         self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 13)
@@ -279,8 +278,9 @@ class InboxTestCase(TestCase):
         for i in xrange(3):
             testMessageFactory(store=s, read=False, spam=False, archived=True, receivedWhen=Time())
 
-        PrivateApplication(store=s).installOn(s)
-        inboxScreen = InboxScreen(Inbox(store=s))
+        inbox = Inbox(store=s)
+        installOn(inbox, s)
+        inboxScreen = InboxScreen(inbox)
         self.assertEqual(inboxScreen.viewSelection["view"], 'inbox')
 
         def assertCountsAre(**d):
@@ -314,10 +314,11 @@ class InboxTestCase(TestCase):
 
     def testDefer(self):
         s = Store()
-        inbox = Inbox(store=s)
 
         scheduler = Scheduler(store=s)
-        scheduler.installOn(s)
+        installOn(scheduler, s)
+        inbox = Inbox(store=s)
+        installOn(inbox, s)
 
         message = testMessageFactory(store=s, read=True)
         task = inbox.action_defer(message, 365, 0, 0)
@@ -333,12 +334,14 @@ class InboxTestCase(TestCase):
 
     def testDeferCascadingDelete(self):
         s = Store()
-        inbox = Inbox(store=s)
 
         scheduler = Scheduler(store=s)
-        scheduler.installOn(s)
+        installOn(scheduler, s)
+        inbox = Inbox(store=s)
+        installOn(inbox, s)
 
         message = testMessageFactory(store=s)
+
         task = inbox.action_defer(message, 365, 0, 0)
         message.deleteFromStore()
         self.assertEquals(s.count(UndeferTask), 0)
@@ -346,10 +349,9 @@ class InboxTestCase(TestCase):
     def _setUpInbox(self):
         s = Store()
 
-        QuotientPreferenceCollection(store=s).installOn(s)
-
-        self.translator = PrivateApplication(store=s)
-        self.translator.installOn(s)
+        inbox = Inbox(store=s)
+        installOn(inbox, s)
+        self.translator = inbox.privateApplication
 
         msgs = list(testMessageFactory(
                 store=s,
@@ -360,7 +362,7 @@ class InboxTestCase(TestCase):
                     for i in xrange(5))
         msgs.reverse()
 
-        self.inboxScreen = InboxScreen(Inbox(store=s))
+        self.inboxScreen = InboxScreen(inbox)
         self.viewSelection = dict(self.inboxScreen.viewSelection)
         self.msgs = msgs
         self.msgIds = map(self.translator.toWebID, self.msgs)
@@ -464,7 +466,7 @@ class InboxTestCase(TestCase):
         Test L{xquotient.inbox.InboxScreen.getComposer}
         """
         self._setUpInbox()
-        compose.Composer(store=self.store).installOn(self.store)
+        installOn(compose.Composer(store=self.store), self.store)
         composer = self.inboxScreen.getComposer()
 
         self.failIf(composer.toAddresses)
@@ -486,15 +488,9 @@ class ReadUnreadTestCase(TestCase):
     def setUp(self):
         self.store = Store()
 
-        # Required for InboxScreen to even be instantiated
-        self.translator = PrivateApplication(store=self.store)
-        self.translator.installOn(self.store)
-
-        # Required for InboxScreen.fastForward to be called successfully.
-        self.preferences = QuotientPreferenceCollection(store=self.store)
-
         self.inbox = Inbox(store=self.store)
-        self.inbox.installOn(self.store)
+        installOn(self.inbox, self.store)
+        self.translator = self.inbox.privateApplication
         self.messages = []
         for i in range(self.NUM_MESSAGES):
             self.messages.append(

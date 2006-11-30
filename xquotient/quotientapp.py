@@ -1,39 +1,36 @@
 from zope.interface import implements
 
-from axiom.item import Item, InstallableMixin, declareLegacyItem
+from axiom.item import Item, declareLegacyItem
 from axiom import attributes, scheduler
 from axiom.upgrade import (registerAttributeCopyingUpgrader,
                            registerUpgrader)
+from axiom.dependency import dependsOn
 
 from xmantissa import website, webapp, ixmantissa, people, prefs, webnav, fulltext
 
-from xquotient import inbox, mail, gallery, qpeople, extract, spam, _mailsearchui
+from xquotient import mail, gallery, qpeople, extract, spam, _mailsearchui
 from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.grabber import GrabberConfiguration
 
 
-INDEXER_TYPE = fulltext.PyLuceneIndexer
-
-
-class MessageSearchProvider(Item, InstallableMixin):
+class MessageSearchProvider(Item):
     """
     Wrapper around an ISearchProvider which will hand back search results
     wrapped in a fragment that knows about Messages.
     """
     installedOn = attributes.reference()
 
-    indexer = attributes.reference(doc="""
+    indexer = dependsOn(fulltext.PyLuceneIndexer, doc="""
     The actual fulltext indexing implementation object which will perform
     searches.  The results it returns will be wrapped up in a fragment which
     knows how to display L{exmess.Message} instances.
-    """, allowNone=False)
+    """)
 
+    messageSource = dependsOn(mail.MessageSource)
+    powerupInterfaces = (ixmantissa.ISearchProvider)
 
-    def installOn(self, other):
-        super(MessageSearchProvider, self).installOn(other)
-        other.powerUp(self, ixmantissa.ISearchProvider)
-
-
+    def installed(self):
+        self.indexer.addSource(self.messageSource)
     def count(self, term):
         raise NotImplementedError("No one should ever call count, I think.")
 
@@ -46,7 +43,6 @@ class MessageSearchProvider(Item, InstallableMixin):
         return d
 
 
-
 class QuotientBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
@@ -54,25 +50,6 @@ class QuotientBenefactor(Item):
     schemaVersion = 1
 
     endowed = attributes.integer(default=0)
-
-    def installOn(self, other):
-        other.powerUp(self, ixmantissa.IBenefactor)
-
-    def endow(self, ticket, avatar):
-        avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
-        avatar.findOrCreate(website.WebSite).installOn(avatar)
-        avatar.findOrCreate(webapp.PrivateApplication).installOn(avatar)
-
-        avatar.findOrCreate(mail.DeliveryAgent).installOn(avatar)
-
-        avatar.findOrCreate(mail.MessageSource)
-
-        avatar.findOrCreate(spam.Filter).installOn(avatar)
-
-        avatar.findOrCreate(QuotientPreferenceCollection).installOn(avatar)
-        avatar.findOrCreate(MessageDisplayPreferenceCollection).installOn(avatar)
-
-        avatar.findOrCreate(inbox.Inbox).installOn(avatar)
 
 
 class ExtractBenefactor(Item):
@@ -83,59 +60,19 @@ class ExtractBenefactor(Item):
     def installOn(self, other):
         other.powerUp(self, ixmantissa.IBenefactor)
 
-
-    def endow(self, ticket, avatar):
-        avatar.findOrCreate(extract.ExtractPowerup).installOn(avatar)
-        avatar.findOrCreate(gallery.Gallery).installOn(avatar)
-        avatar.findOrCreate(gallery.ThumbnailDisplayer).installOn(avatar)
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(extract.ExtractPowerup).deleteFromStore()
-        avatar.findUnique(gallery.Gallery).deleteFromStore()
-        avatar.findUnique(gallery.ThumbnailDisplayer).deleteFromStore()
-
-
-
 class QuotientPeopleBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
     endowed = attributes.integer(default=0)
-
-    def installOn(self, other):
-        other.powerUp(self, ixmantissa.IBenefactor)
-
-    def endow(self, ticket, avatar):
-        organizer = avatar.findOrCreate(people.Organizer)
-        organizer.installOn(avatar)
-
-        avatar.findOrCreate(qpeople.MessageLister).installOn(organizer)
-
-
 
 class IndexingBenefactor(Item):
     implements(ixmantissa.IBenefactor)
 
     endowed = attributes.integer(default=0)
 
-    def installOn(self, other):
-        other.powerUp(self, ixmantissa.IBenefactor)
 
 
-    def endow(self, ticket, avatar):
-        messageSource = avatar.findUnique(mail.MessageSource)
-        indexer = avatar.findOrCreate(INDEXER_TYPE)
-        indexer.addSource(messageSource)
-        searcher = MessageSearchProvider(store=avatar, indexer=indexer)
-        searcher.installOn(avatar)
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(MessageSearchProvider).deleteFromStore()
-
-
-
-class QuotientPreferenceCollection(Item, InstallableMixin, prefs.PreferenceCollectionMixin):
+class QuotientPreferenceCollection(Item, prefs.PreferenceCollectionMixin):
     """
     The core Quotient L{xmantissa.ixmantissa.IPreferenceCollection}.  Doesn't
     collect any preferences, but groups some quotient settings related fragments
@@ -147,9 +84,7 @@ class QuotientPreferenceCollection(Item, InstallableMixin, prefs.PreferenceColle
 
     installedOn = attributes.reference()
 
-    def installOn(self, other):
-        super(QuotientPreferenceCollection, self).installOn(other)
-        other.powerUp(self, ixmantissa.IPreferenceCollection)
+    powerupInterfaces = (ixmantissa.IPreferenceCollection)
 
     def getPreferenceParameters(self):
         return ()
@@ -198,3 +133,4 @@ def quotientPreferenceCollection2To3(old):
                               installedOn=old.installedOn)
 
 registerUpgrader(quotientPreferenceCollection2To3, 'quotient_preference_collection', 2, 3)
+

@@ -3,16 +3,16 @@ from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImag
 
 from axiom import store
 from axiom.userbase import LoginSystem
+from axiom.dependency import installOn
 
 from nevow.testutil import FragmentWrapper
 
 from xmantissa.offering import installOffering
 from xmantissa.webtheme import getLoader
 
-from xmantissa.plugins.mailoff import (
-    plugin as quotientOffering, quotientBenefactorFactory)
+from xmantissa.plugins.mailoff import plugin as quotientOffering
 
-from xquotient.quotientapp import QuotientBenefactor
+from xquotient.inbox import Inbox
 from xquotient.mail import DeliveryAgent
 
 
@@ -83,12 +83,13 @@ class MIMEReceiverMixin:
     def createMIMEReceiver(self):
         return self.deliveryAgent.createMIMEReceiver(u'test://' + self.dbdir)
 
-    def setUpMailStuff(self, extraBenefactors=()):
+    def setUpMailStuff(self, extraPowerups=()):
         sitedir = self.mktemp()
         s = store.Store(sitedir)
         def tx1():
             loginSystem = LoginSystem(store=s)
-            loginSystem.installOn(s)
+            installOn(loginSystem, s)
+
 
             account = loginSystem.addAccount(u'testuser', u'example.com', None)
             substore = account.avatars.open()
@@ -96,12 +97,10 @@ class MIMEReceiverMixin:
 
             installOffering(s, quotientOffering, {})
 
-            endowBene = lambda b: b.instantiate().endow(None, substore)
-
             def tx2():
-                endowBene(quotientBenefactorFactory)
-                for bene in extraBenefactors:
-                    endowBene(bene)
+                installOn(Inbox(store=substore), substore)
+                for P in extraPowerups:
+                    installOn(P(store=substore), substore)
                 self.deliveryAgent = substore.findUnique(DeliveryAgent)
                 return self.createMIMEReceiver()
             return substore.transact(tx2)

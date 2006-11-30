@@ -6,10 +6,10 @@ from nevow import rend, inevow, tags
 from nevow.flat import flatten
 from nevow.athena import expose
 
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item
 from axiom import attributes
 from axiom.upgrade import registerUpgrader
-
+from axiom.dependency import dependsOn
 from xmantissa import ixmantissa, people
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import dictFillSlots
@@ -63,14 +63,13 @@ class AddPersonFragment(people.AddPersonFragment):
     expose(getPersonHTML)
 
 
-class CorrespondentExtractor(Item, InstallableMixin):
+class CorrespondentExtractor(Item):
     """
     Creates items based on the people involved with particular messages.
     """
     installedOn = attributes.reference()
 
-    def installOn(self, other):
-        super(CorrespondentExtractor, self).installOn(other)
+    def installed(self):
         self.store.findUnique(mail.MessageSource).addReliableListener(self)
 
 
@@ -149,17 +148,15 @@ class SubjectColumn(AttributeColumn):
         return item.message.subject
 
 
-class MessageLister(Item, InstallableMixin):
+class MessageLister(Item):
     implements(ixmantissa.IOrganizerPlugin)
 
     typeName = 'quotient_message_lister_plugin'
     schemaVersion = 1
 
     installedOn = attributes.reference()
-
-    def installOn(self, other):
-        super(MessageLister, self).installOn(other)
-        other.powerUp(self, ixmantissa.IOrganizerPlugin)
+    powerupInterfaces = (ixmantissa.IOrganizerPlugin)
+    organizer = dependsOn(people.Organizer)
 
     def personalize(self, person):
         return MessageList(self, person)

@@ -1221,7 +1221,8 @@ class _UndeferTask(item.Item):
 
 
 
-class MessageDisplayPreferenceCollection(item.Item, item.InstallableMixin, PreferenceCollectionMixin):
+
+class MessageDisplayPreferenceCollection(item.Item, PreferenceCollectionMixin):
     """
     L{xmantissa.ixmantissa.IPreferenceCollection} which collects preferences
     that affect the display/rendering of L{xquotient.exmess.Message}s
@@ -1231,9 +1232,7 @@ class MessageDisplayPreferenceCollection(item.Item, item.InstallableMixin, Prefe
     installedOn = attributes.reference()
     preferredFormat = attributes.text(default=u"text/html")
 
-    def installOn(self, other):
-        other.powerUp(self, ixmantissa.IPreferenceCollection, item.POWERUP_BEFORE)
-        super(MessageDisplayPreferenceCollection, self).installOn(other)
+    powerupInterfaces = [(ixmantissa.IPreferenceCollection, item.POWERUP_BEFORE)]
 
 
     def getPreferenceParameters(self):
