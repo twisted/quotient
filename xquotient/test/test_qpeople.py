@@ -3,7 +3,6 @@ from twisted.trial.unittest import TestCase
 from epsilon.extime import Time
 
 from axiom.store import Store
-from axiom.dependency import installOn
 
 from xmantissa.people import Organizer, Person, EmailAddress
 from xquotient.qpeople import MessageLister
@@ -16,7 +15,7 @@ class MessageListerTestCase(TestCase):
         s = Store()
 
         o = Organizer(store=s)
-        installOn(o, s)
+        o.installOn(s)
 
         def makePerson(name, address):
             return EmailAddress(store=s,

@@ -8,7 +8,6 @@ from axiom import scheduler
 from axiom import item
 from axiom import attributes
 from axiom import userbase
-from axiom.dependency import installOn
 
 from xmantissa import webapp
 
@@ -38,7 +37,7 @@ class CompositionTestMixin(object):
         compose._esmtpSendmail = self._esmtpSendmail
 
         self.store = store.Store(dbdir=dbdir)
-        installOn(scheduler.Scheduler(store=self.store), self.store)
+        scheduler.Scheduler(store=self.store).installOn(self.store)
         self.defaultFromAddr = compose.FromAddress(
                                 store=self.store,
                                 smtpHost=u'example.org',
@@ -48,7 +47,7 @@ class CompositionTestMixin(object):
         self.defaultFromAddr.setAsDefault()
 
         self.composer = compose.Composer(store=self.store)
-        installOn(self.composer, self.store)
+        self.composer.installOn(self.store)
 
 
     def _esmtpSendmail(self, *args, **kwargs):
@@ -203,13 +202,17 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def setUp(self):
         """
-        Create an *on-disk* store (XXX This is hella slow)
+        Create an *on-disk* store (XXX This is hella slow) and set up
+        some dependencies that ComposeFragment needs.
         """
         CompositionTestMixin.setUp(self, dbdir=self.mktemp())
+
+        webapp.PrivateApplication(store=self.store).installOn(self.store)
         da = mail.DeliveryAgent(store=self.store)
-        installOn(da, self.store)
+        da.installOn(self.store)
         self.cabinet = compose.FileCabinet(store=self.store)
         self.cf = compose.ComposeFragment(self.composer)
+
 
     def test_createMessageHonorsSmarthostFromAddress(self):
         """
@@ -388,9 +391,9 @@ class FromAddressConfigFragmentTest(unittest.TestCase):
 
     def setUp(self):
         self.store = store.Store()
+        cprefs = compose.ComposePreferenceCollection(store=self.store)
+        cprefs.installOn(self.store)
         self.composer = compose.Composer(store=self.store)
-        installOn(self.composer, self.store)
-        cprefs = self.composer.prefs
         self.frag = compose.FromAddressConfigFragment(cprefs)
 
     def test_addAddress(self):
@@ -405,15 +408,19 @@ class FromAddressConfigFragmentTest(unittest.TestCase):
                      smtpPassword=u'secret')
 
         self.frag.addAddress(default=False, **attrs)
-        item = self.store.findUnique(compose.FromAddress, compose.FromAddress._address==u'foo@bar')
+        item = self.store.findUnique(compose.FromAddress)
         for (k, v) in attrs.iteritems():
             self.assertEquals(getattr(item, k), v)
         # make sure it didn't make it the default
-        self.assertEquals(item._default, False)
+        self.assertEquals(
+                self.store.count(
+                    compose.FromAddress,
+                    compose.FromAddress._default == True),
+                0)
         item.deleteFromStore()
 
         self.frag.addAddress(default=True, **attrs)
-        item = self.store.findUnique(compose.FromAddress, compose.FromAddress._address==u'foo@bar')
+        item = self.store.findUnique(compose.FromAddress)
         for (k, v) in attrs.iteritems():
             self.assertEquals(getattr(item, k), v)
         # make sure it did
@@ -431,7 +438,7 @@ class FromAddressExtractionTest(unittest.TestCase):
         """
         s = store.Store(self.mktemp())
         ls = userbase.LoginSystem(store=s)
-        installOn(ls, s)
+        ls.installOn(s)
 
         acc = ls.addAccount('username', 'dom.ain', 'password', protocol=u'not email')
         ss = acc.avatars.open()
@@ -492,7 +499,7 @@ class FromAddressTestCase(unittest.TestCase):
         """
         s = store.Store(self.mktemp())
         ls = userbase.LoginSystem(store=s)
-        installOn(ls, s)
+        ls.installOn(s)
 
         acc = ls.addAccount('foo', 'host', 'password', protocol=u'email')
         ss = acc.avatars.open()

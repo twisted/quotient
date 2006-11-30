@@ -4,8 +4,6 @@ import os
 from twisted.trial import unittest
 
 from axiom import store, userbase
-from axiom.scheduler import Scheduler
-from axiom.dependency import installOn
 
 from xquotient.exmess import SPAM_STATUS, CLEAN_STATUS
 
@@ -133,14 +131,14 @@ class DSPAMFilterTestCase(unittest.TestCase, MessageCreationMixin):
     def setUp(self):
         dbdir = self.mktemp()
         self.store = s = store.Store(dbdir)
-        installOn(Scheduler(store=s), s)
         ls = userbase.LoginSystem(store=s)
-        installOn(ls, s)
+        ls.installOn(s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
         ss = acc.avatars.open()
         self.df = spam.DSPAMFilter(store=ss)
-        installOn(self.df, ss)
-        self.f = self.df.filter
+        self.f = spam.Filter(store=ss)
+        self.f.installedOn = ss #XXX sorta cheating
+        self.df.installOn(self.f)
 
     def testMessageClassification(self):
         self.f.processItem(self._message())
@@ -155,7 +153,7 @@ class FilterTestCase(unittest.TestCase, MessageCreationMixin):
         dbdir = self.mktemp()
         self.store = s = store.Store(dbdir)
         ls = userbase.LoginSystem(store=s)
-        installOn(ls, s)
+        ls.installOn(s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
         ss = acc.avatars.open()
         self.f = spam.Filter(store=ss)

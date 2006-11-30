@@ -10,7 +10,6 @@ from twisted.test.proto_helpers import StringTransport
 from axiom.store import Store
 from axiom.userbase import LoginSystem
 from axiom.test.util import getPristineStore
-from axiom.dependency import installOn
 
 from xquotient.mail import DeliveryAgent
 from xquotient.popout import POP3Up, POP3ServerFactory
@@ -19,11 +18,11 @@ def createStore(testCase):
     location = testCase.mktemp()
     s = Store(location)
     da = DeliveryAgent(store=s)
-    installOn(da, s)
+    da.installOn(s)
     for msgText in testCase.messageTexts:
         receiver = da.createMIMEReceiver(u'test://' + location)
         receiver.feedStringNow(msgText)
-    installOn(POP3Up(store=s), s)
+    POP3Up(store=s).installOn(s)
     return s
 
 
@@ -238,7 +237,7 @@ class ProtocolTestCase(TestCase):
         Create a store with a LoginSystem and a portal wrapped around it.
         """
         store = Store()
-        installOn(LoginSystem(store=store), store)
+        LoginSystem(store=store).installOn(store)
         realm = IRealm(store)
         checker = ICredentialsChecker(store)
         self.portal = Portal(realm, [checker])

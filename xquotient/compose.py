@@ -23,18 +23,16 @@ from epsilon import extime, descriptor
 
 from axiom import iaxiom, attributes, item, scheduler, userbase
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
-from axiom.dependency import dependsOn
 
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform, prefs
-from xmantissa.webapp import PrivateApplication
 from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, equotient, renderers, mimeutil
 from xquotient.exmess import Message, MessageDetail
 from xquotient.mimestorage import Part
-from xquotient.mail import MailDeliveryAgent, DeliveryAgent
+
 
 
 def _esmtpSendmail(username, password, smtphost, port, from_addr, to_addrs,
@@ -234,7 +232,7 @@ class _NeedsDelivery(item.Item):
         Try to reliably deliver this message. If errors are encountered, try
         harder.
         """
-        sch = self.composer.scheduler
+        sch = iaxiom.IScheduler(self.store)
         if self.tries < len(self.RETRANS_TIMES):
             # Set things up to try again, if this attempt fails
             nextTry = datetime.timedelta(seconds=self.RETRANS_TIMES[self.tries])
@@ -276,64 +274,19 @@ class _NeedsDelivery(item.Item):
 registerAttributeCopyingUpgrader(_NeedsDelivery, 1, 2)
 
 
-class ComposePreferenceCollection(item.Item, prefs.PreferenceCollectionMixin):
-    """
-    L{xmantissa.ixmantissa.IPreferenceCollection} which collects preferences
-    that have something to do with compose or outgoing mail
-    """
-    implements(ixmantissa.IPreferenceCollection)
-
-    schemaVersion = 3
-
-    installedOn = attributes.reference()
-    powerupInterfaces = (ixmantissa.IPreferenceCollection)
-
-    def getPreferenceParameters(self):
-        return None
-
-    def getSections(self):
-        return (FromAddressConfigFragment(self),)
-
-    def getTabs(self):
-        return (webnav.Tab('Mail', self.storeID, 0.0, children=(
-                    webnav.Tab('Outgoing', self.storeID, 0.0),),
-                    authoritative=False),)
-
-
-class Drafts(item.Item):
-    implements(ixmantissa.INavigableElement)
-
-    typeName = 'quotient_drafts'
-    schemaVersion = 1
-
-    installedOn = attributes.reference()
-    powerupInterfaces = (ixmantissa.INavigableElement)
-
-    def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.6, children=
-                    [webnav.Tab('Drafts', self.storeID, 0.0)],
-                authoritative=False)]
-
-
-class Composer(item.Item):
+class Composer(item.Item, item.InstallableMixin):
     implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     typeName = 'quotient_composer'
     schemaVersion = 3
 
     installedOn = attributes.reference()
-    powerupInterfaces = (ixmantissa.INavigableElement, iquotient.IMessageSender)
 
-    privateApplication = dependsOn(PrivateApplication)
-    scheduler = dependsOn(scheduler.SubScheduler)
-    mda = dependsOn(MailDeliveryAgent)
-    deliveryAgent = dependsOn(DeliveryAgent)
-    prefs = dependsOn(ComposePreferenceCollection)
-    drafts = dependsOn(Drafts)
+    def installOn(self, other):
+        super(Composer, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
+        other.powerUp(self, iquotient.IMessageSender)
 
-    def installed(self):
-        defaultFrom = self.store.findOrCreate(FromAddress, _address=None)
-        defaultFrom.setAsDefault()
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.6, children=
@@ -677,7 +630,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         return inevow.IQ(self.docFactory).onePattern('attach-button')
 
     def render_inboxLink(self, ctx, data):
-        #XXX circular dependency
         from xquotient.inbox import Inbox
         return self.translator.linkTo(self.composer.store.findUnique(Inbox).storeID)
 
@@ -805,7 +757,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         s.seek(0)
 
         msg = self.composer.createMessageAndQueueIt(fromAddress.address, s, True)
-
         # there is probably a better way than this, but there
         # isn't a way to associate the same file item with multiple
         # messages anyway, so there isn't a need to reflect that here
@@ -968,8 +919,53 @@ class RedirectingComposeFragment(liveform.LiveFormFragment, renderers.ButtonRend
         self.composer.redirect(fromAddress, toAddresses, self.message)
 
 
-class ComposeBenefactor(item.Item):
+
+class ComposeBenefactor(item.Item, item.InstallableMixin):
     endowed = attributes.integer(default=0)
+
+    def endow(self, ticket, avatar):
+        avatar.findOrCreate(scheduler.SubScheduler).installOn(avatar)
+        from xquotient.mail import MailDeliveryAgent
+        avatar.findOrCreate(MailDeliveryAgent).installOn(avatar)
+        avatar.findOrCreate(ComposePreferenceCollection).installOn(avatar)
+
+        defaultFrom = avatar.findOrCreate(FromAddress, _address=None)
+        defaultFrom.setAsDefault()
+
+        avatar.findOrCreate(Composer).installOn(avatar)
+        avatar.findOrCreate(Drafts).installOn(avatar)
+
+
+    def revoke(self, ticket, avatar):
+        avatar.findUnique(Composer).deleteFromStore()
+        avatar.findUnique(Drafts).deleteFromStore()
+
+
+class ComposePreferenceCollection(item.Item, item.InstallableMixin, prefs.PreferenceCollectionMixin):
+    """
+    L{xmantissa.ixmantissa.IPreferenceCollection} which collects preferences
+    that have something to do with compose or outgoing mail
+    """
+    implements(ixmantissa.IPreferenceCollection)
+
+    schemaVersion = 3
+
+    installedOn = attributes.reference()
+
+    def installOn(self, other):
+        super(ComposePreferenceCollection, self).installOn(other)
+        other.powerUp(self, ixmantissa.IPreferenceCollection)
+
+    def getPreferenceParameters(self):
+        return None
+
+    def getSections(self):
+        return (FromAddressConfigFragment(self),)
+
+    def getTabs(self):
+        return (webnav.Tab('Mail', self.storeID, 0.0, children=(
+                    webnav.Tab('Outgoing', self.storeID, 0.0),),
+                    authoritative=False),)
 
 
 registerAttributeCopyingUpgrader(ComposePreferenceCollection, 1, 2)
@@ -1034,7 +1030,6 @@ class FromAddressConfigFragment(LiveElement):
         """
         Add a L{FromAddress} item with the given attribute values
         """
-        #XXX blech. but it's a circular dependency so what can I do?
         composer = self.composePrefs.store.findUnique(Composer)
 
         addr = FromAddress(store=self.composePrefs.store,
@@ -1178,6 +1173,22 @@ class Draft(item.Item):
 
     message = attributes.reference(allowNone=False)
 
+class Drafts(item.Item, item.InstallableMixin):
+    implements(ixmantissa.INavigableElement)
+
+    typeName = 'quotient_drafts'
+    schemaVersion = 1
+
+    installedOn = attributes.reference()
+
+    def getTabs(self):
+        return [webnav.Tab('Mail', self.storeID, 0.6, children=
+                    [webnav.Tab('Drafts', self.storeID, 0.0)],
+                authoritative=False)]
+
+    def installOn(self, other):
+        super(Drafts, self).installOn(other)
+        other.powerUp(self, ixmantissa.INavigableElement)
 
 class DraftsScreen(ScrollingFragment):
     jsClass = u'Quotient.Compose.DraftListScrollingWidget'
@@ -1195,7 +1206,6 @@ class DraftsScreen(ScrollingFragment):
             defaultSortColumn=Message.sentWhen,
             defaultSortAscending=False)
 
-        #XXX another circular dependency
         self.composerURL = self.webTranslator.linkTo(
                                 self.store.findUnique(
                                     Composer).storeID)

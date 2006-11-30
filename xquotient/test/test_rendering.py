@@ -7,7 +7,6 @@ from nevow import loaders, rend
 from nevow.testutil import renderPage, renderLivePage
 
 from axiom.store import Store
-from axiom.dependency import installOn
 
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Person, EmailAddress
@@ -53,7 +52,7 @@ def getBaseStorePath(messageParts):
                 pass
         receiver = DBSetup('test_x').setUpMailStuff()
         store = receiver.store
-        #installOn(PrivateApplication(store=store), store)
+        PrivateApplication(store=store).installOn(store)
         makeMessage(receiver, messageParts, None)
         store.close()
         _theBaseStorePath = store.dbdir
@@ -109,7 +108,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         inbox = self.store.findUnique(Inbox)
 
         composer = compose.Composer(store=self.store)
-        installOn(composer, self.store)
+        composer.installOn(self.store)
 
         return renderLivePage(
                    ThemedFragmentWrapper(
@@ -117,7 +116,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
     def test_peopleMessageListRendering(self):
         mlister = MessageLister(store=self.store)
-        installOn(mlister, self.store)
+        mlister.installOn(self.store)
 
         p = Person(store=self.store,
                    name=u'Bob')

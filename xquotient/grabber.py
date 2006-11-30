@@ -16,17 +16,13 @@ from nevow.athena import expose
 
 from epsilon import descriptor, extime
 
-from axiom import item, attributes, iaxiom
-from axiom.scheduler import SubScheduler
-from axiom.dependency import dependsOn
+from axiom import item, attributes, scheduler, iaxiom
 
-from xmantissa import ixmantissa,  webtheme, liveform
-from xmantissa.webapp import PrivateApplication
-
+from xmantissa import ixmantissa, webapp, webtheme, liveform, tdbview
 from xmantissa.scrolltable import ScrollingFragment, AttributeColumn, TYPE_FRAGMENT
 from xmantissa.stats import BandwidthMeasuringFactory
 
-from xquotient.mail import DeliveryAgent
+from xquotient import mail
 
 
 PROTOCOL_LOGGING = True
@@ -92,8 +88,18 @@ class GrabberBenefactor(item.Item):
     The number of avatars who have been endowed by this benefactor.
     """, default=0)
 
+    def endow(self, ticket, avatar):
+        for cls in (scheduler.SubScheduler, webapp.PrivateApplication,
+                    mail.DeliveryAgent, GrabberConfiguration):
+            avatar.findOrCreate(cls).installOn(avatar)
 
-class GrabberConfiguration(item.Item):
+
+    def deprive(self, ticket, avatar):
+        avatar.findUnique(GrabberConfiguration, GrabberConfiguration.installedOn == avatar).deleteFromStore()
+
+
+
+class GrabberConfiguration(item.Item, item.InstallableMixin):
     """
     Manages the creation, operation, and destruction of grabbers
     (items which retrieve information from remote sources).
@@ -107,10 +113,6 @@ class GrabberConfiguration(item.Item):
     installedOn = attributes.reference(doc="""
     A reference to the avatar which has been powered up by this item.
     """)
-
-    scheduler = dependsOn(SubScheduler)
-    privateApplication = dependsOn(PrivateApplication)
-    deliveryAgent = dependsOn(DeliveryAgent)
 
     def addGrabber(self, username, password, domain, ssl):
         # DO IT
@@ -128,7 +130,7 @@ class GrabberConfiguration(item.Item):
             config=self,
             ssl=ssl)
         # DO IT *NOW*
-        self.scheduler.schedule(pg, extime.Time())
+        scheduler.IScheduler(self.store).schedule(pg, extime.Time())
         # OR MAYBE A LITTLE LATER
 
 
@@ -247,7 +249,7 @@ class POP3Grabber(item.Item):
             self.status = Status(store=self.store, message=u'idle')
 
     def delete(self):
-        self.config.scheduler.unscheduleAll(self)
+        scheduler.IScheduler(self.store).unscheduleAll(self)
         if self.running:
             if self.protocol is not None:
                 self.protocol.stop()
@@ -576,7 +578,7 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
     def createMIMEReceiver(self, source):
         if self.grabber is not None:
             def createIt():
-                agent = self.grabber.config.deliveryAgent
+                agent = self.grabber.store.findUnique(mail.DeliveryAgent)
                 return agent.createMIMEReceiver(source)
             return self._transact(createIt)
 
@@ -606,7 +608,7 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
             return
         self.grabber.running = False
         if self._transient:
-            self.grabber.scheduler.reschedule(
+            scheduler.IScheduler(self.grabber.store).reschedule(
                 self.grabber,
                 self.grabber.scheduled,
                 extime.Time())
@@ -699,7 +701,7 @@ class GrabberConfigFragment(athena.LiveFragment):
     wt = None
     def getEditGrabberForm(self, targetID):
         if self.wt is None:
-            self.wt = self.original.privateApplication
+            self.wt = ixmantissa.IWebTranslator(self.original.store)
 
         grabber = self.wt.fromWebID(targetID)
 

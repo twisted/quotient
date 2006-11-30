@@ -12,7 +12,6 @@ from twisted.python import filepath
 from epsilon.scripts import benchmark
 
 from axiom import store, userbase
-from axiom.dependency import installOn
 
 import xmantissa.plugins
 from xmantissa import ixmantissa, offering
@@ -36,8 +35,9 @@ def initializeStore():
     userStore = user.avatars.open()
 
     for off in offering.getInstalledOfferings(s).values():
-        for p in off.installablePowerups:
-            installOn(p, userStore)
+        for benefactorFactory in off.benefactorFactories:
+            benefactor = benefactorFactory.instantiate(store=s)
+            benefactor.endow(None, userStore)
 
     return s, userStore
 

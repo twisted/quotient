@@ -12,7 +12,6 @@ from axiom.item import Item
 from axiom import attributes
 from axiom.tags import Catalog
 from axiom.scheduler import Scheduler
-from axiom.dependency import installOn
 
 from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
@@ -28,10 +27,9 @@ from xquotient.exmess import (ARCHIVE_STATUS, TRASH_STATUS, SPAM_STATUS,
 
 from xquotient.compose import Composer, ComposeFragment
 from xquotient.quotientapp import QuotientPreferenceCollection
-from xquotient.qpeople import MessageLister
-
 
 from xquotient.test.test_inbox import testMessageFactory
+
 
 class ThrobberTestCase(testcase.TestCase):
     """
@@ -49,7 +47,7 @@ class ScrollingWidgetTestCase(testcase.TestCase):
 
     def getScrollingWidget(self, howManyElements=0):
         store = Store()
-        installOn(PrivateApplication(store=store), store)
+        PrivateApplication(store=store).installOn(store)
         for n in xrange(howManyElements):
             testMessageFactory(store, spam=False)
         f = MailboxScrollingFragment(store)
@@ -180,14 +178,20 @@ class _ControllerMixin:
     sent2 = Time().oneDay() + timedelta(hours=16, minutes=5, seconds=tzfactor)
     def getInbox(self):
         """
-        Return a newly created Inbox, in a newly created Store.
+        Return a newly created Inbox, in a newly created Store which has all of
+        the Inbox dependencies (you know this function is broken because it is
+        more than C{return Inbox(store=Store())}
         """
         s = Store()
-        installOn(Composer(store=s), s)
-        installOn(Catalog(store=s), s)
-        installOn(MessageLister(store=s), s)
+        Scheduler(store=s).installOn(s)
+        Catalog(store=s)
+        WebSite(store=s).installOn(s)
+        PrivateApplication(store=s).installOn(s)
+        QuotientPreferenceCollection(store=s).installOn(s)
+        Composer(store=s).installOn(s)
+        Organizer(store=s).installOn(s)
         inbox = Inbox(store=s)
-        installOn(inbox, s)
+        inbox.installOn(s)
         return inbox
 
 

@@ -5,8 +5,7 @@ from nevow import tags, loaders
 from nevow.athena import expose
 
 from axiom.store import Store
-from axiom.userbase import LoginMethod, LoginSystem
-from axiom.dependency import installOn
+from axiom.userbase import LoginMethod
 
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
@@ -23,14 +22,15 @@ class _ComposeTestMixin:
 
         s = Store()
 
-        installOn(Inbox(store=s), s)
+        PrivateApplication(store=s).installOn(s)
+        Inbox(store=s).installOn(s)
 
         compose.FromAddress(
             store=s,
             address=u'moe@divmod.com').setAsDefault()
 
         composer = compose.Composer(store=s)
-        installOn(composer, s)
+        composer.installOn(s)
 
         composeFrag = composeFragFactory(composer)
         composeFrag.jsClass = u'Quotient.Test.ComposeController'
@@ -51,22 +51,11 @@ class ComposeTestCase(testcase.TestCase, _ComposeTestMixin):
                          style='visibility: hidden'),
                 tags.div(id='mantissa-footer')]])
 
-    def mktemp(self):
-        """
-        This is ten kinds of terrible.
-        """
-        import os, tempfile
-        if not os.path.exists("_trial_temp"):
-            os.mkdir("_trial_temp")
-        return tempfile.mktemp(dir="_trial_temp")
-
     def render_composer(self, ctx, data):
         """
         Make a bunch of people and give them email addresses
         """
-
         (s, composeFrag) = self._getComposeFragment()
-
 
         def makePerson(email, name):
             EmailAddress(store=s,
@@ -78,8 +67,8 @@ class ComposeTestCase(testcase.TestCase, _ComposeTestMixin):
         makePerson(u'localpart@domain', u'Tobias Knight')
         makePerson(u'madonna@divmod.com', u'Madonna')
         makePerson(u'kilroy@foo', u'')
-        return ctx.tag[composeFrag]
 
+        return ctx.tag[composeFrag]
 
 class AddrPassthroughComposeFragment(compose.ComposeFragment):
     """
@@ -135,8 +124,12 @@ class DraftsTestCase(testcase.TestCase):
 
     def getWidgetDocument(self):
         s = Store()
-        composer = compose.Composer(store=s)
-        installOn(composer, s)
+
+        PrivateApplication(store=s).installOn(s)
+        compose.Composer(store=s).installOn(s)
+
+        drafts = compose.Drafts(store=s)
+        drafts.installOn(s)
 
         for i in xrange(5):
             compose.Draft(
@@ -148,7 +141,7 @@ class DraftsTestCase(testcase.TestCase):
                                            receivedWhen=Time(),
                                            sentWhen=Time()))
 
-        f = compose.DraftsScreen(composer.drafts)
+        f = compose.DraftsScreen(drafts)
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
@@ -164,7 +157,8 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
     def getFromAddressScrollTable(self):
         s = Store()
 
-        installOn(compose.Composer(store=s), s)
+        PrivateApplication(store=s).installOn(s)
+        compose.Composer(store=s).installOn(s)
 
         LoginMethod(store=s,
                     internal=False,
@@ -173,6 +167,9 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
                     domain=u'host',
                     verified=True,
                     account=s)
+
+        # system address
+        compose.FromAddress(store=s).setAsDefault()
 
         compose.FromAddress(
             store=s,

@@ -3,24 +3,27 @@ from zope.interface import implements
 from twisted.python.util import sibpath
 from nevow import tags, static
 
-from axiom.item import Item
+from axiom.item import Item, InstallableMixin
 from axiom import attributes
 
 from xmantissa.publicresource import PublicPage
 from xmantissa import ixmantissa
 
-class QuotientPublicPage(Item):
+class QuotientPublicPage(Item, InstallableMixin):
     implements(ixmantissa.IPublicPage)
 
     typeName = 'quotient_public_page'
     schemaVersion = 1
 
     installedOn = attributes.reference()
-    powerupInterfaces = (ixmantissa.IPublicPage)
+
+    def installOn(self, other):
+        super(QuotientPublicPage, self).installOn(other)
+        other.powerUp(self, ixmantissa.IPublicPage)
 
     def getResource(self):
         return PublicIndexPage(self,
-                ixmantissa.IStaticShellContent(self.store, None))
+                ixmantissa.IStaticShellContent(self.installedOn, None))
 
 class PublicIndexPage(PublicPage):
     implements(ixmantissa.ICustomizable)

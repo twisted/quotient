@@ -9,15 +9,14 @@ from nevow.inevow import IRenderer
 
 from epsilon.extime import Time
 
-from axiom.item import Item
+from axiom.item import Item, InstallableMixin
 from axiom import attributes
 from axiom.upgrade import registerUpgrader
-from axiom.dependency import dependsOn
 
 from xmantissa.people import EmailAddress
 
 from xquotient import mail
-from xquotient.gallery import Image, ImageSet, makeThumbnail, Gallery, ThumbnailDisplayer
+from xquotient.gallery import Image, ImageSet, makeThumbnail
 from xquotient.exmess import Message
 
 def extractImages(message):
@@ -125,7 +124,7 @@ class SimpleExtractMixin(object):
 def registerExtractUpgrader1to2(itemClass):
     registerUpgrader(lambda old: old.deleteFromStore(), itemClass.typeName, 1, 2)
 
-class URLExtract(SimpleExtractMixin, Item):
+class URLExtract(SimpleExtractMixin, Item, InstallableMixin):
     typeName = 'quotient_url_extract'
     schemaVersion = 2
 
@@ -148,7 +147,7 @@ class URLExtract(SimpleExtractMixin, Item):
 registerAdapter(ExtractRenderer, URLExtract, IRenderer)
 registerExtractUpgrader1to2(URLExtract)
 
-class PhoneNumberExtract(SimpleExtractMixin, Item):
+class PhoneNumberExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     typeName = 'quotient_phone_number_extract'
     schemaVersion = 2
@@ -174,7 +173,7 @@ class PhoneNumberExtract(SimpleExtractMixin, Item):
 registerAdapter(ExtractRenderer, PhoneNumberExtract, IRenderer)
 registerExtractUpgrader1to2(PhoneNumberExtract)
 
-class EmailAddressExtract(SimpleExtractMixin, Item):
+class EmailAddressExtract(SimpleExtractMixin, Item, InstallableMixin):
 
     typeName = 'quotient_email_address_extract'
     schemaVersion = 2
@@ -208,13 +207,11 @@ extractTypes = {'url': URLExtract,
                 'email address': EmailAddressExtract}
 
 
-class ExtractPowerup(Item):
+class ExtractPowerup(Item, InstallableMixin):
     installedOn = attributes.reference()
 
-    gallery = dependsOn(Gallery)
-    thumbnailDisplayer = dependsOn(ThumbnailDisplayer)
-
-    def installed(self):
+    def installOn(self, other):
+        super(ExtractPowerup, self).installOn(other)
         self.store.findUnique(mail.MessageSource).addReliableListener(self)
 
     def processItem(self, message):

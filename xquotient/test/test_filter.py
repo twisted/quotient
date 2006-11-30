@@ -3,7 +3,6 @@ from twisted.trial import unittest
 from twisted.python.filepath import FilePath
 
 from axiom import store, tags, scheduler
-from axiom.dependency import installOn
 
 from xquotient import filter, mimepart, mail
 from xquotient.mimestorage import Part
@@ -90,8 +89,10 @@ class HeaderRuleTest(unittest.TestCase):
         RuleFilteringPowerup but are handled by MailingListFilteringPowerup.
         """
         self.tagcatalog = tags.Catalog(store=self.store)
-        installOn(scheduler.Scheduler(store=self.store), self.store)
+        scheduler.Scheduler(store=self.store).installOn(self.store)
         mail.MessageSource(store=self.store)
+        mlfb = filter.MailingListFilterBenefactor(store=self.store)
+        rfb = filter.RuleFilterBenefactor(store=self.store)
 
         part = Part()
         part.addHeader(u'X-Mailman-Version', u"2.1.5")
@@ -100,12 +101,12 @@ class HeaderRuleTest(unittest.TestCase):
         part.source = FilePath(self.storepath).child("files").child("x")
         msg = Message.createIncoming(self.store, part,
                                      u'test://test_mailing_list_filter')
-        rfp = filter.RuleFilteringPowerup(store=self.store)
-        installOn(rfp, self.store)
+        rfb.endow(None, self.store)
+        rfp = self.store.findUnique(filter.RuleFilteringPowerup)
         rfp.processItem(msg)
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)), [])
-        mlfp = filter.MailingListFilteringPowerup(store=self.store)
-        installOn(mlfp, self.store)
+        mlfb.endow(None, self.store)
+        mlfp = self.store.findUnique(filter.MailingListFilteringPowerup)
         mlfp.processItem(msg)
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
                          [u'some-list.example.com'])

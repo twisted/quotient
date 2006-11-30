@@ -6,7 +6,6 @@ signup with different combinations of selected benefactor factories
 from time import time
 
 from twisted.trial.unittest import TestCase
-from twisted.python.reflect import qual
 
 from axiom.scripts import axiomatic
 from axiom.store import Store
@@ -15,11 +14,8 @@ from axiom.test.util import getPristineStore
 
 from xmantissa import offering, signup
 from xmantissa.plugins.free_signup import freeTicket
-from xmantissa.product import Product
 
 from xquotient import exmess
-from xquotient.compose import Composer
-from xquotient.inbox import Inbox
 
 def createStore(testCase):
     dbpath = testCase.mktemp()
@@ -67,53 +63,52 @@ class InstallationTestCase(TestCase):
 
         self.signupConfig = adminStore.findUnique(signup.SignupConfiguration)
 
-    def createSignupAndSignup(self, powerups):
+    def createSignupAndSignup(self, benefactorFactories):
         """
         Signup via a newly-created signup, using a unique email address.
-        @return: substore, which will be endowed with C{product}
+        @return: substore, which will be endowed with C{benefactorFactories}
         """
 
-        product = Product(store=self.store, types=[qual(p) for (name, desc, p) in powerups])
         qsignup = self.signupConfig.createSignup(
                     u'admin@localhost',
                     freeTicket.itemClass,
                     {'prefixURL': u'signup'},
-                    product,
+                    dict((bf, {}) for bf in benefactorFactories),
                     u'', u'')
 
         booth = qsignup.booth
         localpart = unicode(str(time()), 'ascii')
         ticket = booth.createTicket(
-                    booth, localpart + '@localhost', product)
+                    booth, localpart + '@localhost', qsignup.benefactor)
         ticket.claim()
         return self.loginSystem.accountByAddress(
                             localpart, u'localhost').avatars.open()
 
     def testBasic(self):
         """
-        Test signup with the top-most Quotient powerup
+        Test signup with the top-most Quotient benefactor
         """
-        self.createSignupAndSignup([(None, None, Inbox)])
+        self.createSignupAndSignup(getFactories('quotient'))
 
     def testCompose(self):
         """
         Test signup with the compose benefactor (which
         depends on the top-most Quotient benefactor)
         """
-        self.createSignupAndSignup([(None, None, Composer)])
+        self.createSignupAndSignup(getFactories('quotient', 'compose'))
 
     def testAll(self):
         """
         Test signup with all benefactors
         """
         self.createSignupAndSignup(
-            getQuotientOffering().installablePowerups)
+            getQuotientOffering().benefactorFactories)
 
     def testDefaultMessageDisplayPrefs(self):
         """
         On signup, users' preferred message format should be HTML.
         """
         ss = self.createSignupAndSignup(
-            getQuotientOffering().installablePowerups)
+            getQuotientOffering().benefactorFactories)
         self.assertEqual(ss.findUnique(
             exmess.MessageDisplayPreferenceCollection).preferredFormat, u"text/html")

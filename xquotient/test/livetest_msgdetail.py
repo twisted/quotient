@@ -3,7 +3,6 @@ from epsilon.extime import Time
 from axiom.store import Store
 from axiom import attributes
 from axiom.item import Item
-from axiom.dependency import installOn
 
 from nevow.livetrial import testcase
 from nevow import tags, loaders
@@ -63,7 +62,9 @@ class _MsgDetailTestMixin:
         @rtype: L{axiom.store.Store}
         """
         s = Store()
-        installOn(Inbox(store=s), s)
+        PrivateApplication(store=s).installOn(s)
+        QuotientPreferenceCollection(store=s).installOn(s)
+        Inbox(store=s).installOn(s)
         return s
 
     def _setUpMsg(self):
@@ -112,7 +113,7 @@ class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
 
     def _setUpStore(self):
         s = super(MsgDetailAddPersonTestCase, self)._setUpStore()
-        installOn(people.Organizer(store=s), s)
+        people.Organizer(store=s).installOn(s)
         return s
 
     def verifyPerson(self, key):

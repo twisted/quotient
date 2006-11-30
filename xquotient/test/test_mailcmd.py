@@ -5,7 +5,6 @@ from twisted.python.usage import UsageError
 from axiom.store import Store
 from axiom.plugins.mailcmd import SMTPConfiguration, POPConfiguration
 from axiom.test.util import CommandStubMixin
-from axiom.dependency import installOn
 
 from xquotient.mail import MailTransferAgent
 from xquotient.popout import POP3Listener
@@ -14,7 +13,7 @@ class ConfigurationMixin(CommandStubMixin):
     def setUp(self):
         self.store = Store()
         self.server = self.createServer(self.store)
-        installOn(self.server, self.store)
+        self.server.installOn(self.store)
         self.config = self.createOptions()
 
 
