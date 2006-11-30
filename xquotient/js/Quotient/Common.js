@@ -3,6 +3,81 @@
 // import Mantissa.People
 // import MochiKit.DOM
 
+Quotient.Common.ButtonToggler = Divmod.Class.subclass('Quotient.Compose.ButtonToggler');
+/**
+ * Class which helps enable/disable Quotient UI buttons
+ *
+ * XXX The buttons themselves should really be widgets
+ */
+Quotient.Common.ButtonToggler.methods(
+    /**
+     * @param buttonNode: A button node, or any node which contains a node
+     * with the class name "button-content" which in turn contains a link
+     * @type buttonNode: node
+     *
+     * @param reducedOpacity: the opacity to set on the button node while it
+     * is disabled (defaults to 0.4)
+     * @type reducedOpacity: float between 0 (transparent) and 1 (opaque)
+     */
+    function __init__(self, buttonNode, reducedOpacity/*=0.4*/) {
+        if(reducedOpacity == undefined) {
+            reducedOpacity = 0.4;
+        }
+        self.buttonNode = buttonNode;
+        self._reducedOpacity = reducedOpacity;
+        self._onclickHandler = null;
+        self._setUpNodes();
+    },
+
+    function _setUpNodes(self) {
+        var buttonContent = Nevow.Athena.NodeByAttribute(
+                                self.buttonNode, "class", "button-content");
+        self.buttonLink = buttonContent.getElementsByTagName("a")[0];
+    },
+
+    /**
+     * Disable the button.  Remove the onclick handler and increase
+     * transparency of the button node
+     */
+    function disable(self) {
+        var onclickHandler = self.buttonLink.onclick;
+        if(onclickHandler == null) {
+            throw new Error("button doesn't have an onclick handler");
+        }
+        self._onclickHandler = onclickHandler;
+        self.buttonLink.onclick = function() {
+            return false;
+        }
+        self.buttonNode.style.opacity = self._reducedOpacity;
+    },
+
+    /**
+     * Enable the button.  Restore the onclick handler and make the button
+     * node opaque
+     */
+    function enable(self) {
+        if(!self._onclickHandler) {
+            throw new Error("button isn't disabled");
+        }
+        self.buttonLink.onclick = self._onclickHandler;
+        self._onclickHandler = null;
+        self.buttonNode.style.opacity = 1;
+    },
+
+    /**
+     * Disable the button until C{deferred} fires
+     *
+     * @type deferred: L{Divmod.Defer.Deferred}
+     */
+    function disableUntilFires(self, deferred) {
+        self.disable();
+        deferred.addBoth(
+            function(passthrough) {
+                self.enable();
+                return passthrough;
+            });
+    });
+
 Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
 
 /**

@@ -299,6 +299,34 @@ Quotient.Compose.Controller.methods(
         self.startSavingDrafts();
 
         self.makeFileInputs();
+        self._storeButtons();
+    },
+
+    /**
+     * Find the container of the send & save buttons inside our node,
+     * wrap each button inside in a L{Quotient.Common.ButtonToggler} and store
+     * the array in C{self._buttonTogglers}
+     */
+    function _storeButtons(self) {
+        var container = self.firstNodeByAttribute(
+                            "class", "send-save-attach-buttons");
+        var buttons = Nevow.Athena.NodesByAttribute(
+                            container, "class", "button");
+        self._buttonTogglers = [];
+        for(var i = 0; i < buttons.length; i++) {
+            self._buttonTogglers.push(Quotient.Common.ButtonToggler(buttons[i]));
+        }
+    },
+
+    /**
+     * Disable the send & save buttons until C{deferred} fires
+     *
+     * @type deferred: L{Divmod.Defer.Deferred}
+     */
+    function _disableButtonsUntilFires(self, deferred) {
+        for(var i = 0; i < self._buttonTogglers.length; i++) {
+            self._buttonTogglers[i].disableUntilFires(deferred);
+        }
     },
 
     /**
@@ -423,6 +451,7 @@ Quotient.Compose.Controller.methods(
 
         self.savingADraft = self.nodeByAttribute("name", "draft").checked;
         var D = Quotient.Compose.Controller.upcall(self, "submit");
+        self._disableButtonsUntilFires(D);
         D.addCallback(
             function(passthrough) {
                 self._submitting = false;

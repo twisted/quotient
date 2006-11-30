@@ -3096,6 +3096,110 @@ Quotient.Test.GrabberListTestCase.methods(
         return scrollWidget.initializationDeferred;
     });
 
+Quotient.Test.ButtonTogglerTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.Test.ButtonTogglerTestCase');
+/**
+ * Tests for L{Quotient.Common.ButtonToggler}
+ */
+Quotient.Test.ButtonTogglerTestCase.methods(
+    /**
+     * Make an element which is structured like a Quotient UI button, and
+     * return it
+     *
+     * @return: object with "button" and "link" members, where "button" is the
+     * button node, and "link" is child <a> node
+     * @rtype: C{Object}
+     */
+    function _makeButton(self) {
+        var button = self.nodeByAttribute("class", "button"),
+            button = button.cloneNode(true),
+            link = button.getElementsByTagName("a")[0];
+
+        button.style.opacity = 1;
+        return {button: button, link: link};
+    },
+
+    /**
+     * Return an object with "toggler", "disabledTest" and "enabledTest"
+     * members, where "toggler" is a L{Quotient.Common.ButtonToggler} and the
+     * other two members are thunks which verify that the current state of the
+     * button is consistent with what we expect for the disabled and enabled
+     * states, respectively
+     *
+     * @rtype: C{Object}
+     */
+    function _makeTogglerTester(self) {
+        var button = self._makeButton(),
+            onclick = button.link.onclick = function() {
+                return true;
+            },
+            OPACITY = 0.32,
+            toggler = Quotient.Common.ButtonToggler(button.button, OPACITY);
+
+        return {toggler: toggler,
+                disabledTest: function() {
+                    self.assertEquals(
+                        button.button.style.opacity, OPACITY.toString());
+                    /* our onclick returns true, and we want to make sure that
+                     * the handler in place returns false, so that clicks do
+                     * nothing */
+                    self.assertEquals(button.link.onclick(), false);
+                },
+                enabledTest: function() {
+                   self.assertEquals(button.button.style.opacity, '1');
+                   self.assertEquals(button.link.onclick, onclick);
+                }};
+    },
+
+    /**
+     * Test the C{enable}/C{disable} methods of
+     * L{Quotient.Common.ButtonToggler}
+     */
+    function test_enableDisable(self) {
+        var tester = self._makeTogglerTester();
+
+        tester.enabledTest();
+        tester.toggler.disable();
+        tester.disabledTest();
+        tester.toggler.enable();
+        tester.enabledTest();
+    },
+
+    /**
+     * Test L{Quotient.Common.ButtonToggler.disableUntilFires}
+     */
+    function test_disableUntilFires(self) {
+        var tester = self._makeTogglerTester(),
+            D = Divmod.Defer.Deferred(),
+            DEFERRED_RESULT = 'hi';
+
+        tester.enabledTest();
+        tester.toggler.disableUntilFires(D);
+        tester.disabledTest();
+        D.addCallback(
+            function(result) {
+                self.assertEquals(result, DEFERRED_RESULT);
+                tester.enabledTest();
+            });
+        D.callback(DEFERRED_RESULT);
+        return D;
+    },
+
+    /**
+     * Test opacity defaulting
+     */
+    function test_opacityDefaulting(self) {
+        var button = self._makeButton(),
+            toggler = Quotient.Common.ButtonToggler(button.button);
+
+        button.link.onclick = function() {
+            /* just set it to something so the toggler doesn't complain */
+        }
+        self.assertEquals(button.button.style.opacity, '1');
+        toggler.disable();
+        self.assertEquals(button.button.style.opacity, '0.4');
+    });
+
 Quotient.Test.ShowNodeAsDialogTestCase = Nevow.Athena.Test.TestCase.subclass(
                                             'Quotient.Test.ShowNodeAsDialogTestCase');
 
