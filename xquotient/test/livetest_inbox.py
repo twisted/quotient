@@ -445,14 +445,18 @@ class FullControllerTestCase(testcase.TestCase, _ControllerMixin):
         """
         inbox = self.getInbox()
         inbox.uiComplexity = 3
+        catalog = inbox.store.findUnique(Catalog)
 
         impl = _Part(store=inbox.store)
-        for i in range(20):
-            testMessageFactory(
-                store=inbox.store, sender=self.aliceEmail,
-                subject=u'message %d' % (i,), receivedWhen=self.sent,
-                sentWhen=self.sent2, spam=False, archived=False,
-                read=False, impl=impl)
+        messages = [
+            testMessageFactory(store=inbox.store, sender=self.aliceEmail,
+                               subject=u'message %d' % (i,),
+                               receivedWhen=self.sent,
+                               sentWhen=self.sent2, spam=False, archived=False,
+                               read=False, impl=impl)
+            for i in range(20)]
+
+        catalog.tag(messages[1], u'foo')
 
         fragment = InboxScreen(inbox)
         fragment.composeFragmentFactory = StubComposeFragment

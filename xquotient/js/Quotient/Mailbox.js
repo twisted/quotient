@@ -1035,7 +1035,7 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * XX
+     * XXX
      */
     function changeBatchSelection(self, to) {
         var anySelected = (to != "none");
@@ -1463,6 +1463,7 @@ Quotient.Mailbox.Controller.methods(
                 } else {
                     self.messageActions.style.visibility = "hidden";
                 }
+                self.changeBatchSelection('none');
             });
     },
 

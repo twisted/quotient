@@ -286,6 +286,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
         return result;
     });
 
+
 Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.ControllerTestCase');
 Quotient.Test.ControllerTestCase.methods(
@@ -1319,6 +1320,58 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Check the interaction between archiving a number of checked messages
+     * (a 'batch') and then archiving a single message (the 'selected'
+     * message).
+     *
+     * In particular, we do the equivalent of selecting the "foo" tag, hitting
+     * "select all", hitting "archive", selecting the "all" special tag, and
+     * then hitting "archive". We then check that there are no messages left
+     * in the inbox display. This means that the selected message was archived.
+     *
+     * Derived from ticket #1780
+     */
+    function test_archiveBatchThenArchiveSelected(self) {
+        var d = self.setUp();
+        var model;
+        // select the 'foo' tag.
+        d.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseTag('foo');
+            });
+        // select all messages in the 'foo' tag (there should be just one).
+        d.addCallback(
+            function(ignored) {
+                self.assertEqual(model.totalRowCount(), 1);
+                self.controllerWidget.changeBatchSelection("all");
+                return self.controllerWidget.archive(null);
+            });
+        // display all messages regardless of tag.
+        d.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseTag('all');
+            });
+        // there should be one message displayed. archive it.
+        d.addCallback(
+            function(ignored) {
+                self.assertEqual(model.totalRowCount(), 1);
+                return self.controllerWidget.archive(null);
+            });
+        // there should be no more messages in this view.
+        d.addCallback(
+            function(ignored) {
+                // totalRowCount is *cached*, so we need to fetch the *real*
+                // value from the *widget*. guh. -- jml
+                var d = self.controllerWidget.scrollWidget.getSize();
+                d.addCallback(function(size) { self.assertEqual(size, 0); });
+                return d
+            });
+        return d;
+    },
+
+
+    /**
      * Test archiving the selected group of messages, including the currently
      * selected message.
      */
@@ -2124,6 +2177,48 @@ Quotient.Test.FullControllerTestCase.methods(
         return result;
     },
 
+
+    /**
+     * Check the interaction between archiving a number of checked messages
+     * (a 'batch') and then archiving a single message (the 'selected'
+     * message).
+     *
+     * This test functions much like
+     * L{ControllerTestCase.test_archiveBatchThenArchiveSelected}, except it
+     * ensures that the messages that are off-screen are *not* archived. This
+     * is the negative behaviour outlined in ticket #1780.
+     */
+    function test_archiveAllTaggedThenArchiveSelected(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                return self.controller.chooseTag('foo');
+            });
+        d.addCallback(
+            function(ignored) {
+                self.controller.changeBatchSelection('all');
+                return self.controller.archive(null);
+            });
+        d.addCallback(
+            function(ignored) {
+                return self.controller.chooseTag('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                return self.controller.archive(null);
+            });
+        d.addCallback(
+            function(ignored) {
+                var d = self.controller.scrollWidget.getSize();
+                // 20 messages originally, 2 archived -- 1 tagged 'foo', and 1
+                // selected.
+                d.addCallback(function(size) { self.assertEqual(size, 18); });
+                return d;
+            });
+        return d;
+    },
+
+
     /**
      * Test deletion of all messages using batch selection.
      */
@@ -2359,8 +2454,7 @@ Quotient.Test.EmptyControllerTestCase.methods(
                                  'No more messages.');
             });
         return d;
-    }
-    );
+    });
 
 /**
  * Tests for Quotient.Compose.FromAddressScrollTable
@@ -2737,6 +2831,7 @@ Quotient.Test.ComposeToAddressTestCase.methods(
             });
         return result;
     });
+
 
 Quotient.Test.MessageDetailTestHelper = Divmod.Class.subclass('Quotient.Test.MessageDetailTestHelper');
 /**
