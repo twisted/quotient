@@ -21,7 +21,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               SENT_STATUS, DEFERRED_STATUS,
                               EVER_DEFERRED_STATUS)
 
-from xquotient.inbox import Inbox, InboxScreen, replaceControlChars
+from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, VIEWS
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose
 from xquotient.test.test_workflow import DummyMessageImplementation, QueryCounter
@@ -271,46 +271,40 @@ class InboxTestCase(TestCase):
         self.assertEqual(m1, m2)
 
 
-    def testMailViewCounts(self):
+    def test_mailViewCounts(self):
+        """
+        Test that L{mailViewCounts} shows the correct number of unread
+        messages for each view, and that it updates as new messages are
+        added to those views.
+        """
         s = Store()
-
-        for i in xrange(9):
-            testMessageFactory(store=s, read=False, spam=False, receivedWhen=Time())
-        for i in xrange(3):
-            testMessageFactory(store=s, read=False, spam=False, archived=True, receivedWhen=Time())
-
         PrivateApplication(store=s).installOn(s)
         inboxScreen = InboxScreen(Inbox(store=s))
-        self.assertEqual(inboxScreen.viewSelection["view"], 'inbox')
+
+        def makeMessages(number, **flags):
+            for i in range(number):
+                testMessageFactory(store=s, receivedWhen=Time(), **flags)
 
         def assertCountsAre(**d):
-            for k in ('trash', 'sent', 'spam', 'all', 'inbox', 'deferred'):
+            for k in VIEWS:
                 if not k in d:
                     d[k] = 0
             self.assertEqual(inboxScreen.mailViewCounts(), d)
 
-        # the Inbox will mark the first Message in it's query as read,
-        # so we subtract one from the expected counts
+        makeMessages(9, read=False, spam=False)
+        makeMessages(3, read=False, spam=False, archived=True)
+        assertCountsAre(inbox=9, all=12, archive=3)
 
-        assertCountsAre(inbox=8, all=11)
+        makeMessages(4, read=False, spam=True)
+        makeMessages(3, read=True, spam=True)
+        assertCountsAre(inbox=9, all=12, archive=3, spam=4)
 
-        for i in xrange(4):
-            testMessageFactory(store=s, read=False, spam=True, receivedWhen=Time())
-        for i in xrange(3):
-            testMessageFactory(store=s, read=True, spam=True, receivedWhen=Time())
+        makeMessages(2, read=False, trash=True)
+        assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2)
 
-        assertCountsAre(inbox=8, all=11, spam=4)
+        makeMessages(4, read=False, outgoing=True)
+        assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2, sent=4)
 
-        for i in xrange(2):
-            testMessageFactory(store=s, read=False, trash=True, receivedWhen=Time())
-
-        assertCountsAre(inbox=8, all=11, spam=4, trash=2)
-
-        for i in xrange(4):
-            testMessageFactory(store=s, read=False, outgoing=True, receivedWhen=Time())
-
-        assertCountsAre(inbox=8, all=11, spam=4, trash=2, sent=4)
-        self.assertEqual(inboxScreen.viewSelection["view"], 'inbox')
 
     def testDefer(self):
         s = Store()

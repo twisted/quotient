@@ -482,10 +482,35 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+
     /**
      * Test switching to the archive view.
      */
     function test_archiveView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('archive');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+
+                self.assertEqual(
+                    rows.length, 2,
+                    "Should have been 2 rows in the archive view.");
+
+                self.assertEqual(rows[0]["subject"], "4th message");
+                self.assertEqual(rows[1]["subject"], "3rd message");
+            });
+        return result;
+    },
+
+
+    /**
+     * Test switching to the 'all messages' view.
+     */
+    function test_allView(self) {
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
@@ -497,7 +522,7 @@ Quotient.Test.ControllerTestCase.methods(
 
                 self.assertEqual(
                     rows.length, 4,
-                    "Should have been 4 rows in the archive view.");
+                    "Should have been 4 rows in the 'all messages' view.");
 
                 self.assertEqual(rows[0]["subject"], "4th message");
                 self.assertEqual(rows[1]["subject"], "3rd message");
@@ -506,6 +531,7 @@ Quotient.Test.ControllerTestCase.methods(
             });
         return result;
     },
+
 
     /**
      * Test switching to the spam view.
@@ -1023,6 +1049,16 @@ Quotient.Test.ControllerTestCase.methods(
             "inbox",
             ["archive", "defer", "delete", "forward", "reply", "train-spam"],
             ["archive", "delete", "train-spam"]);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the archive view.
+     */
+    function test_actionsForArchive(self) {
+        return self._actionTest(
+            'archive',
+            ['unarchive', 'delete', 'forward', 'reply', 'train-spam'],
+            ['unarchive', 'delete', 'train-spam']);
     },
 
     /**

@@ -832,6 +832,8 @@ Quotient.Mailbox.Controller.methods(
                     "reply", "train-spam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
                       "forward", "reply", "train-spam"],
+            "archive": ["unarchive", "delete", "forward",
+                        "reply", "train-spam"],
             "spam": ["delete", "train-ham"],
             "deferred": ["forward", "reply"],
             "sent": ["delete", "forward", "reply"],
@@ -1654,7 +1656,8 @@ Quotient.Mailbox.Controller.methods(
         }
 
         var nodes = {"all": null, "trash": null, "sent": null,
-                     "spam": null, "inbox": null, "deferred": null};
+                     "spam": null, "inbox": null, "deferred": null,
+                     'archive': null};
         var e, nameNode, name;
 
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {

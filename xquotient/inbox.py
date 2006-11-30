@@ -21,7 +21,9 @@ from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import Scrollable, ScrollableView
 
 from xquotient.exmess import Message, getMessageSources, MailboxSelector
-from xquotient.exmess import READ_STATUS, UNREAD_STATUS, CLEAN_STATUS
+from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
+                              INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
+                              SENT_STATUS, SPAM_STATUS, TRASH_STATUS)
 from xquotient import mimepart, equotient, compose, renderers
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
@@ -32,6 +34,13 @@ from xquotient import mimepart, equotient, compose, renderers
 
 _UNSUPPORTED_C0_CHARS = re.compile(ur'[\x01-\x08\x0B\x0C\x0E-\x1F]')
 replaceControlChars = lambda s: _UNSUPPORTED_C0_CHARS.sub('', s)
+
+
+# Views that the user may select.
+VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, SENT_STATUS,
+         SPAM_STATUS, TRASH_STATUS]
+
+
 
 def quoteBody(m, maxwidth=78):
     for part in m.walkMessage(prefer='text/plain'):
@@ -498,9 +507,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         option = inevow.IQ(select).patternGenerator('mailViewChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedMailViewChoice')
 
-        views = ['inbox', 'all', 'deferred', 'sent', 'spam', 'trash']
         counts = self.mailViewCounts()
-        counts = sorted(counts.iteritems(), key=lambda (v, c): views.index(v))
+        counts = sorted(counts.iteritems(), key=lambda (v, c): VIEWS.index(v))
 
         curview = self.viewSelection["view"]
         for (view, count) in counts:
@@ -595,7 +603,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     def mailViewCounts(self):
         counts = {}
         viewSelection = dict(self.viewSelection)
-        for v in (u'trash', u'sent', u'spam', u'all', u'deferred', u'inbox'):
+        for v in VIEWS:
             viewSelection["view"] = v
             counts[v] = self.getUnreadMessageCount(viewSelection)
         return counts
