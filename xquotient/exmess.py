@@ -35,7 +35,7 @@ from xmantissa.prefs import PreferenceCollectionMixin
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 
-from xquotient import gallery, equotient, scrubber
+from xquotient import gallery, equotient, scrubber, mimeutil
 from xquotient.actions import SenderPersonFragment
 
 
@@ -1626,17 +1626,31 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                 value = self.patterns[pattern].fillSlots('address', value)
             yield value
 
-    def render_headerPanel(self, ctx, data):
+    def personStanFromEmailAddress(self, email):
+        """
+        Get some stan which describes the person in the address book who has
+        the email address C{address}.  This'll be a
+        L{xmantissa.people.PersonFragment} if the email address belongs to a
+        person.  If the address book/organizer is installed and the email
+        address doesn't belong to a person, a
+        L{xquotient.actions.SenderPersonFragment} will be returned.  If there
+        is no address book, some stan containing the email address & display
+        name will be returned
+
+        @type email L{xquotient.mimeutil.EmailAddress}
+        """
         if self.organizer is not None:
-            personStan = SenderPersonFragment(self.original)
-            p = self.organizer.personByEmailAddress(self.original.sender)
+            p = self.organizer.personByEmailAddress(email.email)
             if p is not None:
-                personStan = people.PersonFragment(p, self.original.sender)
+                personStan = people.PersonFragment(p, email.email)
+            else:
+                personStan = SenderPersonFragment(email)
             personStan.page = self.page
         else:
-            personStan = tags.span(title=self.original.sender)[
-                            self.original.senderDisplay]
+            personStan = tags.span(title=email.email)[email.anyDisplayName()]
+        return personStan
 
+    def render_headerPanel(self, ctx, data):
         tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone'))
         sentWhen = self.original.sentWhen
 
@@ -1647,21 +1661,27 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         try:
             cc = self.original.impl.getHeader(u'cc')
         except equotient.NoSuchHeader:
-            ccDetailed = ''
+            ccStan = ''
         else:
-            ccDetailed = self.patterns['cc-detailed'].fillSlots('cc', cc)
+            addresses = mimeutil.parseEmailAddresses(cc, mimeEncoded=False)
+            ccStan = list(self.personStanFromEmailAddress(address)
+                        for address in addresses)
+            ccStan = list(self.patterns['cc-address'].fillSlots('cc', cc)
+                        for cc in ccStan)
+            ccStan = self.patterns['cc-detailed'].fillSlots('cc', ccStan)
 
         sender = self.original.sender
-
         senderDisplay = self.original.senderDisplay
         if senderDisplay and not senderDisplay.isspace():
             sender = '"%s" <%s>' % (senderDisplay, sender)
+        senderEmail = mimeutil.EmailAddress(sender, mimeEncoded=False)
+        senderStan = self.personStanFromEmailAddress(senderEmail)
 
         return dictFillSlots(ctx.tag,
-                    {'sender-person': personStan,
+                    {'sender-person': senderStan,
                      'sender': sender,
                      'recipient': self.original.recipient,
-                     'cc-detailed': ccDetailed,
+                     'cc-detailed': ccStan,
                      'subject': self.original.subject,
                      'sent': sentWhenTerse,
                      'sent-detailed': sentWhenDetailed,

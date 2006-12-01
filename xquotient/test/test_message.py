@@ -11,9 +11,13 @@ from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
 from xmantissa.prefs import PreferenceAggregator
+from xmantissa import people
+
 from xquotient.exmess import Message, MessageDetail, PartDisplayer, _addMessageSource, getMessageSources
 from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.quotientapp import QuotientPreferenceCollection
+from xquotient import mimeutil
+from xquotient.actions import SenderPersonFragment
 
 class UtilityTestCase(TestCase):
     """
@@ -181,3 +185,65 @@ class WebTestCase(TestCase):
         m.walkMessage()
         self.assertEqual(impl.preferred, 'text/html')
 
+class PersonStanTestCase(TestCase):
+    """
+    Tests for L{xquotient.exmess.MessageDetail.personStanFromEmailAddress}
+    """
+    def setUp(self):
+        s = Store()
+        PrivateApplication(store=s).installOn(s)
+        QuotientPreferenceCollection(store=s).installOn(s)
+        people.Organizer(store=s).installOn(s)
+
+        self.store = s
+        self.md = MessageDetail(
+            Message(store=s, subject=u'a/b/c', sender=u''))
+
+    def _checkNoAddressBookStan(self, stan, email):
+        """
+        Check that C{stan} looks like something sane to display for email
+        address C{email} address when there is no addressbook
+
+        @type stan: some stan
+        @param email: the email address that the stan is a representation of
+        @type email: L{xquotient.mimeutil.EmailAddress}
+        """
+        self.assertEqual(stan.attributes['title'], email.email)
+        self.assertEqual(stan.children, [email.anyDisplayName()])
+
+    def test_noOrganizer(self):
+        """
+        Test L{xquotient.exmess.MessageDetail.personStanFromEmailAddress} when
+        there is no L{xmantissa.people.Organizer} in the store
+        """
+        self.md.organizer = None
+
+        email = mimeutil.EmailAddress('foo@bar', mimeEncoded=False)
+        stan = self.md.personStanFromEmailAddress(email)
+        self._checkNoAddressBookStan(stan, email)
+
+    def test_notAPerson(self):
+        """
+        Test L{xquotient.exmess.MessageDetail.personStanFromEmailAddress} when
+        there is a L{xmantissa.people.Organizer}, but the email we give isn't
+        assigned to a person
+        """
+        email = mimeutil.EmailAddress('foo@bar', mimeEncoded=False)
+        res = self.md.personStanFromEmailAddress(email)
+        self.failUnless(isinstance(res, SenderPersonFragment))
+
+    def test_aPerson(self):
+        """
+        Test L{xquotient.exmess.MessageDetail.personStanFromEmailAddress} when
+        there is a L{xmantissa.people.Organizer}, and the email we give is
+        assigned to a person
+        """
+        email = mimeutil.EmailAddress('foo@bar', mimeEncoded=False)
+
+        people.EmailAddress(
+            store=self.store,
+            address=u'foo@bar',
+            person=people.Person(store=self.store))
+
+        res = self.md.personStanFromEmailAddress(email)
+        self.failUnless(isinstance(res, people.PersonFragment))

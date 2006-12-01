@@ -2868,28 +2868,56 @@ Quotient.Test.MessageDetailTestHelper.methods(
     },
 
     /**
-     * Collect the names/values of the headers being displayed by our
+     * Collect the names/nodes of the headers being displayed by our
      * L{Quotient.Message.MessageDetail} widget, by looking at its DOM
      *
-     * @return: mapping of header names to values
+     * @return: mapping of header names to nodes
      * @type: C{Object}
      */
     function collectHeaders(self) {
-        var hdrs = self.widget.firstNodeByAttribute("class", "msg-header-table");
-        var fieldvalues = {};
-        var rows = hdrs.getElementsByTagName("tr");
-        var cols, fieldname;
+        var hdrs = self.widget.firstNodeByAttribute("class", "msg-header-table"),
+            fieldValues = {},
+            cols, fieldName;
+
+        function getElementsByTagNameShallow(parent, tagName) {
+            var acc = [];
+            for(var i = 0; i < parent.childNodes.length; i++) {
+                if(parent.childNodes[i].tagName &&
+                    parent.childNodes[i].tagName.toLowerCase() == tagName) {
+                    acc.push(parent.childNodes[i]);
+                }
+            }
+            return acc;
+        }
+
+        var rows = getElementsByTagNameShallow(hdrs, "tr");
 
         for(var i = 0; i < rows.length; i++) {
-            cols = rows[i].getElementsByTagName("td");
+            cols = getElementsByTagNameShallow(rows[i], "td");
             if(cols.length < 2) {
                 continue;
             }
-            fieldname = cols[0].firstChild.nodeValue;
-            fieldname = fieldname.toLowerCase().slice(0, -1);
-            fieldvalues[fieldname] = cols[1].firstChild.nodeValue;
+            fieldName = cols[0].firstChild.nodeValue;
+            fieldName = fieldName.toLowerCase().slice(0, -1);
+            fieldValues[fieldName] = cols[1];
         }
-        return fieldvalues;
+        return fieldValues;
+    },
+
+    /**
+     * Like L{collectHeaders}, but the values in the object returned are the
+     * string values of each header, and headers without a simple string value
+     * will not be included
+     */
+    function collectStringHeaders(self) {
+        var headers = {}, _headers = self.collectHeaders();
+        for(var k in _headers) {
+            if(_headers[k].childNodes.length == 1
+                && !_headers[k].firstChild.tagName) {
+                headers[k] = _headers[k].firstChild.nodeValue;
+            }
+        }
+        return headers;
     });
 
 
@@ -2921,7 +2949,7 @@ Quotient.Test.MsgDetailTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                var fieldvalues = self.testHelper.collectHeaders();
+                var fieldvalues = self.testHelper.collectStringHeaders();
 
                 var assertFieldsEqual = function(answers) {
                     for(var k in answers) {
@@ -3083,12 +3111,80 @@ Quotient.Test.MsgDetailHeadersTestCase.methods(
         var result = self.setUp({'Resent-From': 'user@host'});
         result.addCallback(
             function(ignored) {
-                var headers = self.testHelper.collectHeaders();
+                var headers = self.testHelper.collectStringHeaders();
                 self.assertEquals(headers['resent from'], 'user@host');
                 self.assertEquals(headers['resent to'], undefined);
             });
         return result;
     });
+
+Quotient.Test.MsgDetailCCPeopleTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                            'Quotient.Test.MsgDetailCCPeopleTestCase');
+/**
+ * Tests for rendering a message with the CC header set and some people in the
+ * store
+ */
+Quotient.Test.MsgDetailCCPeopleTestCase.methods(
+    function setUp(self, peopleAddresses, headers) {
+        var d = self.callRemote('setUp', peopleAddresses, headers);
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+                self.testHelper = Quotient.Test.MessageDetailTestHelper(widget);
+            });
+        return d;
+    },
+
+    /**
+     * Test rendering a message with CC set but no people in the store
+     *
+     * There should be nodes for two L{Quotient.Common.SenderPerson} instances
+     * inside the CC header node.
+     */
+    function test_noPeople(self) {
+        var result = self.setUp([], {'cc': '1@host, 2@host'});
+        result.addCallback(
+            function(ignored) {
+                var headers = self.testHelper.collectHeaders(),
+                    cc = headers['cc'];
+
+                self.assertEquals(cc.childNodes.length, 2);
+
+                var spnodes = Nevow.Athena.NodesByAttribute(
+                    cc, "athena:class", "Quotient.Common.SenderPerson");
+
+                self.assertEquals(spnodes.length, 2);
+            });
+        return result;
+    },
+
+    /**
+     * Test rendering a message where CC is set to an email address that
+     * belongs to a person in the store
+     *
+     * The CC header node should contain the node for one person widget
+     */
+    function test_aPerson(self) {
+        var result = self.setUp(['1@host'], {'cc': '1@host'});
+        result.addCallback(
+            function(ignored) {
+                var headers = self.testHelper.collectHeaders(),
+                    cc = headers['cc'];
+
+                self.assertEquals(cc.childNodes.length, 1);
+                self.assertEquals(
+                    Nevow.Athena.NodesByAttribute(
+                        cc, "class", "person-widget").length,
+                    1);
+            });
+        return result;
+    });
+
 
 Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.PostiniConfigurationTestCase');

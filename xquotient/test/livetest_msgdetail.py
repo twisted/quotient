@@ -50,7 +50,7 @@ def _docFactoryFactory(testName, renderMethod='msgDetail'):
                 tags.div(render=tags.directive('liveTest'))[testName],
                 tags.div(render=tags.directive('msgDetail'))])
 
-class _MsgDetailTestMixin:
+class _MsgDetailTestMixin(object):
     """
     Mixin which provides some methods for setting up stores and messages
     """
@@ -163,7 +163,23 @@ class MsgDetailInitArgsTestCase(testcase.TestCase, _MsgDetailTestMixin):
     expose(setUp)
 
 
-class MsgDetailHeadersTestCase(testcase.TestCase, _MsgDetailTestMixin):
+class _MsgDetailHeadersTestMixin(_MsgDetailTestMixin):
+    """
+    Extension of L{_MsgDetailTestMixin} which allows the client to set
+    arbitrary headers on our message
+    """
+
+    def _setUpMsg(self, headers):
+        msg = super(_MsgDetailHeadersTestMixin, self)._setUpMsg()
+        for (k, v) in headers.iteritems():
+            _Header(store=msg.store,
+                    part=msg.impl,
+                    name=k.lower(),
+                    value=v)
+        return msg
+
+
+class MsgDetailHeadersTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
     """
     Test for the rendering of messages which have various headers set
     """
@@ -176,12 +192,46 @@ class MsgDetailHeadersTestCase(testcase.TestCase, _MsgDetailTestMixin):
 
         @type headers: C{dict} of C{unicode}
         """
-        msg = self._setUpMsg()
-        for (k, v) in headers.iteritems():
-            _Header(store=msg.store,
-                    part=msg.impl,
-                    name=k.lower(),
-                    value=v)
+        msg = self._setUpMsg(headers)
+        f = MessageDetail(msg)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)
+
+
+class MsgDetailCCPeopleTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
+    """
+    Tests for rendering a message with the CC header set and some people in
+    the store
+    """
+    jsClass = u'Quotient.Test.MsgDetailCCPeopleTestCase'
+
+    def _setUpStore(self):
+        store = super(MsgDetailCCPeopleTestCase, self)._setUpStore()
+        self.organizer = people.Organizer(store=store)
+        self.organizer.installOn(store)
+        return store
+
+    def setUp(self, peopleAddresses, headers):
+        """
+        Setup & populate a store with a L{xquotient.exmess.Message} which has
+        the headers in C{headers} set to the given values, and a person for
+        each email address in C{peopleAddresses}
+
+        @param peopleAddresses: the email addresses to associate with people
+        @type peopleAddresses: sequence of C{unicode}
+
+        @type headers: C{dict} of C{unicode}
+        """
+        msg = self._setUpMsg(headers)
+        for addr in peopleAddresses:
+            people.EmailAddress(
+                store=msg.store,
+                address=addr,
+                person=people.Person(
+                    store=msg.store,
+                    organizer=self.organizer))
         f = MessageDetail(msg)
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
