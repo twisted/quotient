@@ -19,34 +19,13 @@ Quotient.Message.MessageDetail.methods(
         return self.moreDetailNode;
     },
 
-    /**
-     * Show the source of our message
-     *
-     * @return: deferred firing with L{Quotient.Message.Source}
-     * @rtype: L{Divmod.Defer.Deferred}
-     */
     function messageSource(self) {
-        var d = self.callRemote("getMessageSource");
-        d.addCallback(
-            function(widget_info) {
-                return self.addChildWidgetFromWidgetInfo(widget_info);
-            });
-        d.addCallback(
-            function(widget) {
-                var mbody = self.firstNodeByAttribute("class", "message-body");
-                mbody.parentNode.insertBefore(widget.node, mbody);
-                mbody.style.display = "none";
-                return widget;
-            });
-        return d;
-    },
-
-    /**
-     * Show the body of our message
-     */
-    function showMessageBody(self) {
-        var mbody = self.firstNodeByAttribute("class", "message-body")
-        mbody.style.display = "";
+        self.callRemote("getMessageSource").addCallback(
+            function(source) {
+                MochiKit.DOM.replaceChildNodes(
+                    self.nodeByAttribute("class", "message-body"),
+                    MochiKit.DOM.PRE(null, source));
+        });
     },
 
     /**
@@ -186,21 +165,4 @@ Quotient.Message.MessageDetail.methods(
         }
 
         self.hideTagEditor();
-    });
-
-Quotient.Message.Source = Nevow.Athena.Widget.subclass('Quotient.Message.Source');
-/**
- * Responds to events originating from message source DOM
- */
-Quotient.Message.Source.methods(
-    /**
-     * Called when the user decides they don't want to look at the message
-     * source anymore.  Removes our node from the DOM, and calls
-     * L{showMessageBody} on our widget parent, which we hope is a
-     * L{Quotient.Message.MessageDetail}
-     */
-    function cancel(self) {
-        self.node.parentNode.removeChild(self.node);
-        self.widgetParent.showMessageBody();
-        return false;
     });
