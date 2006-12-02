@@ -119,8 +119,9 @@ table.tdb > tbody > tr > td { cursor: pointer; }
     left: 0px;
 }
 
-.cc-link:visited, .cc-link:link {
+.more-options-disclose:visited, .more-options-disclose:link {
     color: #0099CC;
+    font-weight: bold;
 }
 
 .attach-dialog > tbody > tr > td {

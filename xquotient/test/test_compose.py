@@ -11,7 +11,7 @@ from axiom import userbase
 
 from xmantissa import webapp
 
-from xquotient import compose, mail, mimeutil, exmess
+from xquotient import compose, mail, mimeutil, exmess, equotient
 from xquotient.test.util import PartMaker
 
 
@@ -225,10 +225,104 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             [mimeutil.EmailAddress(
                     'testuser@example.com',
                     mimeEncoded=False)],
-            u'Sup dood', u'A body', u'', u'', u'')
+            u'Sup dood', u'A body', (), (), u'')
         file = msg.impl.source.open()
         msg = Parser.Parser().parse(file)
         self.assertEquals(msg["from"], 'from@example.com')
+
+    def test_createMessageHonorsBCC(self):
+        """
+        Sending a message through the compose UI should honor the BCC
+        addresses we give to it
+        """
+        self.cf._sendMail(
+            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+                'to@example.com',
+                mimeEncoded=False)],
+            u'', u'', [],
+            [mimeutil.EmailAddress(
+                'bcc1@example.com',
+                 mimeEncoded=False),
+             mimeutil.EmailAddress(
+                'bcc2@example.com',
+                mimeEncoded=False)],
+            u'')
+        self.assertEquals(
+            list(self.store.query(compose._NeedsDelivery).getColumn('toAddress')),
+            ['to@example.com', 'bcc1@example.com', 'bcc2@example.com'])
+
+    def _createMessage(self, cc=(), bcc=()):
+        """
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
+        simple message, optionally with CC/BCC headers set
+
+        @param cc: addresses to CC the message to.  defaults to no addresses
+        @type cc: sequence of L{xquotient.mimeutils.EmailAddress}
+        @param bcc: addresses to BCC the message to.  defaults to no addresses
+        @type bcc: sequence of L{xquotient.mimeutils.EmailAddress}
+
+        @return: L{xquotient.exmess.Message}
+        """
+        return self.cf.createMessage(
+            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+                'to@example.com',
+                mimeEncoded=False)],
+            u'', u'', cc, bcc, u'')
+
+
+    def _createBCCMessage(self):
+        """
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
+        message with a BCC
+        """
+        return self._createMessage(
+            bcc=[mimeutil.EmailAddress(
+                'bcc@example.com',
+                 mimeEncoded=False)])
+
+
+    def _createCCMessage(self):
+        """
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
+        message with a BCC
+        """
+        return self._createMessage(
+            cc=[mimeutil.EmailAddress(
+                'cc@example.com',
+                mimeEncoded=False)])
+
+
+    def test_noBCCInTo(self):
+        """
+        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
+        stick the BCC address it's passed into the "To" header
+        """
+        msg = self._createBCCMessage()
+        (addr,) = mimeutil.parseEmailAddresses(msg.impl.getHeader(u'To'))
+        self.assertEquals(addr.email, 'to@example.com')
+
+    def test_noBCCHeader(self):
+        """
+        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
+        result in a BCC header on the message it makes, when it's passed a BCC
+        address
+        """
+        msg = self._createBCCMessage()
+        self.assertRaises(
+            equotient.NoSuchHeader, lambda: msg.impl.getHeader(u'bcc'))
+
+
+    def test_ccHeader(self):
+        """
+        Test that the message created by
+        L{xquotient.compose.ComposeFragment.createMessage} has the "cc" header
+        set if the C{cc} argument contains an address
+        """
+        msg = self._createCCMessage()
+        self.assertEquals(msg.impl.getHeader(u'cc'), 'cc@example.com')
+
 
     def _createMessageWithFiles(self, files):
         """
@@ -241,7 +335,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                                 [mimeutil.EmailAddress(
                                     'testuser@example.com',
                                     mimeEncoded=False)],
-                                u'subject', u'body', u'', u'',
+                                u'subject', u'body', (), (),
                                 files=list(f.storeID for f in files))
 
     def _assertFilenameParamEquals(self, part, filename):
@@ -347,8 +441,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                     mimeEncoded=False)],
             subject=u'The subject of the message.',
             messageBody=u'The body of the message.',
-            cc=u'',
-            bcc=u'',
+            cc=[],
+            bcc=[],
             files=[],
             draft=True)
         m = self.store.findUnique(exmess.Message)
@@ -372,8 +466,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                     mimeEncoded=False)],
             subject=u'The subject of the message.',
             messageBody=u'The body of the message.',
-            cc=u'',
-            bcc=u'',
+            cc=[],
+            bcc=[],
             files=[],
             draft=False)
         m = self.store.findUnique(exmess.Message)

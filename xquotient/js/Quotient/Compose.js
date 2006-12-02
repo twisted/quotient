@@ -276,10 +276,10 @@ Quotient.Compose.Controller.methods(
     function __init__(self, node, inline, allPeople) {
         Quotient.Compose.Controller.upcall(self, "__init__", node, inline, allPeople);
 
-        var cc = self.firstNodeByAttribute("name", "cc");
-        if(0 < cc.value.length) {
-            self.toggleCCForm(
-                self.firstNodeByAttribute("class", "cc-link"));
+        var cc = self.firstNodeByAttribute("name", "cc"),
+            bcc = self.firstNodeByAttribute("name", "cc");
+        if(0 < cc.value.length || 0 < bcc.value.length) {
+            self.toggleMoreOptions();
         }
 
         self.fileList = self.firstNodeByAttribute("class", "file-list");
@@ -383,17 +383,52 @@ Quotient.Compose.Controller.methods(
         }
     },
 
-    function toggleCCForm(self, node) {
-        if(!self.ccForm) {
-            self.ccForm = self.firstNodeByAttribute("class", "cc-form");
+    /**
+     * Flip the visibility of all nodes below this widget's node which have
+     * the class name "more-options", and change the label inside the node
+     * with class name "more-options-disclosure" accordingly.
+     */
+    function toggleMoreOptions(self) {
+        if(!self.moreOptions) {
+            self.moreOptions = self.nodesByAttribute("class", "more-options");
         }
-        if(self.ccForm.style.display == "none") {
-            self.ccForm.style.display = "";
-            node.firstChild.nodeValue = "- Cc";
+
+        for(var i = 0; i < self.moreOptions.length; i++) {
+            if(self.moreOptions[i].style.display == "none") {
+                self.moreOptions[i].style.display = "";
+            } else {
+                self.moreOptions[i].style.display = "none";
+            }
+        }
+
+        if(!self.moreOptionsDisclose) {
+            self.moreOptionsDisclose = self.firstNodeByAttribute(
+                                        "class", "more-options-disclose");
+        }
+        self._toggleDisclosureLabels(self.moreOptionsDisclose);
+        return false;
+    },
+
+    /**
+     * Switch around the visibility of the node with class name "closed-label"
+     * and node with class name "open-label" inside the node C{node}
+     *
+     * @type node: node
+     */
+    function _toggleDisclosureLabels(self, node) {
+        var closed = Nevow.Athena.FirstNodeByAttribute(
+                        node, "class", "closed-label"),
+            open = Nevow.Athena.FirstNodeByAttribute(
+                    node, "class", "open-label");
+
+        if(closed.style.display == "none") {
+            closed.style.display = "";
+            open.style.display = "none";
         } else {
-            self.ccForm.style.display = "none";
-            node.firstChild.nodeValue = "+ Cc";
+            closed.style.display = "none";
+            open.style.display= "";
         }
+        return false;
     },
 
     function toggleAttachDialog(self) {

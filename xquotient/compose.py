@@ -597,10 +597,10 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                                            coercer=unicode),
                         liveform.Parameter(name='cc',
                                            type=liveform.TEXT_INPUT,
-                                           coercer=unicode),
+                                           coercer=self._coerceEmailAddressString),
                         liveform.Parameter(name='bcc',
                                            type=liveform.TEXT_INPUT,
-                                           coercer=unicode),
+                                           coercer=self._coerceEmailAddressString),
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
@@ -751,7 +751,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         m['Message-ID'] = smtp.messageid('divmod.xquotient')
 
         if cc:
-            m['Cc'] = encode(cc)
+            m['Cc'] = encode(mimeutil.flattenEmailAddresses(cc))
 
         G.Generator(s).flatten(m)
         s.seek(0)
@@ -770,9 +770,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         # overwrite the previous draft of this message with another draft
         self._saveDraft(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
-        addresses = [addr.pseudoFormat() for addr in toAddresses]
-        if cc:
-            addresses.append(cc)
+        addresses = [addr.pseudoFormat() for addr in toAddresses + cc + bcc]
 
         # except we are going to send this draft
         self.composer.sendMessage(fromAddress, addresses, self._savedDraft.message)
