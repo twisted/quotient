@@ -2510,6 +2510,32 @@ Quotient.Test.FromAddressScrollTableTestCase.methods(
     },
 
     /**
+     * Test that the custom columnAliases and actions definitions are both
+     * respected.
+     */
+    function test_userInterfaceCustomization(self) {
+        return self.setUp().addCallback(
+            function(ignored) {
+                /*
+                 * This is pretty whitebox.
+                 */
+                self.assertNotEqual(
+                    self.scrollTable._headerRow.innerHTML.indexOf('SMTP Host'),
+                    -1);
+
+                var i;
+                for (i = 0; i < self.scrollTable.columnNames.length; ++i) {
+                    if (self.scrollTable.columnNames[i] == "actions") {
+                        break;
+                    }
+                }
+                if (i == self.scrollTable.columnNames.length) {
+                    self.fail("Did not find actions in columnNames.");
+                }
+            });
+    },
+
+    /**
      * Test that the setDefaultAddress action works
      */
     function test_setDefaultAddress(self) {

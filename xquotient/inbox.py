@@ -294,6 +294,10 @@ class MailboxScrollingFragment(Scrollable, ScrollableView, LiveElement):
         self.setViewSelection({u"view": "inbox", u"tag": None, u"person": None, u"account": None})
 
 
+    def getInitialArguments(self):
+        return [self.getTableMetadata(self.viewSelection)]
+
+
     def setViewSelection(self, viewSelection):
         self.viewSelection = dict(
             (k.encode('ascii'), v)

@@ -67,8 +67,7 @@ Quotient.Compose.FromAddressScrollTable = Mantissa.ScrollTable.FlexHeightScrolli
  * items
  */
 Quotient.Compose.FromAddressScrollTable.methods(
-    function __init__(self, node, systemAddrWebID) {
-        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node, 5);
+    function __init__(self, node, metadata, systemAddrWebID) {
         self.columnAliases = {smtpHost: "SMTP Host",
                               smtpPort: "SMTP Port",
                               smtpUsername: "SMTP Username",
@@ -78,6 +77,7 @@ Quotient.Compose.FromAddressScrollTable.methods(
                         Quotient.Compose.DeleteFromAddressAction(
                             systemAddrWebID)];
         self.systemAddrWebID = systemAddrWebID;
+        Quotient.Compose.FromAddressScrollTable.upcall(self, "__init__", node, metadata, 5);
     },
 
     /**
@@ -150,10 +150,10 @@ Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.FlexHeightScrol
                                                 'Quotient.Compose.DraftListScrollingWidget');
 
 Quotient.Compose.DraftListScrollingWidget.methods(
-    function __init__(self, node) {
+    function __init__(self, node, metadata) {
         self.columnAliases = {"sentWhen": "Date"};
         self.columnWidths = {"subject": "50%"};
-        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node, 15);
+        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node, metadata, 15);
     },
 
     function massageColumnValue(self, columnName, columnType, columnValue) {

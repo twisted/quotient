@@ -1154,9 +1154,9 @@ class FromAddressScrollTable(ScrollingFragment):
         Include the web ID of the L{FromAddress} item which represents the
         system address, so the client can prevent it from being deleted
         """
-        return (unicode(self.webTranslator.toWebID(
-                            FromAddress.findSystemAddress(self.store)),
-                            'ascii'),)
+        systemAddress = FromAddress.findSystemAddress(self.store)
+        return super(FromAddressScrollTable, self).getInitialArguments() + [
+            unicode(self.webTranslator.toWebID(systemAddress), 'ascii')]
 
 
 class Draft(item.Item):

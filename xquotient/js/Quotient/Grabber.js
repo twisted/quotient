@@ -35,7 +35,7 @@ Quotient.Grabber.ScrollingWidget = Mantissa.ScrollTable.FlexHeightScrollingWidge
                                         'Quotient.Grabber.ScrollingWidget');
 
 Quotient.Grabber.ScrollingWidget.methods(
-    function __init__(self, node) {
+    function __init__(self, node, metadata) {
         self.columnWidths = {"status": "50%"};
 
         self.actions = [Quotient.Grabber.RefillingAction(
@@ -54,7 +54,7 @@ Quotient.Grabber.ScrollingWidget.methods(
                             "resume", "Resume",
                             "/Quotient/static/images/action-resume.png")];
 
-        Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node, 5);
+        Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node, metadata, 5);
         self._scrollViewport.style.height = '100px';
         self.node.style.display = "none";
         self.initializationDeferred.addCallback(

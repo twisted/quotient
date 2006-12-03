@@ -9,9 +9,9 @@ Quotient.Search.SearchResults = Mantissa.ScrollTable.ScrollingWidget.subclass(
                                     'Quotient.Search.SearchResults');
 
 Quotient.Search.SearchResults.methods(
-    function __init__(self, node) {
+    function __init__(self, node, metadata) {
         self.columnAliases = {receivedWhen: "Date", senderDisplay: "From"};
-        Quotient.Search.SearchResults.upcall(self, "__init__", node);
+        Quotient.Search.SearchResults.upcall(self, "__init__", node, metadata);
         self.node.style.margin = "4px";
     },
 

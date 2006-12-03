@@ -39,7 +39,7 @@ Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass
     "Quotient.Mailbox.ScrollingWidget");
 
 Quotient.Mailbox.ScrollingWidget.methods(
-    function __init__(self, node) {
+    function __init__(self, node, metadata) {
         /*
          * XXX TODO - viewSelection should be a parameter to __init__
          */
@@ -51,7 +51,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.selectedGroup = null;
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
 
-        Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node);
+        Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node, metadata);
 
         self._scrollViewport.style.maxHeight = "";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
@@ -1238,6 +1238,15 @@ Quotient.Mailbox.Controller.methods(
                 function() {
                     self.finishedLoading();
                     self.resized(true);
+                    /*
+                     * Since we probably just made the scrolling widget
+                     * bigger, it is quite likely that we exposed some rows
+                     * without data.  Ask it to check on that and deal with
+                     * it, if necessary.  This is a kind of gross hack
+                     * necessitated by the lack of a general mechanism for
+                     * cooperation between the view and the model. -exarkun
+                     */
+                    self.scrollWidget._getSomeRows(true);
                 });
         }, 0);
     },

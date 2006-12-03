@@ -7,8 +7,8 @@ Quotient.Extracts.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclas
                                         'Quotient.Extracts.ScrollingWidget');
 
 Quotient.Extracts.ScrollingWidget.methods(
-    function __init__(self, node) {
-        Quotient.Extracts.ScrollingWidget.upcall(self, "__init__", node);
+    function __init__(self, node, metadata) {
+        Quotient.Extracts.ScrollingWidget.upcall(self, "__init__", node, metadata);
         self._scrollViewport.style.maxHeight = '200px';
     },
 
