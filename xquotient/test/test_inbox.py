@@ -10,6 +10,8 @@ from axiom.store import Store
 from axiom.scheduler import Scheduler
 
 from axiom.tags import Catalog
+from axiom.attributes import integer
+from axiom.item import Item
 
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
 from xmantissa.webapp import PrivateApplication
@@ -19,12 +21,14 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               MailboxSelector, UNREAD_STATUS, READ_STATUS,
                               Correspondent, SENDER_RELATION, DRAFT_STATUS,
                               SENT_STATUS, DEFERRED_STATUS,
-                              EVER_DEFERRED_STATUS)
+                              EVER_DEFERRED_STATUS, RECIPIENT_RELATION,
+                              COPY_RELATION, BLIND_COPY_RELATION)
 
-from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, VIEWS
+from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, VIEWS, replyToAll
 from xquotient.quotientapp import QuotientPreferenceCollection
-from xquotient import compose
-from xquotient.test.test_workflow import DummyMessageImplementation, QueryCounter
+from xquotient import compose, mimeutil
+from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
+                                          DummyMessageImplementationMixin)
 
 
 
@@ -623,3 +627,71 @@ class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):
         self.assertEquals(
             self.inbox.scrollingFragment.requestCurrentSize(),
             1)
+
+
+
+class DummyMessageImplWithABunchOfAddresses(Item, DummyMessageImplementationMixin):
+    """
+    Mock L{xquotient.iquotient.IMessageData} which returns a bunch of things
+    from L{relatedAddresses}
+    """
+    z = integer()
+
+    def relatedAddresses(self):
+        """
+        Return one address for each relation type
+        """
+        EmailAddress = mimeutil.EmailAddress
+        for (rel, addr) in ((SENDER_RELATION, 'sender@host'),
+                            (RECIPIENT_RELATION, 'recipient@host'),
+                            (COPY_RELATION, 'copy@host'),
+                            (BLIND_COPY_RELATION, 'blind-copy@host')):
+            yield (rel, mimeutil.EmailAddress(addr, False))
+
+
+
+class ComposeActionsTestCase(TestCase):
+    """
+    Tests for the compose-related actions of L{xquotient.inbox.InboxScreen}
+    (reply, forward, etc) and related functionality
+    """
+
+    def setUp(self):
+        self.store = Store()
+        self.privateApplication = PrivateApplication(store=self.store)
+        self.privateApplication.installOn(self.store)
+
+        self.inbox = Inbox(store=self.store)
+        self.inbox.installOn(self.store)
+        self.inboxScreen = InboxScreen(self.inbox)
+
+        self.msg = testMessageFactory(
+                    store=self.store,
+                    spam=False,
+                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
+
+
+    def testReplyToAll(self):
+        """
+        Test L{xquotient.inbox.replyToAll}
+        """
+        self.assertEquals(
+            sorted(e.email for e in replyToAll(self.msg)),
+            ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])
+
+
+    def testReplyAllToMessage(self):
+        """
+        Test L{xquotient.inbox.replyAllToMessage}
+        """
+        fromAddrs = []
+        def _composeSomething(_fromAddrs, *a, **k):
+            fromAddrs.append([e.email for e in _fromAddrs])
+        self.inboxScreen._composeSomething = _composeSomething
+
+        webID = self.privateApplication.toWebID(self.msg)
+        self.inboxScreen.replyAllToMessage(webID)
+        self.assertEquals(len(fromAddrs), 1)
+        self.assertEquals(
+            sorted(fromAddrs[0]),
+            ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])

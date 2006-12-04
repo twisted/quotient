@@ -41,18 +41,11 @@ from xquotient.exmess import _MessageStatus
 from xquotient.mimestorage import Part, Header
 
 
-class DummyMessageImplementation(Item):
+class DummyMessageImplementationMixin:
     """
     Mock implementation of message data.
     """
     implements(IMessageData)
-
-    senderInfo = text(
-        doc="""
-        The sender as passed by the factory which created this implementation;
-        used to provide a sensible implementation of relatedAddresses.
-        """,
-        default=None, allowNone=True)
 
     def relatedAddresses(self):
         """Implement related address interface for creating correspondents
@@ -67,6 +60,7 @@ class DummyMessageImplementation(Item):
     # maybe the rest of IMessageData...?
     def walkMessage(self, prefer=None):
         return []
+
     def walkAttachments(self, prefer=None):
         return []
 
@@ -75,6 +69,16 @@ class DummyMessageImplementation(Item):
 
     def guessSentTime(self, default):
         return Time()
+
+
+
+class DummyMessageImplementation(Item, DummyMessageImplementationMixin):
+    senderInfo = text(
+        doc="""
+        The sender as passed by the factory which created this implementation;
+        used to provide a sensible implementation of relatedAddresses.
+        """,
+        default=None, allowNone=True)
 
 
 

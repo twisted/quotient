@@ -114,6 +114,23 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
                    ThemedFragmentWrapper(
                        InboxScreen(inbox)))
 
+
+    def test_inboxComposeFragmentRendering(self):
+        """
+        Test rendering of the L{xquotient.compose.ComposeFragment} returned
+        from L{xquotient.inbox.Inbox.getComposer}
+        """
+        compose.Composer(store=self.store).installOn(self.store)
+
+        inbox = self.store.findUnique(Inbox)
+        inboxScreen = InboxScreen(inbox)
+
+        composeFrag = inboxScreen.getComposer()
+
+        return renderLivePage(
+            ThemedFragmentWrapper(composeFrag))
+
+
     def test_peopleMessageListRendering(self):
         mlister = MessageLister(store=self.store)
         mlister.installOn(self.store)

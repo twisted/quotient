@@ -1666,28 +1666,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 return self.controllerWidget.replyTo(false);
             });
-        result.addCallback(
-            function(ignored) {
-                var children = self.controllerWidget.childWidgets;
-                var lastChild = children[children.length - 1];
-                self.failUnless(lastChild instanceof Quotient.Compose.Controller);
-
-                /*
-                 * XXX Stop it from saving drafts, as this most likely won't
-                 * work and potentially corrupts page state in ways which will
-                 * break subsequent tests.
-                 */
-                lastChild.stopSavingDrafts();
-
-                /*
-                 * Make sure it's actually part of the page
-                 */
-                var parentNode = lastChild.node;
-                while (parentNode != null && parentNode != self.node) {
-                    parentNode = parentNode.parentNode;
-                }
-                self.assertEqual(parentNode, self.node);
-            });
+        result.addCallback(self._makeComposeTester());
         return result;
     },
 
@@ -1701,29 +1680,21 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 return self.controllerWidget.forward(false);
             });
+        result.addCallback(self._makeComposeTester());
+        return result;
+    },
+
+    /**
+     * Test that selecting the "reply all" action for a message brings up a
+     * compose widget.
+     */
+    function test_replyToAll(self) {
+        var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                var children = self.controllerWidget.childWidgets;
-                var lastChild = children[children.length - 1];
-                self.failUnless(lastChild instanceof Quotient.Compose.Controller);
-
-                /*
-                 * XXX Stop it from saving drafts, as this most likely won't
-                 * work and potentially corrupts page state in ways which will
-                 * break subsequent tests.
-                 */
-                lastChild.stopSavingDrafts();
-
-                /*
-                 * Make sure it's actually part of the page
-                 */
-                var parentNode = lastChild.node;
-                while (parentNode != null && parentNode != self.node) {
-                    parentNode = parentNode.parentNode;
-                }
-                self.assertEqual(parentNode, self.node);
+                return self.controllerWidget.replyToAll(false);
             });
-        return result;
+        result.addCallback(self._makeComposeTester());
     },
 
     /**
@@ -2025,14 +1996,27 @@ Quotient.Test.ControllerTestCase.methods(
      */
     function _makeComposeTester(self) {
         return function(composer) {
-            self.failUnless(
-                composer instanceof Quotient.Compose.Controller);
+            var children = self.controllerWidget.childWidgets;
+            var lastChild = children[children.length - 1];
+            self.failUnless(lastChild instanceof Quotient.Compose.Controller);
 
-            self.assertEqual(composer.node.parentNode,
-                                self.controllerWidget.messageDetail);
-            self.failUnless(composer.inline);
+            /*
+                * XXX Stop it from saving drafts, as this most likely won't
+                * work and potentially corrupts page state in ways which will
+                * break subsequent tests.
+                */
+            lastChild.stopSavingDrafts();
 
-            return composer;
+            /*
+                * Make sure it's actually part of the page
+                */
+            var parentNode = lastChild.node;
+            while (parentNode != null && parentNode != self.node) {
+                parentNode = parentNode.parentNode;
+            }
+            self.assertEqual(parentNode, self.node);
+            self.failUnless(lastChild.inline);
+            return lastChild;
         }
     },
 
@@ -2892,7 +2876,7 @@ Quotient.Test.ComposeToAddressTestCase.methods(
      */
     function test_roundtrip(self) {
         var addrs = ['foo@bar', 'bar@baz'];
-        var result = self.setUp('roundtrip', addrs.join(', '));
+        var result = self.setUp('roundtrip', addrs);
         result.addCallback(
             function(composer) {
                 /* save a draft, but bypass all the dialog/looping stuff */
