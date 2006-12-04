@@ -919,9 +919,9 @@ class Message(item.Item):
         @return: None
         """
         self.addStatus(DEFERRED_STATUS)
+        self.removeStatus(INBOX_STATUS)
         self.everDeferred = True
         self.addStatus(EVER_DEFERRED_STATUS)
-        self.freezeStatus()
         task = _UndeferTask(store=self.store,
                             message=self,
                             deferredUntil=timeFactory() + duration)
@@ -934,8 +934,8 @@ class Message(item.Item):
 
         @return: None
         """
-        self.unfreezeStatus()
         self.removeStatus(DEFERRED_STATUS)
+        self.addStatus(INBOX_STATUS)
         self.markUnread()
         self.store.query(_UndeferTask,
                          _UndeferTask.message == self).deleteFromStore()
@@ -1195,6 +1195,7 @@ def _message3to4(m):
 registerUpgrader(_message3to4, Message.typeName, 3, 4)
 
 
+
 class _UndeferTask(item.Item):
     """
     Created when a message is deferred.  When run, I undefer the message, mark
@@ -1202,6 +1203,7 @@ class _UndeferTask(item.Item):
     """
 
     typeName = 'xquotient_inbox_undefertask'
+    schemaVersion = 2
 
     message = attributes.reference(reftype=Message,
                                    whenDeleted=attributes.reference.CASCADE,
@@ -1215,7 +1217,7 @@ class _UndeferTask(item.Item):
         self.message.undefer()
 
 
-    def __init__(self, store, message, deferredUntil):
+    def __init__(self, store, message, deferredUntil, **kw):
         """
         Create an _UndeferTask.  As part of creation, I will schedule myself,
         so all my attributes must be provided to this constructor.
@@ -1225,10 +1227,31 @@ class _UndeferTask(item.Item):
         @param deferredUntil: a L{Time} that the message will be undeferred.
         """
         item.Item.__init__(self, store=store, message=message,
-                           deferredUntil=deferredUntil)
+                           deferredUntil=deferredUntil, **kw)
         schd = IScheduler(self.store)
         schd.schedule(self, self.deferredUntil)
 
+
+
+def _undeferTask1to2(task):
+    """
+    Upgrader to the way deferred messages are stored so they appear in the "All"
+    view.
+
+    Previously, deferred messages were simply "frozen" and given a
+    DEFERRED_STATUS. Now they are no longer frozen, instead the INBOX_STATUS is
+    removed. Because each deferred message has exactly one L{_UndeferTask}, we
+    add an upgrader to L{_UndeferTask} in order to upgrade all deferred
+    messages.
+    """
+    schd = IScheduler(task.store)
+    schd.unscheduleAll(task)
+    self = task.upgradeVersion(_UndeferTask.typeName, 1, 2,
+                               message=task.message,
+                               deferredUntil=task.deferredUntil)
+    self.message.unfreezeStatus()
+    self.message.removeStatus(INBOX_STATUS)
+registerUpgrader(_undeferTask1to2, _UndeferTask.typeName, 1, 2)
 
 
 

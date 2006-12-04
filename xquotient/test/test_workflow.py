@@ -1043,20 +1043,29 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIf(self.message.shouldBeClassified)
 
 
-    def test_deferral(self):
+    def _deferMessage(self):
         """
-        Verify that a message which is deferred generates a callback which,
-        when called, moves it back out of the deferred status.
+        Defer C{self.message}. Used in L{test_deferral} and friends.
+
+        @return: A set of statuses that C{self.message} has after the deferral.
         """
         self.message.classifyClean()
         self.message.markRead()
         now = Time()
         self.message.deferFor(timedelta(days=1), timeFactory=lambda : now)
-        stats = set(self.message.iterStatuses())
+        return set(self.message.iterStatuses())
+
+
+    def test_deferral(self):
+        """
+        Verify that a message which is deferred generates a callback which,
+        when called, moves it back out of the deferred status.
+        """
+        stats = self._deferMessage()
 
         self.failIfIn(INCOMING_STATUS, stats)
         self.failIfIn(INBOX_STATUS, stats)
-        self.failIfIn(CLEAN_STATUS, stats)
+        self.failUnlessIn(CLEAN_STATUS, stats)
         self.failUnlessIn(DEFERRED_STATUS, stats)
         self.failUnlessIn(EVER_DEFERRED_STATUS, stats)
 
@@ -1075,26 +1084,23 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessEqual(self.store.query(_UndeferTask).count(), 0)
 
 
+    def test_deferredAppearsInAll(self):
+        """
+        Verify that a message which is deferred still appears in the 'all' view.
+        """
+        sq = MailboxSelector(self.store)
+        sq.refineByStatus(CLEAN_STATUS)
+        self._deferMessage()
+        self.assertEquals([self.message], list(sq))
+
+
     def test_undeferral(self):
         """
         Verify that a message which is deferred and then manually undeferred is
-        in the same state as one which is undeferred manually.
+        in the same state as one which is undeferred automatically.
         """
+        stats = self._deferMessage()
 
-        self.message.classifyClean()
-        self.message.markRead()
-        now = Time()
-        self.message.deferFor(timedelta(days=1), timeFactory=lambda : now)
-        stats = set(self.message.iterStatuses())
-
-        self.failIfIn(INCOMING_STATUS, stats)
-        self.failIfIn(INBOX_STATUS, stats)
-        self.failIfIn(CLEAN_STATUS, stats)
-        self.failUnlessIn(DEFERRED_STATUS, stats)
-        self.failUnlessIn(EVER_DEFERRED_STATUS, stats)
-
-        self.failUnlessEqual(len(self.scheduled), 1)
-        # self.tick()
         self.message.undefer()
 
         stats = set(self.message.iterStatuses())
