@@ -988,6 +988,17 @@ class Message(item.Item):
         self._prefs = None
 
 
+    def deleteFromStore(self):
+        """
+        Delete this message from the fulltext index, if there is one, as well
+        as deleting it from the database.
+        """
+        # XXX This is a hack because real deletion notification is hard.
+        for indexer in self.store.powerupsFor(ixmantissa.IFulltextIndexer):
+            indexer.remove(self)
+        super(Message, self).deleteFromStore()
+
+
     def walkMessage(self, prefer=None):
         if self.impl is None:
             return []

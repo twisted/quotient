@@ -1,9 +1,13 @@
+
+from zope.interface import implements
+
 from twisted.application.service import IService
 from twisted.trial.unittest import TestCase, SkipTest
 
 from axiom.store import Store
+from axiom.item import Item
+from axiom.attributes import reference, inmemory
 
-from nevow.flat import flatten
 from nevow.testutil import renderLivePage
 
 from xmantissa.plugins.mailoff import indexingBenefactorFactory
@@ -130,3 +134,62 @@ class ViewTestCase(TestCase, MIMEReceiverMixin):
         s = self.indexer.store
         deferred = ixmantissa.ISearchAggregator(s).search(u'hi', {}, None, None)
         return deferred.addCallback(gotSearchResult)
+
+
+
+class DummyIndexer(Item):
+    """
+    Stub L{ixmantissa,IFulltextIndexer} provider used to test that
+    L{ixmantissa.IFulltextIndexer}s receive the appropriate notification if
+    various events.
+    """
+    implements(ixmantissa.IFulltextIndexer)
+
+    removed = inmemory()
+    installedOn = reference()
+
+    def activate(self):
+        self.removed = []
+
+
+    def remove(self, item):
+        self.removed.append(item)
+
+
+
+class DeletionTestCase(TestCase):
+    """
+    Tests for the interaction between message deletion and the indexer.
+    """
+    def setUp(self):
+        """
+        Create a Store with a Message in it.
+        """
+        self.store = Store()
+        self.message = Message(store=self.store)
+
+
+    def test_deletionNotification(self):
+        """
+        Test that when a Message is deleted, all L{ixmantissa.IFulltextIndexer}
+        powerups on that message's store are notified of the event.
+        """
+        indexers = []
+        for i in range(2):
+            indexers.append(DummyIndexer(store=self.store))
+            self.store.powerUp(indexers[-1], ixmantissa.IFulltextIndexer)
+            self.assertEqual(indexers[-1].removed, [])
+
+        self.message.deleteFromStore()
+
+        for i in range(2):
+            self.assertEqual(indexers[i].removed, [self.message])
+
+
+    def test_deletionWithoutIndexers(self):
+        """
+        Test that deletion of a message can succeed even if there are no
+        L{ixmantissa.IFulltextIndexer} powerups on the message's store.
+        """
+        self.message.deleteFromStore()
+        self.assertEqual(list(self.store.query(Message)), [])

@@ -125,6 +125,7 @@ class IndexingBenefactor(Item):
     def endow(self, ticket, avatar):
         messageSource = avatar.findUnique(mail.MessageSource)
         indexer = avatar.findOrCreate(INDEXER_TYPE)
+        indexer.installOn(avatar)
         indexer.addSource(messageSource)
         searcher = MessageSearchProvider(store=avatar, indexer=indexer)
         searcher.installOn(avatar)
