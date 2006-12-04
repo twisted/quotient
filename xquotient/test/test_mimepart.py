@@ -330,6 +330,39 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, PersistenceMixin)
         self.assertEquals(fi.documentType(), msg.message.typeName)
 
 
+    def test_unknownMultipartTypeAsMixed(self):
+        """
+        Test that unknown multipart mime types are rendered with 'multipart/mixed'
+        content types (with their original content).
+
+          Any "multipart" subtypes that an implementation does not recognize
+          must be treated as being of subtype "mixed".
+
+        RFC 2046, Section 5.1.3
+        """
+        content = PartMaker('multipart/appledouble', 'appledouble',
+                            PartMaker('text/applefile', 'applefile'),
+                            PartMaker('image/jpeg', 'jpeg')).make()
+        part = self.setUpMailStuff().feedStringNow(content)
+        walkedPart = part.walkMessage('image/jpeg').next()
+        self.assertEquals(walkedPart.type, 'multipart/mixed')
+        self.assertEquals(walkedPart.part, part)
+
+
+    def test_unknownTypeAsOctetStream(self):
+        """
+        Test that unknown non-multipart mime types are rendered as
+        'application/octet-stream'.
+
+        See RFC 2046, Section 4 for more details.
+        """
+        content = PartMaker('image/applefile', 'applefile').make()
+        part = self.setUpMailStuff().feedStringNow(content)
+        walkedPart = part.walkMessage(None).next()
+        self.assertEquals(walkedPart.type, 'application/octet-stream')
+        self.assertEquals(walkedPart.part, part)
+
+
     def testIndexability(self):
         """
         Test that the result is adaptable to IFulltextIndexable and the

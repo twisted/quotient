@@ -328,15 +328,22 @@ class Part(item.Item):
                                               disposition=disposition,
                                               filename=fname,
                                               part=part)
+
+
     def iterateUnhandled(self, prefer=None):
-        yield mimepart.Part(
-            self.message.storeID, self.partID,
-            'text/plain',
-            children=[
-                mimepart.FixedParagraph.fromString(
-                    "ERROR: UNRENDERABLE TYPE - %r" %
-                    self.getContentType())],
-            part=self)
+        """
+        If there is no handler for this part, render it either as multipart/mixed
+        (if it is multipart) or as application/octet-stream (if it is not).
+
+        See RFC 2046, Section 4 and Section 5.1.3 for more details.
+        """
+        if self.getContentType().startswith('multipart'):
+            contentType = 'multipart/mixed'
+        else:
+            contentType = 'application/octet-stream'
+        yield mimepart.Part(self.message.storeID, self.partID, contentType,
+                            part=self)
+
 
     def iterate_text_plain(self):
         content = self.getUnicodeBody()
