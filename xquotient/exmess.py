@@ -634,8 +634,7 @@ class Message(item.Item):
         """
         self = cls._createBasicMessage(store, impl, source)
 
-        # XXX something should fail without this:
-        # self.attachments = len(list(impl.walkAttachments()))
+        self.attachments = len(list(impl.walkAttachments()))
         self._extractRelatedAddresses()
         self.addStatus(INCOMING_STATUS)
         self.addStatus(UNREAD_STATUS)

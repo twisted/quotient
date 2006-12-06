@@ -39,6 +39,7 @@ from xquotient.exmess import SENDER_RELATION, RECIPIENT_RELATION
 from xquotient.exmess import _MessageStatus
 
 from xquotient.mimestorage import Part, Header
+from xquotient.mimepart import AttachmentPart
 
 
 class DummyMessageImplementationMixin:
@@ -1224,3 +1225,46 @@ class DeletionTest(_WorkflowMixin, TestCase):
             self.failUnlessEqual(ctrs[relatedClass], rqc)
 
     test_deleteMessageFromStore = transacted(test_deleteMessageFromStore)
+
+
+
+class AttachmentMessageImplementation(Item, DummyMessageImplementationMixin):
+    """
+    L{IMessageData} implementor that has some attachments
+    """
+
+    senderInfo = text(
+        doc="""
+        The sender as passed by the factory which created this implementation;
+        used to provide a sensible implementation of relatedAddresses.
+        """,
+        default=None, allowNone=True)
+
+    def walkAttachments(self, prefer=None):
+        yield AttachmentPart('', '', '')
+
+
+
+class AttributeTest(_WorkflowMixin, TestCase):
+    """
+    Test that various features of an L{IMessageData} are turned into
+    attributes on a L{xquotient.exmess.Message} at creation-time
+    """
+    def test_attachments(self):
+        """
+        Test that L{xquotient.exmess.Message.createMessage} bases the
+        C{attachments} attribute on the length iterable returned by
+        L{IMessageData.walkAttachments}
+        """
+        msgData = AttachmentMessageImplementation(store=self.store)
+        msg = Message.createIncoming(self.store, msgData, u'test')
+        self.assertEquals(msg.attachments, 1)
+
+    def test_noAttachments(self):
+        """
+        Test that L{xquotient.exmess.Message.createMessage} sets
+        C{attachments} to 0 if L{IMessageData.walkAttachments} returns an
+        empty sequence
+        """
+        msg = Message.createIncoming(self.store, self.messageData, u'test')
+        self.assertEquals(msg.attachments, 0)
