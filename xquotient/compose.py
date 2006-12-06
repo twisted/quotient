@@ -3,7 +3,7 @@ import datetime
 
 from email import (Parser as P, Generator as G, MIMEMultipart as MMP,
                    MIMEText as MT, MIMEMessage as MM, MIMEBase as MB,
-                   Header as MH, Charset as MC, Utils as EU)
+                   Header as MH, Charset as MC, Utils as EU, Encoders as EE)
 
 import StringIO as S
 
@@ -734,6 +734,10 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                 part.set_payload([P.Parser().parse(fileItem.body.open())])
             else:
                 part.set_payload(fileItem.body.getContent())
+                if majorType == 'text':
+                    EE.encode_quopri(part)
+                else:
+                    EE.encode_base64(part)
         part.add_header('content-disposition', 'attachment', filename=fileItem.name)
         return part
 

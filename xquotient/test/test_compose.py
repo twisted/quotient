@@ -1,3 +1,5 @@
+import quopri
+
 from twisted.trial import unittest
 from twisted.python.filepath import FilePath
 
@@ -362,7 +364,9 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                     u'the filename', u'text/plain', 'some text/plain')
         msg = self._createMessageWithFiles((fileItem,))
         (_, attachment) = msg.walkMessage()
-        self.assertEquals(attachment.part.getBody(), 'some text/plain\n')
+        self.assertEquals(
+            attachment.part.getBody(decode=True),
+            'some text/plain\n')
         self.assertEquals(attachment.type, 'text/plain')
         self._assertFilenameParamEquals(attachment.part, 'the filename')
 
@@ -406,6 +410,44 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         self.assertEquals(textPlain2.getBody(), 'text/plain #2\n')
 
 
+    def test_createMessageWithBinaryAttachment(self):
+        """
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
+        a binary attachment.  The attachment's part should be encoded as
+        base64, with the appropriate content-transfer-encoding header
+        """
+        fileItem = self.cabinet.createFileItem(
+                        u'some stuff', u'application/octet-stream',
+                        u'this is the body')
+        msg = self._createMessageWithFiles((fileItem,))
+        (binPart,) = msg.walkAttachments()
+        self.assertEquals(
+            binPart.part.getHeader(u'content-transfer-encoding'),
+            'base64')
+        self.assertEquals(
+            binPart.part.getBody(),
+            'this is the body'.encode('base64'))
+
+
+    def test_createMessageWithTextAttachment(self):
+        """
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
+        a text attachment.  The attachment's part should be encoded as
+        quoted-printable, with the appropriate content-transfer-encoding
+        header
+        """
+        fileItem = self.cabinet.createFileItem(
+                        u'some stuff', u'text/plain',
+                        u'this is the body\t')
+        msg = self._createMessageWithFiles((fileItem,))
+        (textPart,) = msg.walkAttachments()
+        self.assertEquals(
+            textPart.part.getHeader(u'content-transfer-encoding'),
+            'quoted-printable')
+        self.assertEquals(
+            textPart.part.getBody(),
+            quopri.encodestring(
+                'this is the body\t', quotetabs=True) + '\n')
 
 
     def test_createMessageNotIncoming(self):
