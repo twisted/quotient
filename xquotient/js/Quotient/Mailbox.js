@@ -1866,11 +1866,12 @@ Quotient.Mailbox.Controller.methods(
          * view other than that, this action should make the message
          * disappear.
          */
-        return self.touch("archive", self.scrollWidget.viewSelection["view"] != "all");
+        return self.touch("archive", self.scrollWidget.viewSelection["view"] != "archive");
     },
 
     function unarchive(self, n) {
-        return self.touch("unarchive", self.scrollWidget.viewSelection["view"] == "all");
+        var view = self.scrollWidget.viewSelection['view'];
+        return self.touch("unarchive", view == 'archive');
     },
 
     function trash(self, n) {

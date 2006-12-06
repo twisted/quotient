@@ -1836,6 +1836,87 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+
+    /**
+     * Test that a message disappears when it is unarchived from the archive
+     * view.
+     */
+    function test_unarchiveRemovesFromArchive(self) {
+        var d = self.setUp();
+        var model, rowIdentifier;
+        d.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView('archive');
+            });
+        d.addCallback(
+            function(ignored) {
+                rowIdentifier = model.getRowData(0).__id__;
+                return self.controllerWidget.unarchive(null);
+            });
+        d.addCallback(
+            function(ignored) {
+                self.assertThrows(Mantissa.ScrollTable.NoSuchWebID,
+                                  function () {
+                                      model.findIndex(rowIdentifier);
+                                  });
+            });
+        return d;
+    },
+
+
+    /**
+     * Test that a message in "All" view remains in "All" when it is
+     * unarchived.
+     */
+    function test_unarchiveKeepsInAll(self) {
+        var d = self.setUp();
+        var model, rowIdentifier;
+        d.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                rowIdentifier = model.getRowData(0).__id__;
+                return self.controllerWidget.unarchive(null);
+            });
+        d.addCallback(
+            function(ignored) {
+                self.assertEqual(rowIdentifier, model.getRowData(0).__id__);
+            });
+        return d;
+    },
+
+
+    /**
+     * Test that archiving a message from the Archive view does not change
+     * the display.
+     */
+    function test_archiveFromArchiveIdempotent(self) {
+        var d = self.setUp();
+        var model, rowIdentifier;
+        d.addCallback(
+            function(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView('archive');
+            });
+        d.addCallback(
+            function(ignored) {
+                rowIdentifier = model.getRowData(0).__id__;
+                return self.controllerWidget.archive(null);
+            });
+        d.addCallback(
+            function(ignored) {
+                // check that the "archived" row is unchanged.
+                self.assertEqual(rowIdentifier,
+                                 model.getRowData(0).__id__);
+            });
+        return d;
+    },
+
+
     /**
      * Test that the (undisplayed) Message.sender column is passed to the
      * scrolltable model
