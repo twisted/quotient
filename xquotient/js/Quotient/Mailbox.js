@@ -1860,26 +1860,100 @@ Quotient.Mailbox.Controller.methods(
         self.decrementMailViewCount(addTo, -affectedUnreadCount);
     },
 
+    /**
+     * Disable the currently enabled action buttons (e.g. reply, archive,
+     * etc.) until C{deferred} fires.
+     *
+     * @type deferred: C{Divmod.Defer.Deferred}
+     * @return: C{deferred}
+     */
+    function disableActionButtonsUntilFires(self, deferred) {
+        var view = self.scrollWidget.viewSelection.view,
+            actions = self.actions[view],
+            buttons;
+
+        for(var actionName in actions) {
+            buttons = Nevow.Athena.NodesByAttribute(
+                actions[actionName].button, "class", "button");
+            if(buttons.length == 1) {
+                Quotient.Common.ButtonToggler(
+                    buttons[0]).disableUntilFires(deferred);
+            }
+        }
+        return deferred;
+    },
+
+    /**
+     * Call L{archive} and don't return its result
+     *
+     * @return: false
+     */
+    function dom_archive(self, n) {
+        self.archive(n);
+        return false;
+    },
+
     function archive(self, n) {
         /*
          * Archived messages show up in the "all" view.  So, if we are in any
          * view other than that, this action should make the message
          * disappear.
          */
-        return self.touch("archive", self.scrollWidget.viewSelection["view"] != "archive");
+        return self.disableActionButtonsUntilFires(
+            self.touch(
+                "archive",
+                self.scrollWidget.viewSelection["view"] != "archive"));
+    },
+
+    /**
+     * Call L{unarchive} and don't return its result
+     *
+     * @return: false
+     */
+    function dom_unarchive(self, n) {
+        self.unarchive(n);
+        return false;
     },
 
     function unarchive(self, n) {
-        var view = self.scrollWidget.viewSelection['view'];
-        return self.touch("unarchive", view == 'archive');
+        return self.disableActionButtonsUntilFires(
+            self.touch(
+                "unarchive",
+                self.scrollWidget.viewSelection["view"] == "archive"));
+    },
+
+    /**
+     * Call L{trash} and don't return its result
+     *
+     * @return: false
+     */
+    function dom_trash(self, n) {
+        self.trash(n);
+        return false;
     },
 
     function trash(self, n) {
-        return self.touch("delete", self.scrollWidget.viewSelection["view"] != "trash");
+        return self.disableActionButtonsUntilFires(
+            self.touch(
+                "delete",
+                self.scrollWidget.viewSelection["view"] != "trash"));
+    },
+
+    /**
+     * Call L{untrash} and don't return its result
+     *
+     * @return: false
+     */
+    function dom_untrash(self, n) {
+        self.untrash(n);
+        return false;
     },
 
     function untrash(self, n) {
-        return self.touch("undelete", self.scrollWidget.viewSelection["view"] == "trash");
+        return self.disableActionButtonsUntilFires(
+            self.touch(
+                "undelete",
+                self.scrollWidget.viewSelection["view"] == "trash"));
     },
 
     function showDeferForm(self) {
@@ -1989,11 +2063,24 @@ Quotient.Mailbox.Controller.methods(
         }
         var result = self.callRemote(
             remoteMethodName, self.scrollWidget.getSelectedRow().__id__);
+
+        self.disableActionButtonsUntilFires(result);
+
         result.addCallback(
             function(composeInfo) {
                 return self.splatComposeWidget(composeInfo, reloadMessage);
             });
         return result;
+    },
+
+    /**
+     * Call L{replyTo} and don't return its result
+     *
+     * @return: false
+     */
+    function dom_replyTo(self) {
+        self.replyTo();
+        return false;
     },
 
     function replyTo(self, reloadMessage/*=undefined*/) {
@@ -2020,6 +2107,16 @@ Quotient.Mailbox.Controller.methods(
         return self._doComposeAction("redirectMessage", reloadMessage);
     },
 
+    /**
+     * Call L{forward} and don't return its result
+     *
+     * @return false
+     */
+    function dom_forward(self) {
+        self.forward();
+        return false;
+    },
+
     function forward(self, reloadMessage/*=undefined*/) {
         /*
          * See replyTo
@@ -2036,9 +2133,10 @@ Quotient.Mailbox.Controller.methods(
      * completed.
      */
     function _trainSpam(self) {
-        return self.touch(
-            "trainSpam",
-            (self.scrollWidget.viewSelection["view"] != "spam"));
+        return self.disableActionButtonsUntilFires(
+            self.touch(
+                "trainSpam",
+                (self.scrollWidget.viewSelection["view"] != "spam")));
     },
 
     /**

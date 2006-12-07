@@ -327,6 +327,49 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test L{Quotient.Mailbox.Controller.disableActionButtonsUntilFires}
+     */
+    function test_disableActionButtonsUntilFires(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(result) {
+                var buttons = [];
+                for(var k in self.controllerWidget.actions['inbox']) {
+                    /* special-case defer because it isn't really a button */
+                    if(k == 'defer') {
+                        continue;
+                    }
+                    buttons.push(
+                        Nevow.Athena.NodeByAttribute(
+                            self.controllerWidget.actions['inbox'][k].button,
+                            'class',
+                            'button'));
+
+                    self.assertEqual(
+                        buttons[buttons.length-1].style.opacity, '');
+                }
+
+                var d = Divmod.Defer.Deferred();
+                self.controllerWidget.disableActionButtonsUntilFires(d);
+
+                for(var i = 0; i < buttons.length; i++) {
+                    self.assertNotEqual(buttons[i].style.opacity, '');
+                    self.failUnless(parseFloat(buttons[i].style.opacity) < 1);
+                }
+
+                d.callback(buttons);
+                return d;
+            });
+        result.addCallback(
+            function(buttons) {
+                for(var i = 0; i < buttons.length; i++) {
+                    self.assertEqual(parseFloat(buttons[i].style.opacity), 1);
+                }
+            });
+        return result;
+    },
+
+    /**
      * Test that the L{getPeople} method returns an Array of objects describing
      * the people names visible.
      */

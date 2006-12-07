@@ -122,44 +122,52 @@
           "content" slot of an instance of the "button" template pattern -->
           <div class="message-actions" style="float: right">
             <span class="train-spam-button">
-              <nevow:invisible nevow:render="button" href="#">
-                <athena:handler event="onclick" handler="trainSpam" />
-                This Is Spam
+              <nevow:invisible nevow:render="button">
+                <a href="#">
+                  <athena:handler event="onclick" handler="trainSpam" />
+                  This Is Spam
+                </a>
               </nevow:invisible>
             </span>
             <span class="train-ham-button" style="display: none;">
-              <nevow:invisible nevow:render="button" href="#">
-                <athena:handler event="onclick" handler="trainHam" />
-                Not Spam
+              <nevow:invisible nevow:render="button">
+                <a href="#">
+                  <athena:handler event="onclick" handler="trainHam" />
+                  Not Spam
+                </a>
               </nevow:invisible>
             </span>
           </div>
           <span class="archive-button">
-            <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).archive(this); return false"
-              href="#">
-              archive
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_archive" />
+                archive
+              </a>
             </nevow:invisible>
           </span>
           <span class="unarchive-button">
-            <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).unarchive(this); return false"
-              href="#">
-              unarchive
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_unarchive" />
+                unarchive
+              </a>
             </nevow:invisible>
           </span>
           <span class="delete-button">
-            <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).trash(this); return false"
-              href="#">
-              delete
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_trash" />
+                delete
+              </a>
             </nevow:invisible>
           </span>
           <span class="undelete-button">
-            <nevow:invisible nevow:render="button"
-              onclick="Quotient.Mailbox.Controller.get(this).untrash(this); return false"
-              href="#">
-              undelete
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_untrash" />
+                undelete
+              </a>
             </nevow:invisible>
           </span>
           <span class="defer-button">
@@ -174,19 +182,19 @@
             </select>
           </span>
           <span class="forward-button">
-            <nevow:invisible
-               nevow:render="button"
-               onclick="Quotient.Mailbox.Controller.get(this).forward(this); return false"
-               href="#">
-              forward
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_forward" />
+                forward
+              </a>
             </nevow:invisible>
           </span>
           <span class="reply-button">
-            <nevow:invisible
-               nevow:render="button"
-               onclick="Quotient.Mailbox.Controller.get(this).replyTo(this); return false"
-               href="#">
-              reply
+            <nevow:invisible nevow:render="button">
+              <a href="#">
+                <athena:handler event="onclick" handler="dom_replyTo" />
+                reply
+              </a>
             </nevow:invisible>
           </span>
           <select class="more-actions">
@@ -271,9 +279,11 @@
                     </form>
                   </td>
                   <td style="padding-left: 2px">
-                    <nevow:invisible nevow:render="button" href="#">
-                      <athena:handler event="onclick" handler="changeBatchSelectionByNode" />
-                      select
+                    <nevow:invisible nevow:render="button">
+                      <a href="#">
+                        <athena:handler event="onclick" handler="changeBatchSelectionByNode" />
+                        select
+                      </a>
                     </nevow:invisible>
                   </td>
                 </tr>
