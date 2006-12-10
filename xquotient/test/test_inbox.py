@@ -24,8 +24,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               EVER_DEFERRED_STATUS, RECIPIENT_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
 
-from xquotient.inbox import (Inbox, InboxScreen, replaceControlChars, VIEWS,
-                             replyToAll, MailboxScrollingFragment)
+from xquotient.inbox import Inbox, InboxScreen, replaceControlChars, VIEWS, replyToAll
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose, mimeutil
 from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
@@ -77,13 +76,6 @@ def testMessageFactory(store, archived=False, spam=None, read=False,
     # of the body part, probably?
     if receivedWhen:
         m.receivedWhen = receivedWhen
-        # we're supplying our own received date, after message creation, but
-        # this won't be reflected in the statusDate of the statuses that were
-        # added to the message as a result of createIncoming, so we'll remove
-        # them all and re-add them
-        for s in m.iterStatuses():
-            m.removeStatus(s)
-            m.addStatus(s)
     if sentWhen:
         m.sentWhen = sentWhen
     if sender:
@@ -184,18 +176,13 @@ class InboxTestCase(TestCase):
         self.assertEquals(ibs.getUserTagNames(),
                           [u'tag1', u'taga', u'tagstart'])
 
-    def test_unreadMessageCount(self):
-        """
-        Check that the count returned by
-        L{xquotient.inbox.InboxScreen.getUnreadMessageCount} matches our
-        expectations for a variety of views
-        """
+    def testUnreadMessageCount(self):
         s = Store()
 
-        for i in xrange(6):
-            testMessageFactory(store=s, read=True, spam=False, receivedWhen=Time())
         for i in xrange(13):
             m = testMessageFactory(store=s, read=False, spam=False, receivedWhen=Time())
+        for i in xrange(6):
+            testMessageFactory(store=s, read=True, spam=False, receivedWhen=Time())
 
         PrivateApplication(store=s).installOn(s) # IWebTranslator
 
@@ -514,7 +501,6 @@ class ReadUnreadTestCase(TestCase):
                         receivedWhen=Time(),
                         subject=u''
                         ))
-        self.messages.reverse()
 
 
     def test_screenCreation(self):
@@ -709,45 +695,3 @@ class ComposeActionsTestCase(TestCase):
         self.assertEquals(
             sorted(fromAddrs[0]),
             ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])
-
-
-
-class ScrollingFragmentTestCase(TestCase):
-    """
-    Tests for L{xquotient.inbox.MailboxScrollingFragment}
-    """
-
-    def setUp(self):
-        """
-        Create a store, three messages and a scrolling fragment
-        """
-        self.store = Store()
-
-        def makeMessage(subject, receivedWhen):
-            testMessageFactory(
-                store=self.store,
-                read=False,
-                spam=False,
-                subject=subject,
-                receivedWhen=receivedWhen)
-
-        makeMessage(u'3', Time.fromPOSIXTimestamp(67))
-        makeMessage(u'1', Time.fromPOSIXTimestamp(43))
-        makeMessage(u'2', Time.fromPOSIXTimestamp(55))
-
-        self.scrollingFragment = MailboxScrollingFragment(self.store)
-
-
-    def test_sortAscending(self):
-        """
-        Test that the default sort of
-        L{xquotient.inbox.MailboxScrollingFragment} is ascending on the
-        C{receivedWhen} column
-        """
-        subjects = list(m.subject for m in
-            self.scrollingFragment.performQuery(0, 3))
-
-        self.assertEquals(
-            subjects,
-            list(self.store.query(
-                Message, sort=Message.receivedWhen.asc).getColumn('subject')))

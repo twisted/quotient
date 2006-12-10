@@ -113,7 +113,7 @@ def _viewSelectionToMailboxSelector(store, viewSelection):
 
     sq = MailboxSelector(store)
     sq.setLimit(None)
-    sq.setOldestFirst()
+    sq.setNewestFirst()
     if view == u'all':
         view = CLEAN_STATUS
 
