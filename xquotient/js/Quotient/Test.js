@@ -327,6 +327,48 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test that the right-padding of the mailbox widget is equal to the
+     * width of the mantissa search box
+     */
+    function test_searchBox(self) {
+        var searchBox = document.createElement("div");
+        searchBox.style.width = "200px";
+        var searchButton = document.createElement("div");
+        searchButton.id = "search-button";
+        searchBox.appendChild(searchButton);
+        document.body.appendChild(searchBox);
+
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var ctc = self.controllerWidget.firstNodeByAttribute(
+                    "class", "content-table-container");
+                self.assertEqual(ctc.style.paddingRight, "200px");
+            });
+        result.addBoth(
+            function(passthrough) {
+                document.body.removeChild(searchBox);
+                return passthrough;
+            });
+        return result;
+    },
+
+    /**
+     * Test that there is no right-padding on the mailbox widget if there is
+     * no search box
+     */
+    function test_noSearchBox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var ctc = self.controllerWidget.firstNodeByAttribute(
+                    "class", "content-table-container");
+                self.assertEqual(ctc.style.paddingRight, "");
+            });
+        return result;
+    },
+
+    /**
      * Test L{Quotient.Mailbox.Controller.disableActionButtonsUntilFires}
      */
     function test_disableActionButtonsUntilFires(self) {
