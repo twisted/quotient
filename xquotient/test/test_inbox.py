@@ -24,8 +24,8 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               EVER_DEFERRED_STATUS, RECIPIENT_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
 
-from xquotient.inbox import (Inbox, InboxScreen, replaceControlChars, VIEWS,
-                             replyToAll, MailboxScrollingFragment)
+from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
+                             MailboxScrollingFragment)
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose, mimeutil
 from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
@@ -149,12 +149,6 @@ class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
 
 
 class InboxTestCase(TestCase):
-    def testControlChars(self):
-        s = ''.join(map(chr, range(1, 32))) + 'foobar'
-        # ord('\t') < ord('\n') < ord('\r')
-        self.assertEquals(replaceControlChars(s), '\t\n\rfoobar')
-
-
     def testAdaption(self):
         """
         Test that an Inbox can be adapted to INavigableFragment so that it can
