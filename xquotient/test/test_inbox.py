@@ -694,6 +694,21 @@ class ComposeActionsTestCase(TestCase):
             ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])
 
 
+    def test_replyToAllFromAddress(self):
+        """
+        Test that L{xquotient.inbox.replyToAll} doesn't include addresses of
+        L{xquotient.compose.FromAddress} items that exist in the same store as
+        the message that is being replied to
+        """
+        addrs = set(u'blind-copy@host copy@host recipient@host sender@host'.split())
+        for addr in addrs:
+            fromAddr = compose.FromAddress(address=addr, store=self.msg.store)
+            self.assertEquals(
+                sorted(e.email for e in replyToAll(self.msg)),
+                sorted(addrs - set([addr])))
+            fromAddr.deleteFromStore()
+
+
     def testReplyAllToMessage(self):
         """
         Test L{xquotient.inbox.replyAllToMessage}

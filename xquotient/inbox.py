@@ -89,7 +89,10 @@ def replyToAll(m):
     @type m: L{xquotient.exmess.Message}
     @rtype: sequene of L{xquotient.mimeutil.EmailAddress}
     """
-    return set(addr for (rel, addr) in m.impl.relatedAddresses())
+    fromAddrs = list(m.store.query(compose.FromAddress))
+    fromAddrs = set(a.address for a in fromAddrs)
+    return set(addr for (rel, addr) in m.impl.relatedAddresses()
+        if addr.email not in fromAddrs)
 
 def _viewSelectionToMailboxSelector(store, viewSelection):
     """
