@@ -1,6 +1,6 @@
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import maybeDeferred, gatherResults, Deferred, AlreadyCalledError
+from twisted.internet.defer import maybeDeferred, gatherResults
 from twisted.python.failure import Failure
 from twisted.internet.error import ConnectionDone
 from twisted.cred.portal import IRealm, Portal
@@ -9,24 +9,21 @@ from twisted.test.proto_helpers import StringTransport
 
 from axiom.store import Store
 from axiom.userbase import LoginSystem
-from axiom.test.util import getPristineStore, QueryCounter
+from axiom.test.util import getPristineStore
 
 from xquotient.mail import DeliveryAgent
-from xquotient.popout import POP3Up, POP3ServerFactory, _ndchain, MessageInfo
+from xquotient.popout import POP3Up, POP3ServerFactory
 
 def createStore(testCase):
     location = testCase.mktemp()
     s = Store(location)
     da = DeliveryAgent(store=s)
     da.installOn(s)
-    makeSomeMessages(testCase, da, location)
-    POP3Up(store=s).installOn(s)
-    return s
-
-def makeSomeMessages(testCase, da, location):
     for msgText in testCase.messageTexts:
         receiver = da.createMIMEReceiver(u'test://' + location)
         receiver.feedStringNow(msgText)
+    POP3Up(store=s).installOn(s)
+    return s
 
 
 class MailboxTestCase(TestCase):
@@ -46,60 +43,11 @@ class MailboxTestCase(TestCase):
         "o/` Someplace so high above the wall o/`\n",
         "o/` I see my light come shining, from the west down to the east o/`\n",
         "o/` Any day now, any day now, I shall be released o/`\n",
-
-        'Third-Message: This One\n'
-        '\n'
-        'Okay\n',
         ]
 
     def setUp(self):
         self.store = getPristineStore(self, createStore)
         self.mailbox = self.store.findUnique(POP3Up)
-
-
-    def test_cooperativeLogin(self):
-        """
-        Verify that the mailbox will be loaded without hanging the server for
-        an inordinate period of time.
-        """
-        qc = QueryCounter(self.store)
-        n = []
-        def m():
-            n.append(self.mailbox._realize())
-        self.assertEquals(qc.measure(m), 0)
-        [actual] = n; n[:] = []
-        actual.coiterate = lambda x: n.append(x) or Deferred()
-        actual.pagesize = 1
-        da = self.store.findUnique(DeliveryAgent)
-        location = u'extra'
-
-        # this next line initializes the table for pop3, which accounts to a
-        # fairly steep startup cost.  TODO: optimize axiom so this isn't as
-        # steep.
-        self.store.query(MessageInfo).deleteFromStore()
-
-        self.assertEquals(qc.measure(actual.kickoff), 0)
-        [tickit] = n; n[:] = []
-        bootstrapBaseline = qc.measure(tickit.next)
-        baseline = qc.measure(tickit.next)
-        for x in range(2):
-            self.store.query(MessageInfo).deleteFromStore()
-            # Eliminate all the previously-created message information
-            self.assertEquals(qc.measure(actual.kickoff), 0)
-            # actual.kickoff()
-            [tickit] = n; n[:] = []
-            self.assertEquals(qc.measure(tickit.next), bootstrapBaseline)
-            self.store.transact(makeSomeMessages, self, da, location)
-            self.assertEquals(qc.measure(tickit.next), baseline)
-            # exhaust it so we can start again
-            while True:
-                try:
-                    # "<=" because the _last_ iteration will be 1 less than all
-                    # the previous, due to the successful comparison/exit
-                    # instruction
-                    self.failUnless(qc.measure(tickit.next) <= baseline)
-                except StopIteration:
-                    break
 
 
     def test_listMessagesAggregate(self):
@@ -315,50 +263,3 @@ class ProtocolTestCase(TestCase):
             written,
             '-ERR Username without domain name (ie "yourname" instead of '
             '"yourname@yourdomain") not allowed; try with a domain name.\r\n')
-
-
-
-
-class UtilityTestCase(TestCase):
-    """
-    Test utility functionality which is currently specific to the POP3 module.
-    """
-
-    def test_nonDestructiveDeferredCallback(self):
-        """
-        Verify the use of non-destructive deferred chaining: a chained deferred is
-        created with a callback that returns nothing - verify that a second
-        callback on the original deferred receives the original value.
-        """
-        x = Deferred()
-        chained = []
-        notchained = []
-        def ccb(val):
-            chained.append(val)
-            return 3
-        ndc =_ndchain(x).addCallback(ccb)
-        def ucb(val):
-            notchained.append(val)
-            return 4
-        x.addCallback(ucb)
-        x.callback(2)
-        self.assertEquals(notchained, [2])
-        self.assertEquals(chained, [2])
-        self.assertEquals(ndc.result, 3)
-        self.assertEquals(x.result, 4)
-
-
-    def test_nonDestructiveDeferredAbuse(self):
-        """
-        Verify that the non-destructive deferred will not break its callback,
-        even if its result is (incorrectly) called back externally.
-        """
-        x = Deferred()
-        boom = _ndchain(x)
-        boom.callback(1)
-        l = []
-        x.addCallback(lambda n : (l.append(n) or 9))
-        x.callback(7)
-        self.assertEquals(l, [7])
-        self.assertEquals(x.result, 9)
-        self.assertEquals(len(self.flushLoggedErrors(AlreadyCalledError)), 1)

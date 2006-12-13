@@ -1,4 +1,3 @@
-# -*- test-case-name: xquotient.test.test_popout -*-
 
 import os
 
@@ -6,15 +5,10 @@ from OpenSSL import SSL
 
 from zope.interface import implements
 
-from twisted.python import log
-
 from twisted.application import service
 from twisted.internet import defer, reactor, protocol
 from twisted.protocols import policies
 from twisted.cred import portal, checkers
-from twisted.mail import pop3
-
-from epsilon.cooperator import iterateInReactor as coiterate
 
 from xmantissa.stats import BandwidthMeasuringFactory
 
@@ -24,6 +18,8 @@ from epsilon import sslverify
 
 from axiom import item, attributes
 from axiom.errors import MissingDomainPart
+
+from twisted.mail import pop3
 
 # XXX Ugh.  This whole file is basically a straight copy of mail.py, and it
 # SUCKS.  I am not going to think too hard about it now (SHIP! SHIP! SHIP!)
@@ -44,80 +40,71 @@ class MessageInfo(item.Item):
     message = attributes.reference()
 
 
-class _ActualMailbox:
-    """
-    This is an in-memory implementation of all the transient state associated
-    with a user's authenticated POP3 session.
-    """
+class POP3Up(item.Item, item.InstallableMixin):
 
-    listingDeferred = None
-    pagesize = 1
+    typeName = 'quotient_pop3_user_powerup'
 
-    def __init__(self, store):
-        """
-        Create a mailbox implementation from an L{axiom.store.Store}.
+    implements(pop3.IMailbox)
 
-        @type store: L{axiom.store.Store}
+    messageList = attributes.inmemory()
+    deletions = attributes.inmemory()
 
-        @param store: a user store containing L{Message} and possibly also
-        L{MessageInfo} objects.
-        """
-        self.store = store
-        self.undeleteMessages()
+    installedOn = attributes.reference()
+
+    def activate(self):
         self.messageList = None
-        self.messageListInProgress = None
-        self.coiterate = coiterate
+        self.deletions = set()
 
 
-    def whenReady(self):
-        """
-        Return a deferred which will fire when the mailbox is ready, or a
-        deferred which has already fired if the mailbox is already ready.
-        """
-        if self.listingDeferred is None:
-            self.listingDeferred = self.kickoff()
-        return _ndchain(self.listingDeferred)
+    def installOn(self, other):
+        super(POP3Up, self).installOn(other)
+        other.powerUp(self, pop3.IMailbox)
 
 
-    def kickoff(self):
-        """
-        Begin loading all POP-accessible messages into an in-memory list.
+    def getMessageList(self):
+        # XXX could be made more incremental by screwing with login, making it
+        # return a deferred
+        if self.messageList is None:
+            # load it
+            oldMessages = list(self.store.query(
+                Message,
+                attributes.AND(Message.storeID == MessageInfo.message,
+                               MessageInfo.localPop3Deleted == False),
+                sort=Message.storeID.asc))
+            newMessages = list(self.store.query(
+                Message,
+                Message.storeID.notOneOf(
+                        self.store.query(MessageInfo).getColumn('message',
+                                                                raw=True)),
+                sort=Message.storeID.asc))
+            for message in newMessages:
+                MessageInfo(store=self.store,
+                            localPop3Deleted=False,
+                            localPop3UID=os.urandom(16).encode('hex'),
+                            message=message)
+            self.messageList = list(self.store.query(
+                    MessageInfo,
+                    MessageInfo.localPop3Deleted == False))
+        return self.messageList
+    getMessageList = item.transacted(getMessageList)
 
-        @return: a Deferred which will fire with a list of L{MessageInfo}
-        instances when complete.
-        """
-        self.messageListInProgress = True
-        def _(ignored):
-            self.messageListInProgress = False
-            return self.messageList
-        return self.coiterate(self._buildMessageList()).addCallback(_)
+
+    def listMessages(self, index=None):
+        if index is None:
+            return [self.messageSize(idx) for idx in
+                    xrange(len(self.getMessageList()))]
+        else:
+            return self.messageSize(index)
 
 
-    def _buildMessageList(self):
-        """
-        @return: a generator, designed to be run to completion in coiterate(),
-        which will alternately yield None and L{MessageInfo} instances as it
-        loads them from the database.
-        """
-        infoList = []
-        for message in self.store.query(Message
-                                        ).paginate(pagesize=self.pagesize):
-            # Find the POP information for this message.
-            messageInfos = list(self.store.query(MessageInfo,
-                                                 MessageInfo.message == message))
-            if len(messageInfos) == 0:
-                messageInfo = MessageInfo(store=self.store,
-                                          localPop3Deleted=False,
-                                          localPop3UID=os.urandom(16).encode('hex'),
-                                          message=message)
-            else:
-                messageInfo = messageInfos[0]
-            if messageInfo.localPop3Deleted:
-                yield None
-            else:
-                infoList.append(messageInfo)
-                yield messageInfo
-        self.messageList = infoList
+    def _getMessageImpl(self, index):
+        msgList = self.getMessageList()
+        try:
+            msg = msgList[index]
+        except IndexError:
+            raise ValueError(index)
+        else:
+            return msg
 
 
     def messageSize(self, index):
@@ -125,25 +112,6 @@ class _ActualMailbox:
             return 0
         i = self._getMessageImpl(index).message.impl
         return i.bodyOffset + (i.bodyLength or 0)
-
-
-
-    def listMessages(self, index=None):
-        if index is None:
-            return [self.messageSize(idx) for idx in
-                    xrange(len(self.messageList))]
-        else:
-            return self.messageSize(index)
-
-
-    def _getMessageImpl(self, index):
-        msgList = self.messageList
-        try:
-            msg = msgList[index]
-        except IndexError:
-            raise ValueError(index)
-        else:
-            return msg
 
 
     def deleteMessage(self, index):
@@ -166,109 +134,16 @@ class _ActualMailbox:
 
 
     def sync(self):
-        ml = self.messageList
+        ml = self.getMessageList()
         for delidx in self.deletions:
             ml[delidx].localPop3Deleted = True
         self.messageList = None
         self.deletions = set()
-        self.listingDeferred = None
-        return self.whenReady()
+        self.getMessageList()
 
 
     def undeleteMessages(self):
         self.deletions = set()
-
-
-def _ndchain(d1):
-    """
-    Create a deferred based on another deferred's results, without altering the
-    value which will be passed to callbacks of the input deferred.
-
-    @param d1: a L{Deferred} which will fire in the future.
-
-    @return: a L{Deferred} which will fire at the same time as the given input,
-    with the same value.
-    """
-    # XXX this is what Twisted's chainDeferred _should_ have done in the first
-    # place.
-    d2 = defer.Deferred()
-    def cb(value):
-        try:
-            d2.callback(value)
-        except:
-            log.err()
-        return value
-    d1.addBoth(cb)
-    return d2
-
-
-class POP3Up(item.Item, item.InstallableMixin):
-    """
-    This is a powerup which provides POP3 mailbox functionality to a user.
-
-    The actual work of implementing L{IMailbox} is done in a separate,
-    transient in-memory class.
-    """
-
-    typeName = 'quotient_pop3_user_powerup'
-
-    implements(pop3.IMailbox)
-
-    actualMailbox = attributes.inmemory()
-
-    installedOn = attributes.reference()
-
-
-    def installOn(self, other):
-        super(POP3Up, self).installOn(other)
-        other.powerUp(self, pop3.IMailbox)
-
-
-    def _realize(self):
-        """
-        Generate the object which will implement this user's mailbox.
-
-        @return: an L{_ActualMailbox} instance.
-        """
-        r = _ActualMailbox(self.store)
-        self.actualMailbox = r
-        return r
-
-    def _deferOperation(self, methodName):
-        """
-        This generates methods which, when invoked, will tell my mailbox
-        implementation to load all of its messages if necessary and then
-        perform the requested operation.
-
-        @type methodName: L{str}
-
-        @param methodName: the name of the method being potentially deferred.
-        Should be in L{IMailbox}.
-
-        @return: a callable which returns a Deferred that fires with the
-        results of the given IMailbox method.
-        """
-        actualMailbox = getattr(self, 'actualMailbox', None)
-        if actualMailbox is None:
-            actualMailbox = self._realize()
-        actualMethod = getattr(actualMailbox, methodName)
-        def inner(*a, **k):
-            def innerinner(ignored):
-                return actualMethod(*a, **k)
-            return actualMailbox.whenReady().addCallback(innerinner)
-        return inner
-
-
-    def __getattr__(self, name):
-        """
-        Provides normal attribute access, except for methods from
-        L{pop3.IMailbox}, which are handled with L{_deferOperation}.
-
-        @param name: the name of the attribute being requested.
-        """
-        if name in pop3.IMailbox:
-            return self._deferOperation(name)
-        return super(POP3Up, self).__getattr__(self, name)
 
 
 
