@@ -13,8 +13,6 @@ from axiom.tags import Catalog
 from axiom.attributes import integer
 from axiom.item import Item
 
-from axiom.test.util import QueryCounter
-
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
@@ -30,7 +28,7 @@ from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment)
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose, mimeutil
-from xquotient.test.test_workflow import (DummyMessageImplementation,
+from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
                                           DummyMessageImplementationMixin)
 
 
