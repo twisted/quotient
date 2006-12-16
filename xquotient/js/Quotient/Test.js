@@ -327,6 +327,31 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Test viewing message source and getting back to the message body
+     */
+    function test_messageSource(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.messageSource();
+            });
+        result.addCallback(
+            function(ignored) {
+                /* should be a Quotient.Message.Source inside the mailbox */
+                var source = Nevow.Athena.Widget.get(
+                    self.controllerWidget.firstNodeByAttribute(
+                        "athena:class",
+                        "Quotient.Message.Source"));
+
+                source.cancel();
+
+                /* no more Quotient.Message.Source */
+                self.assertEqual(source.node.parentNode, null);
+            });
+        return result;
+    },
+
+    /**
      * Test that the right-padding of the mailbox widget is equal to the
      * width of the mantissa search box
      */

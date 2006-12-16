@@ -1,3 +1,5 @@
+from twisted.python.filepath import FilePath
+
 from datetime import datetime, timedelta
 import time
 
@@ -19,6 +21,7 @@ from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
 
 from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
+from xquotient import equotient
 
 from xquotient.exmess import Message, MessageDetail
 from xquotient.exmess import _UndeferTask as UndeferTask
@@ -78,6 +81,7 @@ class _Part(Item):
     schemaVersion = 1
 
     junk = attributes.text()
+    source = property(lambda s: FilePath(__file__.rstrip('c')))
 
     def walkMessage(self, *z):
         return ()
@@ -85,6 +89,11 @@ class _Part(Item):
 
     def getHeader(self, *z):
         return u'hi!\N{WHITE SMILING FACE}<>'
+
+    def getParam(self, param, default=None, header=None, un_quote=None):
+        if default is not None:
+            return default
+        raise equotient.NoSuchHeader()
 
     def associateWithMessage(self, message):
         pass

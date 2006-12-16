@@ -22,7 +22,7 @@ from twisted.web.sux import ParseError
 
 from epsilon.extime import Time
 
-from nevow import rend, inevow, athena, static, loaders, tags
+from nevow import rend, inevow, athena, static, loaders, tags, page
 from nevow.athena import expose
 
 from axiom.tags import Catalog, Tag
@@ -34,6 +34,7 @@ from xmantissa import ixmantissa, people, webapp, liveform, webnav
 from xmantissa.prefs import PreferenceCollectionMixin
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
+from xmantissa.webtheme import ThemedElement
 
 from xquotient import gallery, equotient, scrubber, mimeutil
 from xquotient.actions import SenderPersonFragment
@@ -1557,6 +1558,38 @@ class ZippedAttachmentResource(rend.Page):
         """
         return static.File(self.message.zipAttachments(), 'application/zip')
 
+
+class MessageSourceFragment(ThemedElement):
+    """
+    Fragment responsible for rendering the unmodified source of an
+    L{xquotient.exmess.Message}
+    """
+    jsClass = u'Quotient.Message.Source'
+    fragmentName = 'message-source'
+
+    def __init__(self, message):
+        """
+        @type message: L{xquotient.exmess.Message}
+        """
+        self.message = message
+        ThemedElement.__init__(self)
+
+    def source(self, req, tag):
+        """
+        Get the source of C{self.message}
+
+        @rtype: C{unicode}
+        """
+        source = self.message.impl.source.getContent()
+        charset = self.message.impl.getParam('charset', default='utf-8')
+
+        try:
+            return unicode(source, charset, 'replace')
+        except LookupError:
+            return unicode(source, 'utf-8', 'replace')
+    page.renderer(source)
+
+
 class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     '''i represent the viewable facet of some kind of message'''
 
@@ -1830,13 +1863,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
 
     def getMessageSource(self):
-        source = self.original.impl.source.getContent()
-        charset = self.original.impl.getParam('charset', default='utf-8')
+        """
+        Get the source of our message.
 
-        try:
-            return unicode(source, charset, 'replace')
-        except LookupError:
-            return unicode(source, 'utf-8', 'replace')
+        @rtype: L{MessageSourceFragment}
+        """
+        f = MessageSourceFragment(self.original)
+        f.setFragmentParent(self)
+        return f
     expose(getMessageSource)
 
 
