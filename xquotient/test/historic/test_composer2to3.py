@@ -8,7 +8,9 @@ to the item
 from axiom.test.historic.stubloader import StubbedTest
 
 from axiom.userbase import LoginMethod
-from xquotient.compose import Composer, FromAddress
+from xquotient.compose import Composer
+from xquotient.smtpout import FromAddress
+
 
 class ComposerUpgradeTestCase(StubbedTest):
     def testUpgrade(self):

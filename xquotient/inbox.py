@@ -23,14 +23,15 @@ from xmantissa.scrolltable import Scrollable, ScrollableView
 from xquotient.exmess import Message, getMessageSources, MailboxSelector
 from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
-                              SENT_STATUS, SPAM_STATUS, TRASH_STATUS)
+                              OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
+                              SPAM_STATUS, TRASH_STATUS)
 from xquotient import mimepart, equotient, compose, renderers, mimeutil
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
 
 # Views that the user may select.
-VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, SENT_STATUS,
-         SPAM_STATUS, TRASH_STATUS]
+VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, OUTBOX_STATUS,
+         BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS, TRASH_STATUS]
 
 
 
@@ -81,7 +82,8 @@ def replyToAll(m):
     @type m: L{xquotient.exmess.Message}
     @rtype: sequene of L{xquotient.mimeutil.EmailAddress}
     """
-    fromAddrs = list(m.store.query(compose.FromAddress))
+    from xquotient import smtpout
+    fromAddrs = list(m.store.query(smtpout.FromAddress))
     fromAddrs = set(a.address for a in fromAddrs)
     return set(addr for (rel, addr) in m.impl.relatedAddresses()
         if addr.email not in fromAddrs)

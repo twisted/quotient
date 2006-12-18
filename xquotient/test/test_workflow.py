@@ -32,7 +32,8 @@ from xquotient.exmess import (
     Message, Correspondent, MailboxSelector, _UndeferTask, INBOX_STATUS,
     CLEAN_STATUS, SPAM_STATUS, INCOMING_STATUS, TRASH_STATUS, TRAINED_STATUS,
     UNREAD_STATUS, READ_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
-    EVER_DEFERRED_STATUS, DRAFT_STATUS, STICKY_STATUSES, SENT_STATUS)
+    EVER_DEFERRED_STATUS, DRAFT_STATUS, STICKY_STATUSES, SENT_STATUS,
+    OUTBOX_STATUS, BOUNCED_STATUS)
 
 from xquotient.exmess import SENDER_RELATION, RECIPIENT_RELATION
 
@@ -784,7 +785,7 @@ class DraftStatusChangeMethodTests(_WorkflowMixin, TestCase):
 
     def test_initialDraftState(self):
         """
-        Test that messages created as drafts have the SENT, UNREAD, and DRAFT
+        Test that messages created as drafts have the UNREAD, and DRAFT
         statuses and no others.
         """
         self.assertEqual(
@@ -795,12 +796,47 @@ class DraftStatusChangeMethodTests(_WorkflowMixin, TestCase):
     def test_startSendingDraft(self):
         """
         When the user starts sending a draft, it should lose its DRAFT status
-        and gain a SENT status.  Verify that is the case.
+        and gain an OUTBOX status.  Verify that is the case.
         """
         self.message.startedSending()
         self.assertEqual(
             set(self.message.iterStatuses()),
-            set([UNREAD_STATUS, SENT_STATUS]))
+            set([UNREAD_STATUS, OUTBOX_STATUS]))
+
+
+    def test_sent(self):
+        """
+        When a message has been successfully sent to one recipient, it should
+        gain a SENT status.  Verify that is the case.
+        """
+        self.message.startedSending()
+        self.message.sent()
+        self.assertEqual(set(self.message.iterStatuses()),
+                         set([UNREAD_STATUS, SENT_STATUS, OUTBOX_STATUS]))
+
+
+    def test_finishedSending(self):
+        """
+        When a message has been sent to all of its recipients, it should be
+        removed from the outbox. Verify that this is the case.
+        """
+        self.message.startedSending()
+        self.message.sent()
+        self.message.finishedSending()
+        self.assertEqual(set(self.message.iterStatuses()),
+                         set([UNREAD_STATUS, SENT_STATUS]))
+
+
+    def test_allBounced(self):
+        """
+        When a message has bounced for all of its recipients, or was unable to
+        be sent, then it should lose its OUTBOX status and gain a BOUNCED
+        status.  Verify that is the case
+        """
+        self.message.startedSending()
+        self.message.allBounced()
+        self.assertEqual(set(self.message.iterStatuses()),
+                         set([UNREAD_STATUS, BOUNCED_STATUS]))
 
 
 

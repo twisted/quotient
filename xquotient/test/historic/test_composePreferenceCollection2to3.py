@@ -6,7 +6,9 @@ the user's login credentials
 
 from axiom.test.historic.stubloader import StubbedTest
 
-from xquotient.compose import ComposePreferenceCollection, Composer, FromAddress
+from xquotient.compose import ComposePreferenceCollection, Composer
+from xquotient.smtpout import FromAddress
+
 
 class ComposePreferenceCollectionUpgradeTestCase(StubbedTest):
     def testUpgrade(self):

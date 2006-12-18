@@ -5,16 +5,16 @@ from nevow import tags, loaders
 from nevow.athena import expose
 
 from axiom.store import Store
-from axiom.userbase import LoginMethod
 
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Person, EmailAddress
 
-from xquotient import compose, mimeutil
+from xquotient import compose, mimeutil, smtpout
 from xquotient.inbox import Inbox
-from xquotient.exmess import Message
 from xquotient.test.test_inbox import testMessageFactory
+
+
 
 class _ComposeTestMixin:
     def _getComposeFragment(
@@ -25,7 +25,7 @@ class _ComposeTestMixin:
         PrivateApplication(store=s).installOn(s)
         Inbox(store=s).installOn(s)
 
-        compose.FromAddress(
+        smtpout.FromAddress(
             store=s,
             address=u'moe@divmod.com').setAsDefault()
 
@@ -149,42 +149,6 @@ class DraftsTestCase(testcase.TestCase):
         f.docFactory = getLoader(f.fragmentName)
         return f
 
-
-class FromAddressScrollTableTestCase(testcase.TestCase):
-    """
-    Tests for L{xquotient.compose.FromAddressScrollTable}
-    """
-
-    jsClass = u'Quotient.Test.FromAddressScrollTableTestCase'
-
-    def getFromAddressScrollTable(self):
-        s = Store()
-
-        PrivateApplication(store=s).installOn(s)
-        compose.Composer(store=s).installOn(s)
-
-        LoginMethod(store=s,
-                    internal=False,
-                    protocol=u'email',
-                    localpart=u'default',
-                    domain=u'host',
-                    verified=True,
-                    account=s)
-
-        # system address
-        compose.FromAddress(store=s).setAsDefault()
-
-        compose.FromAddress(
-            store=s,
-            address=u'notdefault@host',
-            smtpHost=u'host',
-            smtpUsername=u'notdefault')
-
-        f = compose.FromAddressScrollTable(s)
-        f.setFragmentParent(self)
-        f.docFactory = getLoader(f.fragmentName)
-        return f
-    expose(getFromAddressScrollTable)
 
 
 class ComposeAutoCompleteTestCase(testcase.TestCase):

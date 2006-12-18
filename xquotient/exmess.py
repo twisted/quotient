@@ -968,7 +968,38 @@ class Message(item.Item):
         @return: None
         """
         self.removeStatus(DRAFT_STATUS)
+        self.addStatus(OUTBOX_STATUS)
+
+
+    def finishedSending(self):
+        """
+        The message has been sent to all its recipients, and each of those
+        delivery attempts have either definitely succeeded or definitely
+        failed.
+
+        @return: None
+        """
+        self.removeStatus(OUTBOX_STATUS)
+
+
+    def sent(self):
+        """
+        The message has been successfully sent to a single recipient.
+
+        @return: None
+        """
         self.addStatus(SENT_STATUS)
+
+
+    def allBounced(self):
+        """
+        Sending this message failed.
+
+        @return: None
+        """
+        self.removeStatus(OUTBOX_STATUS)
+        self.addStatus(BOUNCED_STATUS)
+
 
     # end status manipulation methods
 
@@ -1365,8 +1396,10 @@ ARCHIVE_STATUS = u'archive'
 DEFERRED_STATUS = u'deferred'
 
 # Messages which have this status are on their way out of the mail system.
-# (XXX: nothing actually applies this status yet...)
 OUTBOX_STATUS = u'outbox'
+
+# Messages which have this status have been bounced by a remote mail server.
+BOUNCED_STATUS = u'bounce'
 
 # Messages which have this status are pending completion; they have been
 # composed, but not sent, by the local user.

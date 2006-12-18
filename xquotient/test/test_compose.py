@@ -9,11 +9,10 @@ from axiom import store
 from axiom import scheduler
 from axiom import item
 from axiom import attributes
-from axiom import userbase
 
 from xmantissa import webapp
 
-from xquotient import compose, mail, mimeutil, exmess, equotient
+from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
 
 
@@ -35,12 +34,12 @@ class CompositionTestMixin(object):
 
     def setUp(self, dbdir=None):
         self.reactor = Reactor()
-        self._originalSendmail = compose._esmtpSendmail
-        compose._esmtpSendmail = self._esmtpSendmail
+        self._originalSendmail = smtpout._esmtpSendmail
+        smtpout._esmtpSendmail = self._esmtpSendmail
 
         self.store = store.Store(dbdir=dbdir)
         scheduler.Scheduler(store=self.store).installOn(self.store)
-        self.defaultFromAddr = compose.FromAddress(
+        self.defaultFromAddr = smtpout.FromAddress(
                                 store=self.store,
                                 smtpHost=u'example.org',
                                 smtpUsername=u'radix',
@@ -57,7 +56,7 @@ class CompositionTestMixin(object):
         return self._originalSendmail(*args, **kwargs)
 
     def tearDown(self):
-        compose._esmtpSendmail = self._originalSendmail
+        smtpout._esmtpSendmail = self._originalSendmail
 
 
 
@@ -251,7 +250,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                 mimeEncoded=False)],
             u'')
         self.assertEquals(
-            list(self.store.query(compose._NeedsDelivery).getColumn('toAddress')),
+            list(self.store.query(
+                    smtpout.DeliveryToAddress).getColumn('toAddress')),
             ['to@example.com', 'bcc1@example.com', 'bcc2@example.com'])
 
     def _createMessage(self, cc=(), bcc=()):
@@ -490,7 +490,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         m = self.store.findUnique(exmess.Message)
         self.assertEquals(set(m.iterStatuses()),
                           set([exmess.UNREAD_STATUS, exmess.DRAFT_STATUS]))
-        self.assertEquals(list(self.store.query(compose._NeedsDelivery)),
+        self.assertEquals(list(self.store.query(smtpout.DeliveryToAddress)),
                           [])
 
 
@@ -514,132 +514,9 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             draft=False)
         m = self.store.findUnique(exmess.Message)
         self.assertEquals(set(m.iterStatuses()),
-                          set([exmess.UNREAD_STATUS, exmess.SENT_STATUS]))
-        nd = self.store.findUnique(compose._NeedsDelivery)
+                          set([exmess.UNREAD_STATUS, exmess.OUTBOX_STATUS]))
+        nd = self.store.findUnique(smtpout.DeliveryToAddress)
         self.assertIdentical(nd.message, m)
 
 
 
-class FromAddressConfigFragmentTest(unittest.TestCase):
-    """
-    Test L{compose.FromAddressConfigFragment}
-    """
-
-    def setUp(self):
-        self.store = store.Store()
-        cprefs = compose.ComposePreferenceCollection(store=self.store)
-        cprefs.installOn(self.store)
-        self.composer = compose.Composer(store=self.store)
-        self.frag = compose.FromAddressConfigFragment(cprefs)
-
-    def test_addAddress(self):
-        """
-        Test that L{compose.FromAddressConfigFragment.addAddress} creates
-        L{compose.FromAddress} items with the right attribute values
-        """
-        attrs = dict(address=u'foo@bar',
-                     smtpHost=u'bar',
-                     smtpUsername=u'foo',
-                     smtpPort=25,
-                     smtpPassword=u'secret')
-
-        self.frag.addAddress(default=False, **attrs)
-        item = self.store.findUnique(compose.FromAddress)
-        for (k, v) in attrs.iteritems():
-            self.assertEquals(getattr(item, k), v)
-        # make sure it didn't make it the default
-        self.assertEquals(
-                self.store.count(
-                    compose.FromAddress,
-                    compose.FromAddress._default == True),
-                0)
-        item.deleteFromStore()
-
-        self.frag.addAddress(default=True, **attrs)
-        item = self.store.findUnique(compose.FromAddress)
-        for (k, v) in attrs.iteritems():
-            self.assertEquals(getattr(item, k), v)
-        # make sure it did
-        self.assertEquals(compose.FromAddress.findDefault(self.store), item)
-
-class FromAddressExtractionTest(unittest.TestCase):
-    """
-    Test  L{compose._getFromAddressFromStore}
-    """
-
-    def testPolicy(self):
-        """
-        Test that only internal or verified L{userbase.LoginMethod}s with
-        protocol=email are considered candidates for from addresses
-        """
-        s = store.Store(self.mktemp())
-        ls = userbase.LoginSystem(store=s)
-        ls.installOn(s)
-
-        acc = ls.addAccount('username', 'dom.ain', 'password', protocol=u'not email')
-        ss = acc.avatars.open()
-
-        # not verified or internal, should explode
-        self.assertRaises(
-            RuntimeError, lambda: compose._getFromAddressFromStore(ss))
-
-        # ANY_PROTOCOL
-        acc.addLoginMethod(u'yeah', u'x.z', internal=True)
-
-        # should work
-        self.assertEquals(
-            'yeah@x.z',
-            compose._getFromAddressFromStore(ss))
-
-        ss.findUnique(
-            userbase.LoginMethod,
-            userbase.LoginMethod.localpart == u'yeah').deleteFromStore()
-
-        # external, verified
-        acc.addLoginMethod(u'yeah', u'z.a', internal=False, verified=True)
-
-        # should work
-        self.assertEquals(
-            'yeah@z.a',
-            compose._getFromAddressFromStore(ss))
-
-
-class FromAddressTestCase(unittest.TestCase):
-    """
-    Test L{compose.FromAddress}
-    """
-
-    def testDefault(self):
-        """
-        Test L{compose.FromAddress.setAsDefault} and
-        L{compose.FromAddress.findDefault}
-        """
-        s = store.Store()
-
-        addrs = dict((localpart, compose.FromAddress(
-                                    store=s, address=localpart + '@host'))
-                        for localpart in u'foo bar baz'.split())
-
-        qux = compose.FromAddress(store=s, address=u'qux@host')
-        qux.setAsDefault()
-
-        self.assertEquals(compose.FromAddress.findDefault(s).address, u'qux@host')
-
-        addrs['foo'].setAsDefault()
-
-        self.assertEquals(compose.FromAddress.findDefault(s).address, u'foo@host')
-
-    def testSystemAddress(self):
-        """
-        Test L{compose.FromAddress.findSystemAddress}
-        """
-        s = store.Store(self.mktemp())
-        ls = userbase.LoginSystem(store=s)
-        ls.installOn(s)
-
-        acc = ls.addAccount('foo', 'host', 'password', protocol=u'email')
-        ss = acc.avatars.open()
-
-        fa = compose.FromAddress(store=ss)
-        self.assertIdentical(compose.FromAddress.findSystemAddress(ss), fa)
-        self.assertEquals(fa.address, 'foo@host')

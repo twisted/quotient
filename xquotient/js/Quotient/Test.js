@@ -619,6 +619,42 @@ Quotient.Test.ControllerTestCase.methods(
 
 
     /**
+     * Test switching to the 'outbox' view.
+     */
+    function test_outboxView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('outbox');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+                self.assertEqual(rows.length, 0);
+            });
+        return result;
+    },
+
+
+    /**
+     * Test switching to the 'bounce' view.
+     */
+    function test_bounceView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('bounce');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+                self.assertEqual(rows.length, 0);
+            });
+        return result;
+    },
+
+
+    /**
      * Test switching to the 'all messages' view.
      */
     function test_allView(self) {
@@ -1210,6 +1246,21 @@ Quotient.Test.ControllerTestCase.methods(
             "deferred",
             ["forward", "reply"],
             []);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the outbox view.
+     */
+    function test_actionsForOutbox(self) {
+        return self._actionTest('outbox', [], []);
+    },
+
+    /**
+     * Like L{test_actionsForInbox}, but for the bounce view.
+     */
+    function test_actionsForBounce(self) {
+        return self._actionTest('bounce', ['delete', 'forward'],
+                                ['delete']);
     },
 
     /**

@@ -27,7 +27,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment)
 from xquotient.quotientapp import QuotientPreferenceCollection
-from xquotient import compose, mimeutil
+from xquotient import compose, mimeutil, smtpout
 from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
                                           DummyMessageImplementationMixin)
 
@@ -36,7 +36,7 @@ from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCount
 def testMessageFactory(store, archived=False, spam=None, read=False,
                        sentWhen=None, receivedWhen=None, subject=u'',
                        trash=False, outgoing=False, draft=False, impl=None,
-                       sender=None, recipient=u''):
+                       sent=True, bounced=False, sender=None, recipient=u''):
     """
     Provide a simulacrum of message's old constructor signature to avoid
     unnecessarily deep modification of tests.
@@ -52,8 +52,12 @@ def testMessageFactory(store, archived=False, spam=None, read=False,
         if not draft:
             # XXX: this is *actually* the status change that transpires when
             # you transition a message from "draft" to "sent" status.
-            m.removeStatus(DRAFT_STATUS)
-            m.addStatus(SENT_STATUS)
+            m.startedSending()
+            if sent:
+                m.sent()
+                m.finishedSending()
+            elif bounced:
+                m.allBounced()
         if spam is not None:
             assert spam is False, "That doesn't make any sense."
     else:
@@ -148,16 +152,36 @@ class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
 
 
 
-class InboxTestCase(TestCase):
-    def testAdaption(self):
+class InboxTest(TestCase):
+    def setUp(self):
+        self.store = Store()
+        self.translator = PrivateApplication(store=self.store)
+        self.translator.installOn(self.store)
+        self.inbox = Inbox(store=self.store)
+        self.inboxScreen = InboxScreen(self.inbox)
+        self.scheduler = Scheduler(store=self.store)
+        self.scheduler.installOn(self.store)
+        self.viewSelection = dict(self.inboxScreen.viewSelection)
+
+
+    def makeMessages(self, number, **flags):
+        messages = []
+        for i in xrange(number):
+            m = testMessageFactory(store=self.store, receivedWhen=Time(),
+                                   **flags)
+            messages.append(m)
+        return messages
+
+
+
+class InboxTestCase(InboxTest):
+    def test_adaption(self):
         """
         Test that an Inbox can be adapted to INavigableFragment so that it can
         be displayed on a webpage.
         """
-        s = Store()
-        PrivateApplication(store=s).installOn(s)
-        inbox = Inbox(store=s)
-        self.assertNotIdentical(INavigableFragment(inbox, None), None)
+        self.assertNotIdentical(INavigableFragment(self.inbox, None),
+                                None)
 
 
     def test_userTagNames(self):
@@ -165,85 +189,151 @@ class InboxTestCase(TestCase):
         Verify that tags created in the axiom tags system will show up to the
         inbox via getUserTagNames
         """
-        s = Store()
-        m = testMessageFactory(store=s)
-        c = Catalog(store=s)
+        m = testMessageFactory(store=self.store)
+        c = Catalog(store=self.store)
         c.tag(m, u'tag1')
         c.tag(m, u'taga')
         c.tag(m, u'tagstart')
 
-        PrivateApplication(store=s).installOn(s) # IWebTranslator
-        ib = Inbox(store=s)
-        ibs = InboxScreen(ib)
-        self.assertEquals(ibs.getUserTagNames(),
+        self.assertEquals(self.inboxScreen.getUserTagNames(),
                           [u'tag1', u'taga', u'tagstart'])
+
+
+    def test_defer(self):
+        """
+        Test that L{action_defer} moves a message to the DEFERRED status.
+        """
+        message = testMessageFactory(store=self.store, read=True)
+        self.inbox.action_defer(message, 365, 0, 0)
+        self.failUnless(message.hasStatus(DEFERRED_STATUS),
+                        'message was not deferred')
+
+
+    def test_undefer(self):
+        """
+        Test that the message is undeferred (has the DEFERRED status removed)
+        after the deferred time period elapses.
+        """
+        # XXX I don't think this test is a good idea.  there's no reason
+        # action_defer should return anything. -- glyph
+        message = testMessageFactory(store=self.store, read=True)
+        task = self.inbox.action_defer(message, 365, 0, 0)
+
+        self.scheduler.reschedule(task, task.deferredUntil, Time())
+        self.scheduler.tick()
+        self.failIf(message.hasStatus(DEFERRED_STATUS),
+                    'message is still deferred')
+        self.failIf(message.read, 'message is marked read')
+        self.failUnless(message.hasStatus(EVER_DEFERRED_STATUS),
+                        'message does not have "ever deferred" status')
+        self.assertEquals(self.store.count(UndeferTask), 0)
+
+
+    def test_deferCascadingDelete(self):
+        """
+        Check that the L{UndeferTask} for a deferred message is removed when
+        that message is deleted from the store.
+        """
+        message = testMessageFactory(store=self.store)
+        self.inbox.action_defer(message, 365, 0, 0)
+        message.deleteFromStore()
+        self.assertEquals(self.store.count(UndeferTask), 0)
+
+
+    def test_getComposer(self):
+        """
+        Test L{xquotient.inbox.InboxScreen.getComposer}
+        """
+        compose.Composer(store=self.store).installOn(self.store)
+        composer = self.inboxScreen.getComposer()
+        self.failIf(composer.toAddresses)
+        self.failIf(composer.subject)
+        self.failIf(composer.messageBody)
+        self.failIf(composer.attachments)
+
+        self.failUnless(composer.inline)
+
+
+
+class MessageCountTest(InboxTest):
+    def unreadCount(self, view=None):
+        if view is not None:
+            self.viewSelection['view'] = view
+        return self.inboxScreen.getUnreadMessageCount(self.viewSelection)
+
+
+    def assertCountsAre(self, **d):
+        for k in VIEWS:
+            if not k in d:
+                d[k] = 0
+        self.assertEqual(self.inboxScreen.mailViewCounts(), d)
+
 
     def test_unreadMessageCount(self):
         """
-        Check that the count returned by
-        L{xquotient.inbox.InboxScreen.getUnreadMessageCount} matches our
-        expectations for a variety of views
+        Check that L{InboxScreen.getUnreadMessageCount} return the correct
+        message count under a variety of conditions.
         """
-        s = Store()
+        self.makeMessages(13, read=False, spam=False)
+        self.makeMessages(6, read=True, spam=False)
 
-        for i in xrange(6):
-            testMessageFactory(store=s, read=True, spam=False, receivedWhen=Time())
-        for i in xrange(13):
-            m = testMessageFactory(store=s, read=False, spam=False, receivedWhen=Time())
+        self.assertEqual(self.unreadCount('inbox'), 13)
+        self.assertEqual(self.unreadCount('all'), 13)
+        self.assertEqual(self.unreadCount('sent'), 0)
+        self.assertEqual(self.unreadCount('spam'), 0)
 
-        PrivateApplication(store=s).installOn(s) # IWebTranslator
-
-        # *seems* like we shouldn't have to adapt Inbox, but
-        # the view state variables (inAllView, inSpamView, etc)
-        # seem pretty clearly to belong on InboxScreen, carrying
-        # most of the interesting methods with them
-
-        # we're in the "Inbox" view
-        inbox = Inbox(store=s)
-        inboxScreen = InboxScreen(inbox)
-        viewSelection = dict(inboxScreen.viewSelection)
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 13)
-        sq = MailboxSelector(s)
+        # mark 1 read message as unread
+        sq = MailboxSelector(self.store)
         sq.refineByStatus(READ_STATUS)
         iter(sq).next().markUnread()
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 14)
+        self.assertEqual(self.unreadCount('inbox'), 14)
 
-        viewSelection["view"] = 'spam'
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
-
-        sq = MailboxSelector(s)
+        # mark 6 unread messages as spam
+        sq = MailboxSelector(self.store)
         sq.refineByStatus(UNREAD_STATUS)
         sq.setLimit(6)
         spam = []
         for m in sq:
             m.classifySpam()
             spam.append(m)
+        self.assertEqual(self.unreadCount('spam'), 6)
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 6)
-
+        # return all spam messages to the inbox
         for m in spam:
             m.classifyClean()
         m.archive()
+        self.assertEqual(self.unreadCount('spam'), 0)
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
 
-        viewSelection["view"] = 'all'
+    def test_outgoingUnreadCount(self):
+        """
+        Check that the count of messages in the outbox view is correct.
+        """
+        self.makeMessages(4, read=False, outgoing=True, draft=False, sent=False)
+        self.assertEqual(self.unreadCount('outbox'), 4)
+        self.makeMessages(3, read=False, outgoing=True, draft=False, sent=False,
+                          bounced=True)
+        self.assertEqual(self.unreadCount('bounce'), 3)
+        self.assertEqual(self.unreadCount('outbox'), 4)
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 14)
 
-        viewSelection["view"] = 'sent'
+    def test_unreadCountLimit(self):
+        """
+        Verify that unread counts on arbitrarily large mailboxes only count up
+        to a specified limit.
+        """
+        halfCount = 5
+        countLimit = 2 * halfCount
+        self.inboxScreen.countLimit = countLimit
 
-        self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 0)
+        self.makeMessages(halfCount, read=False, spam=False)
+        self.assertEqual(self.unreadCount(), halfCount)
 
-        m.archive()
-        # the next bit tests a totally nonsense situation.
-#         m.outgoing = True
+        self.makeMessages(halfCount, read=False, spam=False)
+        self.assertEqual(self.unreadCount(), countLimit)
 
-#         self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 1)
-
-#         viewSelection["view"] = 'inbox'
-
-#         self.assertEqual(inboxScreen.getUnreadMessageCount(viewSelection), 13)
+        self.makeMessages(halfCount, read=False, spam=False)
+        self.assertEqual(self.unreadCount(), countLimit)
 
 
     def test_unreadCountComplexityLimit(self):
@@ -251,138 +341,72 @@ class InboxTestCase(TestCase):
         Verify that unread counts on arbitrarily large mailboxes only perform
         counting work up to a specified limit.
         """
-        s = Store()
-        COUNT_LIMIT = 10
-        assert ((COUNT_LIMIT // 2) * 2) == COUNT_LIMIT, "count limit must be even"
-        def makeSomeMessages():
-            for i in xrange(COUNT_LIMIT // 2):
-                testMessageFactory(store=s, read=False, spam=False,
-                                   receivedWhen=Time())
-
-        PrivateApplication(store=s).installOn(s) # IWebTranslator
-
-        inbox = Inbox(store=s)
-        inboxScreen = InboxScreen(inbox)
-        inboxScreen.countLimit = COUNT_LIMIT
-        viewSelection = dict(inboxScreen.viewSelection)
-        def countit():
-            return inboxScreen.getUnreadMessageCount(viewSelection)
-        makeSomeMessages()
-        self.assertEqual(countit(), COUNT_LIMIT // 2)
-        makeSomeMessages()
-        self.assertEqual(countit(), COUNT_LIMIT)
-        makeSomeMessages()
-        self.assertEqual(countit(), COUNT_LIMIT)
         # Now make sure the DB's work is limited too, not just the result
         # count.
-        qc = QueryCounter(s)
-        m1 = qc.measure(countit)
-        makeSomeMessages()
-        m2 = qc.measure(countit)
+        halfCount = 5
+        countLimit = 2 * halfCount
+        self.inboxScreen.countLimit = countLimit
+
+        self.makeMessages(3 * halfCount, read=False, spam=False)
+        qc = QueryCounter(self.store)
+        m1 = qc.measure(self.unreadCount)
+
+        self.makeMessages(halfCount, read=False, spam=False)
+        m2 = qc.measure(self.unreadCount)
         self.assertEqual(m1, m2)
 
 
     def test_mailViewCounts(self):
         """
-        Test that L{mailViewCounts} shows the correct number of unread
-        messages for each view, and that it updates as new messages are
-        added to those views.
+        Test that L{mailViewCounts} shows the correct number of unread messages
+        for each view, and that it updates as new messages are added to those
+        views.
         """
-        s = Store()
-        PrivateApplication(store=s).installOn(s)
-        inboxScreen = InboxScreen(Inbox(store=s))
+        self.makeMessages(9, read=False, spam=False)
+        self.makeMessages(3, read=False, spam=False, archived=True)
+        self.assertCountsAre(inbox=9, all=12, archive=3)
 
-        def makeMessages(number, **flags):
-            for i in range(number):
-                testMessageFactory(store=s, receivedWhen=Time(), **flags)
+        self.makeMessages(4, read=False, spam=True)
+        self.makeMessages(3, read=True, spam=True)
+        self.assertCountsAre(inbox=9, all=12, archive=3, spam=4)
 
-        def assertCountsAre(**d):
-            for k in VIEWS:
-                if not k in d:
-                    d[k] = 0
-            self.assertEqual(inboxScreen.mailViewCounts(), d)
+        self.makeMessages(2, read=False, trash=True)
+        self.assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2)
 
-        makeMessages(9, read=False, spam=False)
-        makeMessages(3, read=False, spam=False, archived=True)
-        assertCountsAre(inbox=9, all=12, archive=3)
-
-        makeMessages(4, read=False, spam=True)
-        makeMessages(3, read=True, spam=True)
-        assertCountsAre(inbox=9, all=12, archive=3, spam=4)
-
-        makeMessages(2, read=False, trash=True)
-        assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2)
-
-        makeMessages(4, read=False, outgoing=True)
-        assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2, sent=4)
+        self.makeMessages(4, read=False, outgoing=True)
+        self.assertCountsAre(inbox=9, all=12, archive=3, spam=4, trash=2, sent=4)
 
 
-    def testDefer(self):
-        s = Store()
-        inbox = Inbox(store=s)
+    def test_outgoingMailViewCounts(self):
+        """
+        Test that L{mailViewCounts} shows the correct number of unread messages
+        for each 'outgoing' view (bounced, sent and outbox).
+        """
+        self.makeMessages(4, read=False, outgoing=True, sent=False)
+        self.assertCountsAre(outbox=4)
+        self.makeMessages(3, read=False, outgoing=True, sent=False,
+                          bounced=True)
+        self.assertCountsAre(outbox=4, bounce=3)
 
-        scheduler = Scheduler(store=s)
-        scheduler.installOn(s)
 
-        message = testMessageFactory(store=s, read=True)
-        task = inbox.action_defer(message, 365, 0, 0)
-        self.failUnless(message.hasStatus(DEFERRED_STATUS), 'message was not deferred')
-        # XXX I don't think this test is a good idea.  there's no reason
-        # action_defer should return anything.
-        scheduler.reschedule(task, task.deferredUntil, Time())
-        scheduler.tick()
-        self.failIf(message.hasStatus(DEFERRED_STATUS), 'message is still deferred')
-        self.failIf(message.read, 'message is marked read')
-        self.failUnless(message.hasStatus(EVER_DEFERRED_STATUS), 'messsage does not have "ever deferred" status')
-        self.assertEquals(s.count(UndeferTask), 0)
 
-    def testDeferCascadingDelete(self):
-        s = Store()
-        inbox = Inbox(store=s)
-
-        scheduler = Scheduler(store=s)
-        scheduler.installOn(s)
-
-        message = testMessageFactory(store=s)
-        task = inbox.action_defer(message, 365, 0, 0)
-        message.deleteFromStore()
-        self.assertEquals(s.count(UndeferTask), 0)
-
-    def _setUpInbox(self):
-        s = Store()
-
-        QuotientPreferenceCollection(store=s).installOn(s)
-
-        self.translator = PrivateApplication(store=s)
-        self.translator.installOn(s)
-
-        msgs = list(testMessageFactory(
-                store=s,
-                subject=unicode(str(i)),
-                spam=False,
-                receivedWhen=Time(),
-                sentWhen=Time())
-                    for i in xrange(5))
-        msgs.reverse()
-
-        self.inboxScreen = InboxScreen(Inbox(store=s))
-        self.viewSelection = dict(self.inboxScreen.viewSelection)
-        self.msgs = msgs
+class PopulatedInboxTest(InboxTest):
+    def setUp(self):
+        super(PopulatedInboxTest, self).setUp()
+        QuotientPreferenceCollection(store=self.store).installOn(self.store)
+        self.msgs = self.makeMessages(5, spam=False)
+        self.msgs.reverse()
         self.msgIds = map(self.translator.toWebID, self.msgs)
-        self.store = s
 
 
-    def testLookaheadWithActions(self):
+    def test_lookaheadWithActions(self):
         """
-        Test that message lookahead is correct when the process
-        of moving from one message to the next is accomplished by
-        eliminating the current message from the active view (e.g.
-        by acting on it), rather than doing it explicitly with
-        selectMessage().  Do this all the way down, until there
-        are no messages left
+        Test that message lookahead is correct when the process of moving from
+        one message to the next is accomplished by eliminating the current
+        message from the active view (e.g. by acting on it), rather than doing
+        it explicitly with selectMessage(). Do this all the way down, until
+        there are no messages left
         """
-        self._setUpInbox()
-
         for i in range(len(self.msgs) - 2):
             readCount, unreadCount = self.inboxScreen.actOnMessageIdentifierList(
                 'archive',
@@ -404,7 +428,7 @@ class InboxTestCase(TestCase):
 
         self.assertEquals(readCount, 1)
         self.assertEquals(unreadCount, 0)
-    testLookaheadWithActions.todo = "read/unread flag not managed properly yet."
+    test_lookaheadWithActions.todo = "read/unread flag not managed properly yet"
 
 
     def test_fastForward(self):
@@ -412,72 +436,71 @@ class InboxTestCase(TestCase):
         Test fast forwarding to a particular message by id sets that message
         to read.
         """
-        self._setUpInbox()
-        fragment = self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
+        fragment = self.inboxScreen.fastForward(self.viewSelection,
+                                                self.msgIds[2])
         self.failUnless(self.msgs[2].read)
 
 
-    def test_messagesForBatchType(self):
-        """
-        Test that the correct messages are returned from
-        L{Inbox.messagesForBatchType}.
-        """
-        store = Store()
-        inbox = Inbox(store=store)
 
-        viewSelection = {
-            u"view": "inbox",
-            u"tag": None,
-            u"person": None,
-            u"account": None}
+class MessageForBatchType(InboxTest):
+    def messagesForBatchType(self, batchType):
+        """
+        Convenience method to return the list of C{messagesForBatchType} on
+        C{self.inbox}.
+        """
+        return list(self.inbox.messagesForBatchType(batchType,
+                                                    self.viewSelection))
 
-        # Test that even with no messages, it spits out the right value (an
-        # empty list).
+
+    def test_messagesForBatchTypeEmpty(self):
+        """
+        Test that even with no messages, L{Inbox.messagesForBatchType} spits
+        out the right value (an empty list).
+        """
         for batchType in ("read", "unread", "all"):
-            self.assertEquals(
-                list(inbox.messagesForBatchType(batchType, viewSelection)),
-                [])
+            self.assertEquals(self.messagesForBatchType(batchType), [])
 
-        # Make one message and assert that it only comes back from queries for
-        # the batch type which applies to it.
-        message = testMessageFactory(store=store, spam=False)
 
-        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
+    def test_messagesForBatchTypeOneUnread(self):
+        """
+        Make one unread message and check that it only comes back from
+        queries for the batch type which applies to it.
+        """
+        message = testMessageFactory(store=self.store, spam=False)
+        self.assertEquals(self.messagesForBatchType('read'), [])
+        self.assertEquals(self.messagesForBatchType('unread'), [message])
+        self.assertEquals(self.messagesForBatchType('all'), [message])
 
+
+    def test_messagesForBatchTypeOneRead(self):
+        """
+        Make one read message and check that it only comes back from the
+        queries for the batch type which applies to it.
+        """
+        message = testMessageFactory(store=self.store, spam=False)
         message.markRead()
-        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
-        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message])
+        self.assertEquals(self.messagesForBatchType('read'), [message])
+        self.assertEquals(self.messagesForBatchType("unread"), [])
+        self.assertEquals(self.messagesForBatchType('all'), [message])
 
-        # Make one more and make sure the batch is correct with various
-        # combinations of states between the two.
-        other = testMessageFactory(store=store, spam=False)
 
-        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [other])
-        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
+    def test_messagesForBatchTypeTwo(self):
+        """
+        Take one read message and another message and make sure that the batch
+        is correct with various combinations of states between the two.
+        """
+        message = testMessageFactory(store=self.store, spam=False)
+        message.markRead()
+        other = testMessageFactory(store=self.store, spam=False)
+
+        self.assertEquals(self.messagesForBatchType("read"), [message])
+        self.assertEquals(self.messagesForBatchType("unread"), [other])
+        self.assertEquals(self.messagesForBatchType('all'), [message, other])
 
         other.markRead()
-        self.assertEquals(list(inbox.messagesForBatchType("read", viewSelection)), [message, other])
-        self.assertEquals(list(inbox.messagesForBatchType("unread", viewSelection)), [])
-        self.assertEquals(list(inbox.messagesForBatchType("all", viewSelection)), [message, other])
-
-    def testGetComposer(self):
-        """
-        Test L{xquotient.inbox.InboxScreen.getComposer}
-        """
-        self._setUpInbox()
-        compose.Composer(store=self.store).installOn(self.store)
-        composer = self.inboxScreen.getComposer()
-
-        self.failIf(composer.toAddresses)
-        self.failIf(composer.subject)
-        self.failIf(composer.messageBody)
-        self.failIf(composer.attachments)
-
-        self.failUnless(composer.inline)
+        self.assertEquals(self.messagesForBatchType("read"), [message, other])
+        self.assertEquals(self.messagesForBatchType("unread"), [])
+        self.assertEquals(self.messagesForBatchType('all'), [message, other])
 
 
 
@@ -696,7 +719,7 @@ class ComposeActionsTestCase(TestCase):
         """
         addrs = set(u'blind-copy@host copy@host recipient@host sender@host'.split())
         for addr in addrs:
-            fromAddr = compose.FromAddress(address=addr, store=self.msg.store)
+            fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
             self.assertEquals(
                 sorted(e.email for e in replyToAll(self.msg)),
                 sorted(addrs - set([addr])))

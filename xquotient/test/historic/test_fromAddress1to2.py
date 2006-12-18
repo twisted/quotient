@@ -6,7 +6,8 @@ turned into the system address, and other FromAddress items survive intact
 
 from axiom.test.historic.stubloader import StubbedTest
 
-from xquotient.compose import FromAddress, _getFromAddressFromStore
+from xquotient.smtpout import FromAddress, _getFromAddressFromStore
+
 
 class FromAddressUpgradeTestCase(StubbedTest):
     def testUpgrade(self):

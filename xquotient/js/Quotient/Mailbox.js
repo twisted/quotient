@@ -16,7 +16,6 @@
  *
  */
 
-
 // import Mantissa.People
 // import Mantissa.ScrollTable
 // import Mantissa.LiveForm
@@ -836,6 +835,8 @@ Quotient.Mailbox.Controller.methods(
                         "reply", "train-spam"],
             "spam": ["delete", "train-ham"],
             "deferred": ["forward", "reply"],
+            "bounce": ['delete', 'forward'],
+            "outbox": [],
             "sent": ["delete", "forward", "reply"],
             "trash": ["forward" ,"reply", "undelete"]};
 
@@ -1665,9 +1666,9 @@ Quotient.Mailbox.Controller.methods(
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
 
-        var nodes = {"all": null, "trash": null, "sent": null,
-                     "spam": null, "inbox": null, "deferred": null,
-                     'archive': null};
+        var nodes = {"all": null, "trash": null, "sent": null, "outbox": null,
+                     "bounce": null, "spam": null, "inbox": null,
+                     "deferred": null, 'archive': null};
         var e, nameNode, name;
 
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
