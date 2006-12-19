@@ -183,7 +183,9 @@
                 <tr class="more-options" style="display: none">
                   <td class="header-table-first-col">BCC:</td>
                   <td class="header-table-last-col">
-                    <input type="text" name="bcc" style="width: 98%" />
+                    <input type="text" name="bcc" style="width: 98%">
+                      <nevow:attr name="value"><nevow:slot name="bcc" /></nevow:attr>
+                    </input>
                   </td>
                 </tr>
                 <tr class="files-form" style="display: none">

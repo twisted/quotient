@@ -246,7 +246,7 @@ class InboxTestCase(InboxTest):
         """
         compose.Composer(store=self.store).installOn(self.store)
         composer = self.inboxScreen.getComposer()
-        self.failIf(composer.toAddresses)
+        self.failIf(composer.recipients)
         self.failIf(composer.subject)
         self.failIf(composer.messageBody)
         self.failIf(composer.attachments)
@@ -702,45 +702,66 @@ class ComposeActionsTestCase(TestCase):
                     impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
 
 
-    def testReplyToAll(self):
+    def _recipientsToStrings(self, recipients):
+        """
+        Convert a mapping of "strings to lists of
+        L{xquotient.mimeutil.EmailAddress} instances" into a mapping of
+        "strings to lists of string email addresses"
+        """
+        result = {}
+        for (k, v) in recipients.iteritems():
+            result[k] = list(e.email for e in v)
+        return result
+
+    def test_replyToAll(self):
         """
         Test L{xquotient.inbox.replyToAll}
         """
         self.assertEquals(
-            sorted(e.email for e in replyToAll(self.msg)),
-            ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])
+            self._recipientsToStrings(
+                replyToAll(self.msg)),
+            {'bcc': ['blind-copy@host'],
+             'cc': ['copy@host'],
+             'to': ['sender@host']})
 
 
     def test_replyToAllFromAddress(self):
         """
         Test that L{xquotient.inbox.replyToAll} doesn't include addresses of
-        L{xquotient.compose.FromAddress} items that exist in the same store as
+        L{xquotient.smtpout.FromAddress} items that exist in the same store as
         the message that is being replied to
         """
-        addrs = set(u'blind-copy@host copy@host recipient@host sender@host'.split())
+        addrs = set(u'blind-copy@host copy@host sender@host'.split())
         for addr in addrs:
             fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
+            gotAddrs = set()
+            for l in replyToAll(self.msg).itervalues():
+                gotAddrs.update(e.email for e in l)
             self.assertEquals(
-                sorted(e.email for e in replyToAll(self.msg)),
-                sorted(addrs - set([addr])))
+                gotAddrs,
+                addrs - set([addr]))
             fromAddr.deleteFromStore()
 
 
-    def testReplyAllToMessage(self):
+    def test_replyAllToMessage(self):
         """
-        Test L{xquotient.inbox.replyAllToMessage}
+        Test L{xquotient.inbox.InboxScreen.replyAllToMessage}
         """
-        fromAddrs = []
-        def _composeSomething(_fromAddrs, *a, **k):
-            fromAddrs.append([e.email for e in _fromAddrs])
+        def _composeSomething(recipients, *a, **k):
+            _composeSomething.recipients = recipients
         self.inboxScreen._composeSomething = _composeSomething
 
         webID = self.privateApplication.toWebID(self.msg)
         self.inboxScreen.replyAllToMessage(webID)
-        self.assertEquals(len(fromAddrs), 1)
+
+        recipients = self._recipientsToStrings(
+            _composeSomething.recipients)
+
         self.assertEquals(
-            sorted(fromAddrs[0]),
-            ['blind-copy@host', 'copy@host', 'recipient@host', 'sender@host'])
+            recipients,
+            {'bcc': ['blind-copy@host'],
+             'cc': ['copy@host'],
+             'to': ['sender@host']})
 
 
 

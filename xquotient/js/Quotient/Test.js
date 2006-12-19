@@ -2122,7 +2122,7 @@ Quotient.Test.ControllerTestCase.methods(
 
                 self.assertArraysEqual(invokeArguments[0].toAddresses, ['alice@example.com']);
                 self.assertArraysEqual(invokeArguments[0].cc, ['bob@example.com']);
-                self.assertArraysEqual(invokeArguments[0].bcc, ['']);
+                self.assertArraysEqual(invokeArguments[0].bcc, ['jane@example.com']);
                 self.assertArraysEqual(invokeArguments[0].subject, ['Test Message']);
                 self.assertArraysEqual(invokeArguments[0].draft, [false]);
                 self.assertArraysEqual(invokeArguments[0].messageBody, ['message body text']);

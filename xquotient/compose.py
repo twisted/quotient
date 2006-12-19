@@ -341,14 +341,16 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
     _savedDraft = None
 
-    def __init__(self, composer, toAddresses=(), subject=u'', messageBody=u'',
+    def __init__(self, composer, recipients=None, subject=u'', messageBody=u'',
                  attachments=(), inline=False):
         """
         @type composer: L{Composer}
 
-        @param toAddresses: email addresses of the recipients of this message
-        @type toAddresses: sequence of L{xquotient.mimeutil.EmailAddress}
-        instances
+        @param recipients: email addresses of the recipients of this message.
+        defaults to no recipients
+        @type recipients: C{dict} which can contain any combination of the
+        keys C{to}, C{cc} and C{bcc}, where the values are sequences of
+        L{xquotient.mimeutil.EmailAddress} instances
 
         @param subject: the subject of this message
         @type subject: C{unicode}
@@ -394,7 +396,9 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                         liveform.Parameter(name='draft',
                                            type=liveform.CHECKBOX_INPUT,
                                            coercer=bool)])
-        self.toAddresses = toAddresses
+        if recipients is None:
+            recipients = {}
+        self.recipients = recipients
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments
@@ -456,6 +460,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                         'message-body': bodyPattern.fillSlots(
                                             'body', txt.getBody(decode=True)),
                         'cc': cc,
+                        'bcc': '',
                         'attachments': attachments}
 
             # make subsequent edits overwrite the draft we're editing
@@ -466,13 +471,22 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                                     'id', a.part.storeID).fillSlots(
                                     'name', a.filename or 'No Name'))
 
-            slotData = {'to': mimeutil.flattenEmailAddresses(self.toAddresses),
+            addrs = {}
+            for k in ('to', 'cc', 'bcc'):
+                if k in self.recipients:
+                    addrs[k] = mimeutil.flattenEmailAddresses(
+                        self.recipients[k])
+                else:
+                    addrs[k] = ''
+
+            slotData = {'to': addrs['to'],
                         'from': self._getFromAddressStan(),
                         'subject': subjectPattern.fillSlots(
                                     'subject', self.subject),
                         'message-body': bodyPattern.fillSlots(
                                             'body', self.messageBody),
-                        'cc': '',
+                        'cc': addrs['cc'],
+                        'bcc': addrs['bcc'],
                         'attachments': attachments}
 
         return dictFillSlots(ctx.tag, slotData)
@@ -691,6 +705,7 @@ class RedirectingComposeFragment(liveform.LiveFormFragment, renderers.ButtonRend
                  'subject': '',
                  'message-body': self._getMessageBody(),
                  'cc': '',
+                 'bcc': '',
                  'attachments': ''})
 
 

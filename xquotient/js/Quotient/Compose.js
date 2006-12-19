@@ -277,7 +277,7 @@ Quotient.Compose.Controller.methods(
         Quotient.Compose.Controller.upcall(self, "__init__", node, inline, allPeople);
 
         var cc = self.firstNodeByAttribute("name", "cc"),
-            bcc = self.firstNodeByAttribute("name", "cc");
+            bcc = self.firstNodeByAttribute("name", "bcc");
         if(0 < cc.value.length || 0 < bcc.value.length) {
             self.toggleMoreOptions();
         }

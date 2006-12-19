@@ -111,9 +111,9 @@ class StubComposeFragment(LiveFragment):
     jsClass = ComposeFragment.jsClass
     fragmentName = ComposeFragment.fragmentName
 
-    def __init__(self, composer, toAddresses, subject, messageBody, attachments, inline):
+    def __init__(self, composer, recipients, subject, messageBody, attachments, inline):
         self.composer = composer
-        self.toAddresses = toAddresses
+        self.recipients = recipients
         self.subject = subject
         self.messageBody = messageBody
         self.attachments = attachments
@@ -150,6 +150,7 @@ class StubComposeFragment(LiveFragment):
         ctx.fillSlots('from', 'bob@example')
         ctx.fillSlots('to', 'alice@example.com')
         ctx.fillSlots('cc', 'bob@example.com')
+        ctx.fillSlots('bcc', 'jane@example.com')
         ctx.fillSlots(
             'subject',
             iq.onePattern('subject').fillSlots('subject', 'Test Message'))

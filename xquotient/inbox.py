@@ -24,8 +24,9 @@ from xquotient.exmess import Message, getMessageSources, MailboxSelector
 from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
-                              SPAM_STATUS, TRASH_STATUS)
-from xquotient import mimepart, equotient, compose, renderers, mimeutil
+                              SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
+                              COPY_RELATION, BLIND_COPY_RELATION)
+from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout
 
 #_entityReference = re.compile('&([a-z]+);', re.I)
 
@@ -74,19 +75,32 @@ def replyTo(m):
         recipient = m.sender
     return mimeutil.parseEmailAddresses(recipient, mimeEncoded=False)
 
+
 def replyToAll(m):
     """
     Figure out the address(es) that a reply to all people involved in message
     C{m} should be sent to.
 
     @type m: L{xquotient.exmess.Message}
-    @rtype: sequene of L{xquotient.mimeutil.EmailAddress}
+    @return: Mapping of header names to sequences of
+    L{xquotient.mimeutil.EmailAddress} instances.  Keys are 'to', 'cc' and
+    'bcc'.
+    @rtype: C{dict}
     """
-    from xquotient import smtpout
     fromAddrs = list(m.store.query(smtpout.FromAddress))
     fromAddrs = set(a.address for a in fromAddrs)
-    return set(addr for (rel, addr) in m.impl.relatedAddresses()
-        if addr.email not in fromAddrs)
+
+    relToKey = {SENDER_RELATION: 'to',
+                COPY_RELATION: 'cc',
+                BLIND_COPY_RELATION: 'bcc'}
+    addrs = {}
+
+    for (rel, addr) in m.impl.relatedAddresses():
+        if rel not in relToKey or addr.email in fromAddrs:
+            continue
+        addrs.setdefault(relToKey[rel], []).append(addr)
+    return addrs
+
 
 def _viewSelectionToMailboxSelector(store, viewSelection):
     """
@@ -701,10 +715,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     composeFragmentFactory = compose.ComposeFragment
 
-    def _composeSomething(self, toAddresses=(), subject=u'', messageBody=u'', attachments=()):
+    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=()):
         composer = self.inbox.store.findUnique(compose.Composer)
         cf = self.composeFragmentFactory(composer,
-                                         toAddresses=toAddresses,
+                                         recipients=recipients,
                                          subject=subject,
                                          messageBody=messageBody,
                                          attachments=attachments,
@@ -746,7 +760,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     def replyToMessage(self, messageIdentifier):
         curmsg = self.translator.fromWebID(messageIdentifier)
-        return self._composeSomething(replyTo(curmsg),
+        return self._composeSomething({'to': replyTo(curmsg)},
                                       reSubject(curmsg),
                                       self._getBodyForReply(curmsg))
     expose(replyToMessage)
@@ -797,11 +811,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
         currentMessageDetail = self._messageFragment(curmsg)
 
-        return self._composeSomething((),
-                                      reSubject(curmsg, 'Fwd: '),
-                                      '\n\n' + '\n> '.join(reply),
-                                      currentMessageDetail.attachmentParts)
+        return self._composeSomething(
+            subject=reSubject(curmsg, 'Fwd: '),
+            messageBody='\n\n' + '\n> '.join(reply),
+            attachments=currentMessageDetail.attachmentParts)
     expose(forwardMessage)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
-

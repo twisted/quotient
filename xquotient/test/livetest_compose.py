@@ -108,8 +108,8 @@ class ComposeToAddressTestCase(testcase.TestCase, _ComposeTestMixin):
         def composeFragFactory(composer):
             return AddrPassthroughComposeFragment(
                         composer,
-                        toAddresses=[mimeutil.EmailAddress(e, False)
-                                        for e in toAddresses])
+                        recipients={'to': [mimeutil.EmailAddress(e, False)
+                                            for e in toAddresses]})
 
         (s, frag) = self._getComposeFragment(
                         composeFragFactory=composeFragFactory)
