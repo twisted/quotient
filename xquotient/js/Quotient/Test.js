@@ -284,6 +284,76 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 self.failIf(div.style.height);
             });
         return result;
+    },
+
+
+    /**
+     * Test that the DOM for a row without 'everDeferred' has no boomerang.
+     */
+    function test_noBoomerang(self) {
+        var d = self.setUp();
+        return d.addCallback(
+            function(ignored) {
+                var data = self.scrollingWidget.model.getRowData(0);
+                // sanity check
+                self.assertEqual(data['everDeferred'], false);
+                var dom = self.scrollingWidget.findCellElement(data);
+                Divmod.msg(MochiKit.DOM.emitHTML(dom));
+                self.assertEqual(dom.childNodes.length, 2);
+            });
+    },
+
+
+    /**
+     * Test that the DOM for a row with 'everDeferred' contains an image
+     * of a boomerang.
+     */
+    function test_deferredHasBoomerang(self) {
+        var d = self.setUp();
+        return d.addCallback(
+            function(ignored) {
+                var data = self.scrollingWidget.model.getRowData(0);
+                data['everDeferred'] = true;
+                var dom = self.scrollingWidget.makeCellElement('senderDisplay',
+                                                               data);
+                self.assertEqual(dom.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+            });
+    },
+
+
+    /**
+     * Test that we can add a boomerang and an 'everDeferred' status to a
+     * row after it has been built.
+     */
+    function test_deferredGainsBoomerang(self) {
+        var d = self.setUp();
+        return d.addCallback(
+            function(ignored) {
+                var data = self.scrollingWidget.model.getRowData(0);
+                self.scrollingWidget.setAsDeferred(data);
+                self.assertEqual(data['everDeferred'], true);
+                var dom = self.scrollingWidget.findCellElement(data);
+                self.assertEqual(dom.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+            });
+    },
+
+
+    /**
+     * Test that 'setAsDeferred' is idempotent.
+     */
+    function test_onlyOneBoomerang(self) {
+        var d = self.setUp();
+        return d.addCallback(
+            function(ignored) {
+                var data = self.scrollingWidget.model.getRowData(0);
+                var dom = self.scrollingWidget.findCellElement(data);
+                self.scrollingWidget.setAsDeferred(data);
+                self.assertEqual(dom.childNodes.length, 3);
+                self.scrollingWidget.setAsDeferred(data);
+                self.assertEqual(dom.childNodes.length, 3);
+            });
     });
 
 
@@ -1816,6 +1886,133 @@ Quotient.Test.ControllerTestCase.methods(
             });
         return result;
     },
+
+
+    /**
+     * Test that a boomerang appears on a message that is deferred from the
+     * 'all' view.
+     */
+    function test_deferDisplay(self) {
+        var model, widget;
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                widget = self.controllerWidget.scrollWidget;
+                model = widget.model;
+                return self.controllerWidget.chooseMailView('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                return self.controllerWidget.formDefer();
+            });
+        d.addCallback(
+            function(ignored) {
+                var node = widget.findCellElement(model.getRowData(0));
+                self.assertEqual(node.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+            });
+        return d;
+    },
+
+
+    /**
+     * Same as test_deferDisplay, except for a whole group.
+     */
+    function test_deferDisplayGroup(self) {
+        var model, widget;
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                widget = self.controllerWidget.scrollWidget;
+                model = widget.model;
+                return self.controllerWidget.chooseMailView('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                var ids = [model.getRowData(0).__id__,
+                           model.getRowData(1).__id__];
+                self.controllerWidget.scrollWidget.groupSelectRow(ids[0]);
+                self.controllerWidget.scrollWidget.groupSelectRow(ids[1]);
+                return self.controllerWidget.formDefer();
+            });
+        d.addCallback(
+            function(ignored) {
+                var node = widget.findCellElement(model.getRowData(0));
+                self.assertEqual(node.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+                node = widget.findCellElement(model.getRowData(1));
+                self.assertEqual(node.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+                node = widget.findCellElement(model.getRowData(2));
+                self.assertEqual(node.childNodes.length, 2);
+            });
+        return d;
+    },
+
+
+    /**
+     * Same as test_deferDisplay, except for a batch selection.
+     */
+    function test_deferDisplayBatch(self) {
+        var model, widget;
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                widget = self.controllerWidget.scrollWidget;
+                model = widget.model;
+                return self.controllerWidget.chooseMailView('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                self.controllerWidget.changeBatchSelection('all');
+                return self.controllerWidget.formDefer();
+            });
+        d.addCallback(
+            function(ignored) {
+                var node, index, indices = model.getRowIndices();
+                for (var i=0; i<indices.length; ++i) {
+                    index = indices[i];
+                    node = widget.findCellElement(model.getRowData(index));
+                    self.assertEqual(node.childNodes[2].getAttribute('src'),
+                                     '/Quotient/static/images/boomerang.gif');
+                }
+            });
+        return d;
+    },
+
+
+    /**
+     * Same as test_deferDisplay, but use the
+     * L{Quotient.Mailbox.Controller.selectDefer} method instead.
+     */
+    function test_selectDeferDisplay(self) {
+        var model, widget;
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                widget = self.controllerWidget.scrollWidget;
+                model = widget.model;
+                return self.controllerWidget.chooseMailView('all');
+            });
+        d.addCallback(
+            function(ignored) {
+                var deferSelect = self.controllerWidget.deferSelect;
+                var opts = deferSelect.getElementsByTagName('option');
+                opts[1].selected = true; // deferSelect.selectedIndex = 1;
+                // sanity check
+                self.assertNotEqual(self.controllerWidget._getDeferralSelection(),
+                                    null);
+                return self.controllerWidget.selectDefer();
+            });
+        d.addCallback(
+            function(ignored) {
+                var node = widget.findCellElement(model.getRowData(0));
+                self.assertEqual(node.childNodes[2].getAttribute('src'),
+                                 '/Quotient/static/images/boomerang.gif');
+            });
+        return d;
+    },
+
 
     /**
      * Test that selecting the reply-to action for a message brings up a

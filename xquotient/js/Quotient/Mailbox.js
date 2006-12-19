@@ -1,4 +1,3 @@
-
 /**
  *
  * XXX TODO -
@@ -222,6 +221,41 @@ Quotient.Mailbox.ScrollingWidget.methods(
         return self.widgetParent.decrementActiveMailViewCount();
     },
 
+
+    /**
+     * Return the 'cell element' of a scroll widget row. That is, find the
+     * bit in the DOM that was made by L{makeCellElement} and return that.
+     */
+    function findCellElement(self, rowData) {
+        var node = rowData.__node__;
+        return node.firstChild.firstChild.firstChild;
+    },
+
+
+    /**
+     * Return a DOM element which is an image of a boomerang.
+     */
+    function _makeBoomerang(self) {
+        return MochiKit.DOM.IMG(
+            {"src": "/Quotient/static/images/boomerang.gif",
+             "border": "0",
+             "height": "13px"});
+    },
+
+
+    /**
+     * Set the given row as having been deferred at some point.
+     *
+     * @param index: The index of the row which has become deferred.
+     */
+    function setAsDeferred(self, data) {
+        if (!data['everDeferred']) {
+            data['everDeferred'] = true;
+            var dom = self.findCellElement(data);
+            dom.appendChild(self._makeBoomerang());
+        }
+    },
+
     /**
      * Remove the row at the given index and update the message selection if
      * necessary.
@@ -374,9 +408,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                     }}), massage(colName)];
 
             if (rowData["everDeferred"]) {
-                content.push(IMG({"src": "/Quotient/static/images/boomerang.gif",
-                                  "border": "0",
-                                  "height": "13px"}));
+                content.push(self._makeBoomerang());
             }
 
             return MochiKit.DOM.DIV(attrs, content);
@@ -1094,6 +1126,26 @@ Quotient.Mailbox.Controller.methods(
         return [include, exclude];
     },
 
+
+    /**
+     * Set each of the rows in the selection as deferred.
+     */
+    function _deferSelectedRows(self) {
+        if (self.scrollWidget.selectedGroup == null) {
+            return;
+        }
+        var indices = self.scrollWidget.model.getRowIndices();
+        // one potato, two potato, three potato, four ...
+        for (var i = 0; i < indices.length; ++i) {
+            var index = indices[i];
+            var row = self.scrollWidget.model.getRowData(index);
+            if (row.__id__ in self.scrollWidget.selectedGroup) {
+                self.scrollWidget.setAsDeferred(row);
+            }
+        }
+    },
+
+
     function _removeRows(self, rows) {
         /*
          * This action is removing rows from visibility.  Drop them
@@ -1688,6 +1740,7 @@ Quotient.Mailbox.Controller.methods(
         self.mailViewNodes = nodes;
     },
 
+
     /**
      * Perform the specified action.
      *
@@ -2023,7 +2076,7 @@ Quotient.Mailbox.Controller.methods(
         if (period === null) {
             return;
         }
-        return self.touch("defer", true, period);
+        return self._doDefer(period);
     },
 
     /**
@@ -2042,11 +2095,48 @@ Quotient.Mailbox.Controller.methods(
         return false;
     },
 
+
+    /**
+     * Defer the currently selected rows and update the display to indicate
+     * that this has been done.
+     *
+     * This method added to avoid special-casing the touch* methods to know
+     * about the defer operation.
+     *
+     * @param period: The period of time to defer the selected rows.
+     * @return: A L{Divmod.Base.Deferred} that is passed through from
+     * L{touch}.
+     */
+    function _doDefer(self, period) {
+        var widget = self.scrollWidget;
+        var batchAction = self._batchSelection != null,
+            selectedGroup = widget.selectedGroup;
+        var destructive = widget.viewSelection["view"] != 'all';
+        destructive = destructive || batchAction;
+        var d = self.touch("defer", destructive, period);
+        d.addCallback(
+            function(passThrough) {
+                if (!batchAction) {
+                    if (selectedGroup == null) {
+                        var selected = widget._selectedRowID;
+                        var data = widget.model.findRowData(selected);
+                        return widget.setAsDeferred(data);
+                    } else {
+                        self._deferSelectedRows();
+                    }
+                }
+                return passThrough;
+            });
+        return d;
+    },
+
+
     function formDefer(self) {
         var period = self._getDeferralPeriod();
         self.deferForm.style.display = "none";
-        return self.touch("defer", true, period);
+        return self._doDefer(period);
     },
+
 
     /**
      * Remove all content from the message detail area and add the given node.
