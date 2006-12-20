@@ -7,26 +7,25 @@ from twisted.trial.unittest import TestCase
 from epsilon.extime import Time
 
 from axiom.store import Store
-from axiom.scheduler import Scheduler
+from axiom.dependency import installOn
 
 from axiom.tags import Catalog
 from axiom.attributes import integer
 from axiom.item import Item
 
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
-from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
 
 from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
-                              MailboxSelector, UNREAD_STATUS, READ_STATUS,
-                              Correspondent, SENDER_RELATION, DRAFT_STATUS,
-                              SENT_STATUS, DEFERRED_STATUS,
-                              EVER_DEFERRED_STATUS, RECIPIENT_RELATION,
-                              COPY_RELATION, BLIND_COPY_RELATION)
+                              MailboxSelector, UNREAD_STATUS,
+                              READ_STATUS, Correspondent,
+                              SENDER_RELATION, DEFERRED_STATUS,
+                              EVER_DEFERRED_STATUS,
+                              RECIPIENT_RELATION, COPY_RELATION,
+                              BLIND_COPY_RELATION)
 
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment)
-from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import compose, mimeutil, smtpout
 from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
                                           DummyMessageImplementationMixin)
@@ -115,9 +114,9 @@ class _MessageRetrievalMixin:
         """
         self.store = Store()
 
-        # Inbox requires but does not provide IWebTranslator.
-        self.privateApplication = PrivateApplication(store=self.store)
-        self.privateApplication.installOn(self.store)
+        inboxItem = Inbox(store=self.store)
+        installOn(inboxItem, self.store)
+        self.privateApplication = inboxItem.privateApplication
         self.webTranslator = IWebTranslator(self.store)
 
         baseTime = datetime(year=2001, month=3, day=6)
@@ -129,7 +128,8 @@ class _MessageRetrievalMixin:
                         spam=False,
                         receivedWhen=Time.fromDatetime(
                             baseTime + timedelta(seconds=i))))
-        self.inbox = InboxScreen(Inbox(store=self.store))
+
+        self.inbox = InboxScreen(inboxItem)
 
 
 class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
@@ -155,12 +155,11 @@ class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
 class InboxTest(TestCase):
     def setUp(self):
         self.store = Store()
-        self.translator = PrivateApplication(store=self.store)
-        self.translator.installOn(self.store)
         self.inbox = Inbox(store=self.store)
+        installOn(self.inbox, self.store)
+        self.translator = self.inbox.privateApplication
         self.inboxScreen = InboxScreen(self.inbox)
-        self.scheduler = Scheduler(store=self.store)
-        self.scheduler.installOn(self.store)
+        self.scheduler = self.inbox.scheduler
         self.viewSelection = dict(self.inboxScreen.viewSelection)
 
 
@@ -180,9 +179,9 @@ class InboxTestCase(InboxTest):
         Test that an Inbox can be adapted to INavigableFragment so that it can
         be displayed on a webpage.
         """
+
         self.assertNotIdentical(INavigableFragment(self.inbox, None),
                                 None)
-
 
     def test_userTagNames(self):
         """
@@ -194,6 +193,7 @@ class InboxTestCase(InboxTest):
         c.tag(m, u'tag1')
         c.tag(m, u'taga')
         c.tag(m, u'tagstart')
+
 
         self.assertEquals(self.inboxScreen.getUserTagNames(),
                           [u'tag1', u'taga', u'tagstart'])
@@ -207,6 +207,7 @@ class InboxTestCase(InboxTest):
         self.inbox.action_defer(message, 365, 0, 0)
         self.failUnless(message.hasStatus(DEFERRED_STATUS),
                         'message was not deferred')
+
 
 
     def test_undefer(self):
@@ -244,7 +245,7 @@ class InboxTestCase(InboxTest):
         """
         Test L{xquotient.inbox.InboxScreen.getComposer}
         """
-        compose.Composer(store=self.store).installOn(self.store)
+        installOn(compose.Composer(store=self.store), self.store)
         composer = self.inboxScreen.getComposer()
         self.failIf(composer.recipients)
         self.failIf(composer.subject)
@@ -284,6 +285,7 @@ class MessageCountTest(InboxTest):
 
         # mark 1 read message as unread
         sq = MailboxSelector(self.store)
+
         sq.refineByStatus(READ_STATUS)
         iter(sq).next().markUnread()
         self.assertEqual(self.unreadCount('inbox'), 14)
@@ -351,6 +353,7 @@ class MessageCountTest(InboxTest):
         qc = QueryCounter(self.store)
         m1 = qc.measure(self.unreadCount)
 
+
         self.makeMessages(halfCount, read=False, spam=False)
         m2 = qc.measure(self.unreadCount)
         self.assertEqual(m1, m2)
@@ -389,11 +392,9 @@ class MessageCountTest(InboxTest):
         self.assertCountsAre(outbox=4, bounce=3)
 
 
-
 class PopulatedInboxTest(InboxTest):
     def setUp(self):
         super(PopulatedInboxTest, self).setUp()
-        QuotientPreferenceCollection(store=self.store).installOn(self.store)
         self.msgs = self.makeMessages(5, spam=False)
         self.msgs.reverse()
         self.msgIds = map(self.translator.toWebID, self.msgs)
@@ -492,7 +493,6 @@ class MessageForBatchType(InboxTest):
         message = testMessageFactory(store=self.store, spam=False)
         message.markRead()
         other = testMessageFactory(store=self.store, spam=False)
-
         self.assertEquals(self.messagesForBatchType("read"), [message])
         self.assertEquals(self.messagesForBatchType("unread"), [other])
         self.assertEquals(self.messagesForBatchType('all'), [message, other])
@@ -514,15 +514,9 @@ class ReadUnreadTestCase(TestCase):
     def setUp(self):
         self.store = Store()
 
-        # Required for InboxScreen to even be instantiated
-        self.translator = PrivateApplication(store=self.store)
-        self.translator.installOn(self.store)
-
-        # Required for InboxScreen.fastForward to be called successfully.
-        self.preferences = QuotientPreferenceCollection(store=self.store)
-
         self.inbox = Inbox(store=self.store)
-        self.inbox.installOn(self.store)
+        installOn(self.inbox, self.store)
+        self.translator = self.inbox.privateApplication
         self.messages = []
         for i in range(self.NUM_MESSAGES):
             self.messages.append(
@@ -617,7 +611,7 @@ class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):
         super(MessagesByPersonRetrievalTestCase, self).setUp()
 
         self.organizer = Organizer(store=self.store)
-        self.organizer.installOn(self.store)
+        installOn(self.organizer, self.store)
 
         self.person = Person(store=self.store,
                              organizer=self.organizer,
@@ -689,11 +683,10 @@ class ComposeActionsTestCase(TestCase):
 
     def setUp(self):
         self.store = Store()
-        self.privateApplication = PrivateApplication(store=self.store)
-        self.privateApplication.installOn(self.store)
 
         self.inbox = Inbox(store=self.store)
-        self.inbox.installOn(self.store)
+        installOn(self.inbox, self.store)
+        self.privateApplication = self.inbox.privateApplication
         self.inboxScreen = InboxScreen(self.inbox)
 
         self.msg = testMessageFactory(

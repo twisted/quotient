@@ -3,9 +3,9 @@ from nevow.athena import expose
 
 from axiom.store import Store
 from axiom.userbase import LoginMethod
+from axiom.dependency import installOn
 
 from xmantissa.webtheme import getLoader
-from xmantissa.webapp import PrivateApplication
 
 from xquotient import compose, smtpout
 
@@ -20,9 +20,6 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
     def getFromAddressScrollTable(self):
         s = Store()
 
-        PrivateApplication(store=s).installOn(s)
-        compose.Composer(store=s).installOn(s)
-
         LoginMethod(store=s,
                     internal=False,
                     protocol=u'email',
@@ -31,8 +28,7 @@ class FromAddressScrollTableTestCase(testcase.TestCase):
                     verified=True,
                     account=s)
 
-        # system address
-        smtpout.FromAddress(store=s).setAsDefault()
+        installOn(compose.Composer(store=s), s)
 
         smtpout.FromAddress(
             store=s,

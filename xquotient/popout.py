@@ -8,7 +8,7 @@ from zope.interface import implements
 from twisted.application import service
 from twisted.internet import defer, reactor, protocol
 from twisted.protocols import policies
-from twisted.cred import portal, checkers
+from twisted.cred import portal
 
 from xmantissa.stats import BandwidthMeasuringFactory
 
@@ -18,6 +18,9 @@ from epsilon import sslverify
 
 from axiom import item, attributes
 from axiom.errors import MissingDomainPart
+from axiom.userbase import LoginSystem
+from axiom.dependency import dependsOn
+from axiom.upgrade import registerUpgrader 
 
 from twisted.mail import pop3
 
@@ -40,7 +43,7 @@ class MessageInfo(item.Item):
     message = attributes.reference()
 
 
-class POP3Up(item.Item, item.InstallableMixin):
+class POP3Up(item.Item):
 
     typeName = 'quotient_pop3_user_powerup'
 
@@ -51,15 +54,11 @@ class POP3Up(item.Item, item.InstallableMixin):
 
     installedOn = attributes.reference()
 
+    powerupInterfaces = (pop3.IMailbox,)
+
     def activate(self):
         self.messageList = None
         self.deletions = set()
-
-
-    def installOn(self, other):
-        super(POP3Up, self).installOn(other)
-        other.powerUp(self, pop3.IMailbox)
-
 
     def getMessageList(self):
         # XXX could be made more incremental by screwing with login, making it
@@ -200,21 +199,13 @@ class POP3ServerFactory(protocol.Factory):
 
 class POP3Benefactor(item.Item):
     endowed = attributes.integer(default=0)
+    powerupNames = ["xquotient.popout.POP3Up"]
 
-    def endow(self, ticket, avatar):
-        for cls in (POP3Up,):
-            avatar.findOrCreate(POP3Up).installOn(avatar)
-
-
-    def revoke(self, ticket, avatar):
-        avatar.findUnique(POP3Up).deleteFromStore()
-
-
-
-class POP3Listener(item.Item, item.InstallableMixin, service.Service):
+class POP3Listener(item.Item, service.Service):
 
     typeName = "quotient_pop3listener"
-    schemaVersion = 1
+    schemaVersion = 2
+    powerupInterfaces = (service.IService,)
 
     # These are for the Service stuff
     parent = attributes.inmemory()
@@ -226,9 +217,6 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
     factory = attributes.inmemory()
     port = attributes.inmemory()
     securePort = attributes.inmemory()
-
-    installedOn = attributes.reference(
-        "A reference to the store or avatar which we have powered up.")
 
     portNumber = attributes.integer(
         "The TCP port to bind to serve SMTP.",
@@ -243,6 +231,8 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
         "key and certificate for use by the SMTP/SSL server.",
         default=None)
 
+    userbase = dependsOn(LoginSystem)
+
     # When enabled, toss all traffic into logfiles.
     debug = False
 
@@ -253,25 +243,14 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
         self.port = None
         self.securePort = None
 
-    def installOn(self, other):
-        super(POP3Listener, self).installOn(other)
-        other.powerUp(self, service.IService)
-        self.setServiceParent(other)
+
+
+    def installed(self):
+        self.setServiceParent(self.store)
 
     def privilegedStartService(self):
-        realm = portal.IRealm(self.installedOn, None)
-        if realm is None:
-            raise MailConfigurationError(
-                "No realm: "
-                "you need to install a userbase before using this service.")
 
-        chk = checkers.ICredentialsChecker(self.installedOn, None)
-        if chk is None:
-            raise MailConfigurationError(
-                "No checkers: "
-                "you need to install a userbase before using this service.")
-
-        self.portal = portal.Portal(realm, [chk])
+        self.portal = portal.Portal(self.userbase, [self.userbase])
         self.factory = POP3ServerFactory(self.portal)
 
         if self.debug:
@@ -298,3 +277,9 @@ class POP3Listener(item.Item, item.InstallableMixin, service.Service):
             L.append(defer.maybeDeferred(self.securePort.stopListening))
             self.securePort = None
         return defer.DeferredList(L)
+
+def pop3Listener1to2(old):
+    p3l = old.upgradeVersion(POP3Listener.typeName, 1, 2)
+    p3l.userbase = old.store.findOrCreate(LoginSystem)
+    return p3l
+registerUpgrader(pop3Listener1to2, POP3Listener.typeName, 1, 2)

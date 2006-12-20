@@ -13,9 +13,9 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom import attributes
 from axiom.tags import Catalog
-from axiom.scheduler import Scheduler
+from axiom.userbase import LoginMethod
+from axiom.dependency import installOn
 
-from xmantissa.website import WebSite
 from xmantissa.webtheme import getLoader
 from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Organizer, Person, EmailAddress
@@ -23,16 +23,16 @@ from xmantissa.people import Organizer, Person, EmailAddress
 from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
 from xquotient import equotient
 
-from xquotient.exmess import Message, MessageDetail
+from xquotient.exmess import MessageDetail
 from xquotient.exmess import _UndeferTask as UndeferTask
 from xquotient.exmess import (ARCHIVE_STATUS, TRASH_STATUS, SPAM_STATUS,
                               DEFERRED_STATUS, TRAINED_STATUS)
 
 from xquotient.compose import Composer, ComposeFragment
-from xquotient.quotientapp import QuotientPreferenceCollection
+from xquotient.qpeople import MessageLister
+
 
 from xquotient.test.test_inbox import testMessageFactory
-
 
 class ThrobberTestCase(testcase.TestCase):
     """
@@ -50,7 +50,7 @@ class ScrollingWidgetTestCase(testcase.TestCase):
 
     def getScrollingWidget(self, howManyElements=0):
         store = Store()
-        PrivateApplication(store=store).installOn(store)
+        installOn(PrivateApplication(store=store), store)
         for n in xrange(howManyElements):
             testMessageFactory(store, spam=False)
         f = MailboxScrollingFragment(store)
@@ -188,20 +188,22 @@ class _ControllerMixin:
     sent2 = Time().oneDay() + timedelta(hours=16, minutes=5, seconds=tzfactor)
     def getInbox(self):
         """
-        Return a newly created Inbox, in a newly created Store which has all of
-        the Inbox dependencies (you know this function is broken because it is
-        more than C{return Inbox(store=Store())}
+        Return a newly created Inbox, in a newly created Store.
         """
         s = Store()
-        Scheduler(store=s).installOn(s)
-        Catalog(store=s)
-        WebSite(store=s).installOn(s)
-        PrivateApplication(store=s).installOn(s)
-        QuotientPreferenceCollection(store=s).installOn(s)
-        Composer(store=s).installOn(s)
-        Organizer(store=s).installOn(s)
+        LoginMethod(store=s,
+            internal=False,
+            protocol=u'email',
+            localpart=u'default',
+            domain=u'host',
+            verified=True,
+            account=s)
+
+        installOn(Composer(store=s), s)
+        installOn(Catalog(store=s), s)
+        installOn(MessageLister(store=s), s)
         inbox = Inbox(store=s)
-        inbox.installOn(s)
+        installOn(inbox, s)
         return inbox
 
 

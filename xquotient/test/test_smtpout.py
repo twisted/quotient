@@ -3,6 +3,7 @@ from twisted.python.failure import Failure
 from twisted.trial import unittest
 
 from axiom import attributes, item, scheduler, store, userbase
+from axiom.dependency import installOn
 
 from xquotient import exmess, smtpout, compose
 from xquotient.test.test_workflow import DummyMessageImplementation
@@ -33,7 +34,7 @@ class SendingTest(unittest.TestCase):
         self.composer = MockComposer(store=self.store)
         self.composer.log = []
         self.scheduler = scheduler.Scheduler(store=self.store)
-        self.scheduler.installOn(self.store)
+        installOn(self.scheduler, self.store)
         messageData = DummyMessageImplementation(store=self.store)
         self.message = exmess.Message.createDraft(self.store, messageData,
                                                   u'test')
@@ -202,10 +203,9 @@ class FromAddressConfigFragmentTest(unittest.TestCase):
 
     def setUp(self):
         self.store = store.Store()
-        cprefs = compose.ComposePreferenceCollection(store=self.store)
-        cprefs.installOn(self.store)
         self.composer = compose.Composer(store=self.store)
-        self.frag = smtpout.FromAddressConfigFragment(cprefs)
+        installOn(self.composer, self.store)
+        self.frag = smtpout.FromAddressConfigFragment(self.composer.prefs)
 
 
     def test_addAddress(self):
@@ -220,19 +220,15 @@ class FromAddressConfigFragmentTest(unittest.TestCase):
                      smtpPassword=u'secret')
 
         self.frag.addAddress(default=False, **attrs)
-        item = self.store.findUnique(smtpout.FromAddress)
+        item = self.store.findUnique(smtpout.FromAddress,
+                                     smtpout.FromAddress._default == False)
         for (k, v) in attrs.iteritems():
             self.assertEquals(getattr(item, k), v)
-        # make sure it didn't make it the default
-        self.assertEquals(
-                self.store.count(
-                    smtpout.FromAddress,
-                    smtpout.FromAddress._default == True),
-                0)
         item.deleteFromStore()
 
         self.frag.addAddress(default=True, **attrs)
-        item = self.store.findUnique(smtpout.FromAddress)
+        item = self.store.findUnique(smtpout.FromAddress,
+                                     smtpout.FromAddress._default == True)
         for (k, v) in attrs.iteritems():
             self.assertEquals(getattr(item, k), v)
         # make sure it did
@@ -252,7 +248,7 @@ class FromAddressExtractionTest(unittest.TestCase):
         """
         s = store.Store(self.mktemp())
         ls = userbase.LoginSystem(store=s)
-        ls.installOn(s)
+        installOn(ls, s)
 
         acc = ls.addAccount('username', 'dom.ain', 'password', protocol=u'not email')
         ss = acc.avatars.open()
@@ -315,7 +311,7 @@ class FromAddressTestCase(unittest.TestCase):
         """
         s = store.Store(self.mktemp())
         ls = userbase.LoginSystem(store=s)
-        ls.installOn(s)
+        installOn(ls, s)
 
         acc = ls.addAccount('foo', 'host', 'password', protocol=u'email')
         ss = acc.avatars.open()

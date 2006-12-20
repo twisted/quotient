@@ -10,14 +10,14 @@ from axiom.attributes import reference, inmemory
 
 from nevow.testutil import renderLivePage
 
-from xmantissa.plugins.mailoff import indexingBenefactorFactory
 from xmantissa import ixmantissa
+from xmantissa.fulltext import PyLuceneIndexer
 
-from xquotient.quotientapp import INDEXER_TYPE
+from xquotient.quotientapp import MessageSearchProvider
 from xquotient.exmess import Message, splitAddress
 from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  ThemedFragmentWrapper)
-
+from xquotient.extract import ExtractPowerup
 
 def _checkForPyLucene(indexer):
     """
@@ -34,9 +34,9 @@ def _checkForPyLucene(indexer):
 class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
-                             (indexingBenefactorFactory,))
+                             (MessageSearchProvider,))
 
-        self.indexer = self.mimeReceiver.store.findUnique(INDEXER_TYPE)
+        self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
         _checkForPyLucene(self.indexer)
 
     def _indexSomething(self, thing):
@@ -111,8 +111,8 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
 class ViewTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
-                                (indexingBenefactorFactory,))
-        self.indexer = self.mimeReceiver.store.findUnique(INDEXER_TYPE)
+                                (MessageSearchProvider,))
+        self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
         _checkForPyLucene(self.indexer)
 
 

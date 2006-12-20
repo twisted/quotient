@@ -9,12 +9,16 @@ from nevow import tags as T, inevow, athena
 from nevow.page import renderer
 from nevow.athena import expose, LiveElement
 
-from axiom.item import Item, InstallableMixin, transacted, declareLegacyItem
+from axiom.item import Item, transacted, declareLegacyItem
 from axiom import tags
 from axiom import attributes
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
+from axiom.dependency import dependsOn
+from axiom.scheduler import SubScheduler
 
 from xmantissa import ixmantissa, webnav, people, webtheme
+from xmantissa.webapp import PrivateApplication
+
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import Scrollable, ScrollableView
@@ -26,6 +30,8 @@ from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
 from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout
+from xquotient.mail import MessageSource, DeliveryAgent
+from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
 
 # Views that the user may select.
 VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, OUTBOX_STATUS,
@@ -138,13 +144,22 @@ def _viewSelectionToMailboxSelector(store, viewSelection):
     return sq
 
 
-class Inbox(Item, InstallableMixin):
+class Inbox(Item):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
     schemaVersion = 3
 
     installedOn = attributes.reference()
+
+    powerupInterfaces = (ixmantissa.INavigableElement,)
+
+    privateApplication = dependsOn(PrivateApplication)
+    scheduler = dependsOn(SubScheduler)
+    messageSource = dependsOn(MessageSource)
+    quotientPrefs = dependsOn(QuotientPreferenceCollection)
+    deliveryAgent = dependsOn(DeliveryAgent)
+    messageDisplayPrefs = dependsOn(MessageDisplayPreferenceCollection)
 
     # uiComplexity should be an integer between 1 and 3, where 1 is the least
     # complex and 3 is the most complex.  the value of this attribute
@@ -168,9 +183,7 @@ class Inbox(Item, InstallableMixin):
                     [webnav.Tab('Inbox', self.storeID, 0.4)],
                 authoritative=True)]
 
-    def installOn(self, other):
-        super(Inbox, self).installOn(other)
-        other.powerUp(self, ixmantissa.INavigableElement)
+
 
 
     def getBaseComparison(self, viewSelection):

@@ -5,9 +5,10 @@ from nevow import tags, loaders
 from nevow.athena import expose
 
 from axiom.store import Store
+from axiom.userbase import LoginMethod
+from axiom.dependency import installOn
 
 from xmantissa.webtheme import getLoader
-from xmantissa.webapp import PrivateApplication
 from xmantissa.people import Person, EmailAddress
 
 from xquotient import compose, mimeutil, smtpout
@@ -22,15 +23,22 @@ class _ComposeTestMixin:
 
         s = Store()
 
-        PrivateApplication(store=s).installOn(s)
-        Inbox(store=s).installOn(s)
+        LoginMethod(store=s,
+                    internal=False,
+                    protocol=u'email',
+                    localpart=u'default',
+                    domain=u'host',
+                    verified=True,
+                    account=s)
+
+        installOn(Inbox(store=s), s)
 
         smtpout.FromAddress(
             store=s,
             address=u'moe@divmod.com').setAsDefault()
 
         composer = compose.Composer(store=s)
-        composer.installOn(s)
+        installOn(composer, s)
 
         composeFrag = composeFragFactory(composer)
         composeFrag.jsClass = u'Quotient.Test.ComposeController'
@@ -55,7 +63,9 @@ class ComposeTestCase(testcase.TestCase, _ComposeTestMixin):
         """
         Make a bunch of people and give them email addresses
         """
+
         (s, composeFrag) = self._getComposeFragment()
+
 
         def makePerson(email, name):
             EmailAddress(store=s,
@@ -67,8 +77,8 @@ class ComposeTestCase(testcase.TestCase, _ComposeTestMixin):
         makePerson(u'localpart@domain', u'Tobias Knight')
         makePerson(u'madonna@divmod.com', u'Madonna')
         makePerson(u'kilroy@foo', u'')
-
         return ctx.tag[composeFrag]
+
 
 class AddrPassthroughComposeFragment(compose.ComposeFragment):
     """
@@ -127,12 +137,8 @@ class DraftsTestCase(testcase.TestCase):
 
     def getWidgetDocument(self):
         s = Store()
-
-        PrivateApplication(store=s).installOn(s)
-        compose.Composer(store=s).installOn(s)
-
-        drafts = compose.Drafts(store=s)
-        drafts.installOn(s)
+        composer = compose.Composer(store=s)
+        installOn(composer, s)
 
         for i in xrange(5):
             compose.Draft(
@@ -144,11 +150,10 @@ class DraftsTestCase(testcase.TestCase):
                                            receivedWhen=Time(),
                                            sentWhen=Time()))
 
-        f = compose.DraftsScreen(drafts)
+        f = compose.DraftsScreen(composer.drafts)
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f
-
 
 
 class ComposeAutoCompleteTestCase(testcase.TestCase):

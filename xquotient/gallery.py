@@ -6,7 +6,7 @@ from twisted.python.components import registerAdapter
 from nevow import rend, static, flat, athena, tags, inevow
 from nevow.athena import expose
 
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item
 from axiom import attributes
 from axiom.upgrade import registerUpgrader
 
@@ -107,7 +107,7 @@ class ThumbnailDisplayer(Item, website.PrefixURLMixin):
     def createResource(self):
         return ThumbnailDisplay(self)
 
-class Gallery(Item, InstallableMixin):
+class Gallery(Item):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_gallery'
@@ -115,9 +115,7 @@ class Gallery(Item, InstallableMixin):
 
     installedOn = attributes.reference()
 
-    def installOn(self, other):
-        super(Gallery, self).installOn(other)
-        other.powerUp(self, ixmantissa.INavigableElement)
+    powerupInterfaces = (ixmantissa.INavigableElement,)
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.6, children=

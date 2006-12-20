@@ -3,17 +3,16 @@ from epsilon.extime import Time
 from axiom.store import Store
 from axiom import attributes
 from axiom.item import Item
+from axiom.dependency import installOn
 
 from nevow.livetrial import testcase
 from nevow import tags, loaders
 from nevow.athena import expose
 
 from xmantissa.webtheme import getLoader
-from xmantissa.webapp import PrivateApplication
 from xmantissa import people
 
 from xquotient.exmess import Message, MessageDetail
-from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient.inbox import Inbox
 from xquotient import equotient
 
@@ -62,9 +61,7 @@ class _MsgDetailTestMixin(object):
         @rtype: L{axiom.store.Store}
         """
         s = Store()
-        PrivateApplication(store=s).installOn(s)
-        QuotientPreferenceCollection(store=s).installOn(s)
-        Inbox(store=s).installOn(s)
+        installOn(Inbox(store=s), s)
         return s
 
     def _setUpMsg(self):
@@ -113,7 +110,7 @@ class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
 
     def _setUpStore(self):
         s = super(MsgDetailAddPersonTestCase, self)._setUpStore()
-        people.Organizer(store=s).installOn(s)
+        installOn(people.Organizer(store=s), s)
         return s
 
     def verifyPerson(self, key):
@@ -210,7 +207,7 @@ class MsgDetailCCPeopleTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
     def _setUpStore(self):
         store = super(MsgDetailCCPeopleTestCase, self)._setUpStore()
         self.organizer = people.Organizer(store=store)
-        self.organizer.installOn(store)
+        installOn(self.organizer, store)
         return store
 
     def setUp(self, peopleAddresses, headers):

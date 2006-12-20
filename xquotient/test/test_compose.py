@@ -9,8 +9,7 @@ from axiom import store
 from axiom import scheduler
 from axiom import item
 from axiom import attributes
-
-from xmantissa import webapp
+from axiom.dependency import installOn
 
 from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
@@ -38,7 +37,7 @@ class CompositionTestMixin(object):
         smtpout._esmtpSendmail = self._esmtpSendmail
 
         self.store = store.Store(dbdir=dbdir)
-        scheduler.Scheduler(store=self.store).installOn(self.store)
+        installOn(scheduler.Scheduler(store=self.store), self.store)
         self.defaultFromAddr = smtpout.FromAddress(
                                 store=self.store,
                                 smtpHost=u'example.org',
@@ -48,7 +47,7 @@ class CompositionTestMixin(object):
         self.defaultFromAddr.setAsDefault()
 
         self.composer = compose.Composer(store=self.store)
-        self.composer.installOn(self.store)
+        installOn(self.composer, self.store)
 
 
     def _esmtpSendmail(self, *args, **kwargs):
@@ -130,7 +129,7 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
     """
     def setUp(self):
         CompositionTestMixin.setUp(self, dbdir=self.mktemp())
-        mail.DeliveryAgent(store=self.store).installOn(self.store)
+        installOn(mail.DeliveryAgent(store=self.store), self.store)
 
     def test_createRedirectedMessage(self):
         """
@@ -203,17 +202,13 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def setUp(self):
         """
-        Create an *on-disk* store (XXX This is hella slow) and set up
-        some dependencies that ComposeFragment needs.
+        Create an *on-disk* store (XXX This is hella slow)
         """
         CompositionTestMixin.setUp(self, dbdir=self.mktemp())
-
-        webapp.PrivateApplication(store=self.store).installOn(self.store)
         da = mail.DeliveryAgent(store=self.store)
-        da.installOn(self.store)
+        installOn(da, self.store)
         self.cabinet = compose.FileCabinet(store=self.store)
         self.cf = compose.ComposeFragment(self.composer)
-
 
     def test_createMessageHonorsSmarthostFromAddress(self):
         """
@@ -517,6 +512,3 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                           set([exmess.UNREAD_STATUS, exmess.OUTBOX_STATUS]))
         nd = self.store.findUnique(smtpout.DeliveryToAddress)
         self.assertIdentical(nd.message, m)
-
-
-

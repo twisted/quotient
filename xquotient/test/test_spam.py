@@ -8,15 +8,13 @@ from twisted.trial.unittest import TestCase
 from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import boolean, inmemory, integer
-from axiom.iaxiom import IScheduler
+from axiom.dependency import installOn
 
 from xquotient.iquotient import IHamFilter
 from xquotient.spam import Filter
 from xquotient.mimestorage import Part
 from xquotient.exmess import (Message, _TrainingInstruction, SPAM_STATUS,
                               TRAINED_STATUS, CLEAN_STATUS)
-
-from xquotient.mail import MessageSource
 
 from xquotient.test.test_workflow import (DummyMessageImplementation,
                                           FakeScheduler)
@@ -31,16 +29,14 @@ class TestFilter(Item):
     """
     implements(IHamFilter)
 
+    powerupInterfaces = (IHamFilter,)
+
     result = boolean(default=False, allowNone=False)
     test = inmemory()
 
     forgotTraining = boolean(default=False)
 
     trainCount = integer(default=0)
-
-    def installOn(self, other):
-        other.powerUp(self, IHamFilter)
-
 
     def classify(self, item):
         return self.result, 0
@@ -94,13 +90,8 @@ class FilterTestCase(TestCase):
 
     def setUp(self):
         self.store = Store()
-         # XXX implicit dependency: needed for MessageSource
         self.scheduler = FakeScheduler(store=self.store, test=self)
-        self.store.powerUp(self.scheduler, IScheduler)
-
-        # XXX implicit dependency: needed for Filter.
-        MessageSource(store=self.store)
-
+        installOn(self.scheduler, self.store)
 
     def test_postiniHeaderParsing(self):
         """
@@ -132,9 +123,9 @@ class FilterTestCase(TestCase):
         learn about a bunch of new messages.
         """
         f = Filter(store=self.store)
-        f.installOn(self.store)
+        installOn(f, self.store)
         tf = TestFilter(store=self.store, test=self)
-        tf.installOn(f)
+        installOn(tf, self.store)
         COUNT = 10
         for j in range(2):
             for x in range(COUNT):
@@ -213,7 +204,8 @@ class FilterTestCase(TestCase):
         """
         msg = self._messageWithPostiniHeader(
             u'(S:90.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
-        f = Filter(usePostiniScore=True, postiniThreshhold=1.0)
+        f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
+        installOn(f, self.store)
         f.processItem(msg)
         self.failIf(msg.hasStatus(SPAM_STATUS))
 
@@ -226,7 +218,8 @@ class FilterTestCase(TestCase):
         msg = self._messageWithPostiniHeader(
             u'(S:90.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
         f = Filter(store=self.store, usePostiniScore=False, postiniThreshhold=None)
-        TestFilter(store=self.store, result=True).installOn(f)
+        tf = TestFilter(store=self.store, result=True)
+        installOn(tf, self.store)
         f.processItem(msg)
         self.failUnless(msg.hasStatus(SPAM_STATUS))
 
@@ -239,7 +232,7 @@ class FilterTestCase(TestCase):
         msg = self._messageWithPostiniHeader(
             u'(S: 0.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )')
         f = Filter(store=self.store, usePostiniScore=False, postiniThreshhold=None)
-        TestFilter(store=self.store, result=False).installOn(f)
+        installOn(TestFilter(store=self.store, result=False), self.store)
         f.processItem(msg)
         self.failIf(msg.hasStatus(SPAM_STATUS))
 
@@ -279,7 +272,9 @@ class FilterTestCase(TestCase):
             Part(),
             u'test://postiniWithoutHeaderSpamFiltering')
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
-        TestFilter(store=self.store, result=True).installOn(f)
+        tf = TestFilter(store=self.store, result=True)
+        installOn(tf, self.store)
+        self.failUnlessEquals(len(list(f._filters())),  1)
         f.processItem(msg)
         self.assertIn(SPAM_STATUS, list(msg.iterStatuses()))
 
@@ -294,6 +289,6 @@ class FilterTestCase(TestCase):
             Part(),
             u'test://postiniWithoutHeaderHamFiltering')
         f = Filter(store=self.store, usePostiniScore=True, postiniThreshhold=1.0)
-        TestFilter(store=self.store, result=False).installOn(f)
+        installOn(TestFilter(store=self.store, result=False), self.store)
         f.processItem(msg)
         self.assertNotIn(SPAM_STATUS, list(msg.iterStatuses()))

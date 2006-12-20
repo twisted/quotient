@@ -19,6 +19,7 @@ from axiom.store import Store
 from axiom.item import Item, transacted
 from axiom.attributes import integer, inmemory, text
 from axiom.iaxiom import IScheduler
+from axiom.dependency import installOn
 
 from axiom.tags import Catalog
 
@@ -94,7 +95,7 @@ class FakeScheduler(Item):
     test = inmemory()
 
     implements(IScheduler)
-
+    powerupInterfaces = (IScheduler,)
     def schedule(self, runnable, when):
         self.test.fakeSchedule(runnable, when)
 
@@ -1204,8 +1205,7 @@ class DeletionTest(_WorkflowMixin, TestCase):
         """
         from xquotient.mail import DeliveryAgent
         from xquotient.test.test_mimepart import MessageTestMixin
-        da = self.store.findOrCreate(DeliveryAgent)
-        da.installOn(self.store)
+        da = self.store.findOrCreate(DeliveryAgent, lambda da: installOn(da, self.store))
 
         mimerec = da.createMIMEReceiver(u'test://test')
         mimerec.feedStringNow(MessageTestMixin.trivialMessage)
