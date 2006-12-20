@@ -13,11 +13,14 @@ from xmantissa.webapp import PrivateApplication
 from xmantissa.prefs import PreferenceAggregator
 from xmantissa import people
 
-from xquotient.exmess import Message, MessageDetail, PartDisplayer, _addMessageSource, getMessageSources
+from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
+                              _addMessageSource, getMessageSources,
+                              MessageSourceFragment)
 from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import mimeutil
 from xquotient.actions import SenderPersonFragment
+from xquotient.test.util import MIMEReceiverMixin, PartMaker
 
 class UtilityTestCase(TestCase):
     """
@@ -84,6 +87,7 @@ class PartItem(Item):
         self.preferred = preferred
 
 
+
 class MessageTestCase(TestCase):
     def testDeletion(self):
         s = Store()
@@ -105,7 +109,7 @@ class MessageTestCase(TestCase):
 
 
 
-class WebTestCase(TestCase):
+class WebTestCase(TestCase, MIMEReceiverMixin):
     def _testPartDisplayerScrubbing(self, input, scrub=True):
         """
         Set up a store, a PartItem with a body of C{input},
@@ -184,6 +188,22 @@ class WebTestCase(TestCase):
         MessageDisplayPreferenceCollection(store=s).installOn(s)
         m.walkMessage()
         self.assertEqual(impl.preferred, 'text/html')
+
+
+    def test_messageSourceReplacesIllegalChars(self):
+        """
+        Test that L{xquotient.exmess.MessageSourceFragment} renders the source
+        of a message with XML-illegal characters replaced
+        """
+        self.setUpMailStuff()
+        m = self.createMIMEReceiver().feedStringNow(
+            PartMaker('text/html', '\x00 \x01 hi').make()).message
+        f = MessageSourceFragment(m)
+        self.assertEqual(
+            f.source(None, None),
+            PartMaker('text/html', '0x0 0x1 hi').make() + '\n')
+
+
 
 class PersonStanTestCase(TestCase):
     """

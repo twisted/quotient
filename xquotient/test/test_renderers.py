@@ -14,7 +14,7 @@ class RenderersTestCase(TestCase):
     Tests for L{xquotient.renderers}
     """
 
-    def testSpacePreservingStringRenderer(self):
+    def test_spacePreservingStringRenderer(self):
         """
         Check that L{renderers.SpacePreservingStringRenderer} does the
         right thing with newlines and spaces
@@ -36,14 +36,14 @@ class RenderersTestCase(TestCase):
                     renderers.ParagraphRenderer(
                         mimepart.FlowedParagraph.fromRFC2646(text)))
 
-    def testParagraphNesting(self):
+    def test_paragraphNesting(self):
         """
         Check that L[renderers.ParagraphRenderer} doesn't explode
         if asked to render a deep tree of paragraphs
         """
         self._renderQuotedMessage(1000)
 
-    def testQuotingLevels(self):
+    def test_quotingLevels(self):
         """
         Check that L{renderers.ParagraphRenderer} assigns the
         right quoting levels to things
@@ -59,9 +59,37 @@ class RenderersTestCase(TestCase):
 
         self.assertEqual(i, 3)
 
-    def testParagraphRendererPreservesWhitespace(self):
+    def test_paragraphRendererPreservesWhitespace(self):
         self.assertEqual(
             renderPlainFragment(
                 renderers.ParagraphRenderer(
                     mimepart.FixedParagraph.fromString('  foo'))).strip(),
             '&#160; foo')
+
+
+    def test_paragraphRendererReplacesIllegalChars(self):
+        """
+        Test that L{xquotient.renderers.ParagraphRenderer} replaces
+        XML-illegal characters in the content of the paragraph it is passed
+        """
+        para = mimepart.FixedParagraph.fromString('\x00 hi!')
+        rend = renderers.ParagraphRenderer(para)
+        self.assertEqual(renderPlainFragment(rend).strip(), '0x0 hi!')
+
+
+    def test_replaceIllegalChars(self):
+        """
+        Test that L{xquotient.renderers.replaceIllegalChars} replaces 0x00 +
+        everything in the C0 control set minus CR, LF and HT with strings
+        describing the missing characters
+        """
+        s = ''.join(map(chr, range(32))) + 'foobar'
+        # ord('\t') < ord('\n') < ord('\r')
+        expected = (
+            ''.join(hex(n) for n in xrange(ord('\t'))) +
+            '\t\n0xb0xc\r' +
+            ''.join(hex(n) for n in xrange(ord('\r')+1, 32)) +
+            'foobar')
+
+        self.assertEquals(
+            renderers.replaceIllegalChars(s), expected)

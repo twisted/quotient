@@ -1,5 +1,4 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
-import re
 from itertools import chain, imap
 
 from datetime import timedelta
@@ -28,11 +27,10 @@ from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               COPY_RELATION, BLIND_COPY_RELATION)
 from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout
 
-#_entityReference = re.compile('&([a-z]+);', re.I)
-
 # Views that the user may select.
 VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, OUTBOX_STATUS,
          BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS, TRASH_STATUS]
+
 
 
 
@@ -49,9 +47,9 @@ def quoteBody(m, maxwidth=78):
         para = mimepart.FlowedParagraph.fromRFC2646(payload)
     else:
         para = mimepart.FixedParagraph.fromString(payload)
-    newtext = para.asRFC2646(maxwidth-2).split('\r\n')
+    newtext = renderers.replaceIllegalChars(para.asRFC2646(maxwidth-2))
 
-    return [ '\n>'.join(newtext) ]
+    return [ '\n>'.join(newtext.split('\r\n')) ]
 
 
 def reSubject(m, pfx='Re: '):

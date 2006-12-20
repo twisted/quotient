@@ -170,15 +170,48 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
                     ThemedFragmentWrapper(
                         compose.DraftsScreen(drafts)))
 
+class MockPart(object):
+    """
+    A mock L{xquotient.mimestorage.Part} which implements enough functionality
+    to satisfy L{xquotient.exmess.PartDisplayer}
+    """
+    def __init__(self, unicodeBody, contentType='text/plain'):
+        """
+        @param unicodeBody: the body of the part
+        @type unicodeBody: C{unicode}
 
-class PartTestCase(TestCase):
+        @param contentType: the content type of the part.  defaults to
+        text/plain
+        @type contentType: C{str}
+        """
+        self.unicodeBody = unicodeBody
+        self.contentType = contentType
+
+
+    def getUnicodeBody(self):
+        return self.unicodeBody
+
+
+    def getBody(self, decode=False):
+        return str(self.unicodeBody)
+
+
+    def getContentType(self):
+        return self.contentType
+
+
+
+class PartDisplayerTestCase(TestCase):
+    """
+    Tests for L{xquotient.exmess.PartDisplayer}
+    """
     def setUp(self):
         self.partDisplayer = PartDisplayer(None)
 
 
     def test_scrubbingInvalidDocument(self):
         """
-        Pass a completely malformed document to L{PartDisplay.scrubbedHTML}
+        Pass a completely malformed document to L{PartDisplayer.scrubbedHTML}
         and assert that it returns C{None} instead of raising an exception.
         """
         self.assertIdentical(None, self.partDisplayer.scrubbedHTML(''))
@@ -186,7 +219,27 @@ class PartTestCase(TestCase):
 
     def test_scrubbingSimpleDocument(self):
         """
-        Pass a trivial document to L{PartDisplay.scrubbedHMTL} and make sure
+        Pass a trivial document to L{PartDisplayer.scrubbedHMTL} and make sure
         it comes out the other side in-tact.
         """
         self.assertEquals('<div></div>', self.partDisplayer.scrubbedHTML('<div></div>'))
+
+
+    def test_renderablePartReplacesInvalidCharsinHTML(self):
+        """
+        Test that L{xquotient.exmess.PartDisplayer.renderablePart} replaces
+        XML-illegal characters in the body of the text/html part it is passed
+        """
+        part = MockPart(u'<div>\x00 hi \x01</div>', 'text/html')
+        tag = self.partDisplayer.renderablePart(part)
+        self.assertEquals(tag.content, '<div>0x0 hi 0x1</div>')
+
+    def test_renderablePartDoesntReplaceInvalidCharsElsewhere(self):
+        """
+        Test that L{xquotient.exmess.PartDisplayer.renderablePart} doesn't
+        replace XML-illegal characters if the content-type of the part isn't
+        text/html
+        """
+        part = MockPart(u'\x00', 'text/plain')
+        tag = self.partDisplayer.renderablePart(part)
+        self.assertEquals(tag.content, '\x00')

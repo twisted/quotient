@@ -1,14 +1,29 @@
 # -*- test-case-name: xquotient.test.test_renderers -*-
+import re
 
 from itertools import imap, cycle
 
 from zope.interface import implements
 
-from nevow import inevow, rend, tags, stan, flat, page
+from nevow import inevow, tags, flat, page
 
 from xmantissa.publicresource import getLoader
 from xmantissa import ixmantissa
 
+_ILLEGAL_CHARS = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F]')
+
+def replaceIllegalChars(s):
+    """
+    Replace characters in C{s} which should not appear in XML documents with a
+    string representation of the character (e.g. '\x00 \x01' -> '0x0 0x1').
+    This includes 0x00 and the C0 control set (0x01 through 0x1F), with the
+    exception of CR (0x0D), LF (0x0A) and HT (0x09).
+
+    See:
+        * http://lists.w3.org/Archives/Public/public-i18n-geo/2003May/att-0030/W3C_I18N_Q_A_C0_Range.htm
+        * http://www.w3.org/TR/REC-xml/#charsets
+    """
+    return _ILLEGAL_CHARS.sub(lambda match: hex(ord(match.group(0))), s)
 
 def textToRudimentaryHTML(text):
     return flat.flatten(
@@ -115,7 +130,8 @@ class ParagraphRenderer:
                     p.fillSlots('quote-class', qc)
                     yield p
                 else:
-                    yield SpacePreservingStringRenderer(c)
+                    yield SpacePreservingStringRenderer(
+                        replaceIllegalChars(c))
 
         self.pattern.fillSlots('content', walkParagraph(self.paragraph))
         return self.pattern

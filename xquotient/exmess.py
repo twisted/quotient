@@ -38,6 +38,7 @@ from xmantissa.webtheme import ThemedElement
 
 from xquotient import gallery, equotient, scrubber, mimeutil
 from xquotient.actions import SenderPersonFragment
+from xquotient.renderers import replaceIllegalChars
 
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -1499,8 +1500,9 @@ class PartDisplayer(ItemGrabber):
         @param content: C{unicode}
         @param scrubberFunction: function
         """
+        content = replaceIllegalChars(content.encode('utf-8'))
         try:
-            dom = microdom.parseString(content.encode('utf-8'),
+            dom = microdom.parseString(content,
                                        beExtremelyLenient=True)
         except ParseError:
             return None
@@ -1531,17 +1533,23 @@ class PartDisplayer(ItemGrabber):
         return self._parseAndScrub(content, scrubber.scrubCIDLinks)
 
 
-    def render_content(self, ctx, data):
-        request = inevow.IRequest(ctx)
-        part = self.item
+    def renderablePart(self, part, scrub=True):
+        """
+        Convert a L{xquotient.mimestorage.Part} into something renderable by nevow
 
+        @param part: the part
+        @type part: L{xquotient.mimestorage.Part}
+
+        @param scrub: whether to scrub the part content if it's HTML
+        @type scrub: boolean
+
+        @return: L{nevow.tags.xml}
+        """
         ctype = part.getContentType()
-        request.setHeader('content-type', ctype)
-
         if ctype.startswith('text/'):
             content = part.getUnicodeBody()
             if ctype.endswith('/html'):
-                if 'noscrub' not in request.args:
+                if scrub:
                     content = self.scrubbedHTML(content)
                 else:
                     content = self.cidLinkScrubbedHTML(content)
@@ -1550,6 +1558,14 @@ class PartDisplayer(ItemGrabber):
         else:
             content = part.getBody(decode=True)
         return tags.xml(content)
+
+
+    def render_content(self, ctx, data):
+        request = inevow.IRequest(ctx)
+        ctype = self.item.getContentType()
+        request.setHeader('content-type', ctype)
+        return self.renderablePart(self.item, not 'noscrub' in request.args)
+
 
 
 
@@ -1613,7 +1629,8 @@ class MessageSourceFragment(ThemedElement):
 
         @rtype: C{unicode}
         """
-        source = self.message.impl.source.getContent()
+        source = replaceIllegalChars(
+            self.message.impl.source.getContent())
         charset = self.message.impl.getParam('charset', default='utf-8')
 
         try:
