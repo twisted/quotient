@@ -197,31 +197,39 @@ class MsgDetailHeadersTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
     expose(setUp)
 
 
-class MsgDetailCCPeopleTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
+class MsgDetailCorrespondentPeopleTestCase(testcase.TestCase, _MsgDetailHeadersTestMixin):
     """
-    Tests for rendering a message with the CC header set and some people in
-    the store
+    Tests for rendering a message where various correspondents are or aren't
+    represented by L{xmantissa.people.Person} items in the store
     """
-    jsClass = u'Quotient.Test.MsgDetailCCPeopleTestCase'
+    jsClass = u'Quotient.Test.MsgDetailCorrespondentPeopleTestCase'
 
     def _setUpStore(self):
-        store = super(MsgDetailCCPeopleTestCase, self)._setUpStore()
+        store = super(MsgDetailCorrespondentPeopleTestCase, self)._setUpStore()
         self.organizer = people.Organizer(store=store)
         installOn(self.organizer, store)
         return store
 
-    def setUp(self, peopleAddresses, headers):
+    def setUp(self, peopleAddresses, cc, recipient):
         """
         Setup & populate a store with a L{xquotient.exmess.Message} which has
-        the headers in C{headers} set to the given values, and a person for
-        each email address in C{peopleAddresses}
+        correspondents set to the values of C{cc} and C{recipient}, and a
+        person for each email address in C{peopleAddresses}
 
-        @param peopleAddresses: the email addresses to associate with people
-        @type peopleAddresses: sequence of C{unicode}
+        @param cc: addresses to use as the value of the C{cc} header
+        @type cc: C{unicode}
+
+        @param recipient: address to use as the value of the C{recipient}
+        attribute
+        @type cc: C{unicode}
 
         @type headers: C{dict} of C{unicode}
         """
+        headers = {}
+        if cc:
+            headers[u'cc'] = cc
         msg = self._setUpMsg(headers)
+        msg.recipient = recipient
         for addr in peopleAddresses:
             people.EmailAddress(
                 store=msg.store,

@@ -3439,8 +3439,8 @@ Quotient.Test.MsgDetailTestCase.methods(
     },
 
     /**
-     * Test that the headers in the DOM reflect the headers of the message
-     * that is being rendered
+     * Test that the text headers in the DOM reflect the headers of the
+     * message that is being rendered
      */
     function test_headers(self) {
         var result = self.setUp();
@@ -3456,7 +3456,6 @@ Quotient.Test.MsgDetailTestCase.methods(
 
                 assertFieldsEqual(
                     {from: '"Sender" <sender@host>',
-                     to: "recipient@host",
                      subject: "the subject",
                      sent: "Wed, 31 Dec 1969 19:00:00 -0500",
                      received: "Wed, 31 Dec 1969 19:00:01 -0500"});
@@ -3615,15 +3614,15 @@ Quotient.Test.MsgDetailHeadersTestCase.methods(
         return result;
     });
 
-Quotient.Test.MsgDetailCCPeopleTestCase = Nevow.Athena.Test.TestCase.subclass(
-                                            'Quotient.Test.MsgDetailCCPeopleTestCase');
+Quotient.Test.MsgDetailCorrespondentPeopleTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                            'Quotient.Test.MsgDetailCorrespondentPeopleTestCase');
 /**
- * Tests for rendering a message with the CC header set and some people in the
- * store
+ * Tests for rendering a message where various correspondents are or aren't
+ * represented by L{xmantissa.people.Person} items in the store
  */
-Quotient.Test.MsgDetailCCPeopleTestCase.methods(
-    function setUp(self, peopleAddresses, headers) {
-        var d = self.callRemote('setUp', peopleAddresses, headers);
+Quotient.Test.MsgDetailCorrespondentPeopleTestCase.methods(
+    function setUp(self, peopleAddresses, cc, recipient) {
+        var d = self.callRemote('setUp', peopleAddresses, cc, recipient);
         d.addCallback(
             function (widgetInfo) {
                 return self.addChildWidgetFromWidgetInfo(widgetInfo);
@@ -3643,8 +3642,8 @@ Quotient.Test.MsgDetailCCPeopleTestCase.methods(
      * There should be nodes for two L{Quotient.Common.SenderPerson} instances
      * inside the CC header node.
      */
-    function test_noPeople(self) {
-        var result = self.setUp([], {'cc': '1@host, 2@host'});
+    function test_ccNoPeople(self) {
+        var result = self.setUp([], '1@host, 2@host', 'recipient@host');
         result.addCallback(
             function(ignored) {
                 var headers = self.testHelper.collectHeaders(),
@@ -3666,8 +3665,8 @@ Quotient.Test.MsgDetailCCPeopleTestCase.methods(
      *
      * The CC header node should contain the node for one person widget
      */
-    function test_aPerson(self) {
-        var result = self.setUp(['1@host'], {'cc': '1@host'});
+    function test_ccAPerson(self) {
+        var result = self.setUp(['1@host'], '1@host', 'recipient@host');
         result.addCallback(
             function(ignored) {
                 var headers = self.testHelper.collectHeaders(),
@@ -3677,6 +3676,51 @@ Quotient.Test.MsgDetailCCPeopleTestCase.methods(
                 self.assertEquals(
                     Nevow.Athena.NodesByAttribute(
                         cc, "class", "person-widget").length,
+                    1);
+            });
+        return result;
+    },
+
+    /**
+     * Test rendering a message with recipient set but no people in the store
+     *
+     * There should be a node for a L{Quotient.Common.SenderPerson} instance
+     * inside the recipient header node.
+     */
+    function test_recipientNoPeople(self) {
+        var result = self.setUp([], null, 'recipient@host');
+        result.addCallback(
+            function(ignored) {
+                var headers = self.testHelper.collectHeaders(),
+                    recip = headers['to'];
+
+                self.assertEquals(recip.childNodes.length, 1);
+
+                var spnodes = Nevow.Athena.NodesByAttribute(
+                    recip, "athena:class", "Quotient.Common.SenderPerson");
+
+                self.assertEquals(spnodes.length, 1);
+            });
+        return result;
+    },
+
+    /**
+     * Test rendering a message with the recipient set to an email address
+     * which also belongs to a person in the store
+     *
+     * There should be one person widget in the recipient header node
+     */
+    function test_recipientAPerson(self) {
+        var result = self.setUp(['recipient@host'], null, 'recipient@host');
+        result.addCallback(
+            function(ignored) {
+                var headers = self.testHelper.collectHeaders(),
+                    recip = headers['to'];
+
+                self.assertEquals(recip.childNodes.length, 1);
+                self.assertEquals(
+                    Nevow.Athena.NodesByAttribute(
+                        recip, "class", "person-widget").length,
                     1);
             });
         return result;

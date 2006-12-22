@@ -1791,10 +1791,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         senderEmail = mimeutil.EmailAddress(sender, mimeEncoded=False)
         senderStan = self.personStanFromEmailAddress(senderEmail)
 
+        recipient = self.original.recipient
+        recipientEmail = mimeutil.EmailAddress(recipient, mimeEncoded=False)
+        recipientStan = self.personStanFromEmailAddress(recipientEmail)
+
         return dictFillSlots(ctx.tag,
                     {'sender-person': senderStan,
                      'sender': sender,
-                     'recipient': self.original.recipient,
+                     'recipient': recipientStan,
                      'cc-detailed': ccStan,
                      'subject': self.original.subject,
                      'sent': sentWhenTerse,
