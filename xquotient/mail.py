@@ -242,16 +242,13 @@ class MailTransferAgent(item.Item,
     """
 
     typeName = "mantissa_mta"
-    schemaVersion = 2
+    schemaVersion = 3
 
     powerupInterfaces = (service.IService, smtp.IMessageDeliveryFactory)
 
     messageCount = attributes.integer(
         "The number of messages which have been delivered through this agent.",
         default=0)
-
-    installedOn = attributes.reference(
-        "A reference to the store or avatar which we have powered up.")
 
     portNumber = attributes.integer(
         "The TCP port to bind to serve SMTP.",
@@ -344,6 +341,14 @@ class MailTransferAgent(item.Item,
             self.securePort = None
         return defer.DeferredList(L)
 
+item.declareLegacyItem(typeName=MailTransferAgent.typeName,
+                  schemaVersion=2,
+                  attributes=dict(messageCount=attributes.integer(),
+                                  installedOn=attributes.reference(),
+                                  portNumber=attributes.integer(),
+                                  securePortNumber=attributes.integer(),
+                                  certificateFile=attributes.bytes(),
+                                  domain=attributes.bytes()))
 
 def upgradeMailTransferAgent1to2(oldMTA):
     """
@@ -373,6 +378,24 @@ def upgradeMailTransferAgent1to2(oldMTA):
 
 registerUpgrader(upgradeMailTransferAgent1to2, 'mantissa_mta', 1, 2)
 
+def upgradeMailTransferAgent2to3(old):
+    """
+    Add the userbase field since MTA depends on it and remove installedOn.
+
+    The isinstance check here is to avoid doing anything to MDA
+    instances returned by the 1to2 upgrader.
+    """
+    if isinstance(old, MailDeliveryAgent):
+        return old
+    mta = old.upgradeVersion(MailTransferAgent.typeName, 2, 3,
+                             messageCount=old.messageCount,
+                             portNumber=old.portNumber,
+                             securePortNumber=old.securePortNumber,
+                             certificateFile=old.certificateFile,
+                             domain=old.domain)
+    mta.userbase = old.store.findOrCreate(userbase.LoginSystem)
+    return mta
+registerUpgrader(upgradeMailTransferAgent2to3, MailTransferAgent.typeName, 2, 3)
 
 class NullMessage(object):
     """

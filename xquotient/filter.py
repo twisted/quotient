@@ -15,6 +15,7 @@ from nevow import inevow, athena
 from axiom import item, attributes
 from axiom.tags import Catalog
 from axiom.dependency import dependsOn
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa, webnav, webtheme, liveform
 
@@ -26,22 +27,21 @@ class RuleFilteringPowerup(item.Item):
     rules.
     """
     typeName = 'xquotient_filter_filteringpowerup'
-    installedOn = attributes.reference(doc="""
-    Avatar which this powers up.
-    """)
+    schemaVersion = 2
 
     tagCatalog = dependsOn(Catalog, doc="""
     The catalog in which to tag items to which this action is applied.
     """)
+    messageSource = dependsOn(mail.MessageSource)
 
     filters = attributes.inmemory()
+
     powerupInterfaces = (ixmantissa.INavigableElement,)
     def activate(self):
         self.filters = None
 
-
     def installed(self):
-        self.store.findUnique(mail.MessageSource).addReliableListener(self)
+        self.messageSource.addReliableListener(self)
 
     def getTabs(self):
         return [webnav.Tab('Mail', self.storeID, 0.2, children=
@@ -59,6 +59,18 @@ class RuleFilteringPowerup(item.Item):
             if not proceed:
                 break
 
+def ruleFilter1to2(old):
+    """
+    Add messageSource field since RuleFilteringPowerup depends on
+    it. Remove installedOn.
+    """
+    return old.upgradeVersion(RuleFilteringPowerup.typeName, 1, 2,
+                              tagCatalog = old.tagCatalog,
+                              messageSource = old.store.findUnique(
+                                                 mail.MessageSource))
+
+registerUpgrader(ruleFilter1to2, RuleFilteringPowerup.typeName, 1, 2)
+
 
 class RuleFilterBenefactor(item.Item):
     """
@@ -67,6 +79,7 @@ class RuleFilterBenefactor(item.Item):
 
     typeName = 'xquotient_filter_filterbenefactor'
     implements(ixmantissa.IBenefactor)
+    powerupNames = ["xquotient.filter.RuleFilteringPowerup"]
 
     installedOn = attributes.reference()
     endowed = attributes.integer(default=0)
@@ -76,7 +89,7 @@ class MailingListFilterBenefactor(item.Item):
     Endows users with MailingListFilteringPowerup.
     """
     implements(ixmantissa.IBenefactor)
-
+    powerupNames = ["xquotient.filter.MailingListFilteringPowerup"]
     installedOn = attributes.reference()
     endowed = attributes.integer(default=0)
 
@@ -324,6 +337,7 @@ class MailingListFilteringPowerup(item.Item):
     """
     Filters mail according to the mailing list it was sent from.
     """
+    schemaVersion = 2
     tagCatalog = dependsOn(Catalog, doc="""
     The catalog in which to tag items to which this action is applied.
     """)
@@ -340,6 +354,21 @@ class MailingListFilteringPowerup(item.Item):
         if matched:
             self.mailingListRule.getAction().actOn(self, self.mailingListRule,
                                                    item, extraData)
+
+
+
+def mailingListFilter1to2(old):
+    """
+    Add messageSource field since MailingListFilteringPowerup depends
+    on it. Remove installedOn.
+    """
+    return old.upgradeVersion(MailingListFilteringPowerup.typeName, 1, 2,
+                              tagCatalog = old.tagCatalog,
+                              mailingListRule = old.mailingListRule,
+                              messageSource = old.store.findUnique(
+                                                 mail.MessageSource))
+
+registerUpgrader(mailingListFilter1to2, MailingListFilteringPowerup.typeName, 1, 2)
 
 
 class FilteringConfigurationFragment(athena.LiveFragment):
