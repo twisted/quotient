@@ -137,6 +137,13 @@
                             </a>
                           </nevow:invisible>
                         </span>
+                        <nevow:invisible nevow:render="button">
+                          <a href="#" class="more-options-disclose">
+                            <athena:handler event="onclick" handler="toggleMoreOptions" />
+                            <span class="closed-label">More Options...</span>
+                            <span class="open-label" style="display: none">Less Options</span>
+                          </a>
+                        </nevow:invisible>
                         <nevow:invisible nevow:render="attachButton" />
                       </div>
                     </div>
@@ -163,15 +170,6 @@
                       rows="2"><nevow:slot name="to" /></textarea></td>
                 </tr>
                 <nevow:slot name="subject" />
-                <tr>
-                  <td colspan="2" style="text-align: center">
-                    <a href="#" class="more-options-disclose">
-                      <athena:handler event="onclick" handler="toggleMoreOptions" />
-                      <span class="closed-label">More Options...</span>
-                      <span class="open-label" style="display: none">Less Options</span>
-                    </a>
-                  </td>
-                </tr>
                 <tr class="more-options" style="display: none">
                   <td class="header-table-first-col">CC:</td>
                   <td class="header-table-last-col">
