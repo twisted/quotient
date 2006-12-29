@@ -3972,11 +3972,25 @@ Quotient.Test.ShowNodeAsDialogTestCase = Nevow.Athena.Test.TestCase.subclass(
                                             'Quotient.Test.ShowNodeAsDialogTestCase');
 
 Quotient.Test.ShowNodeAsDialogTestCase.methods(
+    /**
+     * Make a node suitable for showing as a dialog, and insert it below our
+     * node in the DOM
+     *
+     * @param testName: name of the test
+     * @type testName: C{String}
+     *
+     * @return: the node
+     */
+    function setUp(self, testName) {
+        var node = document.createElement("div");
+        node.style.display = "none";
+        node.className = "ShowNodeAsDialogTestCase-" + testName + "-dialog";
+        self.node.appendChild(node);
+        return node;
+    },
+
     function test_showNodeAsDialog(self) {
-        /* get the original node */
-        var node = self.firstNodeByAttribute(
-                        "class",
-                        "ShowNodeAsDialogTestCase-dialog");
+        var node = self.setUp("showNodeAsDialog");
         /* show it as a dialog */
         var dialog = Quotient.Common.Util.showNodeAsDialog(node);
 
@@ -3984,7 +3998,7 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
             return Nevow.Athena.NodesByAttribute(
                     document.body,
                     "class",
-                    "ShowNodeAsDialogTestCase-dialog");
+                    node.className);
         }
 
         /* get all elements with the same class name as our node */
@@ -4006,6 +4020,43 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
         /* should be one, now that the dialog has been hidden */
         self.assertEquals(nodes.length, 1);
         self.assertEquals(nodes[0], orignode);
+    },
+
+    /**
+     * Test that L{Quotient.Common.Util.showNodeAsDialog} takes the left/top
+     * scrollbar offsets into account when centering the dialog
+     */
+    function test_scrollAlignment(self) {
+        var node = document.createElement("div");
+        node.style.overflow = "scroll";
+        node.style.height = "100px";
+
+        var stretch = document.createElement("div");
+        stretch.appendChild(document.createTextNode("hi"));
+        stretch.style.height = "1000px";
+        node.appendChild(stretch);
+
+        document.body.appendChild(node);
+
+        var V_SCROLL_OFFSET = 13;
+        node.scrollTop = V_SCROLL_OFFSET;
+
+        var dlgNode = self.setUp("scrollAlignment"),
+            dlg = Quotient.Common.Util.showNodeAsDialog(dlgNode, node);
+
+        var nodeSize = Divmod.Runtime.theRuntime.getElementSize(node),
+            dlgSize = Divmod.Runtime.theRuntime.getElementSize(dlgNode),
+            /* figure out the position at which the dialog should appear.  we
+             * want it to start so that the middle of it will be in the middle
+             * of the _visible_ portion of the parent node, so we calculate
+             * half of the parent height minus half of the dialog height,
+             * offset vertically by the offset of the first visible
+             * (unclipped) pixel in the parent */
+            top = Math.floor((nodeSize.h / 2) - (dlgSize.h / 2)) + V_SCROLL_OFFSET;
+
+        self.assertEquals(parseInt(dlg.node.style.top), top);
+
+        dlg.hide();
     });
 
 Quotient.Test.DraftsTestCase = Nevow.Athena.Test.TestCase.subclass(

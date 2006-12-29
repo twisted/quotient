@@ -85,28 +85,53 @@ Quotient.Common.Util = Nevow.Athena.Widget.subclass('Quotient.Common.Util');
  * out the rest of the document, and hide it when the user clicks outside
  * of the dialog.
  *
+ * @param parent: the node to display the dialog inside.  defaults to
+ * document.body
+ *
  * @return: pair of [dialog node, hide function]
  */
-Quotient.Common.Util.showNodeAsDialog = function(node) {
+Quotient.Common.Util.showNodeAsDialog = function(node, parent/*=document.body*/) {
     /* clone the node so we can add it to the document in the different place */
     node = node.cloneNode(true);
 
-    var pageSize = Divmod.Runtime.theRuntime.getPageSize();
+    /* if the parent is supposed to be the <body>, then we use the <html> tag
+     * for any kind of size calculation.  in standards-compliance mode,
+     * firefox sets the height of <html> to be the height of the viewport -
+     * and the height of <body> to be the height of its content, unless it is
+     * told otherwise (and there are a different set of implications if it is)
+     */
+    if(parent == undefined) {
+        parent = document.body;
+    }
+
+    var sizeParent;
+    if(parent.tagName.toLowerCase() == 'body') {
+        sizeParent = document.documentElement;
+    } else {
+        sizeParent = parent;
+    }
+
+    var pageSize = Divmod.Runtime.theRuntime.getElementSize(sizeParent);
 
     /* make an overlay element */
     var blurOverlay = MochiKit.DOM.DIV({"class": "blur-overlay"}, "&#160;");
-    blurOverlay.style.height = document.documentElement.scrollHeight + "px";
+    blurOverlay.style.height = sizeParent.scrollHeight + "px";
 
     /* add it to the document */
-    document.body.appendChild(blurOverlay);
+    parent.appendChild(blurOverlay);
     /* add our cloned node after it */
-    document.body.appendChild(node);
+    parent.appendChild(node);
 
     var elemSize = Divmod.Runtime.theRuntime.getElementSize(node);
 
     node.style.position = "absolute";
-    node.style.left = Math.floor((pageSize.w / 2) - (elemSize.w / 2)) + "px";
-    node.style.top  = Math.floor((pageSize.h / 2) - (elemSize.h / 2)) + "px";
+
+    var left = Math.floor((pageSize.w / 2) - (elemSize.w / 2));
+    node.style.left = (left + sizeParent.scrollLeft) + "px";
+
+    var top = Math.floor((pageSize.h / 2) - (elemSize.h / 2));
+    node.style.top = (top + sizeParent.scrollTop) + "px";
+
     node.style.display = "";
 
     var hidden = false;
@@ -116,8 +141,8 @@ Quotient.Common.Util.showNodeAsDialog = function(node) {
             return;
         }
         hidden = true;
-        document.body.removeChild(blurOverlay);
-        document.body.removeChild(node);
+        parent.removeChild(blurOverlay);
+        parent.removeChild(node);
         blurOverlay.onclick = null;
     }
 
