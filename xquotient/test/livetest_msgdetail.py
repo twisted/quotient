@@ -210,22 +210,25 @@ class MsgDetailCorrespondentPeopleTestCase(testcase.TestCase, _MsgDetailHeadersT
         installOn(self.organizer, store)
         return store
 
-    def setUp(self, peopleAddresses, cc, recipient):
+    def setUp(self, peopleAddresses, sender, recipient, cc):
         """
         Setup & populate a store with a L{xquotient.exmess.Message} which has
         correspondents set to the values of C{cc} and C{recipient}, and a
         person for each email address in C{peopleAddresses}
 
-        @param cc: addresses to use as the value of the C{cc} header
+        @param sender: address to use as the value of the C{from} header
         @type cc: C{unicode}
 
         @param recipient: address to use as the value of the C{recipient}
         attribute
         @type cc: C{unicode}
 
+        @param cc: addresses to use as the value of the C{cc} header
+        @type cc: C{unicode}
+
         @type headers: C{dict} of C{unicode}
         """
-        headers = {}
+        headers = {u'from': sender}
         if cc:
             headers[u'cc'] = cc
         msg = self._setUpMsg(headers)

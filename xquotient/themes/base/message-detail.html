@@ -10,25 +10,21 @@
   <div nevow:render="headerPanel" class="header-panel">
     <div class="msg-detail-sent-date"><nevow:slot name="sent" /></div>
 
-    <div class="sender-container">
-      <nevow:slot name="sender-person" />
-    </div>
-
     <table style="clear: both; width: 100%" cellpadding="0" cellspacing="0" class="msg-header-table">
       <tr>
-        <td class="msg-detail-field-name">Subject:</td>
-        <td class="msg-subject msg-detail-field-body"><nevow:slot name="subject" /></td>
+        <td class="msg-detail-field-name">From:</td>
+        <td class="msg-detail-field-body"><nevow:slot name="sender" /></td>
       </tr>
       <tr>
         <td class="msg-detail-field-name">To:</td>
         <td class="msg-detail-field-body"><nevow:slot name="recipient" /></td>
       </tr>
+      <tr>
+        <td class="msg-detail-field-name">Subject:</td>
+        <td class="msg-subject msg-detail-field-body"><nevow:slot name="subject" /></td>
+      </tr>
       <nevow:slot name="redirect-headers" />
       <nevow:slot name="cc-detailed" />
-      <tr style="display: none" class="detailed-row">
-        <td class="msg-detail-field-name">From:</td>
-        <td class="msg-detail-field-body"><nevow:slot name="sender" /></td>
-      </tr>
       <tr style="display: none" class="detailed-row">
         <td class="msg-detail-field-name">Sent:</td>
         <td class="msg-detail-field-body"><nevow:slot name="sent-detailed" /></td>

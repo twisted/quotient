@@ -1796,8 +1796,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         recipientStan = self.personStanFromEmailAddress(recipientEmail)
 
         return dictFillSlots(ctx.tag,
-                    {'sender-person': senderStan,
-                     'sender': sender,
+                    {'sender': senderStan,
                      'recipient': recipientStan,
                      'cc-detailed': ccStan,
                      'subject': self.original.subject,
