@@ -1,37 +1,27 @@
 
 import os
 
-from OpenSSL import SSL
-
 from zope.interface import implements
 
-from twisted.application import service
-from twisted.internet import defer, reactor, protocol
+from twisted.internet import protocol
 from twisted.protocols import policies
 from twisted.cred import portal
+from twisted.mail import pop3
+from twisted.application.service import IService
 
-from xmantissa.stats import BandwidthMeasuringFactory
+from axiom import item, attributes
+from axiom.item import declareLegacyItem
+from axiom.attributes import bytes, reference, integer
+from axiom.errors import MissingDomainPart
+from axiom.userbase import LoginSystem
+from axiom.dependency import dependsOn, installOn
+from axiom.upgrade import registerUpgrader
+
+from xmantissa.ixmantissa import IProtocolFactoryFactory
+from xmantissa.port import TCPPort, SSLPort
 
 from xquotient.exmess import Message
 
-from epsilon import sslverify
-
-from axiom import item, attributes
-from axiom.errors import MissingDomainPart
-from axiom.userbase import LoginSystem
-from axiom.dependency import dependsOn
-from axiom.upgrade import registerUpgrader 
-
-from twisted.mail import pop3
-
-# XXX Ugh.  This whole file is basically a straight copy of mail.py, and it
-# SUCKS.  I am not going to think too hard about it now (SHIP! SHIP! SHIP!)
-
-
-class MailConfigurationError(Exception):
-    '''
-    Horrible.
-    '''
 
 class MessageInfo(item.Item):
     typeName = 'quotient_pop3_message'
@@ -201,34 +191,24 @@ class POP3Benefactor(item.Item):
     endowed = attributes.integer(default=0)
     powerupNames = ["xquotient.popout.POP3Up"]
 
-class POP3Listener(item.Item, service.Service):
+
+
+class POP3Listener(item.Item):
+    implements(IProtocolFactoryFactory)
+
+    powerupInterfaces = (IProtocolFactoryFactory,)
 
     typeName = "quotient_pop3listener"
-    schemaVersion = 2
-    powerupInterfaces = (service.IService,)
-
-    # These are for the Service stuff
-    parent = attributes.inmemory()
-    running = attributes.inmemory()
+    schemaVersion = 3
 
     # A cred portal, a Twisted TCP factory and as many as two
     # IListeningPorts
     portal = attributes.inmemory()
     factory = attributes.inmemory()
-    port = attributes.inmemory()
-    securePort = attributes.inmemory()
-
-    portNumber = attributes.integer(
-        "The TCP port to bind to serve SMTP.",
-        default=6110)
-
-    securePortNumber = attributes.integer(
-        "The TCP port to bind to serve SMTP/SSL.",
-        default=0)
 
     certificateFile = attributes.bytes(
-        "The name of a file on disk containing a private "
-        "key and certificate for use by the SMTP/SSL server.",
+        "The name of a file on disk containing a private key and certificate "
+        "for use by the POP3 server when negotiating TLS.",
         default=None)
 
     userbase = dependsOn(LoginSystem)
@@ -240,46 +220,65 @@ class POP3Listener(item.Item, service.Service):
     def activate(self):
         self.portal = None
         self.factory = None
-        self.port = None
-        self.securePort = None
 
 
+    # IProtocolFactoryFactory
+    def getFactory(self):
+        if self.factory is None:
+            self.portal = portal.Portal(self.userbase, [self.userbase])
+            self.factory = POP3ServerFactory(self.portal)
 
-    def installed(self):
-        self.setServiceParent(self.store)
+            if self.debug:
+                self.factory = policies.TrafficLoggingFactory(self.factory, 'pop3')
+        return self.factory
 
-    def privilegedStartService(self):
 
-        self.portal = portal.Portal(self.userbase, [self.userbase])
-        self.factory = POP3ServerFactory(self.portal)
+    def setServiceParent(self, parent):
+        """
+        Compatibility hack necessary to prevent the Axiom service startup
+        mechanism from barfing.  Even though this Item is no longer an IService
+        powerup, it will still be found as one one more time and this method
+        will be called on it.
+        """
 
-        if self.debug:
-            self.factory = policies.TrafficLoggingFactory(self.factory, 'pop3')
 
-        if self.portNumber is not None:
-            self.port = reactor.listenTCP(self.portNumber, BandwidthMeasuringFactory(self.factory, 'pop3'))
-
-        if self.securePortNumber is not None and self.certificateFile is not None:
-            cert = sslverify.PrivateCertificate.loadPEM(file(self.certificateFile).read())
-            certOpts = sslverify.OpenSSLCertificateOptions(
-                cert.privateKey.original,
-                cert.original,
-                requireCertificate=False,
-                method=SSL.SSLv23_METHOD)
-            self.securePort = reactor.listenSSL(self.securePortNumber, BandwidthMeasuringFactory(self.factory, 'pop3s'), certOpts)
-
-    def stopService(self):
-        L = []
-        if self.port is not None:
-            L.append(defer.maybeDeferred(self.port.stopListening))
-            self.port = None
-        if self.securePort is not None:
-            L.append(defer.maybeDeferred(self.securePort.stopListening))
-            self.securePort = None
-        return defer.DeferredList(L)
 
 def pop3Listener1to2(old):
     p3l = old.upgradeVersion(POP3Listener.typeName, 1, 2)
     p3l.userbase = old.store.findOrCreate(LoginSystem)
     return p3l
 registerUpgrader(pop3Listener1to2, POP3Listener.typeName, 1, 2)
+
+declareLegacyItem(
+    POP3Listener.typeName, 2, dict(portNumber=integer(default=6110),
+                                   securePortNumber=integer(default=0),
+                                   certificateFile=bytes(default=None),
+                                   userbase=reference(doc="dependsOn(LoginSystem)")))
+
+def pop3listener2to3(oldPOP3):
+    """
+    Create TCPPort and SSLPort items as appropriate.
+    """
+    newPOP3 = oldPOP3.upgradeVersion(
+        POP3Listener.typeName, 2, 3,
+        userbase=oldPOP3.userbase,
+        certificateFile=oldPOP3.certificateFile)
+
+    if oldPOP3.portNumber is not None:
+        port = TCPPort(store=newPOP3.store, portNumber=oldPOP3.portNumber, factory=newPOP3)
+        installOn(port, newPOP3.store)
+
+    securePortNumber = oldPOP3.securePortNumber
+    certificateFile = oldPOP3.certificateFile
+    if securePortNumber is not None and certificateFile:
+        oldCertPath = newPOP3.store.dbdir.preauthChild(certificateFile)
+        if oldCertPath.exists():
+            newCertPath = newPOP3.store.newFilePath('pop3.pem')
+            oldCertPath.copyTo(newCertPath)
+            port = SSLPort(store=newPOP3.store, portNumber=oldPOP3.securePortNumber, certificatePath=newCertPath, factory=newPOP3)
+            installOn(port, newPOP3.store)
+
+    newPOP3.store.powerDown(newPOP3, IService)
+
+    return newPOP3
+registerUpgrader(pop3listener2to3, POP3Listener.typeName, 2, 3)

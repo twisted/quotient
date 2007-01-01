@@ -21,21 +21,24 @@ except ImportError:
 
 from zope.interface import implements
 
-from twisted.application import service
-from twisted.internet import protocol, defer, reactor
+from twisted.internet import protocol, defer
 from twisted.protocols import policies
 from twisted.python import failure
 from twisted.cred import portal, checkers, credentials
 from twisted.mail import smtp, imap4
+from twisted.mail.smtp import IMessageDeliveryFactory
+from twisted.application.service import IService
 
 from epsilon import sslverify
 
 from axiom import item, attributes, userbase, batch
+from axiom.attributes import reference, integer, bytes
 from axiom.upgrade import registerUpgrader
 from axiom.errors import MissingDomainPart
-from axiom.dependency import dependsOn
+from axiom.dependency import dependsOn, installOn
 
-from xmantissa.stats import BandwidthMeasuringFactory
+from xmantissa.ixmantissa import IProtocolFactoryFactory
+from xmantissa.port import TCPPort, SSLPort
 
 from xquotient import iquotient, exmess, mimestorage
 
@@ -177,13 +180,6 @@ class DeliveryAgent(item.Item):
 
 
 
-class DeliveryFactoryMixin(object):
-    implements(smtp.IMessageDeliveryFactory)
-
-    def getMessageDelivery(self):
-        if self.portal is not None:
-            return MessageDelivery(self.store, self.portal)
-        raise RuntimeError("Cannot create MessageDelivery without portal.")
 
 
 
@@ -233,49 +229,38 @@ class ESMTPFactory(protocol.ServerFactory):
 
 
 
-class MailTransferAgent(item.Item,
-                        service.Service, DeliveryFactoryMixin):
+class MailTransferAgent(item.Item):
     """
     Service responsible for binding server ports for SMTP and SMTP/SSL
     protocols.  Also responsible for attaching an appropriately Axiomified cred
     portal to the factories for those servers.
     """
+    implements(IProtocolFactoryFactory, IMessageDeliveryFactory)
+
+    powerupInterfaces = (IProtocolFactoryFactory, IMessageDeliveryFactory)
 
     typeName = "mantissa_mta"
-    schemaVersion = 3
+    schemaVersion = 4
 
-    powerupInterfaces = (service.IService, smtp.IMessageDeliveryFactory)
+    certificateFile = attributes.bytes(
+        "The name of a file on disk containing a private key and certificate "
+        "for use by the SMTP server when negotiating TLS.",
+        default=None)
 
     messageCount = attributes.integer(
         "The number of messages which have been delivered through this agent.",
         default=0)
-
-    portNumber = attributes.integer(
-        "The TCP port to bind to serve SMTP.",
-        default=0)
-    securePortNumber = attributes.integer(
-        "The TCP port to bind to serve SMTP/SSL.",
-        default=0)
-    certificateFile = attributes.bytes(
-        "The name of a file on disk containing a private "
-        "key and certificate for use by the SMTP/SSL server.",
-        default=None)
 
     domain = attributes.bytes(
         "The canonical name of this host.  Used when greeting SMTP clients.",
         default=None)
 
     userbase = dependsOn(userbase.LoginSystem)
-    # These are for the Service stuff
-    parent = attributes.inmemory()
-    running = attributes.inmemory()
 
     # A cred portal, a Twisted TCP factory and as many as two
     # IListeningPorts
     portal = attributes.inmemory()
     factory = attributes.inmemory()
-    port = attributes.inmemory()
-    securePort = attributes.inmemory()
 
     # When enabled, toss all traffic into logfiles.
     debug = False
@@ -283,63 +268,46 @@ class MailTransferAgent(item.Item,
     def activate(self):
         self.portal = None
         self.factory = None
-        self.port = None
-        self.securePort = None
 
 
-    def installed(self):
-        self.setServiceParent(self.store)
-
-    def privilegedStartService(self):
-        if SSL is None and self.securePortNumber is not None:
-            raise MailConfigurationError(
-                "No SSL support: you need to install "
-                "OpenSSL to serve SMTP/SSL")
-
-        if self.certificateFile is not None:
-            cert = sslverify.PrivateCertificate.loadPEM(
-                file(self.certificateFile).read())
-            certOpts = sslverify.OpenSSLCertificateOptions(
-                cert.privateKey.original,
-                cert.original,
-                requireCertificate=False,
-                method=SSL.SSLv23_METHOD)
-        else:
-            certOpts = None
-
-        self.portal = portal.Portal(
-            self.userbase, [self.userbase, checkers.AllowAnonymousAccess()])
-        self.factory = ESMTPFactory(
-            self.portal,
-            self.domain,
-            {'CRAM-MD5': credentials.CramMD5Credentials,
-             'LOGIN': imap4.LOGINCredentials,
-             },
-            certOpts)
-
-        if self.debug:
-            self.factory = policies.TrafficLoggingFactory(self.factory, 'smtp')
-
-        if self.portNumber is not None:
-            self.port = reactor.listenTCP(
-                self.portNumber,
-                BandwidthMeasuringFactory(self.factory, 'smtp'))
-
-        if self.securePortNumber is not None and certOpts is not None:
-            self.securePort = reactor.listenSSL(
-                self.securePortNumber,
-                BandwidthMeasuringFactory(self.factory, 'smtps'), certOpts)
+    # IMessageDeliveryFactory
+    def getMessageDelivery(self):
+        # Force self.portal to be created
+        self.getFactory()
+        return MessageDelivery(self.store, self.portal)
 
 
-    def stopService(self):
-        L = []
-        if self.port is not None:
-            L.append(defer.maybeDeferred(self.port.stopListening))
-            self.port = None
-        if self.securePort is not None:
-            L.append(defer.maybeDeferred(self.securePort.stopListening))
-            self.securePort = None
-        return defer.DeferredList(L)
+    # IProtocolFactoryFactory
+    def getFactory(self):
+        if self.factory is None:
+            if self.certificateFile is not None:
+                cert = sslverify.PrivateCertificate.loadPEM(
+                    file(self.certificateFile).read())
+                certOpts = sslverify.OpenSSLCertificateOptions(
+                    cert.privateKey.original,
+                    cert.original,
+                    requireCertificate=False,
+                    method=SSL.SSLv23_METHOD)
+            else:
+                certOpts = None
+
+            self.portal = portal.Portal(
+                self.userbase, [self.userbase, checkers.AllowAnonymousAccess()])
+            self.factory = ESMTPFactory(
+                self.portal,
+                self.domain,
+                {'CRAM-MD5': credentials.CramMD5Credentials,
+                 'LOGIN': imap4.LOGINCredentials,
+                 },
+                certOpts)
+            if self.debug:
+                self.factory = policies.TrafficLoggingFactory(self.factory, 'smtp')
+        return self.factory
+
+    # GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+    def setServiceParent(self, parent):
+        pass
+
 
 item.declareLegacyItem(typeName=MailTransferAgent.typeName,
                   schemaVersion=2,
@@ -396,6 +364,48 @@ def upgradeMailTransferAgent2to3(old):
     mta.userbase = old.store.findOrCreate(userbase.LoginSystem)
     return mta
 registerUpgrader(upgradeMailTransferAgent2to3, MailTransferAgent.typeName, 2, 3)
+
+
+item.declareLegacyItem(
+    MailTransferAgent.typeName, 3, dict(messageCount=integer(default=0),
+                                        portNumber=integer(default=0),
+                                        securePortNumber=integer(default=0),
+                                        certificateFile=bytes(default=None),
+                                        domain=bytes(default=None),
+                                        userbase=reference(doc="dependsOn(LoginSystem)")))
+
+def upgradeMailTransferAgent3to4(oldMTA):
+    """
+    Create TCPPort and SSLPort items as appropriate.
+    """
+    if isinstance(oldMTA, MailDeliveryAgent):
+        return oldMTA
+    newMTA = oldMTA.upgradeVersion(
+        MailTransferAgent.typeName, 3, 4,
+        userbase=oldMTA.userbase,
+        certificateFile=oldMTA.certificateFile,
+        messageCount=oldMTA.messageCount,
+        domain=oldMTA.domain)
+
+    if oldMTA.portNumber is not None:
+        port = TCPPort(store=newMTA.store, portNumber=oldMTA.portNumber, factory=newMTA)
+        installOn(port, newMTA.store)
+
+    securePortNumber = oldMTA.securePortNumber
+    certificateFile = oldMTA.certificateFile
+    if securePortNumber is not None and certificateFile:
+        oldCertPath = newMTA.store.dbdir.preauthChild(certificateFile)
+        if oldCertPath.exists():
+            newCertPath = newMTA.store.newFilePath('mta.pem')
+            oldCertPath.copyTo(newCertPath)
+            port = SSLPort(store=newMTA.store, portNumber=securePortNumber, certificatePath=newCertPath, factory=newMTA)
+            installOn(port, newMTA.store)
+
+    newMTA.store.powerDown(newMTA, IService)
+
+    return newMTA
+registerUpgrader(upgradeMailTransferAgent3to4, MailTransferAgent.typeName, 3, 4)
+
 
 class NullMessage(object):
     """

@@ -127,46 +127,6 @@ class MailTests(unittest.TestCase):
         return svc.stopService()
 
 
-    def test_lateInstallation(self):
-        """
-        Test that an MTA installed on a store which has already been started
-        gets started itself.
-        """
-        mta = mail.MailTransferAgent(store=self.store)
-        installOn(mta, self.store)
-        self.failUnless(mta.running)
-
-
-    def test_SMTP(self):
-        """
-        Test that an MTA with an SMTP port number gets an IListeningPort for
-        cleartext communication when it is started.
-        """
-        mta = mail.MailTransferAgent(store=self.store)
-        installOn(mta, self.store)
-
-        self.failIfEqual(mta.port, None)
-        self.assertEquals(mta.securePort, None)
-
-
-    def test_SMTPS(self):
-        """
-        Test that an MTA with an SMTP/SSL port number and a certificate gets an
-        IListeningPort for encrypted communication when it is started.
-        """
-        certfile = self.mktemp()
-        certcreate.main(['--filename', certfile, '--quiet'])
-
-        mta = mail.MailTransferAgent(store=self.store,
-                                     portNumber=None,
-                                     securePortNumber=0,
-                                     certificateFile=certfile)
-        installOn(mta, self.store)
-
-        self.assertEqual(mta.port, None)
-        self.failIfEqual(mta.securePort, None)
-
-
     def test_messageTransferAgentDeliveryFactory(self):
         """
         Test that L{mail.MailTransferAgent} properly powers up the Item it is
@@ -588,11 +548,9 @@ class ProtocolTestCase(unittest.TestCase):
         results in a customized authentication failure message which points
         out that a domain part should be included in the username.
         """
-        mta = mail.MailTransferAgent(
-            store=self.store, portNumber=None, securePortNumber=None)
+        mta = mail.MailTransferAgent(store=self.store)
         installOn(mta, self.store)
-        mta.privilegedStartService()
-        factory = mta.factory
+        factory = mta.getFactory()
         protocol = factory.buildProtocol(('192.168.1.1', 12345))
         transport = StringTransport()
         transport.getHost = lambda: IPv4Address('TCP', '192.168.1.1', 54321)

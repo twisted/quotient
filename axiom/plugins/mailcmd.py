@@ -7,8 +7,11 @@ $ axiomatic mail
 from axiom.plugins.webcmd import decodeCommandLine
 from axiom.scripts.axiomatic import AxiomaticCommand
 from axiom.errors import ItemNotFound
+from axiom.dependency import installOn
 
 from twisted.python.usage import UsageError
+
+from xmantissa.port import TCPPort, SSLPort
 
 from xquotient.mail import MailTransferAgent
 from xquotient.popout import POP3Listener
@@ -28,38 +31,69 @@ class _PortConfigurationMixin:
          'specified)'),
         ]
 
+    optFlags = [
+        ('show', None, 'Display information about the current configuration.'),
+        ]
 
-    def _setPortNumber(self, server, key='port', attr='portNumber'):
+
+    def _changePort(self, factory, type, **kw):
+        port = factory.store.findOrCreate(
+            type,
+            lambda p: installOn(p, p.store),
+            factory=factory)
+        if kw:
+            for k, v in kw.iteritems():
+                setattr(port, k, v)
+        else:
+            port.deleteFromStore()
+
+
+    def _setPort(self, server, key, type):
         if self[key] is not None:
             if not self[key]:
-                port = None
+                self._changePort(server, type)
             else:
                 try:
                     port = int(self[key])
-                    if port < 1 or port > 65535:
+                    if port < 0 or port > 65535:
                         raise ValueError
                 except ValueError:
                     raise UsageError(
                         "Argument to --" + key + " must be an "
                         "integer between 0 and 65536.")
-            setattr(server, attr, port)
+                self._changePort(server, type, portNumber=port)
             return True
         return False
 
 
+    def _setPortNumber(self, server):
+        return self._setPort(server, 'port', TCPPort)
+
+
     def _setSecurePortNumber(self, server):
-        return self._setPortNumber(server, 'secure-port', 'securePortNumber')
+        return self._setPort(server, 'secure-port', SSLPort)
 
 
     def _setCertificate(self, server):
         if self['pem-file'] is not None:
-            if not self['pem-file']:
-                certificateFile = None
+            if self['pem-file']:
+                base = server.store.filesdir
+                certPath = base.preauthChild(self['pem-file'])
+                server.certificateFile = certPath.path
             else:
-                certificateFile = self['pem-file']
-            server.certificateFile = certificateFile
+                certPath = None
+                server.certificateFile = None
+
+            for port in server.store.query(SSLPort, SSLPort.factory == server):
+                if certPath is None:
+                    port.deleteFromStore()
+                else:
+                    port.certificatePath = certPath
+                break
+
             return True
         return False
+
 
 
     def postOptions(self):
@@ -70,10 +104,19 @@ class _PortConfigurationMixin:
                 server = store.findUnique(self.serverType)
             except ItemNotFound:
                 raise UsageError("No %s server installed on this store." % (self.name,))
-            for f in [self._setPortNumber,
-                      self._setSecurePortNumber,
-                      self._setCertificate]:
-                didSomething += f(server)
+            if self['show']:
+                didSomething += 1
+                for p in store.query(TCPPort, TCPPort.factory == server):
+                    print 'Accepting connections on TCP port %d.' % (p.portNumber,)
+                for p in store.query(SSLPort, SSLPort.factory == server):
+                    print 'Accepting connections on SSL/TCP port %d using certificate .' % (p.portNumber, p.certificatePath.path)
+                if server.certificateFile is not None:
+                    print 'Using %s for SMTP TLS support.' % (server.certificateFile.path,)
+            else:
+                for f in [self._setPortNumber,
+                          self._setSecurePortNumber,
+                          self._setCertificate]:
+                    didSomething += f(server)
             return didSomething
         if not store.transact(reconfigure):
             self.opt_help()
