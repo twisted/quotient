@@ -6,7 +6,7 @@ from axiom import attributes, item, scheduler, store, userbase
 from axiom.dependency import installOn
 
 from xquotient import exmess, smtpout, compose
-from xquotient.test.test_workflow import DummyMessageImplementation
+from xquotient.test.util import DummyMessageImplementation
 
 
 class MockComposer(item.Item):
