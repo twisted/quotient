@@ -14,6 +14,8 @@ from axiom.tags import Catalog
 from axiom.attributes import integer
 from axiom.item import Item
 
+from axiom.test.util import QueryCounter
+
 from xmantissa.ixmantissa import INavigableFragment, IWebTranslator
 from xmantissa.people import Organizer, Person, EmailAddress
 
@@ -29,7 +31,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment)
 from xquotient import compose, mimeutil, smtpout
-from xquotient.test.test_workflow import (DummyMessageImplementation, QueryCounter,
+from xquotient.test.test_workflow import (DummyMessageImplementation,
                                           DummyMessageImplementationMixin)
 
 
