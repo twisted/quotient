@@ -75,6 +75,10 @@
 
   <div class="inbox-content">
     <div class="quotient-menubar">
+      <div style="float: right" class="mailbox-status-container">
+        <img style="display: none" class="throbber" src="/Quotient/static/images/throbber-small.gif" />
+        <span class="mailbox-status" />
+      </div>
       <div class="complexity-icons">
         <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
              onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
@@ -103,7 +107,7 @@
             Compose
           </span>
         </a>
-        <div style="clear: left; font-size: 0px">&#160;</div>
+        <div style="clear: both; font-size: 0px">&#160;</div>
     </div>
     <div class="content-table-container">
       <div class="message-actions-container">

@@ -122,9 +122,10 @@ Quotient.Common.Util.showNodeAsDialog = function(node, parent/*=document.body*/)
     /* add our cloned node after it */
     parent.appendChild(node);
 
+    node.style.position = "absolute";
+    node.style.display = "";
     var elemSize = Divmod.Runtime.theRuntime.getElementSize(node);
 
-    node.style.position = "absolute";
 
     var left = Math.floor((pageSize.w / 2) - (elemSize.w / 2));
     node.style.left = (left + sizeParent.scrollLeft) + "px";
@@ -132,7 +133,6 @@ Quotient.Common.Util.showNodeAsDialog = function(node, parent/*=document.body*/)
     var top = Math.floor((pageSize.h / 2) - (elemSize.h / 2));
     node.style.top = (top + sizeParent.scrollTop) + "px";
 
-    node.style.display = "";
 
     var hidden = false;
 
@@ -155,6 +155,27 @@ Quotient.Common.Util.showNodeAsDialog = function(node, parent/*=document.body*/)
         }, 0);
 
     return {node: node, hide: hide};
+}
+
+/**
+ * Show a simple warning dialog with the text C{text}
+ *
+ * @return: same as L{Quotient.Common.Util.showNodeAsDialog}
+ */
+Quotient.Common.Util.showSimpleWarningDialog = function(text) {
+    var node = document.createElement("div");
+    node.setAttribute("class", "simple-warning-dialog");
+    node.setAttribute("style", "display: none");
+    var title = document.createElement("div");
+    title.setAttribute("class", "simple-warning-dialog-title");
+    title.appendChild(document.createTextNode("Warning"));
+    node.appendChild(title);
+    var textWrapper = document.createElement("span");
+    textWrapper.setAttribute("class", "simple-warning-dialog-text");
+    textWrapper.appendChild(document.createTextNode(text));
+    node.appendChild(textWrapper);
+    document.body.appendChild(node);
+    return Quotient.Common.Util.showNodeAsDialog(node);
 }
 
 /**

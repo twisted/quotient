@@ -1,13 +1,15 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
-from itertools import chain, imap
+import itertools
 
 from datetime import timedelta
 from zope.interface import implements
 from twisted.python.components import registerAdapter
+from twisted.internet import defer
 
 from nevow import tags as T, inevow, athena
 from nevow.page import renderer
 from nevow.athena import expose, LiveElement
+from epsilon import cooperator
 
 from axiom.item import Item, transacted, declareLegacyItem
 from axiom import tags
@@ -206,9 +208,7 @@ class Inbox(Item):
                                                viewSelection)._getComparison()
 
 
-    def getComparisonForBatchType(self,
-                                  batchType,
-                                  viewSelection):
+    def getComparisonForBatchType(self, batchType, viewSelection):
         """
         Return an IComparison to be used as the restriction for a particular
         batch of messages from a view onto the mailbox with the given
@@ -220,20 +220,28 @@ class Inbox(Item):
         return sq._getComparison()
 
 
-    def messagesForBatchType(self, batchType, viewSelection):
+    def messagesForBatchType(self, batchType, viewSelection, exclude=()):
         """
-        Return a list of L{exmess.Message} instances which belong to the
+        Return an iterable of L{exmess.Message} items which belong to the
         specified batch.
 
         @param batchType: A string defining a particular batch.  For example,
         C{"read"} or C{"unread"}.
 
-        @rtype: C{list}
+        @param exclude: messages to exclude from the batch selection.
+        defaults to no messages.
+        @type exclude: iterable of L{xquotient.exmess.Message}
+
+        @rtype: iterable
         """
-        comp = self.getComparisonForBatchType(batchType, viewSelection)
-        q = self.store.query(Message, comp)
-        lq = list(q)
-        return lq
+        it = self.store.query(
+            Message,
+            self.getComparisonForBatchType(
+                batchType, viewSelection)).paginate()
+
+        exclude = set(m.storeID for m in exclude)
+        return itertools.ifilter(lambda m: m.storeID not in exclude, it)
+
 
     def action_archive(self, message):
         """
@@ -284,6 +292,78 @@ class Inbox(Item):
         ham.
         """
         message.trainClean()
+
+
+    def _getActionMethod(self, actionName):
+        return getattr(self, 'action_' + actionName)
+
+
+    def _performManyAct(self, action, args, messages, D):
+        """
+        Call C{action} on each message in C{messages}, passing the keyword
+        arguments C{args}, and calling back the deferred C{D} with the number
+        of read and unread messages when done
+
+        @param action: the action to call
+        @type action: function
+
+        @param args: extra arguments to pass to the action
+        @type args: C{dict}
+
+        @param messages: the messages to act on
+        @type messages: iterable of L{xquotient.exmess.Message}
+
+        @param D: the deferred to call when we're done
+        @type D: L{twisted.internet.defer.Deferred}
+
+        @return: deferred firing with pair of (read count, unread count)
+        @type: L{twisted.internet.defer.Deferred}
+        """
+        readCount = 0
+        i = -1
+
+        for message in messages:
+            if message.read:
+                readCount += 1
+            yield action(message, **args)
+            i += 1
+        D.callback((readCount, i+1-readCount))
+
+
+    def performMany(self, actionName, messages, args=None,
+                    scheduler=cooperator.iterateInReactor):
+        """
+        Perform the action with name C{actionName} on the messages in
+        C{messages}, passing C{args} as extra arguments to the action method
+
+        @param actionName: name of an action, e.g. "archive".
+        @type actionName: C{str}
+
+        @param messages: the messages to act on
+        @type messages: iterable of L{xquotient.exmess.Message}
+
+        @param args: extra arguments to pass to the action method
+        @type args: None or a C{dict}
+
+        @param scheduler: callable which takes an iterator of deferreds and
+        consumes them appropriately.  expected to return a deferred.  defaults
+        to L{epsilon.cooperator.iterateInReactor}
+        @type scheduler: callable
+
+        @return: the number of affected messages which have been read and the
+        number of affected messages which haven't
+        @rtype: pair
+        """
+        if args is None:
+            args = {}
+
+        action = self._getActionMethod(actionName)
+        D = defer.Deferred()
+
+        coopDeferred = scheduler(self._performManyAct(action, args, messages, D))
+        coopDeferred.addErrback(D.errback)
+
+        return D
 
 
 
@@ -652,27 +732,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return counts
 
 
-    def _getActionMethod(self, actionName):
-        return getattr(self.inbox, 'action_' + actionName)
-
-    def _performMany(self, actionName, messages=(), webIDs=(), args=None):
-
-        extra = {}
-        for k, v in (args or {}).iteritems():
-            extra[k.encode('ascii')] = v
-
-        readCount = 0
-        unreadCount = 0
-        action = self._getActionMethod(actionName)
-        for message in chain(messages, imap(self.translator.fromWebID, webIDs)):
-            if message.read:
-                readCount += 1
-            else:
-                unreadCount += 1
-            action(message, **extra)
-        return readCount, unreadCount
-
-
     def _messagePreview(self, msg):
         if msg is not None:
             return {
@@ -701,8 +760,12 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         @param extraArguments: Additional keyword arguments to pass on to the
         action handler.
         """
-        messages = map(self.translator.fromWebID, messageIdentifiers)
-        return self._performMany(action, messages, args=extraArguments)
+        msgs = map(self.translator.fromWebID, messageIdentifiers)
+
+        if extraArguments is not None:
+            extraArguments = dict((k.encode('ascii'), v)
+                                    for (k, v) in extraArguments.iteritems())
+        return self.inbox.performMany(action, msgs, args=extraArguments)
     expose(actOnMessageIdentifierList)
 
 
@@ -713,14 +776,20 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         characteristic or which are specifically included but not specifically
         excluded.
         """
-        messages = set(
-            self.inbox.messagesForBatchType(
-                batchType, viewSelection))
-        more = set(map(self.translator.fromWebID, include))
-        less = set(map(self.translator.fromWebID, exclude))
+        msgs = self.inbox.messagesForBatchType(
+            batchType, viewSelection,
+            exclude=[self.translator.fromWebID(webID)
+                        for webID in exclude])
 
-        targets = (messages | more) - less
-        return self._performMany(action, targets, args=extraArguments)
+        msgs = itertools.chain(
+            msgs,
+            (self.translator.fromWebID(webID) for webID in include))
+
+        if extraArguments is not None:
+            extraArguments = dict((k.encode('ascii'), v)
+                                    for (k, v) in extraArguments.iteritems())
+
+        return self.inbox.performMany(action, msgs, args=extraArguments)
     expose(actOnMessageBatch)
 
 

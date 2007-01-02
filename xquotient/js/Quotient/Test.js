@@ -56,6 +56,70 @@ Quotient.Test.TestThrobber.methods(
     });
 
 
+/**
+ * Tests for L{Quotient.Mailbox.Status}
+ */
+Quotient.Test.MailboxStatusTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.MailboxStatusTestCase');
+Quotient.Test.MailboxStatusTestCase.methods(
+    /**
+     * Make a node that contains the stuff that the status widget wants, and
+     * return a status widget
+     */
+    function setUp(self) {
+        var node = document.createElement('div'),
+            throbber = document.createElement('div'),
+            status = document.createElement('div');
+
+        throbber.className = 'throbber';
+        throbber.style.display = 'none';
+        node.appendChild(throbber);
+
+        status.className = 'mailbox-status';
+        node.appendChild(status);
+
+        self.node.appendChild(node);
+
+        self.throbberNode = throbber;
+        self.statusNode = status;
+
+        return Quotient.Mailbox.Status(node);
+    },
+
+    /**
+     * Test L{Quotient.Mailbox.Status.showStatusUntilFires}
+     */
+    function test_showStatusUntilFires(self) {
+        var statusWidget = self.setUp();
+
+        self.assertEqual(self.throbberNode.style.display, "none");
+        self.assertEqual(self.statusNode.childNodes.length, 0);
+
+        var deferred = Divmod.Defer.Deferred();
+
+        var STATUS_MSG = "A message";
+
+        statusWidget.showStatusUntilFires(deferred, STATUS_MSG);
+
+        self.assertEqual(self.throbberNode.style.display, "");
+        self.assertEqual(self.statusNode.childNodes.length, 1);
+        self.assertEqual(self.statusNode.firstChild.nodeValue, STATUS_MSG);
+
+        var CALLBACK_VALUE = 624;
+
+        deferred.addCallback(
+            function(result) {
+                self.assertEqual(result, CALLBACK_VALUE);
+
+                self.assertEqual(self.throbberNode.style.display, "none");
+                self.assertEqual(self.statusNode.childNodes.length, 0);
+            });
+
+        deferred.callback(CALLBACK_VALUE);
+        return deferred;
+    });
+
+
+
 Quotient.Test.ScrollTableTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ScrollTableTestCase');
 Quotient.Test.ScrollTableTestCase.methods(
     /**
@@ -4101,6 +4165,39 @@ Quotient.Test.ShowNodeAsDialogTestCase.methods(
 
         dlg.hide();
     });
+
+Quotient.Test.ShowSimpleWarningDialogTestCase = Nevow.Athena.Test.TestCase.subclass(
+                                                    'Quotient.Test.ShowSimpleWarningDialogTestCase');
+
+/**
+ * Tests for L{Quotient.Common.Util.showSimpleWarningDialog}
+ */
+Quotient.Test.ShowSimpleWarningDialogTestCase.methods(
+    /**
+     * Test that the text we pass gets put inside the dialog node
+     */
+    function test_dialogText(self) {
+        var text = "HI SOME TEXT",
+            dlg = Quotient.Common.Util.showSimpleWarningDialog(text),
+            node = dlg.node;
+        self.assertEquals(
+            Nevow.Athena.NodeByAttribute(
+                node, "class", "simple-warning-dialog-text").firstChild.nodeValue,
+            text);
+        dlg.hide();
+    },
+
+    /**
+     * Test that the dialog is visible
+     */
+    function test_visibility(self) {
+        var dlg = Quotient.Common.Util.showSimpleWarningDialog(""),
+            node = dlg.node;
+        self.assertEquals(node.parentNode, document.body);
+        self.assertEquals(node.style.display, "");
+        dlg.hide();
+    });
+
 
 Quotient.Test.DraftsTestCase = Nevow.Athena.Test.TestCase.subclass(
                                     'Quotient.Test.DraftsTestCase');

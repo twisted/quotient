@@ -22,3 +22,12 @@ class ButtonTogglerTestCase(TestCase, ButtonRenderingMixin):
     def getWidgetDocument(self):
         return tags.div(render=tags.directive('button'))[
                     tags.a(href='#')['A link']]
+
+
+
+class ShowSimpleWarningDialogTestCase(TestCase):
+    """
+    Tests for Quotient.Common.Util.showSimpleWarningDialog
+    """
+
+    jsClass = u'Quotient.Test.ShowSimpleWarningDialogTestCase'
