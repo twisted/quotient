@@ -1,13 +1,7 @@
 from cStringIO import StringIO
 from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
-from zope.interface import implements
-
-from epsilon.extime import Time
-
 from axiom import store
-from axiom.item import Item
-from axiom.attributes import integer, text
 from axiom.userbase import LoginSystem
 from axiom.dependency import installOn
 
@@ -20,11 +14,7 @@ from xmantissa.plugins.mailoff import plugin as quotientOffering
 
 from xquotient.inbox import Inbox
 from xquotient.mail import DeliveryAgent
-from xquotient.iquotient import IMessageData
-from xquotient.mimeutil import EmailAddress
 
-from xquotient.exmess import (SENDER_RELATION, RECIPIENT_RELATION,
-                              COPY_RELATION, BLIND_COPY_RELATION)
 
 class ThemedFragmentWrapper(FragmentWrapper):
     """
@@ -117,63 +107,3 @@ class MIMEReceiverMixin:
                 return self.createMIMEReceiver()
             return substore.transact(tx2)
         return s.transact(tx1)
-
-
-
-class DummyMessageImplementationMixin:
-    """
-    Mock implementation of message data.
-    """
-    implements(IMessageData)
-
-    def relatedAddresses(self):
-        """Implement related address interface for creating correspondents
-        """
-        if self.senderInfo is None:
-            yield (SENDER_RELATION, EmailAddress(
-                    '"Alice Exampleton" <alice@a.example.com>'))
-        else:
-            yield (SENDER_RELATION, EmailAddress(self.senderInfo))
-        yield (RECIPIENT_RELATION, EmailAddress('bob@b.example.com'))
-
-    # maybe the rest of IMessageData...?
-    def walkMessage(self, prefer=None):
-        return []
-
-    def walkAttachments(self, prefer=None):
-        return []
-
-    def associateWithMessage(self, m):
-        pass
-
-    def guessSentTime(self, default):
-        return Time()
-
-
-
-class DummyMessageImplementation(Item, DummyMessageImplementationMixin):
-    senderInfo = text(
-        doc="""
-        The sender as passed by the factory which created this implementation;
-        used to provide a sensible implementation of relatedAddresses.
-        """,
-        default=None, allowNone=True)
-
-
-
-class DummyMessageImplWithABunchOfAddresses(Item, DummyMessageImplementationMixin):
-    """
-    Mock L{xquotient.iquotient.IMessageData} which returns a bunch of things
-    from L{relatedAddresses}
-    """
-    z = integer()
-
-    def relatedAddresses(self):
-        """
-        Return one address for each relation type
-        """
-        for (rel, addr) in ((SENDER_RELATION, 'sender@host'),
-                            (RECIPIENT_RELATION, 'recipient@host'),
-                            (COPY_RELATION, 'copy@host'),
-                            (BLIND_COPY_RELATION, 'blind-copy@host')):
-            yield (rel, EmailAddress(addr, False))

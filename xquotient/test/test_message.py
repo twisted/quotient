@@ -4,7 +4,7 @@ from twisted.trial.unittest import TestCase
 
 from axiom.store import Store
 from axiom.item import Item
-from axiom.attributes import text, inmemory, AND
+from axiom.attributes import text, inmemory
 from axiom.dependency import installOn
 
 from nevow.testutil import AccumulatingFakeRequest as makeRequest
@@ -16,14 +16,12 @@ from xmantissa import people
 
 from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               _addMessageSource, getMessageSources,
-                              MessageSourceFragment, SENDER_RELATION)
+                              MessageSourceFragment)
 from xquotient.exmess import MessageDisplayPreferenceCollection
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import mimeutil
 from xquotient.actions import SenderPersonFragment
-from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
-                                 DummyMessageImplWithABunchOfAddresses)
-from xquotient.exmess import Correspondent
+from xquotient.test.util import MIMEReceiverMixin, PartMaker
 
 class UtilityTestCase(TestCase):
     """
@@ -270,35 +268,3 @@ class PersonStanTestCase(TestCase):
 
         res = self.md.personStanFromEmailAddress(email)
         self.failUnless(isinstance(res, people.PersonFragment))
-
-
-
-class DraftCorrespondentTestCase(TestCase):
-    """
-    Test that L{xquotient.exmess.Correspondent} items are created for the
-    related addresses of draft messages at creation time
-    """
-    def setUp(self):
-        """
-        Make a draft message using an L{xquotient.iquotient.IMessageData} with
-        a bunch of related addresses
-        """
-        self.store = Store()
-        self.messageData = DummyMessageImplWithABunchOfAddresses(
-            store=self.store)
-        self.message = Message.createDraft(
-            self.store, self.messageData, u'test')
-
-    def test_correspondents(self):
-        """
-        Test that the correspondent items in the store match the related
-        addresses of our L{xquotient.iquotient.IMessageData}
-        """
-        for (rel, addr) in self.messageData.relatedAddresses():
-            self.assertEqual(
-                self.store.count(
-                    Correspondent,
-                    AND(Correspondent.relation == rel,
-                        Correspondent.address == addr.email,
-                        Correspondent.message == self.message)), 1,
-                'no Correspondent for rel %r with addr %r' % (rel, addr.email))

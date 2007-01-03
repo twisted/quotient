@@ -597,8 +597,6 @@ class Message(item.Item):
         # self.addStatus(SENT_STATUS)
         self.addStatus(UNREAD_STATUS)
         self.addStatus(DRAFT_STATUS)
-
-        self._extractRelatedAddresses()
         return self
     createDraft = classmethod(createDraft)
 

@@ -17,7 +17,7 @@ from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 from xquotient.qpeople import MessageList, MessageLister
 
-from xquotient.test.util import DummyMessageImplementation
+from xquotient.test.test_workflow import DummyMessageImplementation
 from xquotient.test.test_inbox import testMessageFactory
 
 def makeMessage(receiver, parts, impl):

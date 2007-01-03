@@ -27,6 +27,10 @@ from axiom.test.util import QueryCounter
 
 from xmantissa.people import Person, EmailAddress as StoredEmailAddress
 
+from xquotient.iquotient import IMessageData
+
+from xquotient.mimeutil import EmailAddress
+
 from xquotient.exmess import (
     Message, Correspondent, MailboxSelector, _UndeferTask, INBOX_STATUS,
     CLEAN_STATUS, SPAM_STATUS, INCOMING_STATUS, TRASH_STATUS, TRAINED_STATUS,
@@ -40,8 +44,47 @@ from xquotient.exmess import _MessageStatus
 
 from xquotient.mimestorage import Part, Header
 from xquotient.mimepart import AttachmentPart
-from xquotient.test.util import (DummyMessageImplementation,
-                                 DummyMessageImplementationMixin)
+
+
+class DummyMessageImplementationMixin:
+    """
+    Mock implementation of message data.
+    """
+    implements(IMessageData)
+
+    def relatedAddresses(self):
+        """Implement related address interface for creating correspondents
+        """
+        if self.senderInfo is None:
+            yield (SENDER_RELATION, EmailAddress(
+                    '"Alice Exampleton" <alice@a.example.com>'))
+        else:
+            yield (SENDER_RELATION, EmailAddress(self.senderInfo))
+        yield (RECIPIENT_RELATION, EmailAddress('bob@b.example.com'))
+
+    # maybe the rest of IMessageData...?
+    def walkMessage(self, prefer=None):
+        return []
+
+    def walkAttachments(self, prefer=None):
+        return []
+
+    def associateWithMessage(self, m):
+        pass
+
+    def guessSentTime(self, default):
+        return Time()
+
+
+
+class DummyMessageImplementation(Item, DummyMessageImplementationMixin):
+    senderInfo = text(
+        doc="""
+        The sender as passed by the factory which created this implementation;
+        used to provide a sensible implementation of relatedAddresses.
+        """,
+        default=None, allowNone=True)
+
 
 
 class FakeScheduler(Item):
