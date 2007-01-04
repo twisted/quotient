@@ -15,7 +15,7 @@ from axiom.item import Item, transacted, declareLegacyItem
 from axiom import tags
 from axiom import attributes
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
-from axiom.dependency import dependsOn
+from axiom.dependency import dependsOn, installOn
 from axiom.scheduler import SubScheduler
 
 from xmantissa import ixmantissa, webnav, people, webtheme
@@ -31,7 +31,7 @@ from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
-from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout
+from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
 
@@ -150,9 +150,7 @@ class Inbox(Item):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
-    schemaVersion = 3
-
-    installedOn = attributes.reference()
+    schemaVersion = 4
 
     powerupInterfaces = (ixmantissa.INavigableElement,)
 
@@ -162,6 +160,7 @@ class Inbox(Item):
     quotientPrefs = dependsOn(QuotientPreferenceCollection)
     deliveryAgent = dependsOn(DeliveryAgent)
     messageDisplayPrefs = dependsOn(MessageDisplayPreferenceCollection)
+    filter = dependsOn(spam.Filter)
 
     # uiComplexity should be an integer between 1 and 3, where 1 is the least
     # complex and 3 is the most complex.  the value of this attribute
@@ -172,9 +171,6 @@ class Inbox(Item):
     # showMoreDetail is a boolean which indicates whether messages should be
     # loaded with the "More Detail" pane expanded.
     showMoreDetail = attributes.boolean(default=False)
-
-    catalog = attributes.reference(
-        doc="An unused reference.  Hopefully will be deleted soon.")
 
     def __init__(self, **kw):
         super(Inbox, self).__init__(**kw)
@@ -386,6 +382,44 @@ declareLegacyItem(Inbox.typeName, 2,
                        catalog=attributes.reference()))
 
 registerAttributeCopyingUpgrader(Inbox, 2, 3)
+
+declareLegacyItem(Inbox.typeName, 3,
+                  dict(installedOn=attributes.reference(),
+                       privateApplication=attributes.reference(),
+                       scheduler=attributes.reference(),
+                       messageSource=attributes.reference(),
+                       quotientPrefs=attributes.reference(),
+                       deliveryAgent=attributes.reference(),
+                       messageDisplayPrefs=attributes.reference(),
+                       catalog=attributes.reference(),
+                       uiComplexity=attributes.integer(),
+                       showMoreDetail=attributes.boolean()))
+
+def inbox3to4(old):
+    """
+    Copy over all attributes except for 'installedOn' and 'catalog', which
+    have been deleted, and set the 'filter' attribute to either a
+    L{xquotient.spam.Filter} that exists in the store, or a new one
+    """
+    new = old.upgradeVersion(
+        Inbox.typeName, 3, 4,
+        privateApplication=old.privateApplication,
+        scheduler=old.scheduler,
+        messageSource=old.messageSource,
+        quotientPrefs=old.quotientPrefs,
+        deliveryAgent=old.deliveryAgent,
+        messageDisplayPrefs=old.messageDisplayPrefs,
+        uiComplexity=old.uiComplexity,
+        showMoreDetail=old.showMoreDetail)
+
+    filter = new.store.findFirst(spam.Filter, default=None)
+    if filter is None:
+        filter = spam.Filter(store=new.store)
+        installOn(filter, new.store)
+    new.filter = filter
+    return new
+registerUpgrader(inbox3to4, Inbox.typeName, 3, 4)
+
 
 
 class MailboxScrollingFragment(Scrollable, ScrollableView, LiveElement):
