@@ -128,33 +128,6 @@ class ComposeToAddressTestCase(testcase.TestCase, _ComposeTestMixin):
     expose(getComposeWidget)
 
 
-class DraftsTestCase(testcase.TestCase):
-    """
-    Tests for the L{xquotient.compose.DraftsScreen} scrolltable
-    """
-
-    jsClass = u'Quotient.Test.DraftsTestCase'
-
-    def getWidgetDocument(self):
-        s = Store()
-        composer = compose.Composer(store=s)
-        installOn(composer, s)
-
-        for i in xrange(5):
-            compose.Draft(
-                store=s,
-                message=testMessageFactory(store=s,
-                                           spam=False,
-                                           draft=True,
-                                           subject=unicode(i),
-                                           receivedWhen=Time(),
-                                           sentWhen=Time()))
-
-        f = compose.DraftsScreen(composer.drafts)
-        f.setFragmentParent(self)
-        f.docFactory = getLoader(f.fragmentName)
-        return f
-
 
 class ComposeAutoCompleteTestCase(testcase.TestCase):
     """

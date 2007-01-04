@@ -726,6 +726,21 @@ Quotient.Mailbox.Controller.methods(
         self._batchSelection = null;
         self._longRunningActionDeferred = null;
 
+        self.viewToActions = {
+            "all": ["defer", "delete", "forward",
+                    "reply", "train-spam", "unarchive"],
+            "inbox": ["archive", "defer", "delete",
+                      "forward", "reply", "train-spam"],
+            "archive": ["unarchive", "delete", "forward",
+                        "reply", "train-spam"],
+            "draft": ["delete"],
+            "spam": ["delete", "train-ham"],
+            "deferred": ["forward", "reply"],
+            "bounce": ['delete', 'forward'],
+            "outbox": [],
+            "sent": ["delete", "forward", "reply"],
+            "trash": ["forward" ,"reply", "undelete"]};
+
         /*
          * Fired when the initial load has finished.
          */
@@ -947,32 +962,18 @@ Quotient.Mailbox.Controller.methods(
      * available to this view.
      */
     function _getActionButtons(self) {
-        var buttonInfo = {
-            "all": ["defer", "delete", "forward",
-                    "reply", "train-spam", "unarchive"],
-            "inbox": ["archive", "defer", "delete",
-                      "forward", "reply", "train-spam"],
-            "archive": ["unarchive", "delete", "forward",
-                        "reply", "train-spam"],
-            "spam": ["delete", "train-ham"],
-            "deferred": ["forward", "reply"],
-            "bounce": ['delete', 'forward'],
-            "outbox": [],
-            "sent": ["delete", "forward", "reply"],
-            "trash": ["forward" ,"reply", "undelete"]};
-
         /*
-         * Compute list of all button names from the buttonInfo structured.
+         * Compute list of all button names from the self.viewToActions structured.
          */
         var view, i, j;
         var allButtonNames = [];
-        for (view in buttonInfo) {
-            for (i = 0; i < buttonInfo[view].length; ++i) {
+        for (view in self.viewToActions) {
+            for (i = 0; i < self.viewToActions[view].length; ++i) {
                 /*
                  * Try to find this button in the list of all button names
                  */
                 for (j = 0; j < allButtonNames.length; ++j) {
-                    if (buttonInfo[view][i] == allButtonNames[j]) {
+                    if (self.viewToActions[view][i] == allButtonNames[j]) {
                         break;
                     }
                 }
@@ -981,7 +982,7 @@ Quotient.Mailbox.Controller.methods(
                  * it.
                  */
                 if (j == allButtonNames.length) {
-                    allButtonNames.push(buttonInfo[view][i]);
+                    allButtonNames.push(self.viewToActions[view][i]);
                 }
             }
         }
@@ -1010,15 +1011,15 @@ Quotient.Mailbox.Controller.methods(
         var views = {};
         var actions;
         var actionName;
-        for (view in buttonInfo) {
+        for (view in self.viewToActions) {
             actions = {};
-            for (i = 0; i < buttonInfo[view].length; ++i) {
-                actionName = buttonInfo[view][i];
+            for (i = 0; i < self.viewToActions[view].length; ++i) {
+                actionName = self.viewToActions[view][i];
                 actions[actionName] = {
                     "button": getActionButton(actionName),
                     "enable": true};
             }
-            hide = difference(allButtonNames, buttonInfo[view]);
+            hide = difference(allButtonNames, self.viewToActions[view]);
             for (i = 0; i < hide.length; ++i) {
                 actionName = hide[i];
                 actions[actionName] = {
@@ -1846,9 +1847,10 @@ Quotient.Mailbox.Controller.methods(
             self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
         }
 
-        var nodes = {"all": null, "trash": null, "sent": null, "outbox": null,
-                     "bounce": null, "spam": null, "inbox": null,
-                     "deferred": null, 'archive': null};
+        var nodes = {};
+        for (var view in self.viewToActions) {
+            nodes[view] = null;
+        }
         var e, nameNode, name;
 
         for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {

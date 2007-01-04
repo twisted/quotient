@@ -146,29 +146,7 @@ Quotient.Compose.FileUploadController.methods(
         self.form.elements.upload.disabled = false;
     });
 
-Quotient.Compose.DraftListScrollingWidget = Mantissa.ScrollTable.FlexHeightScrollingWidget.subclass(
-                                                'Quotient.Compose.DraftListScrollingWidget');
 
-Quotient.Compose.DraftListScrollingWidget.methods(
-    function __init__(self, node, metadata) {
-        self.columnAliases = {"sentWhen": "Date"};
-        self.columnWidths = {"subject": "50%"};
-        Quotient.Compose.DraftListScrollingWidget.upcall(self, "__init__", node, metadata, 15);
-    },
-
-    function massageColumnValue(self, columnName, columnType, columnValue) {
-        if(!columnValue) {
-            if(columnName == "recipient") {
-                columnValue = "No Recipient";
-            }
-            if(columnName == "subject") {
-                columnValue = "No Subject";
-            }
-        }
-        return Quotient.Compose.DraftListScrollingWidget.upcall(
-                    self, "massageColumnValue", columnName, columnType, columnValue);
-
-    });
 
 /**
  * L{Quotient.AutoComplete.View} subclass which knows how to turn

@@ -153,22 +153,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
         return renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
 
-    def test_draftsRendering(self):
-        """
-        Test that L{xquotient.compose.DraftsScreen} renders without error.
-        """
-        for i in xrange(5):
-            compose.Draft(store=self.store,
-                          message=Message.createDraft(
-                    self.store,
-                    DummyMessageImplementation(store=self.store),
-                    u'test://test/draft/render'))
 
-        compose.Composer(store=self.store)
-        drafts = compose.Drafts(store=self.store)
-        return renderLivePage(
-                    ThemedFragmentWrapper(
-                        compose.DraftsScreen(drafts)))
 
 class MockPart(object):
     """

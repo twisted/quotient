@@ -57,26 +57,37 @@ class ComposePreferenceCollection(item.Item, prefs.PreferenceCollectionMixin):
                     authoritative=False),)
 
 
+
 class Drafts(item.Item):
-    implements(ixmantissa.INavigableElement)
+    """
+    Shell of an item that exists only to be deleted. The 'Drafts' menu item is
+    no longer. Instead, drafts are accessed through a mail view.
+    """
 
     typeName = 'quotient_drafts'
-    schemaVersion = 1
+    schemaVersion = 2
 
     installedOn = attributes.reference()
-    powerupInterfaces = (ixmantissa.INavigableElement,)
 
-    def getTabs(self):
-        return [webnav.Tab('Mail', self.storeID, 0.6, children=
-                    [webnav.Tab('Drafts', self.storeID, 0.0)],
-                authoritative=False)]
+
+
+def drafts1to2(old):
+    """
+    Delete the Drafts item. It is now superfluous.
+    """
+    new = old.upgradeVersion(old.typeName, 1, 2, installedOn=None)
+    new.deleteFromStore()
+
+
+registerUpgrader(drafts1to2, Drafts.typeName, 1, 2)
+
 
 
 class Composer(item.Item):
     implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     typeName = 'quotient_composer'
-    schemaVersion = 4
+    schemaVersion = 5
 
     powerupInterfaces = (ixmantissa.INavigableElement, iquotient.IMessageSender)
 
@@ -85,7 +96,7 @@ class Composer(item.Item):
     mda = dependsOn(MailDeliveryAgent)
     deliveryAgent = dependsOn(DeliveryAgent)
     prefs = dependsOn(ComposePreferenceCollection)
-    drafts = dependsOn(Drafts)
+
 
     def installed(self):
         defaultFrom = self.store.findOrCreate(FromAddress, _address=None)
@@ -254,6 +265,8 @@ registerUpgrader(composer2to3, Composer.typeName, 2, 3)
 item.declareLegacyItem(Composer.typeName, 3,
                        dict(installedOn=attributes.reference()))
 
+
+
 def composer3to4(old):
     """
     add dependencies as attributes, remove installedOn
@@ -268,7 +281,34 @@ def composer3to4(old):
     composer.drafts = s.findOrCreate(Drafts)
     return composer
 
+
 registerUpgrader(composer3to4, Composer.typeName, 3, 4)
+item.declareLegacyItem(Composer.typeName, 4,
+                       dict(privateApplication=attributes.reference(),
+                            scheduler=attributes.reference(),
+                            mda=attributes.reference(),
+                            deliveryAgent=attributes.reference(),
+                            prefs=attributes.reference(),
+                            drafts=attributes.reference()))
+
+
+
+def composer4to5(old):
+    """
+    Upgrader to remove the 'drafts' attribute.
+    """
+    return old.upgradeVersion(
+        old.typeName, 4, 5,
+        privateApplication=old.privateApplication,
+        scheduler=old.scheduler,
+        mda=old.mda,
+        deliveryAgent=old.deliveryAgent,
+        prefs=old.prefs)
+
+
+registerUpgrader(composer4to5, Composer.typeName, 4, 5)
+
+
 
 class File(item.Item):
     typeName = 'quotient_file'
@@ -845,6 +885,7 @@ registerUpgrader(composePreferenceCollection2to3,
                  2, 3)
 
 
+
 class Draft(item.Item):
     """
     i only exist so my storeID can be exposed, instead of exposing the storeID
@@ -856,40 +897,3 @@ class Draft(item.Item):
     schemaVersion = 1
 
     message = attributes.reference(allowNone=False)
-
-
-class DraftsScreen(ScrollingFragment):
-    jsClass = u'Quotient.Compose.DraftListScrollingWidget'
-
-    def __init__(self, original):
-        from xquotient.exmess import MailboxSelector, DRAFT_STATUS
-        sq = MailboxSelector(original.store)
-        sq.refineByStatus(DRAFT_STATUS)
-        ScrollingFragment.__init__(
-            self,
-            original.store,
-            Message,
-            sq._getComparison(),
-            (Message.recipient, Message.subject, Message.sentWhen),
-            defaultSortColumn=Message.sentWhen,
-            defaultSortAscending=False)
-
-        #XXX another circular dependency
-        self.composerURL = self.webTranslator.linkTo(
-                                self.store.findUnique(
-                                    Composer).storeID)
-        self.docFactory = getLoader(self.fragmentName)
-
-    def constructRows(self, items):
-        rows = ScrollingFragment.constructRows(self, items)
-        for (item, row) in zip(items, rows):
-            draft = self.store.findUnique(Draft, Draft.message==item)
-            row['__id__'] = (self.composerURL
-                                + u'?draft='
-                                + self.webTranslator.toWebID(draft))
-        return rows
-
-    def head(self):
-        return None
-
-registerAdapter(DraftsScreen, Drafts, ixmantissa.INavigableFragment)

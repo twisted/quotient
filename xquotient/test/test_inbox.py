@@ -24,7 +24,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               READ_STATUS, Correspondent,
                               SENDER_RELATION, DEFERRED_STATUS,
                               ARCHIVE_STATUS, TRASH_STATUS,
-                              EVER_DEFERRED_STATUS,
+                              EVER_DEFERRED_STATUS, DRAFT_STATUS,
                               RECIPIENT_RELATION, COPY_RELATION,
                               BLIND_COPY_RELATION)
 
@@ -321,6 +321,16 @@ class MessageCountTest(InboxTest):
                           bounced=True)
         self.assertEqual(self.unreadCount('bounce'), 3)
         self.assertEqual(self.unreadCount('outbox'), 4)
+
+
+    def test_draftCount(self):
+        """
+        Check that the count of messages in the draft folder is correct. This
+        test forces us to create a draft view.
+        """
+        self.makeMessages(4, read=False, outgoing=True, draft=True, sent=False)
+        self.assertEqual(self.unreadCount(DRAFT_STATUS), 4)
+        self.assertCountsAre(draft=4)
 
 
     def test_unreadCountLimit(self):

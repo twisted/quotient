@@ -729,6 +729,34 @@ Quotient.Test.ControllerTestCase.methods(
 
 
     /**
+     * Test that we have all of the expected views in no particular order.
+     */
+    function test_viewNodes(self) {
+        var nodes = Divmod.dir(self.controllerWidget.mailViewNodes);
+        nodes.sort();
+        var expected = ["all", "inbox", "archive", "draft", "spam", "deferred",
+                        "bounce", "outbox", "sent", "trash"];
+        expected.sort();
+        self.assertArraysEqual(nodes, expected);
+    },
+
+
+    /**
+     * Test that the expected views are selectable and that they are in the
+     * right order.
+     */
+    function test_mailViewSelect(self) {
+        var node = self.controllerWidget.viewShortcutSelect;
+        var options = MochiKit.Base.map(
+            function(x) { return x.value; },
+            node.getElementsByTagName('option'));
+        self.assertArraysEqual(options,
+                               ['inbox', 'all', 'archive', 'deferred', 'draft',
+                                'outbox', 'bounce', 'sent', 'spam', 'trash']);
+    },
+
+
+    /**
      * Test switching to the archive view.
      */
     function test_archiveView(self) {
@@ -778,6 +806,24 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 return self.controllerWidget.chooseMailView('bounce');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.collectRows();
+                self.assertEqual(rows.length, 0);
+            });
+        return result;
+    },
+
+
+    /**
+     * Test switching to the 'draft' view.
+     */
+    function test_draftView(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('draft');
             });
         result.addCallback(
             function(ignored) {

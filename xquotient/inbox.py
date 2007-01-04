@@ -30,14 +30,14 @@ from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
-                              COPY_RELATION, BLIND_COPY_RELATION)
+                              COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS)
 from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
 
 # Views that the user may select.
-VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, OUTBOX_STATUS,
-         BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS, TRASH_STATUS]
+VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, DRAFT_STATUS,
+         OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS, TRASH_STATUS]
 
 
 
