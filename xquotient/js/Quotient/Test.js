@@ -905,6 +905,29 @@ Quotient.Test.ControllerTestCase.methods(
     },
 
     /**
+     * Check that there is a checkbox in the 'sent' scrolltable rows
+     */
+    function test_sentViewCheckbox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.chooseMailView('sent');
+            });
+        result.addCallback(
+            function(ignored) {
+                var rows = self.controllerWidget.scrollWidget.nodesByAttribute(
+                    "class", "q-scroll-row");
+                for(var i = 0; i < rows.length; i++) {
+                    self.assertEqual(
+                        Nevow.Athena.NodesByAttribute(
+                            rows[i], "class", "checkbox-image").length,
+                        1);
+                }
+        });
+        return result;
+    },
+
+    /**
      * Test that the sent view has a "to" column instead of a "from" column.
      */
     function test_sentViewToColumn(self) {

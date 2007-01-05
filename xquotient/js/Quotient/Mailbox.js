@@ -180,8 +180,13 @@ Quotient.Mailbox.ScrollingWidget.methods(
          */
         self._rowHeight = undefined;
         return self._createRow(
+        /* all of these keys won't necessarily be used, as some only
+         * contribute to the row content only if we're in some particular
+         * view, e.g. 'recipient' will be used in the 'sent' view, and
+         * 'sender' will be used otherwise, etc. */
                     0, {"sender": "FOO@BAR",
                         "senderDisplay": "FOO",
+                        "recipient": "FOO@BAR",
                         "subject": "A NORMAL SUBJECT",
                         "receivedWhen": "1985-01-26",
                         "read": false,
@@ -463,13 +468,31 @@ Quotient.Mailbox.ScrollingWidget.methods(
         var massage = function(colName) {
             return self.massageColumnValue(
                 colName, self.columnTypes[colName][0], rowData[colName]);
-        }
+            },
+            attrs = {},
+            content = [massage(colName)];
 
-        var attrs = {};
         if(colName == "senderDisplay") {
             attrs["class"] = "sender";
-            attrs["title"] = rowData["sender"];
-            var content = [
+
+            if (rowData["everDeferred"]) {
+                content.push(self._makeBoomerang());
+            }
+        } else if(colName == "subject") {
+            attrs["class"] = "subject";
+        } else if(colName == "sentWhen") {
+            attrs["class"] = "date";
+        } else if(colName == "recipient") {
+            attrs["class"] = "recipient";
+        } else {
+            attrs["class"] = "unknown-inbox-column-"+colName;
+            /* It _SHOULD_ be the following, but that makes certain test
+             * fixtures break.
+             */
+            // throw new Error("invalid column name: " + colName);
+        }
+        if(colName == "senderDisplay" || colName == "recipient") {
+            content.unshift(
                 MochiKit.DOM.IMG({
                     "src": "/Quotient/static/images/checkbox-off.gif",
                     "class": "checkbox-image",
@@ -489,26 +512,10 @@ Quotient.Mailbox.ScrollingWidget.methods(
                         }
 
                         return false;
-                    }}), massage(colName)];
-
-            if (rowData["everDeferred"]) {
-                content.push(self._makeBoomerang());
-            }
-
-            return MochiKit.DOM.DIV(attrs, content);
-        } else if(colName == "subject") {
-            attrs["class"] = "subject";
-        } else if(colName == "sentWhen") {
-            attrs["class"] = "date";
-        } else {
-            attrs["class"] = "unknown-inbox-column-"+colName;
-            /* It _SHOULD_ be the following, but that makes certain test
-             * fixtures break.
-             */
-            // throw new Error("invalid column name: " + colName);
+                    }}));
         }
 
-        return MochiKit.DOM.DIV(attrs, massage(colName));
+        return MochiKit.DOM.DIV(attrs, content);
     },
 
     /**

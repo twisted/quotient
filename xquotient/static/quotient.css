@@ -374,10 +374,6 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     width: 100%;
 }
 
-.sender {
-    color: #109FCF;
-}
-
 .subject {
     font-size: 1.2em;
 }
@@ -539,8 +535,9 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     border-bottom: solid 1px #FFFFFF;
 }
 
-.q-scroll-row .sender {
+.q-scroll-row .sender, .q-scroll-row .recipient {
     margin-top: 8px;
+    color: #109FCF;
 }
 
 .q-scroll-row .date {
