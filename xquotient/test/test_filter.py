@@ -84,13 +84,23 @@ class HeaderRuleTest(unittest.TestCase):
         self.headerRule.operation = filter.CONTAINS
         return self._testImpl(same, notsame, casenotsame)
 
+class MailingListRuleTest(unittest.TestCase):
+
+    def setUp(self):
+        self.storepath = self.mktemp()
+        self.store = store.Store(self.storepath)
+
+        self.rfp = filter.RuleFilteringPowerup(store=self.store)
+        installOn(self.rfp, self.store)
+        self.tagcatalog = self.rfp.tagCatalog
+
+        self.mlfp = filter.MailingListFilteringPowerup(store=self.store)
+        installOn(self.mlfp, self.store)
     def testMailingListFilter(self):
         """
         Ensures that mailing list messages are not handled by
         RuleFilteringPowerup but are handled by MailingListFilteringPowerup.
         """
-        installOn(scheduler.Scheduler(store=self.store), self.store)
-        mail.MessageSource(store=self.store)
 
         part = Part()
         part.addHeader(u'X-Mailman-Version', u"2.1.5")
@@ -99,13 +109,27 @@ class HeaderRuleTest(unittest.TestCase):
         part.source = FilePath(self.storepath).child("files").child("x")
         msg = Message.createIncoming(self.store, part,
                                      u'test://test_mailing_list_filter')
-        rfp = filter.RuleFilteringPowerup(store=self.store)
-        installOn(rfp, self.store)
-        self.tagcatalog = rfp.tagCatalog
-        rfp.processItem(msg)
+
+        self.rfp.processItem(msg)
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)), [])
-        mlfp = filter.MailingListFilteringPowerup(store=self.store)
-        installOn(mlfp, self.store)
-        mlfp.processItem(msg)
+
+        self.mlfp.processItem(msg)
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
                          [u'some-list.example.com'])
+
+    def testEZMLMFilter(self):
+        """
+        Ensure that match_EZMLM doesn't kerplode when presented with a
+        header that doesn't parse well.
+        """
+        part = Part()
+        part.addHeader(u'X-Mailman-Version', u"2.1.5")
+        part.addHeader(u'List-Post',
+                       u"Random bytes")
+        part.source = FilePath(self.storepath).child("files").child("x")
+        msg = Message.createIncoming(self.store, part,
+                                     u'test://test_mailing_list_filter')
+
+        self.mlfp.processItem(msg)
+        self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
+                         [])

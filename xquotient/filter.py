@@ -310,7 +310,7 @@ class MailingListRule(item.Item):
         lp = headers.get('list-post', [None])[0]
         if lp is not None:
             postAddress = mailtoExpr.findall(lp)
-            if postAddress is not None:
+            if postAddress:
                 postAddress = postAddress[0]
                 return postAddress.replace(u"@", u".")
 
