@@ -3174,14 +3174,12 @@ Quotient.Test.ComposeTestCase.methods(
 
     /**
      * Test the name completion method
-     * L{Quotient.Compose.EmailAddressAutoCompleteModel.complete} (when called
-     * via L{Quotient.Compose.Controller}) generates the correct address lists
-     * for various inputs
+     * L{Quotient.Compose.EmailAddressAutoCompleteModel.complete} generates
+     * the correct address lists for various inputs
+     *
+     * @param model: the L{Quotient.Compose.EmailAddressAutoCompleteModel}
      */
-    function test_addressCompletion(self) {
-        /* get the ComposeController */
-        var controller = self.getController();
-
+    function _doAddressCompletionTest(self, model) {
         /* these are the pairs of [displayName, emailAddress] that we expect
          * the controller to have received from getPeople() */
 
@@ -3191,13 +3189,13 @@ Quotient.Test.ComposeTestCase.methods(
         var kilroy  = ["", "kilroy@foo"];
 
         /**
-         * For an emailAddress C{addr} (or part of one), assert that the list of
-         * possible completions returned by ComposeController.completeCurrentAddr()
-         * matches exactly the list of lists C{completions}, where each element
-         * is a pair containing [displayName, emailAddress]
+         * For an emailAddress C{addr} (or part of one), assert that the list
+         * of possible completions returned by complete() matches exactly the
+         * list of lists C{completions}, where each element is a pair
+         * containing [displayName, emailAddress]
          */
         var assertCompletionsAre = function(addr, completions) {
-            var _completions = controller.autoCompleteController.model.complete(addr);
+            var _completions = model.complete(addr);
             self.assertArraysEqual(_completions, completions,
                                    function(a, b) {
                                         self.assertArraysEqual(a, b);
@@ -3226,13 +3224,34 @@ Quotient.Test.ComposeTestCase.methods(
     },
 
     /**
+     * Test that the 'to' autocompleter of our L{Quotient.Compose.Controller}
+     * correctly completes email addresses
+     */
+    function test_toAddressCompletion(self) {
+        var controller = self.getController();
+        self._doAddressCompletionTest(
+            controller.toAutoCompleteController.model);
+    },
+
+    /**
+     * Test that the 'cc' autocompleter of our L{Quotient.Compose.Controller}
+     * correctly completes email addresses
+     */
+    function test_ccAddressCompletion(self) {
+        var controller = self.getController();
+        self._doAddressCompletionTest(
+            controller.ccAutoCompleteController.model);
+    },
+
+    /**
      * Test that
      * L{Quotient.Compose.EmailAddressAutoCompleteView._reconstituteAddress}
-     * (when called via L{Quotient.Compose.Controller}) does the right thing.
+     * correctly turns name & email address pairs into formatted email
+     * addresses
+     *
+     * @param view: L{Quotient.Compose.EmailAddressAutoCompleteView}
      */
-    function test_reconstituteAddresses(self) {
-        var controller = self.getController();
-
+    function _doAddressReconstitutionTest(self, view) {
         /* map each [displayName, emailAddress] pair to the result we expect
          * from ComposeController.reconstituteAddress(), when passed the pair */
         var reconstitutedAddresses = [
@@ -3245,14 +3264,32 @@ Quotient.Test.ComposeTestCase.methods(
             [["", "kilroy@foo"], '<kilroy@foo>']
         ];
 
-        var view = controller.autoCompleteController.view;
-
         /* check they match up */
         for(var i = 0; i < reconstitutedAddresses.length; i++) {
             self.assertEquals(
                 view._reconstituteAddress(reconstitutedAddresses[i][0]),
                 reconstitutedAddresses[i][1]);
         }
+    },
+
+    /**
+     * Test that the 'to' autocompleter of our L{Quotient.Compose.Controller}
+     * correctly reconstitutes email addresses
+     */
+    function test_toAddressReconstitution(self) {
+        var controller = self.getController();
+        self._doAddressReconstitutionTest(
+            controller.toAutoCompleteController.view);
+    },
+
+    /**
+     * Test that the 'cc' autocompleter of our L{Quotient.Compose.Controller}
+     * correctly reconstitutes email addresses
+     */
+    function test_ccAddressReconstitution(self) {
+        var controller = self.getController();
+        self._doAddressReconstitutionTest(
+            controller.ccAutoCompleteController.view);
     },
 
     /**

@@ -228,11 +228,17 @@ Quotient.Compose._Controller.methods(
 
         self.inline = inline;
 
-        self.autoCompleteController = Quotient.AutoComplete.Controller(
-                                        Quotient.Compose.EmailAddressAutoCompleteModel(allPeople),
-                                        Quotient.Compose.EmailAddressAutoCompleteView(
-                                            self.firstNodeByAttribute("name", "toAddresses"),
-                                            self.firstNodeByAttribute("class", "address-completions")));
+        self.toAutoCompleteController = Quotient.AutoComplete.Controller(
+            Quotient.Compose.EmailAddressAutoCompleteModel(allPeople),
+            Quotient.Compose.EmailAddressAutoCompleteView(
+                self.firstNodeByAttribute("name", "toAddresses"),
+                self.firstNodeByAttribute("class", "address-completions")));
+
+        self.ccAutoCompleteController = Quotient.AutoComplete.Controller(
+            Quotient.Compose.EmailAddressAutoCompleteModel(allPeople),
+            Quotient.Compose.EmailAddressAutoCompleteView(
+                self.firstNodeByAttribute("name", "cc"),
+                self.firstNodeByAttribute("class", "address-completions")));
 
         self.completionDeferred = Divmod.Defer.Deferred();
     },
