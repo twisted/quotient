@@ -1650,16 +1650,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     _partsByID = None
 
     def __init__(self, original):
+        athena.LiveFragment.__init__(self, original, getLoader('message-detail'))
+
         self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
 
-        from xquotient.quotientapp import QuotientPreferenceCollection
-        self.qprefs = original.store.findUnique(QuotientPreferenceCollection)
-
-        athena.LiveFragment.__init__(self, original, getLoader('message-detail'))
-
         self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
+
         self.translator = ixmantissa.IWebTranslator(original.store)
         # temporary measure, until we can express this dependency less weirdly
         self.organizer = original.store.findUnique(people.Organizer, default=None)
@@ -1667,13 +1665,16 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         self.zipFileName = self._getZipFileName()
         self.children = {self.zipFileName: ZippedAttachmentResource(original)}
 
+        self.catalog = self.original.store.findOrCreate(Catalog)
+
 
     def head(self):
         return None
 
 
     def getInitialArguments(self):
-        return (self.getMoreDetailSetting(),)
+        return (list(self.catalog.tagsOf(self.original)),
+                self.getMoreDetailSetting())
 
 
     def _getZipFileName(self):
@@ -1699,15 +1700,13 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         @return: Sequence of tag names that have been assigned to the
                  message I represent, or "No Tags" if there aren't any
         """
-        catalog = self.original.store.findOrCreate(Catalog)
-        mtags = list()
-        for tag in catalog.tagsOf(self.original):
-            mtags.extend((tag, ', '))
+        pattern = self.patterns['tag']
+        mtags = list(pattern.fillSlots('name', tag)
+            for tag in self.catalog.tagsOf(self.original))
         if len(mtags) == 0:
             return 'No Tags'
         else:
-            return mtags[:-1]
-        return mtags
+            return mtags
 
 
     def render_messageSourceLink(self, ctx, data):
@@ -1943,6 +1942,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                                     attributes.AND(
                                         Tag.object == self.original,
                                         Tag.name == t)).deleteFromStore()
+
+        return list(self.catalog.tagsOf(self.original))
     expose(modifyTags)
 
 

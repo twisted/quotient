@@ -460,6 +460,44 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+
+    /**
+     * Test that L{Quotient.Mailbox.Controller.selectFilterChoiceNode}
+     * properly selects the choice it is asked to
+     */
+    function test_selectFilterChoiceNode(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var node = document.createElement('div');
+                node.className = 'foo-chooser';
+
+                function makeOption(name) {
+                    var opt = document.createElement('div');
+                    opt.className = 'list-option';
+                    var optName = document.createElement('div');
+                    optName.className = 'opt-name';
+                    optName.appendChild(document.createTextNode(name));
+                    opt.appendChild(optName);
+                    return opt;
+                }
+
+                var optOne = makeOption('option 1');
+                node.appendChild(optOne);
+                var optTwo = makeOption('option 2');
+                node.appendChild(optTwo);
+
+                self.controllerWidget.node.appendChild(node);
+
+                self.controllerWidget.selectFilterChoiceNode(
+                    'foo', 'option 1');
+
+                self.assertEqual(optOne.className, 'selected-list-option');
+                self.assertEqual(optTwo.className, 'list-option');
+            });
+        return result;
+    },
+
     /**
      * Test viewing message source and getting back to the message body
      */
@@ -3660,6 +3698,190 @@ Quotient.Test.MsgDetailTestCase.methods(
         result.addCallback(checkAndToggle(false));
         return result;
     });
+
+Quotient.Test.MsgDetailTagsTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.TestCase.MsgDetailTagsTestCase');
+
+/**
+ * Tests for L{Quotient.Message.MessageDetail} and tags
+ */
+Quotient.Test.MsgDetailTagsTestCase.methods(
+    /**
+     * @param tags: tags to assign to the message
+     * @type tags: C{Array} of C{String}
+     */
+    function setUp(self, tags) {
+        var d = self.callRemote('setUp', tags);
+        d.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        d.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgDetail = widget;
+            });
+        return d;
+    },
+
+    /**
+     * Test that the L{Quotient.Message.MessageDetail} is initialized with a
+     * list of a tags that reflects what is in the database
+     */
+    function test_initialState(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                self.assertArraysEqual(self.msgDetail.tags, ['tag1', 'tag2']);
+            });
+        return D;
+    },
+
+    /**
+     * Figure out the tags of the message by looking at its DOM
+     *
+     * @rtype: C{Array} of C{String}
+     */
+    function _collectTagsFromDOM(self) {
+        var node = self.msgDetail.firstNodeByAttribute(
+            'class', 'tags-display'),
+            tags = [];
+        for(var i = 0; i < node.childNodes.length; i++) {
+            tags.push(node.childNodes[i].firstChild.nodeValue);
+        }
+        return tags;
+    },
+
+    /**
+     * Same as L{test_initialState}, but look at the DOM
+     */
+    function test_initialDOMState(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                self.assertArraysEqual(
+                    self._collectTagsFromDOM(),
+                    ['tag1', 'tag2']);
+            });
+        return D;
+    },
+
+    /**
+     * Test L{Quotient.Message.MessageDetail.saveTags} when a tag is being
+     * removed and one is being added.
+     */
+    function test_saveTags(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                return self.msgDetail.saveTags(['tag1', 'tag3']);
+            });
+        D.addCallback(
+            function(ignored) {
+                self.assertArraysEqual(
+                    self.msgDetail.tags,
+                    ['tag1', 'tag3']);
+            });
+        return D;
+    },
+
+    /**
+     * Same as L{test_saveTags}, but look at the DOM
+     */
+    function test_saveTagsDOM(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                return self.msgDetail.saveTags(['tag1', 'tag3']);
+            });
+        D.addCallback(
+            function(ignored) {
+                self.msgDetail._updateTagList();
+                self.assertArraysEqual(
+                    self._collectTagsFromDOM(),
+                    ['tag1', 'tag3']);
+            });
+        return D;
+    },
+
+    /**
+     * Test L{Quotient.Message.MessageDetail.editTags}
+     */
+    function test_editTags(self) {
+        var D = self.setUp(['tag1', 'tag2', 'tag3']);
+        D.addCallback(
+            function(ignored) {
+                self.msgDetail.editTags();
+                var input = self.msgDetail.editTagsContainer.tags;
+                self.assertEquals(input.style.display, "");
+                self.assertEquals(input.value, 'tag1, tag2, tag3');
+            });
+        return D;
+    },
+
+    /**
+     * Check that the state of the DOM accurately reflects our expectations
+     * for the case where a message has no tags
+     */
+    function _checkNoTags(self) {
+        var tagsDisplay = self.msgDetail.tagsDisplay;
+        self.assertEquals(
+            tagsDisplay.childNodes.length, 1);
+        self.assertEquals(
+            tagsDisplay.firstChild.nodeValue.toLowerCase(), 'no tags');
+    },
+
+    /**
+     * Test L{Quotient.Message.MessageDetail._updateTagList} when there are no
+     * tags.  A "No Tags" message should be shown
+     */
+    function test_updateNoTags(self) {
+        var D = self.setUp([]);
+        D.addCallback(
+            function(ignored) {
+                self.msgDetail._updateTagList();
+                self._checkNoTags();
+            });
+        return D;
+    },
+
+    /**
+     * Test L{Quotient.Message.MessageDetail} when no tags have been changed
+     */
+    function test_saveSameTags(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                return self.msgDetail.saveTags(['tag1', 'tag2']);
+            });
+        D.addCallback(
+            function(ignored) {
+                self.msgDetail._updateTagList();
+                self.assertArraysEqual(
+                    self._collectTagsFromDOM(),
+                    ['tag1', 'tag2']);
+            });
+        return D;
+    },
+
+    /**
+     * Test L{Quotient.Message.MessageDetail} when all tags have been removed
+     */
+    function test_saveRemovedTags(self) {
+        var D = self.setUp(['tag1', 'tag2']);
+        D.addCallback(
+            function(ignored) {
+                return self.msgDetail.saveTags([]);
+            });
+        D.addCallback(
+            function(ignored) {
+                self.msgDetail._updateTagList();
+                self._checkNoTags();
+            });
+        return D;
+    });
+
+
 
 Quotient.Test.MsgDetailAddPersonTestCase = Nevow.Athena.Test.TestCase.subclass(
                                                 'Quotient.Test.MsgDetailAddPersonTestCase');

@@ -1,5 +1,7 @@
-<div xmlns:nevow="http://nevow.com/ns/nevow/0.1" nevow:render="liveFragment"
-  class="message-detail-fragment">
+<div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  xmlns:athena="http://divmod.org/ns/nevow/0.7"
+  class="message-detail-fragment"
+  nevow:render="liveFragment">
 
   <nevow:invisible nevow:render="printableLink" />
 
@@ -42,10 +44,13 @@
             (<a href="#" onclick="Quotient.Message.MessageDetail.get(this).editTags(); return false">Edit</a>)
           </span>
 
-          <form style="display: none" class="edit-tags-container"
-            onsubmit="Quotient.Message.MessageDetail.get(this).saveTags(); return false">
+          <form style="display: none" class="edit-tags-container">
+            <athena:handler event="onsubmit" handler="dom_saveTags" />
             <input class="add-tags-dialog-text-input" type="text" name="tags" size="38" />
-            <a href="#" onclick="Quotient.Message.MessageDetail.get(this).saveTags(); return false">Save</a>
+            <a href="#">
+              <athena:handler event="onclick" handler="dom_saveTags" />
+              Save
+            </a>
             <a href="#" onclick="Quotient.Message.MessageDetail.get(this).hideTagEditor(); return false">Cancel</a>
           </form>
         </td>

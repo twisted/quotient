@@ -5,6 +5,12 @@
     <td class="msg-detail-field-body"><nevow:slot name="address" /></td>
   </tr>
 
+  <a href="#"
+    onclick="return Quotient.Message.MessageDetail.get(this).dom_chooseTag(this)"
+    nevow:pattern="tag"
+    class="tag"
+    ><nevow:slot name="name" /></a>
+
   <tr nevow:pattern="redirected-to">
     <td class="msg-detail-field-name">Resent To:</td>
     <td class="msg-detail-field-body"><nevow:slot name="address" /></td>

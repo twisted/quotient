@@ -203,6 +203,25 @@ Quotient.Common.Util.difference = function(a1, a2) {
     return diff;
 }
 
+/**
+ * Remove duplicate elements from the array C{array}, maintaining the element
+ * ordering
+ *
+ * @type array: C{Array}
+ * @rtype: C{Array}
+ */
+Quotient.Common.Util.uniq = function(array) {
+    /* looks like we need a 'set' type */
+    var uniq = [], seen = {};
+    for(var i = 0; i < array.length; i++) {
+        if(!(array[i] in seen)) {
+            seen[array[i]] = 1;
+            uniq.push(array[i]);
+        }
+    }
+    return uniq;
+}
+
 Quotient.Common.Util.findPosX = function(obj) {
     var curleft = 0;
     if (obj.offsetParent)

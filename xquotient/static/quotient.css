@@ -237,6 +237,10 @@ ul.file-list, ul.file-list li {
     margin: 0px 2px 4px 2px;
 }
 
+.tags-container .tag {
+    margin-right: 4px;
+}
+
 .header-panel {
     margin-bottom: 6px;
     border-bottom: solid 1px #CACACA;

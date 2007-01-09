@@ -1668,8 +1668,8 @@ Quotient.Mailbox.Controller.methods(
     /**
      * Change the class of the given node to C{"selected-list-option"}, change
      * the class of any existing selected nodes in the same select group to
-     * C{"list-option"}, and change the C{onclick} handler of those nodes to be
-     * the same as the C{onclick} handler for the given node.
+     * C{"list-option"}, and change the C{onclick} handler of those nodes to
+     * be the same as the C{onclick} handler for the given node.
      */
     function _selectListOption(self, n) {
         var sibs = n.parentNode.childNodes;
@@ -1690,8 +1690,41 @@ Quotient.Mailbox.Controller.methods(
     function chooseTagByNode(self, tagNode) {
         var tagName = Divmod.Runtime.theRuntime.firstNodeByAttribute(
             tagNode, 'class', 'opt-name');
-        self._selectListOption(tagNode);
-        return self.chooseTag(tagName.firstChild.nodeValue.toLowerCase());
+        return self.chooseTag(tagName.firstChild.nodeValue);
+    },
+
+    /**
+     * Locate the node for a particular choice within a particular category in
+     * the view filter, and make it appear selected.
+     *
+     * @param filterType: The filter type the choice belongs to.  Possible
+     * choices include "view", "tag", "person"
+     * @type filterType: C{String}
+     *
+     * @param choice: The name of the choice.  For a filter type of "tag",
+     * this would be the tag name that appears in the tag list, etc.
+     * @type choice: C{String}
+     *
+     * @rtype: C{undefined}
+     */
+    function selectFilterChoiceNode(self, filterType, choice) {
+        /* XXX each of these filter panes should be a widget */
+        var filterNode = self.firstNodeByAttribute(
+            "class", filterType + "-chooser"),
+            optionNode, optionNameNode;
+        for(var i = 0; i < filterNode.childNodes.length; i++) {
+            optionNode = filterNode.childNodes[i];
+            if(optionNode.className == "list-option" ||
+               optionNode.className == "selected-list-option") {
+                optionNameNode = Nevow.Athena.FirstNodeByAttribute(
+                    optionNode, "class", "opt-name");
+                if(optionNameNode.firstChild.nodeValue == choice) {
+                    self._selectListOption(optionNode);
+                    return;
+                }
+            }
+        }
+        throw new Error("no choice " + choice + " in filter " + filterType);
     },
 
     /**
@@ -1703,7 +1736,8 @@ Quotient.Mailbox.Controller.methods(
      * @param tagName: The tag to select.
      */
     function chooseTag(self, tagName) {
-        if (tagName == 'all') {
+        self.selectFilterChoiceNode("tag", tagName);
+        if (tagName.toLowerCase() == 'all') {
             tagName = null;
         }
         return self.changeViewSelection("tag", tagName);

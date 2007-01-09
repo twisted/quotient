@@ -5,11 +5,22 @@
 
 Quotient.Message.MessageDetail = Nevow.Athena.Widget.subclass("Quotient.Message.MessageDetail");
 Quotient.Message.MessageDetail.methods(
-    function __init__(self, node, showMoreDetail) {
+    function __init__(self, node, tags, showMoreDetail) {
         Quotient.Message.MessageDetail.upcall(self, "__init__", node);
+
+        var tagsContainer = self.firstNodeByAttribute(
+            "class", "tags-container");
+        self.tagsDisplayContainer = Nevow.Athena.FirstNodeByAttribute(
+            tagsContainer, "class", "tags-display-container");
+        self.tagsDisplay = self.tagsDisplayContainer.firstChild;
+        self.editTagsContainer = Nevow.Athena.FirstNodeByAttribute(
+            tagsContainer, "class", "edit-tags-container");
+
+
         if(showMoreDetail) {
             self.toggleMoreDetail();
         }
+        self.tags = tags;
     },
 
     function _getMoreDetailNode(self) {
@@ -119,23 +130,16 @@ Quotient.Message.MessageDetail.methods(
     },
 
     /**
-     * Present an element that contains an editable list of tags for my message
+     * Make the necessary DOM changes to allow editing of the tags of this
+     * message.  This involves showing, populating and focusing the tag text
+     * entry widget
      */
     function editTags(self) {
-        if(!self.tagsDisplayContainer) {
-            var tagsContainer = self.firstNodeByAttribute("class", "tags-container");
-            self.tagsDisplayContainer = Nevow.Athena.FirstNodeByAttribute(
-                                            tagsContainer, "class", "tags-display-container");
-            self.tagsDisplay = self.tagsDisplayContainer.firstChild;
-            self.editTagsContainer = Nevow.Athena.FirstNodeByAttribute(
-                                        tagsContainer, "class", "edit-tags-container");
-        }
-        var tdc = self.tagsDisplayContainer;
-        var input = self.editTagsContainer.getElementsByTagName("input")[0];
+        var input = self.editTagsContainer.tags;
         if(self.tagsDisplay.firstChild.nodeValue != "No Tags") {
-            input.value = self.tagsDisplay.firstChild.nodeValue;
+            input.value = self.tags.join(', ');
         }
-        tdc.style.display = "none";
+        self.tagsDisplayContainer.style.display = "none";
         self.editTagsContainer.style.display = "";
 
         /* IE throws an exception if an invisible element receives focus */
@@ -148,44 +152,112 @@ Quotient.Message.MessageDetail.methods(
     },
 
     /**
-     * Inspect the contents of the tag editor element and persist any
-     * changes that have occured (deleted tags, added tags)
+     * Event-handler for tag saving.
+     *
+     * @return: C{false}
      */
-    function saveTags(self) {
-        var _gotTags = self.editTagsContainer.tags.value.split(/,\s*/);
-        var  gotTags = [];
-        var seen = {};
-        for(var i = 0; i < _gotTags.length; i++) {
-            if(0 < _gotTags[i].length && !(_gotTags[i] in seen)) {
-                seen[_gotTags[i]] = 1;
-                gotTags.push(_gotTags[i]);
+    function dom_saveTags(self) {
+        var tags = self.editTagsContainer.tags.value.split(/,\s*/),
+            nonEmptyTags = [];
+        for(var i = 0; i < tags.length; i++) {
+            if(0 < tags[i].length) {
+                nonEmptyTags.push(tags[i]);
             }
         }
+        self.saveTags(nonEmptyTags).addCallback(
+            function(ignored) {
+                self._updateTagList();
+                self.hideTagEditor();
+            });
+        return false;
+    },
 
-        var existingTags;
-        if(self.tagsDisplay.firstChild.nodeValue == "No Tags") {
-            existingTags = [];
-        } else {
-            existingTags = self.tagsDisplay.firstChild.nodeValue.split(/,\s*/);
+    /**
+     * Tell our parent widget to select the tag C{tag}
+     *
+     * @param tag: the name of the tag to select
+     * @type tag: C{String}
+     */
+    function chooseTag(self, tag) {
+        if(self.widgetParent != undefined
+            && self.widgetParent.chooseTag != undefined) {
+            return self.widgetParent.chooseTag(tag);
         }
+    },
 
-        var tagsToDelete = Quotient.Common.Util.difference(existingTags, gotTags);
-        var tagsToAdd = Quotient.Common.Util.difference(gotTags, existingTags);
+    /**
+     * Event-handler for tag choosing
+     *
+     * @param node: the tag link node
+     * @type node: node
+     *
+     * @return: C{false}
+     */
+    function dom_chooseTag(self, node) {
+        self.chooseTag(node.firstChild.nodeValue);
+        return false;
+    },
 
-        if(tagsToAdd || tagsToDelete) {
-            self.callRemote("modifyTags", tagsToAdd, tagsToDelete);
+    /**
+     * Update the tag list of our message
+     */
+    function _updateTagList(self) {
+        while(self.tagsDisplay.firstChild) {
+            self.tagsDisplay.removeChild(
+                self.tagsDisplay.firstChild);
         }
-
-        if(0 < gotTags.length) {
-            self.tagsDisplay.firstChild.nodeValue = gotTags.join(", ");
-            if(self.widgetParent) {
-                self.widgetParent.addTagsToViewSelector(tagsToAdd);
+        function makeOnclick(node) {
+            return function() {
+                return self.dom_chooseTag(node);
             }
-        } else {
-            self.tagsDisplay.firstChild.nodeValue = "No Tags";
         }
+        for(var i = 0; i < self.tags.length; i++) {
+            /* XXX template */
+            var node = document.createElement("a");
+            node.href = "#";
+            node.className = "tag";
+            node.onclick = makeOnclick(node);
+            node.appendChild(document.createTextNode(self.tags[i]));
+            self.tagsDisplay.appendChild(node);
+        }
+        if(i == 0) {
+            self.tagsDisplay.appendChild(
+                document.createTextNode("No Tags"));
+        }
+    },
 
-        self.hideTagEditor();
+    /**
+     * Modify the tags for this message.
+     *
+     * @param tags: all of the tags for this message
+     * @type tags: C{Array} of C{String}
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function saveTags(self, tags) {
+        tags = Quotient.Common.Util.uniq(tags);
+        var tagsToDelete = Quotient.Common.Util.difference(self.tags, tags),
+            tagsToAdd = Quotient.Common.Util.difference(tags, self.tags),
+            D;
+
+        if(0 < tagsToAdd.length || 0 < tagsToDelete.length) {
+            D = self.callRemote("modifyTags", tagsToAdd, tagsToDelete);
+            D.addCallback(
+                function(tags) {
+                    self.tags = tags;
+                });
+        } else {
+            D = Divmod.Defer.succeed(null);
+        }
+        D.addCallback(
+            function(ignored) {
+                if(0 < tagsToAdd.length
+                    && self.widgetParent != undefined
+                    && self.widgetParent.addTagsToViewSelector != undefined) {
+                    self.widgetParent.addTagsToViewSelector(tagsToAdd);
+                }
+            });
+        return D;
     });
 
 Quotient.Message.Source = Nevow.Athena.Widget.subclass('Quotient.Message.Source');

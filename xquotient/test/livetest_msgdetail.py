@@ -2,6 +2,7 @@ from epsilon.extime import Time
 
 from axiom.store import Store
 from axiom import attributes
+from axiom.tags import Catalog
 from axiom.item import Item
 from axiom.dependency import installOn
 
@@ -97,6 +98,41 @@ class MsgDetailTestCase(testcase.TestCase, _MsgDetailTestMixin):
         f.docFactory = getLoader(f.fragmentName)
         return f
     expose(setUp)
+
+
+
+class MsgDetailTagsTestCase(testcase.TestCase, _MsgDetailTestMixin):
+    """
+    Tests for L{xquotient.exmess.MessageDetail} and tags
+    """
+    jsClass = u'Quotient.Test.MsgDetailTagsTestCase'
+
+    def _setUpMsg(self, tags):
+        """
+        Same as L{_MsgDetailTestMixin._setUpMsg}, but with a tagged message!
+
+        @param tags: tags to assign to message
+        @type tags: C{list} of C{unicode}
+        """
+        msg = super(MsgDetailTagsTestCase, self)._setUpMsg()
+        cat = msg.store.findOrCreate(Catalog)
+        for tag in tags:
+            cat.tag(msg, tag)
+        return msg
+
+
+    def setUp(self, tags):
+        """
+        Setup & populate a store, and render a
+        L{xquotient.exmess.MessageDetail}
+        """
+        f = MessageDetail(self._setUpMsg(tags))
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)
+
+
 
 class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
     """
