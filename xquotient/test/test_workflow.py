@@ -20,6 +20,7 @@ from axiom.item import Item, transacted
 from axiom.attributes import integer, inmemory, text
 from axiom.iaxiom import IScheduler
 from axiom.dependency import installOn
+from axiom.test.util import QueryCounter
 
 from axiom.tags import Catalog
 
@@ -36,7 +37,7 @@ from xquotient.exmess import (
     CLEAN_STATUS, SPAM_STATUS, INCOMING_STATUS, TRASH_STATUS, TRAINED_STATUS,
     UNREAD_STATUS, READ_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
     EVER_DEFERRED_STATUS, DRAFT_STATUS, STICKY_STATUSES, SENT_STATUS,
-    OUTBOX_STATUS, BOUNCED_STATUS)
+    OUTBOX_STATUS, BOUNCED_STATUS, FOCUS_STATUS, EVER_FOCUSED_STATUS)
 
 from xquotient.exmess import SENDER_RELATION, RECIPIENT_RELATION
 
@@ -853,17 +854,78 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(SPAM_STATUS, stats)
 
 
+    def test_classifySpamEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages classified as spam.
+
+        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
+        which is classified as spam.
+        """
+        self.message.focus()
+        self.message.classifySpam()
+
+        stats = set(self.message.iterStatuses())
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_classifySpamFocused(self):
+        """
+        Verify that when a focused message is classified as spam, it loses the
+        focused status.
+        """
+        self.message.focus()
+        self.message.classifySpam()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(SPAM_STATUS, stats)
+
+
     def test_reclassifySpamToClean(self):
         """
         Verify that a message which is misclassified as spam and later classified
         clean will properly be classified as clean.
         """
-
         self.message.classifySpam()
         self.message.classifyClean()
         stats = set(self.message.iterStatuses())
         self.failIfIn(SPAM_STATUS, stats)
         self.failIfIn(INCOMING_STATUS, stats)
+        self.failUnlessIn(INBOX_STATUS, stats)
+        self.failUnlessIn(CLEAN_STATUS, stats)
+
+
+    def test_reclassifySpamToCleanEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages classified as spam.
+
+        This verifies that EVER_FOCUSED_STATUS is removed from a spam message
+        which is re-classified as clean.
+        """
+        self.message.focus()
+        self.message.classifySpam()
+        self.message.classifyClean()
+
+        stats = set(self.message.iterStatuses())
+        self.failIfIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_reclassifySpamToCleanFocused(self):
+        """
+        Verify that when a focused message which has been classified as spam is
+        later classified as clean it properly regains the focus status.
+        """
+        self.message.focus()
+        self.message.classifySpam()
+        self.message.classifyClean()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(SPAM_STATUS, stats)
+        self.failUnlessIn(FOCUS_STATUS, stats)
         self.failUnlessIn(INBOX_STATUS, stats)
         self.failUnlessIn(CLEAN_STATUS, stats)
 
@@ -899,6 +961,72 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIfIn(INBOX_STATUS, stats)
         self.failIfIn(CLEAN_STATUS, stats)
         self.failIfIn(SPAM_STATUS, stats)
+
+
+    def test_trashEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages moved to the trash.
+
+        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
+        which is moved to the trash.
+        """
+        self.message.focus()
+        self.message.classifyClean()
+        self.message.moveToTrash()
+
+        stats = set(self.message.iterStatuses())
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_trashFocused(self):
+        """
+        Verify that focused messages put into the trash have the 'trash' status
+        and lose the 'focus' status.
+        """
+        self.message.focus()
+        self.message.classifyClean()
+        self.message.moveToTrash()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(TRASH_STATUS, stats)
+        self.failIfIn(FOCUS_STATUS, stats)
+
+
+    def test_untrashEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages moved to the trash.
+
+        This verifies that EVER_FOCUSED_STATUS is removed from a message
+        removed from the trash.
+        """
+        self.message.focus()
+        self.message.classifyClean()
+        self.message.moveToTrash()
+        self.message.removeFromTrash()
+
+        stats = set(self.message.iterStatuses())
+        self.failIfIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_untrashFocus(self):
+        """
+        Verify that previously focused messages which are removed from the
+        trash regain their focused status.
+        """
+        self.message.focus()
+        self.message.classifyClean()
+        self.message.moveToTrash()
+        self.message.removeFromTrash()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(TRASH_STATUS, stats)
+        self.failUnlessIn(CLEAN_STATUS, stats)
+        self.failUnlessIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(INBOX_STATUS, stats)
 
 
     def test_trashThenUntrash(self):
@@ -1039,6 +1167,65 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessEqual(self.store.query(_UndeferTask).count(), 0)
 
 
+    def test_deferredFocus(self):
+        """
+        Verify that a focused message which is deferred loses its focus status.
+        """
+        self.message.focus()
+        self._deferMessage()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+
+
+    def test_deferredEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages which get deferred.
+
+        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
+        which is deferred.
+        """
+        self.message.focus()
+        self._deferMessage()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_undeferralFocus(self):
+        """
+        Verify that when a previously focused message is undeferred, it regains
+        its focus status.
+        """
+        self.message.focus()
+        self._deferMessage()
+        self.message.undefer()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(FOCUS_STATUS, stats)
+
+
+    def test_undeferralEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation for
+        focused messages which get deferred.
+
+        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
+        which is deferred.
+        """
+        self.message.focus()
+        self._deferMessage()
+        self.message.undefer()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(EVER_FOCUSED_STATUS, stats)
+
+
     def test_deferredAppearsInAll(self):
         """
         Verify that a message which is deferred still appears in the 'all' view.
@@ -1070,7 +1257,67 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessEqual(self.store.query(_UndeferTask).count(), 0)
 
 
-    def test_archival(self):
+    def test_focus(self):
+        """
+        Verify that when a message is focused, it retains its other statuses.
+        """
+        self.message.classifyClean()
+        self.message.markRead()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(INBOX_STATUS, stats)
+        self.failUnlessIn(CLEAN_STATUS, stats)
+        self.failUnlessIn(READ_STATUS, stats)
+        self.failUnlessIn(FOCUS_STATUS, stats)
+
+
+    def test_unfocus(self):
+        """
+        Verify that when a message is unfocused, it loses its focus status but
+        none of its other statuses.
+        """
+        self.message.focus()
+        self.message.classifyClean()
+        self.message.markRead()
+
+        before = set(self.message.iterStatuses())
+        self.message.unfocus()
+        after = set(self.message.iterStatuses())
+
+        self.assertEqual(before - set([FOCUS_STATUS]), after)
+
+
+    def test_unfocusEverFocused(self):
+        """
+        Whitebox test for the current focus-remembering implementation.
+
+        This verifies that an explicitly unfocused message does not get
+        remembered as focused.
+        """
+        self.message.focus()
+        self.message.unfocus()
+
+        stats = set(self.message.iterStatuses())
+        self.failIfIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_focusArchival(self):
+        """
+        Verify that a message which is placed into the archive is removed from
+        the focus.
+        """
+        self.message.classifyClean()
+        self.message.focus()
+        self.message.archive()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+
+
+    def test_inboxArchival(self):
         """
         Verify that a message which is placed into the archive is removed from the
         inbox.
@@ -1085,7 +1332,26 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(ARCHIVE_STATUS, stats)
 
 
-    def test_unarchival(self):
+    def test_focusUnarchival(self):
+        """
+        Verify that a focused message which has been placed into the archive
+        and then removed from it returns to the focused state.
+        """
+        self.message.classifyClean()
+        self.message.focus()
+        self.message.archive()
+        self.message.unarchive()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(INBOX_STATUS, stats)
+        self.failUnlessIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(CLEAN_STATUS, stats)
+        self.failIfIn(INCOMING_STATUS, stats)
+        self.failIfIn(SPAM_STATUS, stats)
+
+
+    def test_inboxUnarchival(self):
         """
         Verify that a message which has been placed into the archive and then
         removed from it is in the same state as one freshly delivered to the

@@ -12,7 +12,7 @@ from xquotient.quotienttheme import QuotientTheme
 from xquotient.grabber import GrabberConfiguration
 from xquotient.extract import ExtractPowerup
 from xquotient.popout import POP3Up
-from xquotient.filter import MailingListFilteringPowerup, RuleFilteringPowerup
+from xquotient.filter import MailingListFilteringPowerup, RuleFilteringPowerup, Focus
 from xquotient.spam import SpambayesFilter
 from xquotient.qpeople import MessageLister
 
@@ -48,6 +48,7 @@ plugin = offering.Offering(
                             RuleFilteringPowerup),
                            (u'Mailing List Filtering', u'Automatic filtering of messages sent by various mailing list managers.',
                             MailingListFilteringPowerup),
+                           (u'Focus', u'Highly filtered message view.', Focus),
                            (u'Quotient People Plugins', u'Per-person Image/Extract/Picture lists', MessageLister),
                            (u'Spambayes-based trainable Ham/Spam Filtering',
                             u'Filtering of messages based on a bayesian classification with per-user training information.',

@@ -752,6 +752,17 @@ class Message(item.Item):
                     limit=1)))
 
     # status manipulation methods
+    def _focusCheck(self):
+        if self.hasStatus(FOCUS_STATUS):
+            self.removeStatus(FOCUS_STATUS)
+            self.addStatus(EVER_FOCUSED_STATUS)
+
+
+    def _everFocusedCheck(self):
+        if self.hasStatus(EVER_FOCUSED_STATUS):
+            self.removeStatus(EVER_FOCUSED_STATUS)
+            self.addStatus(FOCUS_STATUS)
+
 
     def classifyClean(self):
         """
@@ -763,6 +774,7 @@ class Message(item.Item):
         """
         wasSpam = self._spam
         self._spam = False
+        self._everFocusedCheck()
         if wasSpam is None:
             # This message has never been classified before.
             self.addStatus(CLEAN_STATUS)
@@ -788,6 +800,7 @@ class Message(item.Item):
         """
         wasSpam = self._spam
         self._spam = True
+        self._focusCheck()
         if wasSpam is None:
             # This message has never been classified before.
             self.addStatus(CLEAN_STATUS)
@@ -862,12 +875,31 @@ class Message(item.Item):
                              spam=spam)
 
 
+    def focus(self):
+        """
+        Mark this message as being of particular interest.
+
+        @return: C{None}
+        """
+        self.addStatus(FOCUS_STATUS)
+
+
+    def unfocus(self):
+        """
+        Unmark this message as being of particular interest.
+
+        @return: C{None}
+        """
+        self.removeStatus(FOCUS_STATUS)
+
+
     def moveToTrash(self):
         """
         Mark this message as pending deletion.
 
         @return: None
         """
+        self._focusCheck()
         self.freezeStatus()
         self.addStatus(TRASH_STATUS)
 
@@ -878,6 +910,7 @@ class Message(item.Item):
 
         @return: None
         """
+        self._everFocusedCheck()
         self.unfreezeStatus()
         self.removeStatus(TRASH_STATUS)
 
@@ -919,6 +952,7 @@ class Message(item.Item):
 
         @return: None
         """
+        self._focusCheck()
         self.addStatus(DEFERRED_STATUS)
         self.removeStatus(INBOX_STATUS)
         self.everDeferred = True
@@ -935,6 +969,7 @@ class Message(item.Item):
 
         @return: None
         """
+        self._everFocusedCheck()
         self.removeStatus(DEFERRED_STATUS)
         self.addStatus(INBOX_STATUS)
         self.markUnread()
@@ -948,6 +983,7 @@ class Message(item.Item):
 
         @return: None
         """
+        self._focusCheck()
         self.removeStatus(INBOX_STATUS)
         self.addStatus(ARCHIVE_STATUS)
 
@@ -958,6 +994,7 @@ class Message(item.Item):
 
         @return: None
         """
+        self._everFocusedCheck()
         self.removeStatus(ARCHIVE_STATUS)
         self.addStatus(INBOX_STATUS)
 
@@ -1387,6 +1424,13 @@ CLEAN_STATUS = u'clean'
 # indicate that they have just arrived and should be looked at.
 INBOX_STATUS = u'inbox'
 
+# Messages which are believed to be of particular interest are given the focus
+# status.
+FOCUS_STATUS = u'focus'
+
+# Was this message ever focused?
+EVER_FOCUSED_STATUS = u'ever-focused'
+
 # Once a user deals with messages and "archives" them, they have this status.
 ARCHIVE_STATUS = u'archive'
 
@@ -1430,7 +1474,8 @@ TRAINED_STATUS = u'trained'
 # introduced)
 
 STICKY_STATUSES = [READ_STATUS, UNREAD_STATUS, TRAINED_STATUS,
-                   DEFERRED_STATUS, EVER_DEFERRED_STATUS]
+                   DEFERRED_STATUS, EVER_DEFERRED_STATUS,
+                   EVER_FOCUSED_STATUS]
 
 
 class _MessageStatus(item.Item):

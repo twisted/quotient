@@ -773,7 +773,7 @@ Quotient.Test.ControllerTestCase.methods(
         var nodes = Divmod.dir(self.controllerWidget.mailViewNodes);
         nodes.sort();
         var expected = ["all", "inbox", "archive", "draft", "spam", "deferred",
-                        "bounce", "outbox", "sent", "trash"];
+                        "bounce", "outbox", "sent", "trash", "focus"];
         expected.sort();
         self.assertArraysEqual(nodes, expected);
     },
@@ -789,8 +789,9 @@ Quotient.Test.ControllerTestCase.methods(
             function(x) { return x.value; },
             node.getElementsByTagName('option'));
         self.assertArraysEqual(options,
-                               ['inbox', 'all', 'archive', 'deferred', 'draft',
-                                'outbox', 'bounce', 'sent', 'spam', 'trash']);
+                               ['inbox', 'all', 'focus', 'archive', 'deferred',
+                                'draft', 'outbox', 'bounce', 'sent', 'spam',
+                                'trash']);
     },
 
 
@@ -3048,6 +3049,307 @@ Quotient.Test.EmptyControllerTestCase.methods(
                                  'No more messages.');
             });
         return d;
+    });
+
+
+/**
+ * Tests for UI interactions with the focused state of the workflow.
+ */
+Quotient.Test.FocusControllerTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.FocusControllerTestCase');
+Quotient.Test.FocusControllerTestCase.methods(
+    /**
+     * Get an empty Controller widget and add it as a child to this test case's
+     * node.
+     */
+    function setUp(self) {
+        var result = self.callRemote('getFocusControllerWidget');
+        result.addCallback(
+            function cbWidgetInfo(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        result.addCallback(
+            function cbWidget(widget) {
+                self.controllerWidget = widget;
+                self.node.appendChild(widget.node);
+                return widget.initializationDeferred;
+            });
+        return result;
+    },
+
+    /**
+     * Test that in the inbox view, both the focused message and the unfocused
+     * message show up.
+     */
+    function test_focusedShownByInbox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+                self.assertEqual(model.rowCount(), 2);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+                self.assertEqual(
+                    model.getRowData(1).subject, 'unfocused message');
+            });
+        return result;
+    },
+
+    /**
+     * Test that only the focused message shows up in the focus view.
+     */
+    function test_focusedShownByFocus(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbViewChange(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
+    },
+
+    /**
+     * Test that a focused message can be archived from the inbox view and it
+     * will disappear from both the inbox and focus views.
+     */
+    function test_archiveFocusedFromInbox(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                return self.controllerWidget.archive(null);
+            });
+        result.addCallback(
+            function cbArchived(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'unfocused message');
+            });
+        return result;
+    },
+
+    /**
+     * Like L{test_archiveFocusedFromInbox}, but invoke the archive action from
+     * the focus view instead.
+     */
+    function test_archiveFocusedFromFocus(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbViewChanged(ignored) {
+                return self.controllerWidget.archive(null);
+            });
+        result.addCallback(
+            function cbArchived(ignored) {
+                var model = self.controllerWidget.scrollWidget.model;
+                self.assertEqual(model.rowCount(), 0);
+            });
+        return result;
+    },
+
+    /**
+     * Test that archiving and then unarchiving the focused message results in
+     * it returning to the focus view.
+     */
+    function test_unarchiveFocused(self) {
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.archive(null);
+            });
+        result.addCallback(
+            function cbArchived(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                return self.controllerWidget.chooseMailView('archive');
+            });
+        result.addCallback(
+            function cbArchiveView(ignored) {
+                return self.controllerWidget.unarchive(null);
+            });
+        result.addCallback(
+            function cbUnarchived(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
+    },
+
+    /**
+     * Test that a focused message can be moved to the trash from the inbox.
+     */
+    function test_trashFocusFromInbox(self) {
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.trash(null);
+            });
+        result.addCallback(
+            function cbTrashed(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'unfocused message');
+                return self.controllerWidget.chooseMailView('trash');
+            });
+        result.addCallback(
+            function cbTrashView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+                return self.controllerWidget.untrash(null);
+            });
+        result.addCallback(
+            function cbUntrashed(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
+    },
+
+    /**
+     * Like L{test_trashFocusFromInbox}, but invoke the trash action from the
+     * focus view instead.
+     */
+    function test_trashFocusFromFocus(self) {
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusView(ignored) {
+                return self.controllerWidget.trash(null);
+            });
+        result.addCallback(
+            function cbTrashed(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('trash');
+            });
+        result.addCallback(
+            function cbTrashView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+                return self.controllerWidget.untrash(null);
+            });
+        result.addCallback(
+            function cbUntrashed(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusViewAgain(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
+    },
+
+    /**
+     * Test classifying a focused message as spam from the inbox.
+     */
+    function test_spamFocusFromInbox(self) {
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget._trainSpam(null);
+            });
+        result.addCallback(
+            function cbTrained(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'unfocused message');
+                return self.controllerWidget.chooseMailView('spam');
+            });
+        result.addCallback(
+            function cbSpamView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+                return self.controllerWidget._trainHam(null);
+            });
+        result.addCallback(
+            function cbTrained(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
+    },
+
+    /**
+     * Like L{test_spamFocusFromInbox}, but invoke the spam action from the
+     * focus view.
+     */
+    function test_spamFocusFromFocus(self) {
+        var model;
+        var result = self.setUp();
+        result.addCallback(
+            function cbSetUp(ignored) {
+                model = self.controllerWidget.scrollWidget.model;
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusView(ignored) {
+                return self.controllerWidget._trainSpam(null);
+            });
+        result.addCallback(
+            function cbSpammed(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('spam');
+            });
+        result.addCallback(
+            function cbSpamView(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+                return self.controllerWidget._trainHam(null);
+            });
+        result.addCallback(
+            function cbHammed(ignored) {
+                self.assertEqual(model.rowCount(), 0);
+                return self.controllerWidget.chooseMailView('focus');
+            });
+        result.addCallback(
+            function cbFocusViewAgain(ignored) {
+                self.assertEqual(model.rowCount(), 1);
+                self.assertEqual(
+                    model.getRowData(0).subject, 'focused message');
+            });
+        return result;
     });
 
 /**

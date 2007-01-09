@@ -25,20 +25,23 @@ from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import Scrollable, ScrollableView
 
+from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
+from xquotient.filter import Focus
 from xquotient.exmess import Message, getMessageSources, MailboxSelector
 from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
-                              COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS)
-from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
+                              COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS,
+                              FOCUS_STATUS)
+
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
 
 # Views that the user may select.
-VIEWS = [INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS, DRAFT_STATUS,
-         OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS, TRASH_STATUS]
-
+VIEWS = [FOCUS_STATUS, INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS,
+         DRAFT_STATUS, OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS,
+         TRASH_STATUS]
 
 
 
@@ -150,7 +153,7 @@ class Inbox(Item):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
-    schemaVersion = 4
+    schemaVersion = 5
 
     powerupInterfaces = (ixmantissa.INavigableElement,)
 
@@ -161,6 +164,7 @@ class Inbox(Item):
     deliveryAgent = dependsOn(DeliveryAgent)
     messageDisplayPrefs = dependsOn(MessageDisplayPreferenceCollection)
     filter = dependsOn(spam.Filter)
+    focus = dependsOn(Focus)
 
     # uiComplexity should be an integer between 1 and 3, where 1 is the least
     # complex and 3 is the most complex.  the value of this attribute
@@ -398,8 +402,13 @@ declareLegacyItem(Inbox.typeName, 3,
 def inbox3to4(old):
     """
     Copy over all attributes except for 'installedOn' and 'catalog', which
-    have been deleted, and set the 'filter' attribute to either a
-    L{xquotient.spam.Filter} that exists in the store, or a new one
+    have been deleted.
+
+    To avoid triggering an Axiom bug where installOn will load the Inbox
+    instance being upgraded and re-entrantly run its remaining upgraders,
+    rely on inbox4to5 to set the 'filter' attribute which was added in this
+    version of the schema either to a L{xquotient.spam.Filter} that exists
+    in the store, or to a new one.
     """
     new = old.upgradeVersion(
         Inbox.typeName, 3, 4,
@@ -412,14 +421,55 @@ def inbox3to4(old):
         uiComplexity=old.uiComplexity,
         showMoreDetail=old.showMoreDetail)
 
+    return new
+registerUpgrader(inbox3to4, Inbox.typeName, 3, 4)
+
+declareLegacyItem(Inbox.typeName, 4,
+                  dict(privateApplication=attributes.reference(),
+                       scheduler=attributes.reference(),
+                       messageSource=attributes.reference(),
+                       quotientPrefs=attributes.reference(),
+                       deliveryAgent=attributes.reference(),
+                       messageDisplayPrefs=attributes.reference(),
+                       uiComplexity=attributes.integer(),
+                       showMoreDetail=attributes.boolean(),
+                       filter=attributes.reference()))
+
+def inbox4to5(old):
+    """
+    Copy over all attributes and add a reference to a newly created Focus item.
+    Focus did not exist prior to the addition of this dependency, so there is
+    no way one could exist in the store of an existing Inbox.
+
+    Additionally, find or create a spam.Filter.  See inbox3to4.
+    """
+    focus = Focus(store=old.store)
+
+    new = old.upgradeVersion(
+        Inbox.typeName, 4, 5,
+        privateApplication=old.privateApplication,
+        scheduler=old.scheduler,
+        messageSource=old.messageSource,
+        quotientPrefs=old.quotientPrefs,
+        deliveryAgent=old.deliveryAgent,
+        messageDisplayPrefs=old.messageDisplayPrefs,
+        uiComplexity=old.uiComplexity,
+        showMoreDetail=old.showMoreDetail)
+
+    # Cannot do either of these before the upgradeVersion call: while
+    # examining dependencies, it is likely that the Inbox being upgraded
+    # will be encountered, causing this upgrade function to run again. 
+    # Repeat until the stack is full, then explode. -exarkun
     filter = new.store.findFirst(spam.Filter, default=None)
     if filter is None:
         filter = spam.Filter(store=new.store)
         installOn(filter, new.store)
     new.filter = filter
-    return new
-registerUpgrader(inbox3to4, Inbox.typeName, 3, 4)
 
+    installOn(focus, old.store)
+    new.focus = focus
+    return new
+registerUpgrader(inbox4to5, Inbox.typeName, 4, 5)
 
 
 class MailboxScrollingFragment(Scrollable, ScrollableView, LiveElement):

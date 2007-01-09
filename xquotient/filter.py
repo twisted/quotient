@@ -13,6 +13,8 @@ from twisted.python import reflect, components
 from nevow import inevow, athena
 
 from axiom import item, attributes
+from axiom.iaxiom import IReliableListener
+from axiom.item import Item
 from axiom.tags import Catalog
 from axiom.dependency import dependsOn
 from axiom.upgrade import registerUpgrader
@@ -20,6 +22,9 @@ from axiom.upgrade import registerUpgrader
 from xmantissa import ixmantissa, webnav, webtheme, liveform
 
 from xquotient import iquotient, mail
+from xquotient.mail import MessageSource
+from xquotient.equotient import NoSuchHeader
+
 
 class RuleFilteringPowerup(item.Item):
     """
@@ -429,3 +434,50 @@ class FilteringConfigurationFragment(athena.LiveFragment):
         self.original.powerUp(rule, iquotient.IFilteringRule)
 
 components.registerAdapter(FilteringConfigurationFragment, RuleFilteringPowerup, ixmantissa.INavigableFragment)
+
+
+class Focus(Item):
+    """
+    Implement the rules which determine whether a message gets the focused
+    status or not.
+    """
+    implements(IReliableListener)
+
+    messageSource = dependsOn(MessageSource)
+
+    def installed(self):
+        self.messageSource.addReliableListener(self)
+
+
+    def processItem(self, item):
+        part = item.impl
+        try:
+            getHeader = part.getHeader
+        except AttributeError:
+            pass
+        else:
+            try:
+                precedence = getHeader(u'precedence')
+            except NoSuchHeader:
+                item.focus()
+            else:
+                if precedence.lower() not in (u'list', u'bulk'):
+                    item.focus()
+
+
+    def suspend(self):
+        """
+        Called when this listener is suspended.
+
+        There is no ephemeral state for this listener so this function does
+        nothing.
+        """
+
+
+    def resume(self):
+        """
+        Call when this listener is no longer suspended.
+
+        There is no ephemeral state for this listener so this function does
+        nothing.
+        """

@@ -738,6 +738,8 @@ Quotient.Mailbox.Controller.methods(
                     "reply", "train-spam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
                       "forward", "reply", "train-spam"],
+            "focus": ["archive", "defer", "delete",
+                      "forward", "reply", "train-spam"],
             "archive": ["unarchive", "delete", "forward",
                         "reply", "train-spam"],
             "draft": ["delete"],

@@ -1,13 +1,20 @@
 
 from twisted.trial import unittest
+from twisted.trial.unittest import TestCase
 from twisted.python.filepath import FilePath
 
 from axiom import store, scheduler
+from axiom.store import Store
 from axiom.dependency import installOn
+from axiom.plugins.userbasecmd import Create
+from axiom.plugins.mantissacmd import Mantissa
 
 from xquotient import filter, mimepart, mail
 from xquotient.mimestorage import Part
-from xquotient.exmess import Message
+from xquotient.exmess import Message, FOCUS_STATUS
+from xquotient.filter import Focus
+
+from xquotient.test.test_workflow import DummyMessageImplementation
 
 
 class HeaderRuleTest(unittest.TestCase):
@@ -84,6 +91,8 @@ class HeaderRuleTest(unittest.TestCase):
         self.headerRule.operation = filter.CONTAINS
         return self._testImpl(same, notsame, casenotsame)
 
+
+
 class MailingListRuleTest(unittest.TestCase):
 
     def setUp(self):
@@ -96,6 +105,8 @@ class MailingListRuleTest(unittest.TestCase):
 
         self.mlfp = filter.MailingListFilteringPowerup(store=self.store)
         installOn(self.mlfp, self.store)
+
+
     def testMailingListFilter(self):
         """
         Ensures that mailing list messages are not handled by
@@ -117,6 +128,7 @@ class MailingListRuleTest(unittest.TestCase):
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
                          [u'some-list.example.com'])
 
+
     def testEZMLMFilter(self):
         """
         Ensure that match_EZMLM doesn't kerplode when presented with a
@@ -133,3 +145,115 @@ class MailingListRuleTest(unittest.TestCase):
         self.mlfp.processItem(msg)
         self.assertEqual(list(self.tagcatalog.tagsOf(msg)),
                          [])
+
+
+
+class FocusTests(TestCase):
+    """
+    Tests for the code which determines if a message is focused or not.
+    """
+    def setUp(self):
+        """
+        Create a site store and a user store with the L{Focus} powerup.
+        """
+        # Make the site store within which the test user will be created.
+        self.dbdir = self.mktemp()
+        self.siteStore = Store(self.dbdir)
+        Mantissa().installSite(self.siteStore, '/')
+
+        # Create a store for the user which is set up appropriately.
+        self.userAccount = Create().addAccount(
+            self.siteStore, u'testuser', u'example.com', u'password')
+        self.userStore = self.userAccount.avatars.open()
+        self.focus = Focus(store=self.userStore)
+        installOn(self.focus, self.userStore)
+
+
+    def test_suspend(self):
+        """
+        Make sure the suspend method does nothing.
+        """
+        self.focus.suspend()
+
+
+    def test_resume(self):
+        """
+        Make sure the resume method does nothing.
+        """
+        self.focus.resume()
+
+
+    def test_nonPart(self):
+        """
+        Test that a message with an implementation which isn't a L{Part} that
+        the Message doesn't get focused.
+
+        This is primarily here for completeness at this point.  The only
+        non-Part Messages which exist are probably created by the test suite.
+        """
+        impl = DummyMessageImplementation(store=self.userStore)
+        message = Message.createIncoming(
+            self.userStore, impl, u'test://test_nonPart')
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def _focusedTest(self, part):
+        message = Message.createIncoming(
+            self.userStore, part, u'test://test_otherPrecedence')
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failUnlessIn(FOCUS_STATUS, statuses)
+
+
+    def _unfocusedTest(self, part):
+        message = Message.createIncoming(
+            self.userStore, part, u'test://unfocused')
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def test_bulkPrecedence(self):
+        """
+        Test that an email message with C{bulk} precedence is not focused.
+        """
+        impl = Part()
+        impl.addHeader(u'Precedence', u'bulk')
+        self._unfocusedTest(impl)
+
+        impl = Part()
+        impl.addHeader(u'Precedence', u'BuLK')
+        self._unfocusedTest(impl)
+
+
+    def test_listPrecedence(self):
+        """
+        Test that an email message with C{list} precedence is not focused.
+        """
+        impl = Part()
+        impl.addHeader(u'Precedence', u'list')
+        self._unfocusedTest(impl)
+
+        impl = Part()
+        impl.addHeader(u'Precedence', u'LIsT')
+        self._unfocusedTest(impl)
+
+
+    def test_otherPrecedence(self):
+        """
+        Test that an email message with some random other precedence header
+        value is focused.
+        """
+        impl = Part()
+        impl.addHeader(u'Precedence', u'made up random value')
+        self._focusedTest(impl)
+
+
+    def test_noPrecedence(self):
+        """
+        Test that an email message with no precedence header is focused.
+        """
+        impl = Part()
+        self._focusedTest(impl)

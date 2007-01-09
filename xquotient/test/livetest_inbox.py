@@ -186,6 +186,7 @@ class _ControllerMixin:
     tzfactor = time.daylight and time.altzone or time.timezone
     sent = Time.fromDatetime(datetime(1999, 12, 13))
     sent2 = Time().oneDay() + timedelta(hours=16, minutes=5, seconds=tzfactor)
+
     def getInbox(self):
         """
         Return a newly created Inbox, in a newly created Store.
@@ -205,6 +206,16 @@ class _ControllerMixin:
         inbox = Inbox(store=s)
         installOn(inbox, s)
         return inbox
+
+
+    def widgetFor(self, inbox):
+        """
+        Create and return an InboxScreen for the given inbox.
+        """
+        fragment = InboxScreen(inbox)
+        fragment.composeFragmentFactory = StubComposeFragment
+        fragment.setFragmentParent(self)
+        return fragment
 
 
 
@@ -321,10 +332,7 @@ class ControllerTestCase(testcase.TestCase, _ControllerMixin):
             for m
             in [m1, m2, m3, m4, m5, m6, m7, m8])
 
-        fragment = InboxScreen(inbox)
-        fragment.composeFragmentFactory = StubComposeFragment
-        fragment.setFragmentParent(self)
-        return fragment
+        return self.widgetFor(inbox)
     expose(getControllerWidget)
 
 
@@ -424,10 +432,7 @@ class EmptyInitialViewControllerTestCase(testcase.TestCase, _ControllerMixin):
             receivedWhen=self.sent + offset, sentWhen=self.sent,
             spam=False, archived=True, read=False, impl=impl)
 
-        fragment = InboxScreen(inbox)
-        fragment.composeFragmentFactory = StubComposeFragment
-        fragment.setFragmentParent(self)
-        return fragment
+        return self.widgetFor(inbox)
     expose(getControllerWidget)
 
 
@@ -439,11 +444,7 @@ class EmptyControllerTestCase(testcase.TestCase, _ControllerMixin):
         """
         Retrieve the Controller widget for a mailbox with no messages in it.
         """
-        inbox = self.getInbox()
-        fragment = InboxScreen(inbox)
-        fragment.composeFragmentFactory = StubComposeFragment
-        fragment.setFragmentParent(self)
-        return fragment
+        return self.widgetFor(self.getInbox())
     expose(getEmptyControllerWidget)
 
 
@@ -470,14 +471,56 @@ class FullControllerTestCase(testcase.TestCase, _ControllerMixin):
 
         catalog.tag(messages[1], u'foo')
 
-        fragment = InboxScreen(inbox)
-        fragment.composeFragmentFactory = StubComposeFragment
-        fragment.setFragmentParent(self)
-        return fragment
+        return self.widgetFor(inbox)
     expose(getFullControllerWidget)
+
+
 
 class MailboxStatusTestCase(testcase.TestCase):
     """
     Tests for Quotient.Mailbox.Status
     """
     jsClass = u'Quotient.Test.MailboxStatusTestCase'
+
+
+
+class FocusControllerTestCase(testcase.TestCase, _ControllerMixin):
+    jsClass = u'Quotient.Test.FocusControllerTestCase'
+
+    def getFocusControllerWidget(self):
+        """
+        Retrieve the Controller widget for a mailbox with two messages, one
+        focused and one not.
+        """
+        inbox = self.getInbox()
+        inbox.uiComplexity = 3
+
+        impl = _Part(store=inbox.store)
+
+        # One focused message
+        m = testMessageFactory(
+            store=inbox.store,
+            sender=self.aliceEmail,
+            subject=u'focused message',
+            receivedWhen=self.sent,
+            sentWhen=self.sent2,
+            spam=False,
+            archived=False,
+            read=True,
+            impl=impl)
+        m.focus()
+
+        # One unfocused message in the inbox
+        testMessageFactory(
+            store=inbox.store,
+            sender=self.aliceEmail,
+            subject=u'unfocused message',
+            receivedWhen=self.sent,
+            sentWhen=self.sent2,
+            spam=False,
+            archived=False,
+            read=True,
+            impl=impl)
+
+        return self.widgetFor(inbox)
+    expose(getFocusControllerWidget)
