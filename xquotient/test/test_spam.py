@@ -16,8 +16,8 @@ from xquotient.mimestorage import Part
 from xquotient.exmess import (Message, _TrainingInstruction, SPAM_STATUS,
                               TRAINED_STATUS, CLEAN_STATUS)
 
-from xquotient.test.test_workflow import (DummyMessageImplementation,
-                                          FakeScheduler)
+from xquotient.test.test_workflow import FakeScheduler
+from xquotient.test.util import DummyMessageImplementation
 
 
 

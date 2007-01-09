@@ -11,8 +11,6 @@ from axiom.store import Store
 from axiom.dependency import installOn
 
 from axiom.tags import Catalog
-from axiom.attributes import integer
-from axiom.item import Item
 
 from axiom.test.util import QueryCounter
 
@@ -24,15 +22,13 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               READ_STATUS, Correspondent,
                               SENDER_RELATION, DEFERRED_STATUS,
                               ARCHIVE_STATUS, TRASH_STATUS,
-                              EVER_DEFERRED_STATUS, DRAFT_STATUS,
-                              RECIPIENT_RELATION, COPY_RELATION,
-                              BLIND_COPY_RELATION)
+                              EVER_DEFERRED_STATUS, DRAFT_STATUS)
 
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment)
-from xquotient import compose, mimeutil, smtpout
-from xquotient.test.test_workflow import (DummyMessageImplementation,
-                                          DummyMessageImplementationMixin)
+from xquotient import compose, smtpout
+from xquotient.test.util import (DummyMessageImplementation,
+                                 DummyMessageImplWithABunchOfAddresses)
 
 
 
@@ -776,26 +772,6 @@ class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):
         self.assertEquals(
             self.inbox.scrollingFragment.requestCurrentSize(),
             1)
-
-
-
-class DummyMessageImplWithABunchOfAddresses(Item, DummyMessageImplementationMixin):
-    """
-    Mock L{xquotient.iquotient.IMessageData} which returns a bunch of things
-    from L{relatedAddresses}
-    """
-    z = integer()
-
-    def relatedAddresses(self):
-        """
-        Return one address for each relation type
-        """
-        EmailAddress = mimeutil.EmailAddress
-        for (rel, addr) in ((SENDER_RELATION, 'sender@host'),
-                            (RECIPIENT_RELATION, 'recipient@host'),
-                            (COPY_RELATION, 'copy@host'),
-                            (BLIND_COPY_RELATION, 'blind-copy@host')):
-            yield (rel, mimeutil.EmailAddress(addr, False))
 
 
 
