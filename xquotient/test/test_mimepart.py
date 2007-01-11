@@ -14,7 +14,8 @@ from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.exmess import (
-    SENDER_RELATION, RECIPIENT_RELATION, COPY_RELATION, BLIND_COPY_RELATION)
+    SENDER_RELATION, RECIPIENT_RELATION, COPY_RELATION, BLIND_COPY_RELATION,
+    RESENT_TO_RELATION, RESENT_FROM_RELATION)
 
 from xmantissa import ixmantissa
 
@@ -717,7 +718,7 @@ Received: from example.com (example.com [127.0.0.1])
           by example.org (example.org [127.0.0.1])
           for <alice@example.com>; Mon, 13 Nov 2006 16:04:04 GMT
 Message-ID: <0@example.com>
-%(from)s%(sender)s%(reply-to)s%(cc)s%(to)s%(bcc)s
+%(from)s%(sender)s%(reply-to)s%(cc)s%(to)s%(bcc)s%(resent-to)s%(resent-from)s
 
 Hello.
 """
@@ -751,6 +752,26 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
     bccEmail = u'isaac@example.com'
     bccAddress = u'%s <%s>' % (bccDisplay, bccEmail)
 
+    resentFromDisplay = u'Iv\N{LATIN SMALL LETTER A WITH GRAVE}n'
+    resentFromEmail = u'ivan@example.com'
+    resentFromAddress = u'%s <%s>' % (resentFromDisplay, resentFromEmail)
+
+    resentToDisplay = u'M\N{LATIN SMALL LETTER A WITH GRAVE}llory'
+    resentToEmail = u'mallory@example.com'
+    resentToAddress = u'%s <%s>' % (resentToDisplay, resentToEmail)
+
+
+    def setUp(self):
+        self.headers = {
+            'from': self._header('From', self.fromAddress),
+            'sender': self._header('Sender', self.senderAddress),
+            'reply-to': self._header('Reply-To', self.replyToAddress),
+            'cc': self._header('Cc', self.ccAddress),
+            'to': self._header('To', self.toAddress),
+            'bcc': self._header('Bcc', self.bccAddress),
+            'resent-from': self._header('Resent-From', self.resentFromAddress),
+            'resent-to': self._header('Resent-To', self.resentToAddress)}
+
 
     def _header(self, name, value):
         return (
@@ -780,13 +801,7 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         Test that L{Part.relatedAddresses} yields a sender address taken from
         the C{From} header of a message, if that header is present.
         """
-        self._relationTest({
-                'from': self._header('From', self.fromAddress),
-                'sender': self._header('Sender', self.senderAddress),
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self._relationTest(self.headers,
                            SENDER_RELATION,
                            self.fromEmail,
                            self.fromDisplay)
@@ -798,13 +813,8 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         the C{Sender} header of a message, if that header is present and the
         C{From} header is not.
         """
-        self._relationTest({
-                'from': '',
-                'sender': self._header('Sender', self.senderAddress),
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self.headers['from'] = ''
+        self._relationTest(self.headers,
                            SENDER_RELATION,
                            self.senderEmail,
                            self.senderDisplay)
@@ -816,13 +826,8 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         the C{Reply-To} header of a message, if that header is present and the
         C{From} and C{Sender} headers are not.
         """
-        self._relationTest({
-                'from': '',
-                'sender': '',
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self.headers['from'] = self.headers['sender'] = ''
+        self._relationTest(self.headers,
                            SENDER_RELATION,
                            self.replyToEmail,
                            self.replyToDisplay)
@@ -833,13 +838,7 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         Test that L{Part.relatedAddresses} yields a recipient address taken
         from the C{To} header of the message, if that header is present.
         """
-        self._relationTest({
-                'from': self._header('From', self.fromAddress),
-                'sender': self._header('Sender', self.senderAddress),
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self._relationTest(self.headers,
                            RECIPIENT_RELATION,
                            self.toEmail,
                            self.toDisplay)
@@ -850,13 +849,7 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         Test that L{Part.relatedAddresses} yields a recipient address taken
         from the C{Cc} header of the message, if that header is present.
         """
-        self._relationTest({
-                'from': self._header('From', self.fromAddress),
-                'sender': self._header('Sender', self.senderAddress),
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self._relationTest(self.headers,
                            COPY_RELATION,
                            self.ccEmail,
                            self.ccDisplay)
@@ -867,14 +860,10 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         Test that L{Part.relatedAddresses} yields multiple recipient addresses
         taken from the C{Cc} header of the message, if multiples were found.
         """
-        msgSource = msg(relatedAddressesMessage % {
-                'sender': self._header('Sender', self.senderAddress),
-                'from': self._header('From', self.fromAddress),
-                'to': self._header('To', self.toAddress),
-                'cc': self._header('Cc', self.ccAddress + u", " +
-                                   self.bccAddress),
-                'reply-to': '',
-                'bcc': ''})
+        self.headers['cc'] = self._header(
+            'Cc', self.ccAddress + u", " + self.bccAddress)
+
+        msgSource = msg(relatedAddressesMessage % self.headers)
 
         def checkRelations(msg):
             ccAddrs = [(addr.email, addr.display) for (kind, addr) in msg.relatedAddresses()
@@ -890,16 +879,32 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         Test that L{Part.relatedAddresses} yields a recipient address taken
         from the C{Bcc} header of the message, if that header is present.
         """
-        self._relationTest({
-                'from': self._header('From', self.fromAddress),
-                'sender': self._header('Sender', self.senderAddress),
-                'reply-to': self._header('Reply-To', self.replyToAddress),
-                'cc': self._header('Cc', self.ccAddress),
-                'to': self._header('To', self.toAddress),
-                'bcc': self._header('Bcc', self.bccAddress)},
+        self._relationTest(self.headers,
                            BLIND_COPY_RELATION,
                            self.bccEmail,
                            self.bccDisplay)
+
+
+    def test_resentToRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields a 'resent to' address taken
+        from the C{Resent-To} header of the message, if that header is present
+        """
+        self._relationTest(self.headers,
+                           RESENT_TO_RELATION,
+                           self.resentToEmail,
+                           self.resentToDisplay)
+
+
+    def test_resentFromRelation(self):
+        """
+        Test that L{Part.relatedAddresses} yields a 'resent from' address taken
+        from the C{Resent-From} header of the message, if that header is present
+        """
+        self._relationTest(self.headers,
+                           RESENT_FROM_RELATION,
+                           self.resentFromEmail,
+                           self.resentFromDisplay)
 
 
     def test_noRelations(self):
@@ -913,7 +918,9 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
                 'reply-to': '',
                 'cc': '',
                 'to': '',
-                'bcc': ''})
+                'bcc': '',
+                'resent-from': '',
+                'resent-to': ''})
 
         def checkRelations(msg):
             self.assertEqual(list(msg.relatedAddresses()), [])

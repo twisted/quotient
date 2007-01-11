@@ -181,7 +181,7 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
         portion of an email address if present before trying to deliver
         directed mail to it
         """
-        message= StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.store)
         msg = self.composer.redirect(
                 self.defaultFromAddr,
                 [mimeutil.EmailAddress(
@@ -192,6 +192,37 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
         self.assertEquals(
             list(self.reactor.factory.toEmail),
             ['joe@nowhere'])
+
+
+    def test_redirectRelatedAddresses(self):
+        """
+        Test that an outgoing redirected message has the resent from/to
+        addresses stored
+        """
+        message = StubStoredMessageAndImplAndSource(store=self.store)
+
+        RESENT_TO_ADDRESS = mimeutil.EmailAddress(
+            u'Joe <joe@nowhere>', False)
+        self.composer.redirect(
+            self.defaultFromAddr,
+            [RESENT_TO_ADDRESS],
+            message)
+
+        msg = self.store.findUnique(exmess.Message)
+
+        def checkCorrespondents(relation, address):
+            self.assertEquals(
+                self.store.query(
+                    exmess.Correspondent,
+                    attributes.AND(
+                        exmess.Correspondent.message == msg,
+                        exmess.Correspondent.address == address,
+                        exmess.Correspondent.relation == relation)).count(),
+                1)
+
+        checkCorrespondents(
+            exmess.RESENT_FROM_RELATION, self.defaultFromAddr.address)
+        checkCorrespondents(exmess.RESENT_TO_RELATION, RESENT_TO_ADDRESS.email)
 
 
 

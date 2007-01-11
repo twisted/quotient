@@ -475,7 +475,9 @@ class Part(item.Item):
         for header, relationship in [
             (u'cc', exmess.COPY_RELATION),
             (u'to', exmess.RECIPIENT_RELATION),
-            (u'bcc', exmess.BLIND_COPY_RELATION)]:
+            (u'bcc', exmess.BLIND_COPY_RELATION),
+            (u'resent-to', exmess.RESENT_TO_RELATION),
+            (u'resent-from', exmess.RESENT_FROM_RELATION)]:
             try:
                 v = self.getHeader(header)
             except equotient.NoSuchHeader:

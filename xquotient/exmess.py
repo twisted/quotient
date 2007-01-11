@@ -1362,6 +1362,8 @@ SENDER_RELATION = u'sender'
 RECIPIENT_RELATION = u'recipient'
 COPY_RELATION = u'copy'
 BLIND_COPY_RELATION = u'blind-copy'
+RESENT_TO_RELATION = u'resent-to'
+RESENT_FROM_RELATION = u'resent-from'
 
 
 class Correspondent(item.Item):
