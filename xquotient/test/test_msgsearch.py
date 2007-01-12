@@ -83,27 +83,27 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         splitted = splitAddress('john.smith@alum.mit.edu')
         self.assertEqual(splitted, ['john', 'smith', 'alum', 'mit', 'edu'])
 
-    def testKeywordSearch(self):
+    def test_keywordSearch(self):
         """
         Test that we get the expected results when searching for messages by
         keyword name and value
         """
         msg = self._makeSimpleMsg(u'')
 
-        msg.subject=u'hello world'
-        msg.sender=u'foo@jethro.org'
-        msg.senderDisplay=u'Fred Oliver Osgood'
+        msg.subject = u'hello world'
+        msg.sender = u'foo@jethro.org'
+        msg.senderDisplay = u'Fred Oliver Osgood'
 
         self._indexSomething(msg)
 
         reader = self.indexer.openReadIndex()
         self.assertEqual(list(reader.search(u'', {u'subject': u'world'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'sender': u'foo'})),
+        self.assertEqual(list(reader.search(u'', {u'from': u'foo'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'sender': u'jethro'})),
+        self.assertEqual(list(reader.search(u'', {u'from': u'jethro'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'sender': u'osgood'})),
+        self.assertEqual(list(reader.search(u'', {u'from': u'osgood'})),
                          [msg.storeID])
 
 

@@ -1147,12 +1147,17 @@ class Message(item.Item):
         # The email address: 'foo@bar.com'
         senderParts.append(self.sender)
         # The sender parts broken apart: 'foo bar com'
-        senderParts += splitAddress(self.sender)
+        senderParts.extend(splitAddress(self.sender))
         # The sender display name: 'Fred Oliver Osgood'
-        senderParts.append(self.senderDisplay)
-        senderParts = ' '.join(senderParts)
+        if self.senderDisplay not in senderParts:
+            senderParts.append(self.senderDisplay)
+        senderParts = u' '.join(senderParts)
+        recipientParts = [self.recipient]
+        recipientParts.extend(splitAddress(self.recipient))
+        recipientParts = u' '.join(recipientParts)
         return {u'subject': self.subject,
-                u'sender': senderParts}
+                u'from': senderParts,
+                u'to': recipientParts}
 
 
     def documentType(self):
