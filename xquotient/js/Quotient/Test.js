@@ -812,8 +812,8 @@ Quotient.Test.ControllerTestCase.methods(
                     rows.length, 2,
                     "Should have been 2 rows in the archive view.");
 
-                self.assertEqual(rows[0]["subject"], "4th message");
-                self.assertEqual(rows[1]["subject"], "3rd message");
+                self.assertEqual(rows[0]["subject"], "3rd message");
+                self.assertEqual(rows[1]["subject"], "4th message");
             });
         return result;
     },
@@ -890,10 +890,10 @@ Quotient.Test.ControllerTestCase.methods(
                     rows.length, 4,
                     "Should have been 4 rows in the 'all messages' view.");
 
-                self.assertEqual(rows[0]["subject"], "4th message");
-                self.assertEqual(rows[1]["subject"], "3rd message");
-                self.assertEqual(rows[2]["subject"], "2nd message");
-                self.assertEqual(rows[3]["subject"], "1st message");
+                self.assertEqual(rows[0]["subject"], "1st message");
+                self.assertEqual(rows[1]["subject"], "2nd message");
+                self.assertEqual(rows[2]["subject"], "3rd message");
+                self.assertEqual(rows[3]["subject"], "4th message");
             });
         return result;
     },
@@ -1015,10 +1015,11 @@ Quotient.Test.ControllerTestCase.methods(
         self.assertEquals(
             rows.length, 4, "Should have been 4 rows in Alice view.");
 
-        self.assertEquals(rows[0]["subject"], "4th message");
-        self.assertEquals(rows[1]["subject"], "3rd message");
-        self.assertEquals(rows[2]["subject"], "2nd message");
-        self.assertEquals(rows[3]["subject"], "1st message");
+        /* not a touch once view, so messages should be newest to oldest */
+        self.assertEquals(rows[0]["subject"], "1st message");
+        self.assertEquals(rows[1]["subject"], "2nd message");
+        self.assertEquals(rows[2]["subject"], "3rd message");
+        self.assertEquals(rows[3]["subject"], "4th message");
     },
 
     /**

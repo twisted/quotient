@@ -21,11 +21,11 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               MailboxSelector, UNREAD_STATUS,
                               READ_STATUS, Correspondent,
                               SENDER_RELATION, DEFERRED_STATUS,
-                              ARCHIVE_STATUS, TRASH_STATUS,
+                              ARCHIVE_STATUS, TRASH_STATUS, INBOX_STATUS,
                               EVER_DEFERRED_STATUS, DRAFT_STATUS)
 
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
-                             MailboxScrollingFragment)
+                             MailboxScrollingFragment, TOUCH_ONCE_VIEWS)
 from xquotient import compose, smtpout
 from xquotient.test.util import (DummyMessageImplementation,
                                  DummyMessageImplWithABunchOfAddresses)
@@ -863,37 +863,91 @@ class ScrollingFragmentTestCase(TestCase):
     Tests for L{xquotient.inbox.MailboxScrollingFragment}
     """
 
+    def _makeMessages(self):
+        """
+        Make 3 incoming messages
+
+        @rtype: C{list} of L{xquotient.exmess.Message}
+        """
+        msgs = []
+        for (subject, timestamp) in ((u'3', 67), (u'1', 43), (u'2', 55)):
+            msgs.append(
+                testMessageFactory(
+                    store=self.store,
+                    read=False,
+                    spam=False,
+                    subject=subject,
+                    receivedWhen=Time.fromPOSIXTimestamp(timestamp)))
+        return msgs
+
+
     def setUp(self):
         """
-        Create a store, three messages and a scrolling fragment
+        Create a store and a scrolling fragment
         """
         self.store = Store()
-
-        def makeMessage(subject, receivedWhen):
-            testMessageFactory(
-                store=self.store,
-                read=False,
-                spam=False,
-                subject=subject,
-                receivedWhen=receivedWhen)
-
-        makeMessage(u'3', Time.fromPOSIXTimestamp(67))
-        makeMessage(u'1', Time.fromPOSIXTimestamp(43))
-        makeMessage(u'2', Time.fromPOSIXTimestamp(55))
-
         self.scrollingFragment = MailboxScrollingFragment(self.store)
 
 
-    def test_sortAscending(self):
+    def _checkSortOrder(self, ascending):
+        """
+        Check the sort order of messages in L{self.scrollingFragment}
+
+        @param ascending: should the messages be sorted in ascending order
+        """
+        msgs = self.scrollingFragment.performQuery(
+            0, self.scrollingFragment.performCount())
+        timestamps = list(m.receivedWhen for m in msgs)
+        sortedTimestamps = sorted(timestamps)
+        if not ascending:
+            sortedTimestamps.reverse()
+        self.assertEquals(timestamps, sortedTimestamps)
+
+
+    def _changeView(self, newView):
+        """
+        Change the 'view' parameter of L{self.scrollingFragment}'s view
+        selection to C{newView}
+
+        @param newView: the view name
+        @type newView: C{unicode}
+        """
+        viewSelection = self.scrollingFragment.viewSelection.copy()
+        viewSelection['view'] = newView
+        self.scrollingFragment.setViewSelection(viewSelection)
+
+
+    def test_defaultSortAscending(self):
         """
         Test that the default sort of
         L{xquotient.inbox.MailboxScrollingFragment} is ascending on the
-        C{receivedWhen} column
+        C{receivedWhen} column, as inbox is the default view
         """
-        subjects = list(m.subject for m in
-            self.scrollingFragment.performQuery(0, 3))
+        self._makeMessages()
+        self._checkSortOrder(ascending=True)
 
-        self.assertEquals(
-            subjects,
-            list(self.store.query(
-                Message, sort=Message.receivedWhen.asc).getColumn('subject')))
+
+    def test_inboxSortAscending(self):
+        """
+        Test that the sort order of
+        L{xquotient.inbox.MailboxScrollingFragment} for the inbox view is
+        correct when the view is selected explicitly
+        """
+        self._makeMessages()
+
+        self._changeView(ARCHIVE_STATUS)
+        self._changeView(INBOX_STATUS)
+
+        self._checkSortOrder(ascending=True)
+
+    def test_touchOnceSortOrder(self):
+        """
+        Test that the sort of L{xquotient.inbox.MailboxScrollingFragment} is
+        only ascending for touch once views
+        """
+        for view in set(VIEWS) - set(TOUCH_ONCE_VIEWS):
+            for msg in self._makeMessages():
+                msg.addStatus(view)
+
+            self._changeView(view)
+            self._checkSortOrder(ascending=False)

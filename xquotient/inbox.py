@@ -42,6 +42,9 @@ from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPr
 VIEWS = [FOCUS_STATUS, INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS,
          DRAFT_STATUS, OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS, SPAM_STATUS,
          TRASH_STATUS]
+# The subset of all views that should use 'touch-once' message order; oldest
+# messages first
+TOUCH_ONCE_VIEWS = [INBOX_STATUS, FOCUS_STATUS]
 
 
 
@@ -133,7 +136,10 @@ def _viewSelectionToMailboxSelector(store, viewSelection):
 
     sq = MailboxSelector(store)
     sq.setLimit(None)
-    sq.setOldestFirst()
+    if view in TOUCH_ONCE_VIEWS:
+        sq.setOldestFirst()
+    else:
+        sq.setNewestFirst()
     if view == u'all':
         view = CLEAN_STATUS
 
