@@ -587,25 +587,24 @@ Quotient.Mailbox.ScrollingWidget.methods(
             }
         }
 
-        var selected, row, webID, count=0;
-        for(var i = 0; i < self.model.rowCount(); i++) {
+        var selected, row, webID, count = 0;
+        var indices = self.model.getRowIndices();
+        for (var i = 0; i < indices.length; ++i) {
             row = self.model.getRowData(i);
-            if(row) {
-                webID = row.__id__;
-                selected = (self.selectedGroup != null && webID in self.selectedGroup);
-                /* if we like this row */
-                if(predicate(row)) {
-                    /* and it's selection status isn't the desired one */
-                    if(selected != selectRows) {
-                        /* then change it */
-                        self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
-                        count++;
-                    }
-                /* if we don't like it, but it's in the target state */
-                } else if(selected == selectRows) {
+            webID = row.__id__;
+            selected = (self.selectedGroup != null && webID in self.selectedGroup);
+            /* if we like this row */
+            if(predicate(row)) {
+                /* and it's selection status isn't the desired one */
+                if(selected != selectRows) {
                     /* then change it */
                     self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
+                    count++;
                 }
+                /* if we don't like it, but it's in the target state */
+            } else if(selected == selectRows) {
+                /* then change it */
+                self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
             }
         }
         return count;
@@ -1204,22 +1203,21 @@ Quotient.Mailbox.Controller.methods(
             }
         }
 
-        for(var i = 0; i < sw.model.rowCount(); i++) {
+        var indices = sw.model.getRowIndices();
+        for(var i = 0; i < indices.length; ++i) {
             row = sw.model.getRowData(i);
-            if(row != undefined) {
-                webID = row["__id__"];
-                /* if it's selected */
-                if (sw.selectedGroup != null && webID in sw.selectedGroup) {
-                    /* and it doesn't fulfill the predicate */
-                    if (!pred(row)) {
-                        /* then mark it for explicit inclusion */
-                        include.push(webID);
-                    }
-                /* or it's not selected and does fulfill the predicate */
-                } else if (pred(row)) {
-                    /* then mark it for explicit exclusion */
-                    exclude.push(webID);
+            webID = row["__id__"];
+            /* if it's selected */
+            if (sw.selectedGroup != null && webID in sw.selectedGroup) {
+                /* and it doesn't fulfill the predicate */
+                if (!pred(row)) {
+                    /* then mark it for explicit inclusion */
+                    include.push(webID);
                 }
+                /* or it's not selected and does fulfill the predicate */
+            } else if (pred(row)) {
+                /* then mark it for explicit exclusion */
+                exclude.push(webID);
             }
         }
         return [include, exclude];
