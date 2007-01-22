@@ -883,6 +883,10 @@ class Message(item.Item):
 
         @return: C{None}
         """
+        for s in self.iterStatuses():
+            if s in UNFOCUSABLE_STATUSES:
+                self.addStatus(EVER_FOCUSED_STATUS)
+                return
         self.addStatus(FOCUS_STATUS)
 
 
@@ -1486,6 +1490,11 @@ STICKY_STATUSES = [READ_STATUS, UNREAD_STATUS, TRAINED_STATUS,
                    DEFERRED_STATUS, EVER_DEFERRED_STATUS,
                    EVER_FOCUSED_STATUS]
 
+
+# Applying any of these statuses removes FOCUS_STATUS and applies
+# EVER_FOCUSED_STATUS.  Removing all of them reverses this operation.
+UNFOCUSABLE_STATUSES = [TRASH_STATUS, SPAM_STATUS, ARCHIVE_STATUS,
+                        DEFERRED_STATUS]
 
 class _MessageStatus(item.Item):
     """

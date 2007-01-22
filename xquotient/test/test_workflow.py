@@ -1,5 +1,3 @@
-
-
 """
 This module contains a suite of tests for the various state-transition APIs on
 L{xquotient.exmess.Message} objects.
@@ -23,8 +21,6 @@ from axiom.dependency import installOn
 from axiom.test.util import QueryCounter
 
 from axiom.tags import Catalog
-
-from axiom.test.util import QueryCounter
 
 from xmantissa.people import Person, EmailAddress as StoredEmailAddress
 
@@ -902,6 +898,20 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(UNREAD_STATUS, stats)
 
 
+    def test_focusSpam(self):
+        """
+        Verify that a message which is focused when it is spam gains
+        EVER_FOCUSED_STATUS and not FOCUS_STATUS.
+        """
+        self.message.classifySpam()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
     def test_trash(self):
         """
         Verify that messages put into the trash are visible to the 'trash'
@@ -984,6 +994,20 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(CLEAN_STATUS, stats)
         self.failUnlessIn(FOCUS_STATUS, stats)
         self.failUnlessIn(INBOX_STATUS, stats)
+
+
+    def test_focusTrash(self):
+        """
+        Verify that if a message which is in the trash is focused, it gains
+        EVER_FOCUSED_STATUS instead of FOCUS_STATUS.
+        """
+        self.message.classifyClean()
+        self.message.moveToTrash()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_trashThenUntrash(self):
@@ -1214,6 +1238,20 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessEqual(self.store.query(_UndeferTask).count(), 0)
 
 
+    def test_focusDeferred(self):
+        """
+        Verify that a message which is focused when it is deferred gains
+        EVER_FOCUSED_STATUS and not FOCUS_STATUS.
+        """
+        self._deferMessage()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
     def test_focus(self):
         """
         Verify that when a message is focused, it retains its other statuses.
@@ -1260,7 +1298,7 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIfIn(EVER_FOCUSED_STATUS, stats)
 
 
-    def test_focusArchival(self):
+    def test_archiveFocused(self):
         """
         Verify that a message which is placed into the archive is removed from
         the focus.
@@ -1324,6 +1362,20 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(CLEAN_STATUS, stats)
         self.failIfIn(SPAM_STATUS, stats)
 
+
+    def test_focusArchived(self):
+        """
+        Verify that a message which is focused when it is archived gains
+        EVER_FOCUSED_STATUS and not FOCUS_STATUS.
+        """
+        self.message.classifyClean()
+        self.message.archive()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
 
 
 class DeletionTest(_WorkflowMixin, TestCase):
