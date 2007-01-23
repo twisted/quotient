@@ -18,7 +18,8 @@ class MessageSearchProvider(Item):
     Wrapper around an ISearchProvider which will hand back search results
     wrapped in a fragment that knows about Messages.
     """
-    installedOn = attributes.reference()
+
+    schemaVersion = 2
 
     indexer = dependsOn(fulltext.PyLuceneIndexer, doc="""
     The actual fulltext indexing implementation object which will perform
@@ -42,6 +43,16 @@ class MessageSearchProvider(Item):
         d.addCallback(_mailsearchui.SearchAggregatorFragment, self.store)
         return d
 
+declareLegacyItem(MessageSearchProvider.typeName, 1, dict(
+    indexer=attributes.reference(),
+    installedOn=attributes.reference()))
+
+def _messageSearchProvider1to2(old):
+    new = old.upgradeVersion(MessageSearchProvider.typeName, 1, 2,
+                             indexer=old.indexer,
+                             messageSource=old.store.findUnique(mail.MessageSource))
+    return new
+registerUpgrader(_messageSearchProvider1to2, MessageSearchProvider.typeName, 1, 2)
 
 class QuotientBenefactor(Item):
     implements(ixmantissa.IBenefactor)

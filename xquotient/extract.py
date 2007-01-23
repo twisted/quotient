@@ -9,7 +9,7 @@ from nevow.inevow import IRenderer
 
 from epsilon.extime import Time
 
-from axiom.item import Item
+from axiom.item import Item, declareLegacyItem
 from axiom import attributes
 from axiom.upgrade import registerUpgrader
 from axiom.dependency import dependsOn
@@ -207,8 +207,7 @@ extractTypes = {'url': URLExtract,
 
 
 class ExtractPowerup(Item):
-    installedOn = attributes.reference()
-
+    schemaVersion = 2
     gallery = dependsOn(Gallery)
     thumbnailDisplayer = dependsOn(ThumbnailDisplayer)
 
@@ -220,3 +219,12 @@ class ExtractPowerup(Item):
 
         for et in extractTypes.itervalues():
             et.extract(message)
+
+declareLegacyItem(ExtractPowerup.typeName, 1, dict(
+    installedOn = attributes.reference()))
+
+def _extractPowerup1to2(old):
+    return old.upgradeVersion(ExtractPowerup.typeName, 1, 2,
+                              gallery=old.store.findOrCreate(Gallery),
+                              thumbnailDisplayer=old.store.findOrCreate(ThumbnailDisplayer))
+registerUpgrader(_extractPowerup1to2, ExtractPowerup.typeName, 1, 2)

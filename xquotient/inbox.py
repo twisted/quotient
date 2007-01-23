@@ -15,7 +15,7 @@ from axiom.item import Item, transacted, declareLegacyItem
 from axiom import tags
 from axiom import attributes
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
-from axiom.dependency import dependsOn, installOn
+from axiom.dependency import dependsOn, installOn, installedOn, _DependencyConnector
 from axiom.scheduler import SubScheduler
 
 from xmantissa import ixmantissa, webnav, people, webtheme
@@ -395,12 +395,6 @@ registerAttributeCopyingUpgrader(Inbox, 2, 3)
 
 declareLegacyItem(Inbox.typeName, 3,
                   dict(installedOn=attributes.reference(),
-                       privateApplication=attributes.reference(),
-                       scheduler=attributes.reference(),
-                       messageSource=attributes.reference(),
-                       quotientPrefs=attributes.reference(),
-                       deliveryAgent=attributes.reference(),
-                       messageDisplayPrefs=attributes.reference(),
                        catalog=attributes.reference(),
                        uiComplexity=attributes.integer(),
                        showMoreDetail=attributes.boolean()))
@@ -418,12 +412,12 @@ def inbox3to4(old):
     """
     new = old.upgradeVersion(
         Inbox.typeName, 3, 4,
-        privateApplication=old.privateApplication,
-        scheduler=old.scheduler,
-        messageSource=old.messageSource,
-        quotientPrefs=old.quotientPrefs,
-        deliveryAgent=old.deliveryAgent,
-        messageDisplayPrefs=old.messageDisplayPrefs,
+        privateApplication=old.store.findOrCreate(PrivateApplication),
+        scheduler=old.store.findOrCreate(SubScheduler),
+        messageSource=old.store.findOrCreate(MessageSource),
+        quotientPrefs=old.store.findOrCreate(QuotientPreferenceCollection),
+        deliveryAgent=old.store.findOrCreate(DeliveryAgent),
+        messageDisplayPrefs=old.store.findOrCreate(MessageDisplayPreferenceCollection),
         uiComplexity=old.uiComplexity,
         showMoreDetail=old.showMoreDetail)
 
@@ -462,6 +456,12 @@ def inbox4to5(old):
         uiComplexity=old.uiComplexity,
         showMoreDetail=old.showMoreDetail)
 
+    src = old.store.findUnique(MessageSource)
+    if installedOn(src) is None:
+        #MessageSource was created in pre-dependency-system days
+        _DependencyConnector(installee=src, target=old.store,
+                             explicitlyInstalled=True,
+                             store=old.store)
     # Cannot do either of these before the upgradeVersion call: while
     # examining dependencies, it is likely that the Inbox being upgraded
     # will be encountered, causing this upgrade function to run again. 

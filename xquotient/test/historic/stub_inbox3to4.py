@@ -6,12 +6,23 @@ to version 4.
 """
 
 from axiom.test.historic.stubloader import saveStub
-from axiom.dependency import installOn
-
-from xquotient.inbox import Inbox
+from axiom import scheduler
+from xmantissa import website, webapp
+from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
+from xquotient import inbox, mail
 
 def createDatabase(s):
-    installOn(Inbox(store=s, uiComplexity=2, showMoreDetail=True), s)
+    s.findOrCreate(scheduler.SubScheduler).installOn(s)
+    s.findOrCreate(website.WebSite).installOn(s)
+    s.findOrCreate(webapp.PrivateApplication).installOn(s)
+
+    s.findOrCreate(mail.DeliveryAgent).installOn(s)
+
+    s.findOrCreate(mail.MessageSource)
+
+    s.findOrCreate(QuotientPreferenceCollection).installOn(s)
+    s.findOrCreate(MessageDisplayPreferenceCollection).installOn(s)
+    s.findOrCreate(inbox.Inbox, uiComplexity=2, showMoreDetail=True).installOn(s)
 
 if __name__ == '__main__':
     saveStub(createDatabase, 11096)

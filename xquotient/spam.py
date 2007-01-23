@@ -203,7 +203,7 @@ item.declareLegacyItem(Filter.typeName, 2,
 
 
 
-def filter2to3(old):
+def _filter2to3(old):
     """
     add dependencies as attributes, remove installedOn
     """
@@ -216,7 +216,7 @@ def filter2to3(old):
     filter.tiSource = s.findOrCreate(_TrainingInstructionSource)
     return filter
 
-registerUpgrader(filter2to3, Filter.typeName, 2, 3)
+registerUpgrader(_filter2to3, Filter.typeName, 2, 3)
 
 
 class HamFilterFragment(ThemedFragment):
@@ -293,8 +293,7 @@ class DSPAMFilter(item.Item):
     libdspam-based L{iquotient.IHamFilter} powerup.
     """
     implements(iquotient.IHamFilter)
-
-    installedOn = attributes.reference()
+    schemaVersion = 2
     classifier = attributes.inmemory()
     username = attributes.inmemory()
     lib = attributes.inmemory()
@@ -332,14 +331,24 @@ class DSPAMFilter(item.Item):
         if p.exists():
             p.remove()
 
+
+item.declareLegacyItem(DSPAMFilter.typeName, 1, dict(
+    globalPath=attributes.bytes(),
+    installedOn=attributes.reference()))
+
+def _dspamFilter1to2(old):
+    df = old.upgradeVersion(DSPAMFilter.typeName, 1, 2,
+                            globalPath=old.globalPath,
+                            filter=old.store.findOrCreate(Filter))
+    return df
+registerUpgrader(_dspamFilter1to2, DSPAMFilter.typeName, 1, 2)
+
 class SpambayesFilter(item.Item):
     """
     Spambayes-based L{iquotient.IHamFilter} powerup.
     """
     implements(iquotient.IHamFilter)
-
-    installedOn = attributes.reference()
-
+    schemaVersion = 2
     classifier = attributes.inmemory()
     guesser = attributes.inmemory()
     filter = dependsOn(Filter)
@@ -407,6 +416,15 @@ class SpambayesFilter(item.Item):
             self.guesser = hammie.Hammie(self.classifier)
             self.installedOn.retrain()
 
+
+item.declareLegacyItem(SpambayesFilter.typeName, 1, dict(
+    installedOn=attributes.reference()))
+
+def _sbFilter1to2(old):
+    sbf = old.upgradeVersion(SpambayesFilter.typeName, 1, 2,
+                            filter=old.store.findOrCreate(Filter))
+    return sbf
+registerUpgrader(_sbFilter1to2, SpambayesFilter.typeName, 1, 2)
 
 
 class SpambayesBenefactor(item.Item):

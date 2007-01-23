@@ -19,6 +19,7 @@ from epsilon import descriptor, extime
 from axiom import item, attributes, iaxiom
 from axiom.scheduler import SubScheduler
 from axiom.dependency import dependsOn
+from axiom.upgrade import registerUpgrader
 
 from xmantissa import ixmantissa,  webtheme, liveform
 from xmantissa.webapp import PrivateApplication
@@ -98,15 +99,12 @@ class GrabberConfiguration(item.Item):
     Manages the creation, operation, and destruction of grabbers
     (items which retrieve information from remote sources).
     """
+    schemaVersion = 2
 
     paused = attributes.boolean(doc="""
     Flag indicating whether grabbers created by this Item will be
     allowed to run.
     """, default=False)
-
-    installedOn = attributes.reference(doc="""
-    A reference to the avatar which has been powered up by this item.
-    """)
 
     scheduler = dependsOn(SubScheduler)
     privateApplication = dependsOn(PrivateApplication)
@@ -131,6 +129,18 @@ class GrabberConfiguration(item.Item):
         self.scheduler.schedule(pg, extime.Time())
         # OR MAYBE A LITTLE LATER
 
+item.declareLegacyItem(GrabberConfiguration, 1, dict(
+    paused=attributes.boolean(default=False),
+    installedOn=attributes.reference()))
+
+def _grabberConfiguration1to2(old):
+    new = old.upgradeVersion(GrabberConfiguration.typeName, 1, 2,
+                             paused=old.paused,
+                             scheduler = old.store.findOrCreate(SubScheduler),
+                             privateApplication = old.store.findOrCreate(PrivateApplication),
+                             deliveryAgent = old.store.findOrCreate(DeliveryAgent))
+    return new
+registerUpgrader(_grabberConfiguration1to2, GrabberConfiguration.typeName, 1, 2)
 
 class POP3UID(item.Item):
     grabberID = attributes.text(doc="""
@@ -606,7 +616,7 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
             return
         self.grabber.running = False
         if self._transient:
-            self.grabber.scheduler.reschedule(
+            self.grabber.config.scheduler.reschedule(
                 self.grabber,
                 self.grabber.scheduled,
                 extime.Time())
