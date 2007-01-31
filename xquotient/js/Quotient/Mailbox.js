@@ -1,17 +1,6 @@
 /**
  *
- * XXX TODO -
- *
- * - Synchronized getter/setter methods: current _selectWebID returns a
- *   Deferred: if you call getSelectedRow before that Deferred fires, you'll
- *   get the newly selected row; if you try to inspect the message detail
- *   (display or structured data) before that Deferred fires, you'll see the
- *   old message data.
- *
- * - Batched updates: calling _selectWebID multiple times before the first
- *   call's Deferred fires should make the fewest round-trips and display
- *   updates possible, rather than doing all of the intermediate work which has
- *   been rendered irrelevant by the subsequent calls.
+ * Mailbox specific view logic for displaying a scrolltable of messages.
  *
  */
 
@@ -112,9 +101,11 @@ Quotient.Mailbox.Status.methods(
  * Enhanced scrolling widget which suports the notion of one or more selected
  * rows.
  *
+ * In order to keep the view up to date with the model, this widget requires
+ * its parent widget to implement four methods: updateMessageDetail,
+ * clearMessageDetail, updateMessagePreview, and decrementActiveMailViewCount.
+ *
  * @ivar viewSelection
- * @ivar selectedGroup
- * @ivar _selectedRow
  *
  */
 Quotient.Mailbox.ScrollingWidget = Mantissa.ScrollTable.ScrollingWidget.subclass(
@@ -130,10 +121,15 @@ Quotient.Mailbox.ScrollingWidget.methods(
             "tag": null,
             "person": null,
             "account": null};
-        self.selectedGroup = null;
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
 
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node, metadata);
+
+        /*
+         * Make sure we get row selection/unselection notification so we can
+         * update the checkbox images.
+         */
+        self.model.addObserver(self);
 
         self._scrollViewport.style.maxHeight = "";
         self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
@@ -208,7 +204,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         result.addCallback(
             function(info) {
                 var messageCount = info[0];
-                return self._selectFirstRow().addCallback(
+                return self.activateFirstRow().addCallback(
                     function(ignored) {
                         return messageCount;
                     });
@@ -222,21 +218,6 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Extend the base behavior to reset the message selection group tracking
-     * object.
-     *
-     * XXX - The base scrolltable should really support selection, so all of
-     * the selection related features like this one should move over there.
-     */
-    function emptyAndRefill(self) {
-        self.selectedGroup = null;
-        return self._selectWebID(null).addCallback(
-            function(ignored) {
-                return Quotient.Mailbox.ScrollingWidget.upcall(self, 'emptyAndRefill');
-            });
-    },
-
-    /**
      * Override this to return an empty Array because the Inbox has no row
      * headers.
      */
@@ -244,66 +225,49 @@ Quotient.Mailbox.ScrollingWidget.methods(
         return [];
     },
 
-    /*****************************************************\
-    |**         ISelectableScrollingWidget              **|
-    \*****************************************************/
-
     /**
-     * Change the current message selection to the given webID.
+     * Handle row activation in several ways:
      *
-     * If a message was already selected, change its background color back to
-     * the unselected color.  Change the newly selected message's background
-     * color to the selected color.
-     *
-     * If C{webID} is C{null}, only unselect the currently selected message.
-     *
-     * @type webID: string
-     *
-     * @return: A Deferred which will fire with the webID of the previously
-     * selected message, or null if there was no previously selected message,
-     * once the selection has been changed and the mailbox view brought up to
-     * date.
+     * - mark the row as read
+     * - decrement the active mail view count, if the row was "bold"
+     * - Change the font weight and background color to make it visually
+     *   apparent it is focused.
      */
-    function _selectWebID(self, webID) {
-        var row;
-        var node, oldNode = null;
-        var oldSelectedRowID = null;
+    function rowActivated(self, row) {
+        var node = row.__node__;
+        row["read"] = true;
 
-        if (self._selectedRowID) {
-            oldSelectedRowID = self._selectedRowID;
-            oldNode = self.model.findRowData(self._selectedRowID).__node__;
-            oldNode.style.backgroundColor = '';
+        if (node.style.fontWeight == "bold") {
+            self.decrementActiveMailViewCount();
         }
 
-        if (webID != null) {
-            self._selectedRowID = webID;
+        node.style.fontWeight = "";
+        node.style.backgroundColor = '#FFFFFF';
 
-            row = self.model.findRowData(webID);
-            node = row.__node__;
-
-            row["read"] = true;
-
-            if (node.style.fontWeight == "bold") {
-                self.decrementActiveMailViewCount();
-            }
-
-            node.style.fontWeight = "";
-            node.style.backgroundColor = '#FFFFFF';
-        } else {
-            self._selectedRowID = null;
-        }
-
-        return self.selectionChanged(webID).addCallback(
-            function(ignored) {
-                return oldSelectedRowID;
-            });
+        self.updateMessageDetail(row.__id__);
     },
 
     /**
-     * Called whenever the selected row is changed.
+     * Handle row de-activation to re-set the background color to normal.
      */
-    function selectionChanged(self, webID) {
-        return self.widgetParent.selectionChanged(webID);
+    function rowDeactivated(self, row) {
+        row.__node__.style.backgroundColor = '';
+        self.clearMessageDetail();
+        if (self.model.rowCount() == 0) {
+            self.updateMessagePreview(null);
+        }
+    },
+
+    function updateMessageDetail(self, webID) {
+        return self.widgetParent.updateMessageDetail(webID);
+    },
+
+    function updateMessagePreview(self, previewData) {
+        return self.widgetParent.updateMessagePreview(previewData);
+    },
+
+    function clearMessageDetail(self) {
+        return self.widgetParent.clearMessageDetail();
     },
 
     function decrementActiveMailViewCount(self) {
@@ -346,52 +310,27 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     /**
-     * Remove the row at the given index and update the message selection if
-     * necessary.
-     */
-    function removeRow(self, index) {
-        var unselect;
-        var row = self.model.getRowData(index);
-        /*
-         * The row was selected - unselect it quick or
-         * something terrible will occur.
-         */
-        if (row.__id__ == self._selectedRowID) {
-            unselect = self._selectWebID(null);
-        } else {
-            unselect = Divmod.Defer.succeed(null);
-        }
-        return unselect.addCallback(
-            function(ignored) {
-                Quotient.Mailbox.ScrollingWidget.upcall(self, 'removeRow', index);
-            });
-    },
-
-    /**
      * Return the row data for the currently selected row.  Return null if
      * there is no row selected.
      */
-    function getSelectedRow(self) {
-        if (self._selectedRowID != null) {
-            return self.model.findRowData(self._selectedRowID);
-        }
-        return null;
+    function getActiveRow(self) {
+        return self.model.activeRow();
     },
 
     /**
-     * Call _selectWebID with the webID of the first row of data currently
-     * available.
+     * Activate the first row, if one exists.
      *
      * If there are no rows, no action will be taken.
      */
-    function _selectFirstRow(self) {
-        var webID;
+    function activateFirstRow(self) {
         if (self.model.rowCount()) {
-            webID = self.model.getRowData(0)['__id__'];
-        } else {
-            webID = null;
+            self.model.activateRow(self.model.getRowData(0)['__id__']);
         }
-        return self._selectWebID(webID);
+        /*
+         * XXX We should actually wait for the message detail to show up before
+         * firing this Deferred.
+         */
+        return Divmod.Defer.succeed(null);
     },
 
 
@@ -427,7 +366,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                             /* don't select based on rowOffset because it'll
                              * change as rows are removed
                              */
-                            self._selectWebID(webID);
+                            self.model.activateRow(webID);
                             return false;
                         });
                 },
@@ -499,7 +438,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
                     "height": "12px",
                     "border": 0,
                     "onclick": function senderDisplayClicked(event) {
-                        self.groupSelectRowAndUpdateCheckbox(rowData["__id__"], this);
+                        self.groupSelectRow(rowData["__id__"]);
 
                         this.blur();
 
@@ -522,48 +461,41 @@ Quotient.Mailbox.ScrollingWidget.methods(
      * Toggle the membership of a row in the group selection set.
      */
     function groupSelectRow(self, webID) {
-        var state;
-        if (self.selectedGroup == null) {
-            self.selectedGroup = {};
-            self.selectedGroup[webID] = true;
-            return "on";
-        } else if (webID in self.selectedGroup) {
-            delete self.selectedGroup[webID];
-            /*
-             * Determine if there are any webIDs left in the selected group.
-             */
-            var iterated = false;
-            for (var prop in self.selectedGroup) {
-                iterated = true;
-                break;
-            }
-            if (!iterated) {
-                self.selectedGroup = null;
-            }
-            return "off";
+        if (self.model.isSelected(webID)) {
+            self.model.unselectRow(webID);
         } else {
-            self.selectedGroup[webID] = true;
-            return "on";
+            self.model.selectRow(webID);
         }
     },
 
     /**
-     * Toggle the membership of a row in the group selection set and update the
-     * checkbox image for that row.
+     * Listen for row selection events to add the checkbox image to the display
+     * for selected rows.
      */
-    function groupSelectRowAndUpdateCheckbox(self, webID, checkboxImage) {
-        var state = self.groupSelectRow(webID);
+    function rowSelected(self, row) {
+        var checkboxImage = self._getCheckbox(row.__node__);
         var segs = checkboxImage.src.split("/");
-        segs[segs.length - 1] = "checkbox-" + state + ".gif";
+        segs[segs.length - 1] = "checkbox-on.gif";
+        checkboxImage.src = segs.join("/");
+    },
+
+    /**
+     * Listen for row unselection events to remove the checkbox image from the
+     * display for unselected rows.
+     */
+    function rowUnselected(self, row) {
+        var checkboxImage = self._getCheckbox(row.__node__);
+        var segs = checkboxImage.src.split("/");
+        segs[segs.length - 1] = "checkbox-off.gif";
         checkboxImage.src = segs.join("/");
     },
 
     /**
      * Return the checkbox image node for the given row.
      */
-    function _getCheckbox(self, row) {
+    function _getCheckbox(self, node) {
         return Divmod.Runtime.theRuntime.firstNodeByAttribute(
-            row.__node__, 'class', 'checkbox-image');
+            node, 'class', 'checkbox-image');
     },
 
     /**
@@ -592,19 +524,19 @@ Quotient.Mailbox.ScrollingWidget.methods(
         for (var i = 0; i < indices.length; ++i) {
             row = self.model.getRowData(i);
             webID = row.__id__;
-            selected = (self.selectedGroup != null && webID in self.selectedGroup);
+            selected = self.model.isSelected(webID);
             /* if we like this row */
             if(predicate(row)) {
                 /* and it's selection status isn't the desired one */
                 if(selected != selectRows) {
                     /* then change it */
-                    self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
+                    self.groupSelectRow(webID);
                     count++;
                 }
                 /* if we don't like it, but it's in the target state */
             } else if(selected == selectRows) {
                 /* then change it */
-                self.groupSelectRowAndUpdateCheckbox(webID, self._getCheckbox(row));
+                self.groupSelectRow(webID);
             }
         }
         return count;
@@ -753,6 +685,18 @@ Quotient.Mailbox.Controller.methods(
          * Fired when the initial load has finished.
          */
         self.initializationDeferred = Divmod.Defer.Deferred();
+
+        /*
+         * Used to delay initializationDeferred until the second _getSomeRows
+         * has finished.  Hopefully we can delete this someday, along with the
+         * second _getSomeRows call.
+         */
+        self._secondGetSomeRows = Divmod.Defer.Deferred();
+
+        self.initializationDeferred.addCallback(
+            function(ignored) {
+                return self._secondGetSomeRows;
+            });
     },
 
     /**
@@ -827,7 +771,7 @@ Quotient.Mailbox.Controller.methods(
          */
         self.scrollWidget.initializationDeferred.addCallback(
             function(passthrough) {
-                return self.scrollWidget._selectFirstRow().addCallback(
+                return self.scrollWidget.activateFirstRow().addCallback(
                     function(ignored) {
                         self.initializationDeferred.callback(null);
                         return passthrough;
@@ -873,7 +817,7 @@ Quotient.Mailbox.Controller.methods(
         if(composeInfo) {
             var result = Divmod.Defer.succeed(composeInfo);
         } else {
-             var result = self.callRemote("getComposer");
+            var result = self.callRemote("getComposer");
         }
 
         result.addCallback(
@@ -905,7 +849,7 @@ Quotient.Mailbox.Controller.methods(
     function reloadMessageAfterComposeCompleted(self, composer) {
         composer.completionDeferred.addCallback(
             function() {
-                var selected = self.scrollWidget.getSelectedRow();
+                var selected = self.scrollWidget.getActiveRow();
                 if(selected != null) {
                     return self.fastForward(selected.__id__);
                 }
@@ -940,25 +884,6 @@ Quotient.Mailbox.Controller.methods(
         }
         node.className = "selected-complexity-icon";
         self.recalculateMsgDetailWidth(false);
-    },
-
-    /**
-     * Called whenever the selected message changes.
-     *
-     * This implementation updates the message detail area of the Controller
-     * which is the parent widget of this widget.  It returns a Deferred which
-     * fires when this has been completed.
-     */
-    function selectionChanged(self, webID) {
-        if (webID == null) {
-            if (self.scrollWidget.model.rowCount() == 0) {
-                self.updateMessagePreview(null);
-            }
-            self.clearMessageDetail();
-            return Divmod.Defer.succeed(null);
-        } else {
-            return self.updateMessageDetail(webID);
-        }
     },
 
     /**
@@ -1208,7 +1133,7 @@ Quotient.Mailbox.Controller.methods(
             row = sw.model.getRowData(i);
             webID = row["__id__"];
             /* if it's selected */
-            if (sw.selectedGroup != null && webID in sw.selectedGroup) {
+            if (row.__selected__) {
                 /* and it doesn't fulfill the predicate */
                 if (!pred(row)) {
                     /* then mark it for explicit inclusion */
@@ -1228,18 +1153,10 @@ Quotient.Mailbox.Controller.methods(
      * Set each of the rows in the selection as deferred.
      */
     function _deferSelectedRows(self) {
-        if (self.scrollWidget.selectedGroup == null) {
-            return;
-        }
-        var indices = self.scrollWidget.model.getRowIndices();
-        // one potato, two potato, three potato, four ...
-        for (var i = 0; i < indices.length; ++i) {
-            var index = indices[i];
-            var row = self.scrollWidget.model.getRowData(index);
-            if (row.__id__ in self.scrollWidget.selectedGroup) {
+        self.scrollWidget.model.visitSelectedRows(
+            function(row) {
                 self.scrollWidget.setAsDeferred(row);
-            }
-        }
+            });
     },
 
 
@@ -1249,31 +1166,22 @@ Quotient.Mailbox.Controller.methods(
          * from the model.  Change the currently selected row, if
          * necessary.
          */
-        var i, row, index, removed = 0;
-        var indices = self.scrollWidget.model.getRowIndices();
-        var removalDeferreds = [];
+        var index;
 
-        for (i = 0; i < indices.length; ++i) {
-            index = indices[i] - removed;
-            row = self.scrollWidget.model.getRowData(index);
-            if (self.scrollWidget.selectedGroup != null && row.__id__ in self.scrollWidget.selectedGroup) {
-                removalDeferreds.push(self.scrollWidget.removeRow(index));
-                removed += 1;
-            }
+        for (var i = rows.length - 1; i > -1; --i) {
+            index = self.scrollWidget.model.findIndex(rows[i]);
+            self.scrollWidget.removeRow(index);
         }
 
-        return Divmod.Defer.gatherResults(removalDeferreds).addCallback(
+        return self.scrollWidget.scrolled().addCallback(
             function(ignored) {
-                return self.scrollWidget.scrolled().addCallback(
-                    function(ignored) {
-                        /*
-                         * XXX - Selecting the first row is wrong - we should select a
-                         * row very near to the previously selected row, instead.
-                         */
-                        if (self.scrollWidget.getSelectedRow() == null) {
-                            return self.scrollWidget._selectFirstRow();
-                        }
-                    });
+                /*
+                 * XXX - Selecting the first row is wrong - we should select a
+                 * row very near to the previously selected row, instead.
+                 */
+                if (self.scrollWidget.getActiveRow() == null) {
+                    return self.scrollWidget.activateFirstRow();
+                }
             });
     },
 
@@ -1351,7 +1259,7 @@ Quotient.Mailbox.Controller.methods(
                         if (isDestructive) {
                             return self.scrollWidget.emptyAndRefill().addCallback(
                                 function(ignored) {
-                                    return self.scrollWidget._selectFirstRow();
+                                    return self.scrollWidget.activateFirstRow();
                                 });
                         }
                         return null;
@@ -1435,7 +1343,10 @@ Quotient.Mailbox.Controller.methods(
                      * necessitated by the lack of a general mechanism for
                      * cooperation between the view and the model. -exarkun
                      */
-                    self.scrollWidget._getSomeRows(true);
+                    self.scrollWidget._getSomeRows(true).addBoth(
+                        function(result) {
+                            self._secondGetSomeRows.callback(result);
+                        });
                 });
         }, 0);
     },
@@ -1929,77 +1840,9 @@ Quotient.Mailbox.Controller.methods(
 
         if (self._batchSelection != null) {
             return self.touchBatch(action, isProgress, extraArguments);
-        } else if (self.scrollWidget.selectedGroup != null) {
-            return self.touchSelectedGroup(action, isProgress, extraArguments);
         } else {
-            return self.touchCurrent(action, isProgress, extraArguments);
+            return self.touchSelectedGroup(action, isProgress, extraArguments);
         }
-    },
-
-    /**
-     * Tell the server to perform some action on the currently visible
-     * message.
-     *
-     * @param action: A string describing the action to be performed.  One of::
-     *
-     *     "archive"
-     *     "delete"
-     *     "defer"
-     *     "trainSpam"
-     *     "trainHam"
-     *
-     * @param isProgress: A boolean indicating whether the message will be
-     * removed from the current message list and the progress bar updated to
-     * reflect this.
-     *
-     * @param arguments: An optional extra object to pass to the server-side
-     * action handler.
-     *
-     * @return: C{undefined}
-     */
-    function touchCurrent(self, action, isProgress, /* optional */ extraArguments) {
-        var model = self.scrollWidget.model;
-        var selected = self.scrollWidget._selectedRowID;
-
-        if (selected === undefined) {
-            throw new Error("No row selected.");
-        }
-
-        var result = self.withReducedMessageDetailOpacity(
-            function() {
-                var nextMessageID = model.findNextRow(selected);
-                if (!nextMessageID) {
-                    nextMessageID = model.findPrevRow(selected);
-                }
-
-                var acted = self.callRemote(
-                    "actOnMessageIdentifierList",
-                    action, [selected], extraArguments);
-
-                var removed;
-                if (isProgress) {
-                    /*
-                     * I know that this is removing the current row so I know
-                     * that the Deferred fires synchronously and never fails so
-                     * I don't have to add a callback or errback.
-                     */
-                    removed = self.scrollWidget.removeRow(self.scrollWidget.model.findIndex(selected));
-
-                    /*
-                     * This Deferred, however, is asynchronous.
-                     */
-                    if (nextMessageID) {
-                        removed = self.scrollWidget._selectWebID(nextMessageID);
-                    }
-                } else {
-                    removed = Divmod.Defer.succeed(null);
-                }
-
-                var scrolled = self.scrollWidget.scrolled();
-
-                return Divmod.Defer.gatherResults([acted, removed, scrolled]);
-            });
-        return result;
     },
 
     /**
@@ -2016,9 +1859,19 @@ Quotient.Mailbox.Controller.methods(
     function touchSelectedGroup(self, action, isDestructive, extraArguments) {
         return self._wrapLongRunningAction(
             function() {
+                var rows = [];
+                function accumulate(row) {
+                    rows.push(row.__id__);
+                };
+
+                self.scrollWidget.model.visitSelectedRows(accumulate);
+                if (rows.length == 0) {
+                    return Divmod.Defer.succeed(null);
+                }
+
                 var acted = self.callRemote(
                     "actOnMessageIdentifierList", action,
-                    Divmod.dir(self.scrollWidget.selectedGroup),
+                    rows,
                     extraArguments);
 
                 acted.addCallback(
@@ -2027,8 +1880,7 @@ Quotient.Mailbox.Controller.methods(
                         var unreadTouchedCount = counts[1];
 
                         if (isDestructive) {
-                            var result = self._removeRows(self.scrollWidget.selectedGroup);
-                            self.scrollWidget.selectedGroup = null;
+                            var result = self._removeRows(rows);
                             return result;
                         } else {
                             return null;
@@ -2281,21 +2133,14 @@ Quotient.Mailbox.Controller.methods(
      */
     function _doDefer(self, period) {
         var widget = self.scrollWidget;
-        var batchAction = self._batchSelection != null,
-            selectedGroup = widget.selectedGroup;
+        var batchAction = self._batchSelection != null;
         var destructive = widget.viewSelection["view"] != 'all';
         destructive = destructive || batchAction;
         var d = self.touch("defer", destructive, period);
         d.addCallback(
             function(passThrough) {
                 if (!batchAction) {
-                    if (selectedGroup == null) {
-                        var selected = widget._selectedRowID;
-                        var data = widget.model.findRowData(selected);
-                        return widget.setAsDeferred(data);
-                    } else {
-                        self._deferSelectedRows();
-                    }
+                    self._deferSelectedRows();
                 }
                 return passThrough;
             });
@@ -2325,7 +2170,7 @@ Quotient.Mailbox.Controller.methods(
             reloadMessage = true;
         }
         var result = self.callRemote(
-            remoteMethodName, self.scrollWidget.getSelectedRow().__id__);
+            remoteMethodName, self.scrollWidget.getActiveRow().__id__);
 
         self.disableActionButtonsUntilFires(result);
 

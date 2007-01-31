@@ -214,9 +214,6 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                  * have a widgetParent which implements the necessary methods.
                  */
                 widget.decrementActiveMailViewCount = function() {};
-                widget.selectionChanged = function selectionChanged() {
-                    return Divmod.Defer.succeed(null);
-                };
 
                 return widget.initializationDeferred;
             });
@@ -224,113 +221,35 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
     },
 
     /**
-     * Test that selecting the first message in a
-     * L{Quotient.Mailbox.ScrollingWidget} properly selects it and returns
-     * C{null} as the previously selected message webID.
-     */
-    function test_firstSelectWebID(self) {
-        return self.setUp().addCallback(function() {
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                return self.scrollingWidget._selectWebID(webID).addCallback(
-                    function(oldWebID) {
-                        self.assertEqual(
-                            oldWebID, null,
-                            "Expected null as previously selected message ID.");
-                    });
-            });
-    },
-
-    /**
-     * Test that selecting another message returns the message ID which was
-     * already selected.
-     */
-    function test_secondSelectWebID(self) {
-        return self.setUp().addCallback(function() {
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                return self.scrollingWidget._selectWebID(webID).addCallback(
-                    function(ignored) {
-                        var otherWebID = self.scrollingWidget.model.getRowData(1).__id__;
-                        return self.scrollingWidget._selectWebID(otherWebID).addCallback(
-                            function(oldWebID) {
-                                self.assertEqual(
-                                    oldWebID, webID,
-                                    "Expected first message ID as previous message ID.");
-                            });
-                    });
-            });
-    },
-
-    /**
-     * Test that the selected web ID determines the row returned by
-     * L{getSelectedRow}.
-     */
-    function test_getSelectedRow(self) {
-        return self.setUp().addCallback(function() {
-                var webID;
-
-                webID = self.scrollingWidget.model.getRowData(0).__id__;
-                self.scrollingWidget._selectWebID(webID);
-                self.assertEqual(self.scrollingWidget.getSelectedRow().__id__, webID);
-
-                webID = self.scrollingWidget.model.getRowData(1).__id__;
-                self.scrollingWidget._selectWebID(webID);
-                self.assertEqual(self.scrollingWidget.getSelectedRow().__id__, webID);
-
-                self.scrollingWidget._selectWebID(null);
-                self.assertEqual(self.scrollingWidget.getSelectedRow(), null);
-            });
-    },
-
-    /**
-     * Test that removing the selection by passing C{null} to C{_selectWebID}
-     * properly returns the previously selected message ID.
-     */
-    function test_unselectWebID(self) {
-        return self.setUp().addCallback(function() {
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                return self.scrollingWidget._selectWebID(webID).addCallback(
-                    function(ignored) {
-                        return self.scrollingWidget._selectWebID(null).addCallback(
-                            function(oldWebID) {
-                                self.assertEqual(
-                                    oldWebID, webID,
-                                    "Expected first message ID as previous message ID.");
-                            });
-                    });
-            });
-    },
-
-    /**
      * Test that a row can be added to the group selection with
-     * L{ScrollingWidget.groupSelectRow} and that the proper state is returned
-     * for that row.
+     * L{ScrollingWidget.groupSelectRow}.
      */
     function test_groupSelectRow(self) {
         return self.setUp().addCallback(function() {
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                var state = self.scrollingWidget.groupSelectRow(webID);
-                self.assertEqual(state, "on");
+                var widget = self.scrollingWidget;
+                var model = widget.model;
+                var webID = model.getRowData(0).__id__;
+                widget.groupSelectRow(webID);
                 self.failUnless(
-                    webID in self.scrollingWidget.selectedGroup,
-                    "Expected selected webID to be in the selected group.");
+                    model.isSelected(webID),
+                    "Expected selected webID to be selected.");
             });
     },
 
     /**
      * Test that a row can be removed from the group selection with
-     * L{ScrollingWidget.groupSelectRow} and that the proper state is returned
-     * for that row.
+     * L{ScrollingWidget.groupSelectRow}.
      */
     function test_groupUnselectRow(self) {
         return self.setUp().addCallback(function() {
-                var webID = self.scrollingWidget.model.getRowData(0).__id__;
-                self.scrollingWidget.selectedGroup = {};
-                self.scrollingWidget.selectedGroup[webID] = null;
-                var state = self.scrollingWidget.groupSelectRow(webID);
-                self.assertEqual(state, "off");
-                self.assertEqual(
-                    self.scrollingWidget.selectedGroup, null,
-                    "Expected the selected group to be null.");
+                var widget = self.scrollingWidget;
+                var model = widget.model;
+                var webID = model.getRowData(0).__id__;
+                model.selectRow(webID);
+                widget.groupSelectRow(webID);
+                self.failIf(
+                    model.isSelected(webID),
+                    "Expected selected webID to not be selected.");
             });
     },
 
@@ -455,7 +374,11 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(function(widget) {
                 self.controllerWidget = widget;
                 self.node.appendChild(widget.node);
-                return self.controllerWidget.scrollWidget.initializationDeferred;
+                /*
+                 * Wait for the controller to be fully initialized.  This
+                 * includes its ScrollingWidget.
+                 */
+                return self.controllerWidget.initializationDeferred;
             });
         return result;
     },
@@ -872,7 +795,6 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
-
     /**
      * Test switching to the 'all messages' view.
      */
@@ -1198,7 +1120,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.assertEqual(
-                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.getActiveRow().__id__,
                     self.controllerWidget.scrollWidget.model.getRowData(0).__id__,
                     "Expected first row to be selected.");
             });
@@ -1217,7 +1139,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.assertEqual(
-                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.getActiveRow().__id__,
                     self.controllerWidget.scrollWidget.model.getRowData(0).__id__,
                     "Expected first row to be selected after view change.");
             });
@@ -1260,25 +1182,6 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
-    /**
-     * Test that an archive request issued while another is outstanding also
-     * completes successfully.
-     */
-    function test_concurrentArchive(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function(ignored) {
-                var firstArchive = self.controllerWidget.archive(null);
-                var secondArchive = self.controllerWidget.archive(null);
-                return Divmod.Defer.gatherResults([firstArchive, secondArchive]);
-            });
-        result.addCallback(
-            function(ignored) {
-                self.assertEqual(self.controllerWidget.scrollWidget.model.rowCount(), 0);
-                self.assertEqual(self.controllerWidget.scrollWidget.getSelectedRow(), null);
-            });
-        return result;
-    },
 
     /**
      * Test that the checkbox for a row changes to the checked state when that
@@ -1291,12 +1194,11 @@ Quotient.Test.ControllerTestCase.methods(
                 var scroller = self.controllerWidget.scrollWidget;
                 var row = scroller.model.getRowData(0);
                 var webID = row.__id__;
-                var checkboxImage = scroller._getCheckbox(row);
-                scroller.groupSelectRowAndUpdateCheckbox(
-                    webID, checkboxImage);
+                scroller.groupSelectRow(webID);
                 /*
                  * The checkbox should be checked now.
                  */
+                var checkboxImage = scroller._getCheckbox(row.__node__);
                 self.assertNotEqual(
                     checkboxImage.src.indexOf("checkbox-on.gif"), -1,
                     "Checkbox image was not the on image.");
@@ -1315,18 +1217,17 @@ Quotient.Test.ControllerTestCase.methods(
                 var scroller = self.controllerWidget.scrollWidget;
                 var row = scroller.model.getRowData(0);
                 var webID = row.__id__;
-                var checkboxImage = scroller._getCheckbox(row);
-
                 /*
                  * Select it first, so the next call will unselect it.
                  */
-                scroller.groupSelectRow(webID);
+                scroller.model.selectRow(webID);
 
-                scroller.groupSelectRowAndUpdateCheckbox(
-                    webID, checkboxImage);
+                scroller.groupSelectRow(webID);
                 /*
                  * The checkbox should be checked now.
                  */
+
+                var checkboxImage = scroller._getCheckbox(row.__node__);
                 self.assertNotEqual(
                     checkboxImage.src.indexOf("checkbox-off.gif"), -1,
                     "Checkbox image was not the on image.");
@@ -1343,12 +1244,16 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection("all");
 
-                var scroller = self.controllerWidget.scrollWidget
-                var selected = scroller.selectedGroup;
+                var rows = [];
+                var model = self.controllerWidget.scrollWidget.model;
+                function accumulate(row) {
+                    rows.push(row);
+                }
+                model.visitSelectedRows(accumulate);
 
-                self.assertEqual(Divmod.dir(selected).length, 2);
-                self.assertIn(scroller.model.getRowData(0).__id__, selected);
-                self.assertIn(scroller.model.getRowData(1).__id__, selected);
+                self.assertEqual(rows.length, 2);
+                self.assertEqual(rows[0].__id__, model.getRowData(0).__id__);
+                self.assertEqual(rows[1].__id__, model.getRowData(1).__id__);
             });
         return result;
     },
@@ -1362,11 +1267,15 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection("read");
 
-                var scroller = self.controllerWidget.scrollWidget
-                var selected = scroller.selectedGroup;
+                var rows = [];
+                var model = self.controllerWidget.scrollWidget.model;
+                function accumulate(row) {
+                    rows.push(row);
+                }
+                model.visitSelectedRows(accumulate);
 
-                self.assertEqual(Divmod.dir(selected).length, 1);
-                self.assertIn(scroller.model.getRowData(0).__id__, selected);
+                self.assertEqual(rows.length, 1);
+                self.assertEqual(rows[0].__id__, model.getRowData(0).__id__);
             });
         return result;
     },
@@ -1380,11 +1289,15 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection("unread");
 
-                var scroller = self.controllerWidget.scrollWidget
-                var selected = scroller.selectedGroup;
+                var rows = [];
+                var model = self.controllerWidget.scrollWidget.model;
+                function accumulate(row) {
+                    rows.push(row);
+                }
+                model.visitSelectedRows(accumulate);
 
-                self.assertEqual(Divmod.dir(selected).length, 1);
-                self.assertIn(scroller.model.getRowData(1).__id__, selected);
+                self.assertEqual(rows.length, 1);
+                self.assertEqual(rows[0].__id__, model.getRowData(1).__id__);
             });
         return result;
     },
@@ -1641,7 +1554,7 @@ Quotient.Test.ControllerTestCase.methods(
                 var model = self.controllerWidget.scrollWidget.model;
                 self.assertEqual(
                     model.getRowData(0).__id__,
-                    self.controllerWidget.scrollWidget.getSelectedRow().__id__);
+                    self.controllerWidget.scrollWidget.getActiveRow().__id__);
             });
         return result;
     },
@@ -1798,7 +1711,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 self.assertEqual(
                     model.getRowData(0).__id__,
-                    self.controllerWidget.scrollWidget.getSelectedRow().__id__);
+                    self.controllerWidget.scrollWidget.getActiveRow().__id__);
                 self.assertEqual(
                     model.getRowData(0).__id__,
                     rowIdentifiers[1]);
@@ -2677,7 +2590,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(composer) {
                 var controller = self.controllerWidget;
-                var curmsg = controller.scrollWidget.getSelectedRow();
+                var curmsg = controller.scrollWidget.getActiveRow();
                 var reload = controller.reloadMessageAfterComposeCompleted(composer);
 
                 setTimeout(
@@ -2706,7 +2619,7 @@ Quotient.Test.ControllerTestCase.methods(
                         "Quotient.Message.MessageDetail"));
 
                 self.assertEqual(
-                    self.controllerWidget.scrollWidget.getSelectedRow().__id__,
+                    self.controllerWidget.scrollWidget.getActiveRow().__id__,
                     curmsg.__id__);
             });
         return result;
@@ -2936,7 +2849,11 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
         result.addCallback(function(widget) {
                 self.controllerWidget = widget;
                 self.node.appendChild(widget.node);
-                return self.controllerWidget.scrollWidget.initializationDeferred;
+                /**
+                 * Wait for the controller widget to be fully initialized.
+                 * This includes its ScrollingWidget.
+                 */
+                return self.controllerWidget.initializationDeferred;
             });
         result.addCallback(function(widget) {
                 return self.controllerWidget.chooseMailView('all');
@@ -3009,7 +2926,7 @@ Quotient.Test.EmptyControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.assertEqual(
-                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.getActiveRow(),
                     null,
                     "No rows exist, so none should have been selected.");
             });
@@ -3029,7 +2946,7 @@ Quotient.Test.EmptyControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.assertEqual(
-                    self.controllerWidget.scrollWidget._selectedRowID,
+                    self.controllerWidget.scrollWidget.getActiveRow(),
                     null,
                     "No rows exist, so none should have been selected.");
             });

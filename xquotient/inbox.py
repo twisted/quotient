@@ -464,7 +464,7 @@ def inbox4to5(old):
                              store=old.store)
     # Cannot do either of these before the upgradeVersion call: while
     # examining dependencies, it is likely that the Inbox being upgraded
-    # will be encountered, causing this upgrade function to run again. 
+    # will be encountered, causing this upgrade function to run again.
     # Repeat until the stack is full, then explode. -exarkun
     filter = new.store.findFirst(spam.Filter, default=None)
     if filter is None:
@@ -771,8 +771,11 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
 
     def _nextMessagePreview(self, currentMessage, nextMessage):
+        # XXX This template data is duplicated on the client in Athena code
+        # which dynamically updates the message preview area.  We need to be
+        # able to share templates between the client and the server.
         if currentMessage is None:
-            return u'No more messages'
+            return u'No more messages.'
         onePattern = inevow.IQ(self.docFactory).onePattern
         if nextMessage is None:
             return onePattern('last-message')
@@ -785,7 +788,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     def nextMessagePreview(self, request, tag):
         currentMessage = self._currentMessageAtRenderTime
         nextMessage = self._nextMessageAtRenderTime
-        return self._nextMessagePreview(currentMessage, nextMessage)
+        return tag[self._nextMessagePreview(currentMessage, nextMessage)]
     renderer(nextMessagePreview)
 
 
