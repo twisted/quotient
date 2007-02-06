@@ -1211,6 +1211,7 @@ item.declareLegacyItem(Message.typeName, 2,
 registerAttributeCopyingUpgrader(Message, 1, 2)
 registerAttributeCopyingUpgrader(Message, 2, 3)
 
+
 def _message3to4(m):
     """
     Upgrade between L{Message} schema v3 (flags) to L{Message} schema v4
@@ -1475,6 +1476,9 @@ REPLIED_STATUS = u'replied'
 
 # Messages which have this status have been forwarded.
 FORWARDED_STATUS = u'forwarded'
+
+# Messages which have this status have been redirected.
+REDIRECTED_STATUS = u'redirected'
 
 # Messages which have this status have been trained by the user as either spam
 # or ham, depending on their spam state.
