@@ -28,10 +28,10 @@ from xquotient import iquotient, equotient, renderers, mimeutil
 from smtpout import (FromAddress, MessageDelivery,
                      _getFromAddressFromStore, FromAddressConfigFragment)
 
-from xquotient.exmess import Message, MessageDetail
+from xquotient.exmess import MessageDetail
 from xquotient.mimestorage import Part
 from xquotient.mail import MailDeliveryAgent, DeliveryAgent
-
+from xquotient.mimebakery import saveDraft, sendMail
 
 class ComposePreferenceCollection(item.Item, prefs.PreferenceCollectionMixin):
     """
@@ -441,17 +441,14 @@ class _ComposeFragmentMixin:
     expose(getPeople)
 
 
-
 class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin, _ComposeFragmentMixin):
     implements(ixmantissa.INavigableFragment)
 
     jsClass = u'Quotient.Compose.Controller'
     fragmentName = 'compose'
 
-    _savedDraft = None
-
     def __init__(self, composer, recipients=None, subject=u'', messageBody=u'',
-                 attachments=(), inline=False):
+                 attachments=(), inline=False, parentMessage=None):
         """
         @type composer: L{Composer}
 
@@ -480,8 +477,9 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         user interface
         """
         self.composer = composer
+        self.cabinet = self.composer.store.findOrCreate(FileCabinet)
         self.translator = ixmantissa.IWebTranslator(composer.store)
-
+        self._savedDraft = None
         super(ComposeFragment, self).__init__(
             callable=self._sendOrSave,
             parameters=[liveform.Parameter(name='fromAddress',
@@ -515,7 +513,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         self.inline = inline
 
         self.docFactory = None
-        self.cabinet = self.composer.store.findOrCreate(FileCabinet)
+        self.parentMessage = parentMessage
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
@@ -524,6 +522,50 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         coerced['files'] = formPostEmulator.get('files', ())
         return self.callable(**coerced)
     expose(invoke)
+
+
+    def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody,
+                    cc, bcc, files, draft):
+        """
+        This method is called interactively from the browser via a liveform in
+        response to clicking 'send' or 'save draft'.
+
+        @param fromAddress: a L{smtpout.FromAddress} item.
+
+        @param toAddresses: a list of L{mimeutil.EmailAddress} objects,
+        representing the people to send this to.
+
+        @param subject: freeform string
+        @type subject: L{unicode}
+
+        @param messageBody: the message's body, a freeform string.
+        @type messageBody: L{unicode}
+
+        @param cc: a string, likely an rfc2822-formatted list of addresses
+        (not validated between the client and here, XXX FIXME)
+        @type cc: L{unicode}
+
+        @param bcc: a string, likely an rfc2822-formatted list of addresses
+        (not validated between the client and here, XXX FIXME)
+        @type bcc: L{unicode}
+
+        @param files: a sequence of stringified storeIDs which should point at
+        L{File} items.
+
+        @param draft: a boolean, indicating whether the message represented by
+        the other arguments to this function should be saved as a draft or sent
+        as an outgoing message.  True for save, False for send.
+        """
+
+        if draft:
+            f = saveDraft
+        else:
+            f = sendMail
+        self._savedDraft = f(self._savedDraft, self.composer,
+                             self.cabinet, self.parentMessage,
+                             fromAddress, toAddresses,
+                             subject, messageBody, cc, bcc, files)
+
 
 
     def getInitialArguments(self):
@@ -608,148 +650,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
     def head(self):
         return None
-
-    def _fileItemToEmailPart(self, fileItem):
-        """
-        Convert a L{File} item into an appropriate MIME part object
-        understandable by the stdlib's C{email} package
-        """
-        (majorType, minorType) = fileItem.type.split('/')
-        if majorType == 'multipart':
-            part = P.Parser().parse(fileItem.body.open())
-        else:
-            part = MB.MIMEBase(majorType, minorType)
-            if majorType == 'message':
-                part.set_payload([P.Parser().parse(fileItem.body.open())])
-            else:
-                part.set_payload(fileItem.body.getContent())
-                if majorType == 'text':
-                    EE.encode_quopri(part)
-                else:
-                    EE.encode_base64(part)
-        part.add_header('content-disposition', 'attachment', filename=fileItem.name)
-        return part
-
-
-    def createMessage(self, fromAddress, toAddresses, subject, messageBody,
-                      cc, bcc, files):
-        MC.add_charset('utf-8', None, MC.QP, 'utf-8')
-
-        encode = lambda s: MH.Header(s).encode()
-
-        s = S.StringIO()
-        m = MMP.MIMEMultipart(
-            'alternative',
-            None,
-            [MT.MIMEText(messageBody, 'plain', 'utf-8'),
-             MT.MIMEText(renderers.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
-
-        fileItems = []
-        if files:
-            attachmentParts = []
-            for storeID in files:
-                a = self.composer.store.getItemByID(long(storeID))
-                if isinstance(a, Part):
-                    a = self.cabinet.createFileItem(
-                            a.getParam('filename',
-                                       default=u'',
-                                       header=u'content-disposition'),
-                            unicode(a.getContentType()),
-                            a.getBody(decode=True))
-                fileItems.append(a)
-                attachmentParts.append(
-                    self._fileItemToEmailPart(a))
-
-            m = MMP.MIMEMultipart('mixed', None, [m] + attachmentParts)
-
-        m['From'] = encode(fromAddress.address)
-        m['To'] = encode(mimeutil.flattenEmailAddresses(toAddresses))
-        m['Subject'] = encode(subject)
-        m['Date'] = EU.formatdate()
-        m['Message-ID'] = smtp.messageid('divmod.xquotient')
-
-        if cc:
-            m['Cc'] = encode(mimeutil.flattenEmailAddresses(cc))
-
-        G.Generator(s).flatten(m)
-        s.seek(0)
-
-        msg = self.composer.createMessageAndQueueIt(fromAddress.address, s, True)
-
-        # there is probably a better way than this, but there
-        # isn't a way to associate the same file item with multiple
-        # messages anyway, so there isn't a need to reflect that here
-        for fileItem in fileItems:
-            fileItem.message = msg
-        return msg
-
-    _mxCalc = None
-    def _sendMail(self, fromAddress, toAddresses, subject, messageBody,
-                  cc, bcc, files):
-        # overwrite the previous draft of this message with another draft
-        self._saveDraft(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
-
-        addresses = [addr.pseudoFormat() for addr in toAddresses + cc + bcc]
-
-        # except we are going to send this draft
-        self.composer.sendMessage(fromAddress, addresses, self._savedDraft.message)
-
-        # once the user has sent a message, we'll consider all subsequent
-        # drafts in the lifetime of this fragment as being drafts of a
-        # different message
-        self._savedDraft.deleteFromStore()
-        self._savedDraft = None
-
-    def _saveDraft(self, fromAddress, toAddresses, subject, messageBody,
-                   cc, bcc, files):
-        msg = self.createMessage(fromAddress, toAddresses, subject,
-                                 messageBody, cc, bcc, files)
-        if self._savedDraft is not None:
-            oldmsg = self._savedDraft.message
-            oldmsg.deleteFromStore()
-            self._savedDraft.message = msg
-        else:
-            self._savedDraft = Draft(store=self.composer.store, message=msg)
-
-
-    def _sendOrSave(self, fromAddress, toAddresses, subject, messageBody,
-                    cc, bcc, files, draft):
-        """
-        This method is called interactively from the browser via a liveform in
-        response to clicking 'send' or 'save draft'.
-
-        @param fromAddress: a L{smtpout.FromAddress} item.
-
-        @param toAddresses: a list of L{mimeutil.EmailAddress} objects,
-        representing the people to send this to.
-
-        @param subject: freeform string
-        @type subject: L{unicode}
-
-        @param messageBody: the message's body, a freeform string.
-        @type messageBody: L{unicode}
-
-        @param cc: a string, likely an rfc2822-formatted list of addresses
-        (not validated between the client and here, XXX FIXME)
-        @type cc: L{unicode}
-
-        @param bcc: a string, likely an rfc2822-formatted list of addresses
-        (not validated between the client and here, XXX FIXME)
-        @type bcc: L{unicode}
-
-        @param files: a sequence of stringified storeIDs which should point at
-        L{File} items.
-
-        @param draft: a boolean, indicating whether the message represented by
-        the other arguments to this function should be saved as a draft or sent
-        as an outgoing message.  True for save, False for send.
-        """
-
-        if draft:
-            f = self._saveDraft
-        else:
-            f = self._sendMail
-        return f(fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)

@@ -888,14 +888,15 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     composeFragmentFactory = compose.ComposeFragment
 
-    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=()):
+    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None):
         composer = self.inbox.store.findUnique(compose.Composer)
         cf = self.composeFragmentFactory(composer,
                                          recipients=recipients,
                                          subject=subject,
                                          messageBody=messageBody,
                                          attachments=attachments,
-                                         inline=True)
+                                         inline=True,
+                                         parentMessage=parentMessage)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
         return cf
@@ -935,7 +936,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         curmsg = self.translator.fromWebID(messageIdentifier)
         return self._composeSomething({'to': replyTo(curmsg)},
                                       reSubject(curmsg),
-                                      self._getBodyForReply(curmsg))
+                                      self._getBodyForReply(curmsg),
+                                      parentMessage=curmsg)
     expose(replyToMessage)
 
 
@@ -953,7 +955,8 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         curmsg = self.translator.fromWebID(messageIdentifier)
         return self._composeSomething(replyToAll(curmsg),
                                       reSubject(curmsg),
-                                      self._getBodyForReply(curmsg))
+                                      self._getBodyForReply(curmsg),
+                                      parentMessage=curmsg)
     expose(replyAllToMessage)
 
 
