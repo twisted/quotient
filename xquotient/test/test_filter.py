@@ -1,15 +1,14 @@
-
 from twisted.trial import unittest
 from twisted.trial.unittest import TestCase
 from twisted.python.filepath import FilePath
 
-from axiom import store, scheduler
+from axiom import store
 from axiom.store import Store
 from axiom.dependency import installOn
 from axiom.plugins.userbasecmd import Create
 from axiom.plugins.mantissacmd import Mantissa
 
-from xquotient import filter, mimepart, mail
+from xquotient import filter, mimepart
 from xquotient.mimestorage import Part
 from xquotient.exmess import Message, FOCUS_STATUS
 from xquotient.filter import Focus
@@ -257,3 +256,73 @@ class FocusTests(TestCase):
         """
         impl = Part()
         self._focusedTest(impl)
+
+
+    def test_draft(self):
+        """
+        Verify that a draft is not focused.
+        """
+        impl = Part()
+        message = Message.createDraft(
+            self.userStore, impl, u'test://test_draft')
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def test_outbox(self):
+        """
+        Verify that a message in the outbox is not focused.
+        """
+        impl = Part()
+        message = Message.createDraft(
+            self.userStore, impl, u'test://test_outbox')
+        message.startedSending()
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def test_bounced(self):
+        """
+        Verify that a message which has bounced is not focused.
+        """
+        impl = Part()
+        message = Message.createDraft(
+            self.userStore, impl, u'test://test_bounced')
+        message.startedSending()
+        message.allBounced()
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def test_partiallySent(self):
+        """
+        Verify that a message which has been sent to one recipient is not
+        focused.
+        """
+        impl = Part()
+        message = Message.createDraft(
+            self.userStore, impl, u'test://test_partiallySent')
+        message.startedSending()
+        message.sent()
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)
+
+
+    def test_finishedSending(self):
+        """
+        Verify that a message which has been sent to all recipients is not
+        focused.
+        """
+        impl = Part()
+        message = Message.createDraft(
+            self.userStore, impl, u'test://test_finishedSending')
+        message.startedSending()
+        message.sent()
+        message.finishedSending()
+        self.focus.processItem(message)
+        statuses = set(message.iterStatuses())
+        self.failIfIn(FOCUS_STATUS, statuses)

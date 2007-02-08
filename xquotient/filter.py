@@ -24,6 +24,8 @@ from xmantissa import ixmantissa, webnav, webtheme, liveform
 from xquotient import iquotient, mail
 from xquotient.mail import MessageSource
 from xquotient.equotient import NoSuchHeader
+from xquotient.exmess import (
+    DRAFT_STATUS, OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS)
 
 
 class RuleFilteringPowerup(item.Item):
@@ -450,6 +452,13 @@ class Focus(Item):
 
 
     def processItem(self, item):
+        """
+        Apply the focus status to any incoming message which is probably not a
+        mailing list message.
+        """
+        for s in item.iterStatuses():
+            if s in [DRAFT_STATUS, OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS]:
+                return
         part = item.impl
         try:
             getHeader = part.getHeader

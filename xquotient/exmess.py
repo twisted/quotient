@@ -415,6 +415,15 @@ class MailboxSelector(object):
         return iter(qq)
 
 
+def frozen(status):
+    """
+    Return the frozen version of the given status.
+
+    @type status: C{unicode}
+    @rtype: C{unicode}
+    """
+    return u'.' + status
+
 
 class Message(item.Item):
     """
@@ -716,7 +725,7 @@ class Message(item.Item):
         for statobj in self.store.query(_MessageStatus,
                                         _MessageStatus.message == self):
             if statobj.statusName not in STICKY_STATUSES:
-                statobj.statusName = u'.' + statobj.statusName
+                statobj.statusName = frozen(statobj.statusName)
 
 
     def unfreezeStatus(self):
@@ -754,18 +763,6 @@ class Message(item.Item):
                     limit=1)))
 
     # status manipulation methods
-    def _focusCheck(self):
-        if self.hasStatus(FOCUS_STATUS):
-            self.removeStatus(FOCUS_STATUS)
-            self.addStatus(EVER_FOCUSED_STATUS)
-
-
-    def _everFocusedCheck(self):
-        if self.hasStatus(EVER_FOCUSED_STATUS):
-            self.removeStatus(EVER_FOCUSED_STATUS)
-            self.addStatus(FOCUS_STATUS)
-
-
     def classifyClean(self):
         """
         Automated filters should call this method to indicate that the message
@@ -776,7 +773,6 @@ class Message(item.Item):
         """
         wasSpam = self._spam
         self._spam = False
-        self._everFocusedCheck()
         if wasSpam is None:
             # This message has never been classified before.
             self.addStatus(CLEAN_STATUS)
@@ -802,7 +798,6 @@ class Message(item.Item):
         """
         wasSpam = self._spam
         self._spam = True
-        self._focusCheck()
         if wasSpam is None:
             # This message has never been classified before.
             self.addStatus(CLEAN_STATUS)
@@ -905,7 +900,6 @@ class Message(item.Item):
 
         @return: None
         """
-        self._focusCheck()
         self.freezeStatus()
         self.addStatus(TRASH_STATUS)
 
@@ -916,7 +910,6 @@ class Message(item.Item):
 
         @return: None
         """
-        self._everFocusedCheck()
         self.unfreezeStatus()
         self.removeStatus(TRASH_STATUS)
 
@@ -941,6 +934,24 @@ class Message(item.Item):
         self.read = False
         self.removeStatus(READ_STATUS)
         self.addStatus(UNREAD_STATUS)
+
+
+    def _focusCheck(self):
+        """
+        If FOCUS_STATUS is applied, replace it with EVER_FOCUSED_STATUS.
+        """
+        if self.hasStatus(FOCUS_STATUS):
+            self.removeStatus(FOCUS_STATUS)
+            self.addStatus(EVER_FOCUSED_STATUS)
+
+
+    def _everFocusedCheck(self):
+        """
+        If EVER_FOCUSED_STATUS is applied, replace it with FOCUS_STATUS.
+        """
+        if self.hasStatus(EVER_FOCUSED_STATUS):
+            self.removeStatus(EVER_FOCUSED_STATUS)
+            self.addStatus(FOCUS_STATUS)
 
 
     def deferFor(self, duration, timeFactory=Time):
@@ -1497,8 +1508,7 @@ STICKY_STATUSES = [READ_STATUS, UNREAD_STATUS, TRAINED_STATUS,
 
 # Applying any of these statuses removes FOCUS_STATUS and applies
 # EVER_FOCUSED_STATUS.  Removing all of them reverses this operation.
-UNFOCUSABLE_STATUSES = [TRASH_STATUS, SPAM_STATUS, ARCHIVE_STATUS,
-                        DEFERRED_STATUS]
+UNFOCUSABLE_STATUSES = [ARCHIVE_STATUS, DEFERRED_STATUS]
 
 class _MessageStatus(item.Item):
     """

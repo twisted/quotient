@@ -712,6 +712,7 @@ class DraftStatusChangeMethodTests(_WorkflowMixin, TestCase):
 
 
 
+
 class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
     """
     Test cases for various state changes that messages can go through after
@@ -807,21 +808,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(SPAM_STATUS, stats)
 
 
-    def test_classifySpamEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages classified as spam.
-
-        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
-        which is classified as spam.
-        """
-        self.message.focus()
-        self.message.classifySpam()
-
-        stats = set(self.message.iterStatuses())
-        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
-
-
     def test_classifySpamFocused(self):
         """
         Verify that when a focused message is classified as spam, it loses the
@@ -848,22 +834,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIfIn(INCOMING_STATUS, stats)
         self.failUnlessIn(INBOX_STATUS, stats)
         self.failUnlessIn(CLEAN_STATUS, stats)
-
-
-    def test_reclassifySpamToCleanEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages classified as spam.
-
-        This verifies that EVER_FOCUSED_STATUS is removed from a spam message
-        which is re-classified as clean.
-        """
-        self.message.focus()
-        self.message.classifySpam()
-        self.message.classifyClean()
-
-        stats = set(self.message.iterStatuses())
-        self.failIfIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_reclassifySpamToCleanFocused(self):
@@ -898,20 +868,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(UNREAD_STATUS, stats)
 
 
-    def test_focusSpam(self):
-        """
-        Verify that a message which is focused when it is spam gains
-        EVER_FOCUSED_STATUS and not FOCUS_STATUS.
-        """
-        self.message.classifySpam()
-        self.message.focus()
-
-        stats = set(self.message.iterStatuses())
-
-        self.failIfIn(FOCUS_STATUS, stats)
-        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
-
-
     def test_trash(self):
         """
         Verify that messages put into the trash are visible to the 'trash'
@@ -930,22 +886,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIfIn(SPAM_STATUS, stats)
 
 
-    def test_trashEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages moved to the trash.
-
-        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
-        which is moved to the trash.
-        """
-        self.message.focus()
-        self.message.classifyClean()
-        self.message.moveToTrash()
-
-        stats = set(self.message.iterStatuses())
-        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
-
-
     def test_trashFocused(self):
         """
         Verify that focused messages put into the trash have the 'trash' status
@@ -959,23 +899,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
 
         self.failUnlessIn(TRASH_STATUS, stats)
         self.failIfIn(FOCUS_STATUS, stats)
-
-
-    def test_untrashEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages moved to the trash.
-
-        This verifies that EVER_FOCUSED_STATUS is removed from a message
-        removed from the trash.
-        """
-        self.message.focus()
-        self.message.classifyClean()
-        self.message.moveToTrash()
-        self.message.removeFromTrash()
-
-        stats = set(self.message.iterStatuses())
-        self.failIfIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_untrashFocus(self):
@@ -994,20 +917,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failUnlessIn(CLEAN_STATUS, stats)
         self.failUnlessIn(FOCUS_STATUS, stats)
         self.failUnlessIn(INBOX_STATUS, stats)
-
-
-    def test_focusTrash(self):
-        """
-        Verify that if a message which is in the trash is focused, it gains
-        EVER_FOCUSED_STATUS instead of FOCUS_STATUS.
-        """
-        self.message.classifyClean()
-        self.message.moveToTrash()
-        self.message.focus()
-
-        stats = set(self.message.iterStatuses())
-        self.failIfIn(FOCUS_STATUS, stats)
-        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_trashThenUntrash(self):
@@ -1160,22 +1069,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIfIn(FOCUS_STATUS, stats)
 
 
-    def test_deferredEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages which get deferred.
-
-        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
-        which is deferred.
-        """
-        self.message.focus()
-        self._deferMessage()
-
-        stats = set(self.message.iterStatuses())
-
-        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
-
-
     def test_undeferralFocus(self):
         """
         Verify that when a previously focused message is undeferred, it regains
@@ -1188,23 +1081,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         stats = set(self.message.iterStatuses())
 
         self.failUnlessIn(FOCUS_STATUS, stats)
-
-
-    def test_undeferralEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation for
-        focused messages which get deferred.
-
-        This verifies that EVER_FOCUSED_STATUS is applied to a focused message
-        which is deferred.
-        """
-        self.message.focus()
-        self._deferMessage()
-        self.message.undefer()
-
-        stats = set(self.message.iterStatuses())
-
-        self.failIfIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_deferredAppearsInAll(self):
@@ -1282,20 +1158,6 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         after = set(self.message.iterStatuses())
 
         self.assertEqual(before - set([FOCUS_STATUS]), after)
-
-
-    def test_unfocusEverFocused(self):
-        """
-        Whitebox test for the current focus-remembering implementation.
-
-        This verifies that an explicitly unfocused message does not get
-        remembered as focused.
-        """
-        self.message.focus()
-        self.message.unfocus()
-
-        stats = set(self.message.iterStatuses())
-        self.failIfIn(EVER_FOCUSED_STATUS, stats)
 
 
     def test_archiveFocused(self):
