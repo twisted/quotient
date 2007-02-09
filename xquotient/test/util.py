@@ -174,6 +174,7 @@ class DummyMessageImplWithABunchOfAddresses(Item, DummyMessageImplementationMixi
         """
         for (rel, addr) in ((SENDER_RELATION, 'sender@host'),
                             (RECIPIENT_RELATION, 'recipient@host'),
+                            (RECIPIENT_RELATION, 'recipient2@host'),
                             (COPY_RELATION, 'copy@host'),
                             (BLIND_COPY_RELATION, 'blind-copy@host')):
             yield (rel, EmailAddress(addr, False))

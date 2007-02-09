@@ -788,7 +788,8 @@ class ComposeActionsTestCase(TestCase):
         installOn(self.inbox, self.store)
         self.privateApplication = self.inbox.privateApplication
         self.inboxScreen = InboxScreen(self.inbox)
-
+        fromAddr = smtpout.FromAddress(address=u'recipient@host',
+                                       store=self.store)
         self.msg = testMessageFactory(
                     store=self.store,
                     spam=False,
@@ -815,7 +816,7 @@ class ComposeActionsTestCase(TestCase):
                 replyToAll(self.msg)),
             {'bcc': ['blind-copy@host'],
              'cc': ['copy@host'],
-             'to': ['sender@host']})
+             'to': ['sender@host', 'recipient2@host']})
 
 
     def test_replyToAllFromAddress(self):
@@ -824,7 +825,7 @@ class ComposeActionsTestCase(TestCase):
         L{xquotient.smtpout.FromAddress} items that exist in the same store as
         the message that is being replied to
         """
-        addrs = set(u'blind-copy@host copy@host sender@host'.split())
+        addrs = set(u'blind-copy@host copy@host sender@host recipient2@host'.split())
         for addr in addrs:
             fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
             gotAddrs = set()
@@ -854,7 +855,7 @@ class ComposeActionsTestCase(TestCase):
             recipients,
             {'bcc': ['blind-copy@host'],
              'cc': ['copy@host'],
-             'to': ['sender@host']})
+             'to': ['sender@host', 'recipient2@host']})
 
 
 

@@ -28,12 +28,13 @@ from xmantissa.scrolltable import Scrollable, ScrollableView
 from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
 from xquotient.filter import Focus
 from xquotient.exmess import Message, getMessageSources, MailboxSelector
+
 from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS,
-                              FOCUS_STATUS)
+                              RECIPIENT_RELATION, FOCUS_STATUS)
 
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
@@ -103,6 +104,7 @@ def replyToAll(m):
     fromAddrs = set(a.address for a in fromAddrs)
 
     relToKey = {SENDER_RELATION: 'to',
+                RECIPIENT_RELATION: 'to',
                 COPY_RELATION: 'cc',
                 BLIND_COPY_RELATION: 'bcc'}
     addrs = {}
