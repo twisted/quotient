@@ -16,7 +16,7 @@ from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 
 from nevow.testutil import setJavascriptInterpreterOrSkip
-from nevow.scripts import consolejstest
+from nevow.jsutil import generateTestScript
 
 # XXX TODO: Rewrite all of this use Divmod.UnitTest instead.
 class _JavaScriptTestSuiteProtocol(ProcessProtocol):
@@ -72,7 +72,7 @@ class JavaScriptTestSuite(TestCase):
 
         fname = self.mktemp()
         file(fname, 'w').write(
-            consolejstest.generateTestScript(self.path.child(jsfile).path))
+            generateTestScript(self.path.child(jsfile).path))
 
         reactor.spawnProcess(
             p,
