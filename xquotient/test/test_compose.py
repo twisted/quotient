@@ -13,8 +13,8 @@ from axiom.dependency import installOn
 
 from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
-from xquotient.mimebakery import createMessage, sendMail
-from xquotient.mimepart import Header, MIMEPart
+
+
 
 class CompositionTestMixin(object):
     """
@@ -76,12 +76,13 @@ class StubStoredMessageAndImplAndSource(item.Item):
     calledStartedSending = attributes.boolean(default=False)
     impl = property(lambda s: s)
     source = property(lambda s: FilePath(__file__))
-    headers = attributes.inmemory()
+
     def open(self):
         return "HI DUDE"
 
     def startedSending(self):
         self.calledStartedSending = True
+
 
 class Reactor(object):
     """
@@ -223,6 +224,8 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
             exmess.RESENT_FROM_RELATION, self.defaultFromAddr.address)
         checkCorrespondents(exmess.RESENT_TO_RELATION, RESENT_TO_ADDRESS.email)
 
+
+
 class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
     """
     Test the L{ComposeFragment}.
@@ -238,42 +241,14 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         self.cabinet = compose.FileCabinet(store=self.store)
         self.cf = compose.ComposeFragment(self.composer)
 
-    def test_createReply(self):
-        """
-        Ensure that References and In-Reply-To headers are added to
-        outgoing messages.
-        """
-        class msgStub:
-            impl = MIMEPart()
-        parent = msgStub()
-        parent.impl.headers = [Header("message-id", "<msg99@example.com>"),
-                               Header("references", "<msg98@example.com>"),
-                               Header("references", "<msg97@example.com>")]
-        msg = createMessage(self.composer,
-                            self.cabinet,
-                            parent,
-                            self.defaultFromAddr,
-            [mimeutil.EmailAddress(
-                    'testuser@example.com',
-                    mimeEncoded=False)],
-            u'Sup dood', u'A body', (), (), u'')
-        self.assertEqual([h.value for h in msg.impl.getHeaders('References')],
-                         ["<msg98@example.com>",
-                          "<msg97@example.com>",
-                         "<msg99@example.com>"])
-        self.assertEqual(msg.impl.getHeader("In-Reply-To"),
-                         "<msg99@example.com>")
-
     def test_createMessageHonorsSmarthostFromAddress(self):
         """
         Sending a message through the Compose UI should honor the from
         address we give to it
         """
         self.defaultFromAddr.address = u'from@example.com'
-        msg = createMessage(self.composer,
-                            self.cabinet,
-                            None,
-                            self.defaultFromAddr,
+        msg = self.cf.createMessage(
+            self.defaultFromAddr,
             [mimeutil.EmailAddress(
                     'testuser@example.com',
                     mimeEncoded=False)],
@@ -287,11 +262,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         Sending a message through the compose UI should honor the BCC
         addresses we give to it
         """
-        sendMail(self.cf._savedDraft,
-                 self.composer,
-                 self.cabinet,
-                 None,
-                 self.defaultFromAddr,
+        self.cf._sendMail(
+            self.defaultFromAddr,
             [mimeutil.EmailAddress(
                 'to@example.com',
                 mimeEncoded=False)],
@@ -310,7 +282,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def _createMessage(self, cc=(), bcc=()):
         """
-        Use L{xquotient.mimebakery.createMessage} to make a
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
         simple message, optionally with CC/BCC headers set
 
         @param cc: addresses to CC the message to.  defaults to no addresses
@@ -320,10 +292,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
         @return: L{xquotient.exmess.Message}
         """
-        return createMessage(
-            self.composer,
-            self.cabinet,
-            None,
+        return self.cf.createMessage(
             self.defaultFromAddr,
             [mimeutil.EmailAddress(
                 'to@example.com',
@@ -333,7 +302,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def _createBCCMessage(self):
         """
-        Use L{xquotient.mimebakery.createMessage} to make a
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
         message with a BCC
         """
         return self._createMessage(
@@ -344,7 +313,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def _createCCMessage(self):
         """
-        Use L{xquotient.mimebakery.createMessage} to make a
+        Use L{xquotient.compose.ComposeFragment.createMessage} to make a
         message with a BCC
         """
         return self._createMessage(
@@ -355,7 +324,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_noBCCInTo(self):
         """
-        Test that L{xquotient.mimebakery.createMessage} doesn't
+        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
         stick the BCC address it's passed into the "To" header
         """
         msg = self._createBCCMessage()
@@ -364,7 +333,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_noBCCHeader(self):
         """
-        Test that L{xquotient.mimebakery.createMessage} doesn't
+        Test that L{xquotient.compose.ComposeFragment.createMessage} doesn't
         result in a BCC header on the message it makes, when it's passed a BCC
         address
         """
@@ -376,7 +345,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
     def test_ccHeader(self):
         """
         Test that the message created by
-        L{xquotient.mimebakery.createMessage} has the "cc" header
+        L{xquotient.compose.ComposeFragment.createMessage} has the "cc" header
         set if the C{cc} argument contains an address
         """
         msg = self._createCCMessage()
@@ -385,13 +354,12 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def _createMessageWithFiles(self, files):
         """
-        Create a message with attachments corresponding to the
+        Make an L{xquotient.compose.ComposeFragment}, use it to create a
+        message with attachments corresponding to the
         L{xquotient.compose.File} items C{files}
         """
-        return createMessage(self.composer,
-                             self.cabinet,
-                             None,
-                             self.defaultFromAddr,
+        cf = compose.ComposeFragment(self.composer)
+        return cf.createMessage(self.defaultFromAddr,
                                 [mimeutil.EmailAddress(
                                     'testuser@example.com',
                                     mimeEncoded=False)],
@@ -415,7 +383,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_createMessageAttachment(self):
         """
-        Test L{xquotient.mimebakery.createMessage} when there is an
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is an
         attachment
         """
         fileItem = self.cabinet.createFileItem(
@@ -430,7 +398,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_createMessageWithMessageAttachment(self):
         """
-        Test L{xquotient.mimebakery.createMessage} when there is
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
         an attachment of type message/rfc822
         """
         fileItem = self.cabinet.createFileItem(
@@ -447,7 +415,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_createMessageWithMultipartAttachment(self):
         """
-        Test L{xquotient.mimebakery.createMessage} when there is
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
         a multipart attachment
         """
         fileItem = self.cabinet.createFileItem(
@@ -470,7 +438,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_createMessageWithBinaryAttachment(self):
         """
-        Test L{xquotient.mimebakery.createMessage} when there is
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
         a binary attachment.  The attachment's part should be encoded as
         base64, with the appropriate content-transfer-encoding header
         """
@@ -489,7 +457,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def test_createMessageWithTextAttachment(self):
         """
-        Test L{xquotient.mimebakery.createMessage} when there is
+        Test L{xquotient.compose.ComposeFragment.createMessage} when there is
         a text attachment.  The attachment's part should be encoded as
         quoted-printable, with the appropriate content-transfer-encoding
         header
@@ -515,10 +483,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         triggered.
         """
         sq = exmess.MailboxSelector(self.store)
-        msg = createMessage(
-            self.composer,
-            self.cabinet,
-            None,
+        msg = self.cf.createMessage(
             self.defaultFromAddr,
             [mimeutil.EmailAddress(
                     'testuser@example.com',
