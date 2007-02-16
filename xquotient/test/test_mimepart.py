@@ -701,7 +701,7 @@ Content-Type: text/html;
         charset="iso-8[4
 """.strip()                     # This is important!  The message is different
                                 # when it has a trailing newline.
-
+#"
 class MessageTestCase(unittest.TestCase):
     """
     Test aspects of the L{twisted.mail.smtp.IMessage} implementation.
@@ -928,3 +928,36 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
             self.assertEqual(list(msg.relatedAddresses()), [])
 
         self._messageTest(msgSource, checkRelations)
+
+flowedParagraphExample = """\
+On Tuesday 2 Jan 2007, Bob wrote:
+>On Monday 1 Jan 2007, Alice wrote:
+>>Hello.
+>Hi.
+>To be, or not to be: that is the question: Whether 'tis nobler in the 
+>mind to suffer The slings and arrows of outrageous fortune, Or to take 
+>arms against a sea of troubles, And by opposing end them?
+To die: to sleep; No more; and by a sleep to say we end The heart-ache 
+and the thousand natural shocks That flesh is heir to, 'tis a 
+consummation Devoutly to be wish'd.
+""".replace("\n","\r\n")
+
+class FlowedParagraphTestCase(unittest.TestCase):
+
+    def testAsRFC2646(self):
+        p3 = mimepart.FlowedParagraph(["Hello.\n"], 2)
+        p2 = mimepart.FlowedParagraph(["On Monday 1 Jan 2007, Alice wrote:\n",
+                                       p3, "Hi.\n",
+                                       "To be, or not to be: that is the quest"
+                                       "ion: Whether 'tis nobler in the mind t"
+                                       "o suffer The slings and arrows of outr"
+                                       "ageous fortune, Or to take arms agains"
+                                       "t a sea of troubles, And by opposing e"
+                                       "nd them?\n"], 1)
+        p1 = mimepart.FlowedParagraph(["On Tuesday 2 Jan 2007, Bob wrote:",
+                                       p2, "To die: to sleep; No more; and by "
+                                       "a sleep to say we end The heart-ache a"
+                                       "nd the thousand natural shocks That fl"
+                                       "esh is heir to, 'tis a consummation De"
+                                       "voutly to be wish'd."], 0)
+        self.assertEqual(p1.asRFC2646(), flowedParagraphExample)

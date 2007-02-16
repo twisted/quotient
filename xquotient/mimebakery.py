@@ -8,6 +8,7 @@ from email import (Parser as P, Generator as G, MIMEMultipart as MMP,
                    Header as MH, Charset as MC, Utils as EU, Encoders as EE)
 import StringIO as S
 from xquotient.mimestorage import Part
+from xquotient.mimepart import FlowedParagraph
 from twisted.mail import smtp
 
 from xquotient import renderers, mimeutil
@@ -46,10 +47,13 @@ def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
     encode = lambda s: MH.Header(s).encode()
 
     s = S.StringIO()
+    wrappedMsgBody = FlowedParagraph.fromRFC2646(messageBody).asRFC2646()
+    textPart = MT.MIMEText(wrappedMsgBody, 'plain', 'utf-8')
+    textPart.set_param("format", "flowed")
     m = MMP.MIMEMultipart(
         'alternative',
         None,
-        [MT.MIMEText(messageBody, 'plain', 'utf-8'),
+        [textPart,
          MT.MIMEText(renderers.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
 
     fileItems = []

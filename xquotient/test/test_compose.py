@@ -353,6 +353,33 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                 mimeEncoded=False)])
 
 
+    def test_createMessageWrapsLines(self):
+        """
+        Ensure that the text of an outgoing message is wrapped to 78
+        characters and that its MIME type is 'text/plain; format=flowed'.
+        """
+        self.cf._sendOrSave(
+            fromAddress=self.defaultFromAddr,
+            toAddresses=[mimeutil.EmailAddress(
+            u'testuser@127.0.0.1',
+                    mimeEncoded=False)],
+        subject=u'The subject of the message.',
+            messageBody=u' '.join([u'some words'] * 1000),
+            cc=[],
+            bcc=[],
+            files=[],
+            draft=False)
+ 
+        msg = self.store.findUnique(smtpout.DeliveryToAddress
+                                        )._getMessageSource()
+        m = Parser.Parser().parse(msg)
+        textPart = m.get_payload()[0]
+        self.assertEqual(textPart.get_content_type(), "text/plain")
+        self.assertEqual(textPart.get_param("format"), "flowed")
+        body = textPart.get_payload().decode("quoted-printable")
+        maxLineLength = max([len(line) for line in body.split("\n")])
+        self.failIf(maxLineLength > 78)
+
     def test_noBCCInTo(self):
         """
         Test that L{xquotient.mimebakery.createMessage} doesn't
