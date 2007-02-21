@@ -23,6 +23,37 @@ def msg(s):
     return '\r\n'.join(s.splitlines())
 
 
+class UtilTest(unittest.TestCase):
+    """
+    Test utilities associated with MIME parsing.
+    """
+    def test_safelyDecode(self):
+        """
+        Verify that _safelyDecode will properly decode a valid encoding.
+        """
+        self.assertEquals(u"\u1234",
+                          mimepart._safelyDecode(u"\u1234".encode("utf8"),
+                                                 "utf8"))
+
+    def test_safelyDecodeUnknownCodec(self):
+        """
+        Verify that _safelyDecode will default to ASCII decoding with replacement
+        characters in the case where the provided encoding is unknown.
+        """
+        self.assertEquals(u'\N{REPLACEMENT CHARACTER}' * 3 + u"hello world",
+                          mimepart._safelyDecode(u"\u1234hello world".encode("utf8"),
+                                                 "ascii"))
+
+    def test_safelyDecode(self):
+        """
+        Verify that _safelyDecode will not raise an exception when the given string
+        does not match the given encoding.
+        """
+        self.assertEquals(u'\N{REPLACEMENT CHARACTER}',
+                          mimepart._safelyDecode('\xe1', "utf8"))
+
+
+
 class TestHeaderBodyParse(unittest.TestCase):
     to = 'bob@example.com'
     subject = 'a test message, comma separated'
@@ -60,6 +91,19 @@ Hello Bob,
   How are you?
 -A
 """ % (confusingSubject, confusingFoo))
+
+    brokenEncodingSubject = 'this subject is in ascii, except for this: \xe1\x88\xb4'
+
+    brokenEncodingHeader = msg("""\
+From: alice@example.com
+To: bob@example.com
+Subject: =?completely_invalid_encoding?q?%s?=
+Date: Tue, 11 Oct 2005 14:25:12 GMT
+
+Hello Bob,
+  I am enjoying my vacation in Encodistan.  The local customs are intriguing.
+-A
+""" % (brokenEncodingSubject,))
 
 
     def setUp(self):
@@ -112,6 +156,16 @@ Hello Bob,
         # properly.
         part = self.parse(MessageTestMixin.trivialMessage)
         self.assertEquals(part.getHeader(u'from'), 'alice@example.com')
+
+
+    def test_invalidEncoding(self):
+        """
+        Verify that an incorrectly incoded header will be decoded as ASCII.
+        """
+        part = self.parse(self.brokenEncodingHeader)
+        self.assertEquals(part.getHeader(u'subject'),
+                          self.brokenEncodingSubject.decode('ascii', 'replace'))
+
 
 
 

@@ -350,6 +350,26 @@ class Header(object):
             raise IncomparableHeaders()
         return cmp(self.value, other.value)
 
+
+
+def _safelyDecode(userProvidedBytes, userProvidedEncoding):
+    """
+    Decode a set of bytes according to a user-provided encoding string.
+
+    @param userProvidedBytes: a str received as user input along with the given
+    encoding.
+
+    @param userProvidedEncoding: a str that purports to describe the encoding
+    of userProvidedBytes, but which may in fact be garbage (or something so
+    obscure that the local codecs cannot handle it).
+    """
+    try:
+        return userProvidedBytes.decode(userProvidedEncoding, 'replace')
+    except LookupError:
+        return userProvidedBytes.decode('ascii', 'replace')
+
+
+
 class HeaderBodyParser(object):
 
     _normalizeHeaders = {
@@ -410,8 +430,11 @@ class HeaderBodyParser(object):
                         decodedValueList.append(maybeUncoded)
                     else:
                         uncoded, encoding = maybeUncoded
-                        decodedValueList.append(uncoded.decode(encoding or 'ascii', 'replace'))
-            except ValueError:
+                        if encoding is None:
+                            encoding = 'ascii'
+                        decodedValueList.append(_safelyDecode(uncoded, encoding))
+            except ValueError:  # XXX where is this ValueError coming from?
+                                # -glyph
                 decodedValue = self.prevvalue.decode('ascii', 'replace')
             else:
                 decodedValue = u''.join(decodedValueList)
