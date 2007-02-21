@@ -1,6 +1,6 @@
 // import Quotient
 // import Quotient.Common
-// import Quotient.AutoComplete
+// import Mantissa.AutoComplete
 // import Mantissa.LiveForm
 // import Fadomatic
 // import Mantissa.ScrollTable
@@ -149,10 +149,10 @@ Quotient.Compose.FileUploadController.methods(
 
 
 /**
- * L{Quotient.AutoComplete.View} subclass which knows how to turn
+ * L{Mantissa.AutoComplete.View} subclass which knows how to turn
  * [displayName, emailAddress] pairs into something a user might understand
  */
-Quotient.Compose.EmailAddressAutoCompleteView = Quotient.AutoComplete.View.subclass('Quotient.Compose.EmailAddressAutoCompleteView');
+Quotient.Compose.EmailAddressAutoCompleteView = Mantissa.AutoComplete.View.subclass('Quotient.Compose.EmailAddressAutoCompleteView');
 Quotient.Compose.EmailAddressAutoCompleteView.methods(
     /**
      * For a pair C{nameAddr} containing [displayName, emailAddress], return something
@@ -179,12 +179,12 @@ Quotient.Compose.EmailAddressAutoCompleteView.methods(
     });
 
 /**
- * L{Quotient.AutoComplete.Model} subclass which is aware of the fact that the
+ * L{Mantissa.AutoComplete.Model} subclass which is aware of the fact that the
  * completions list is not a sequence of strings, but a sequence of
  * [displayName, emailAddress] pairs.  We do this so the text "jo" can match
  * "Joanna Jones" <jj@jj.com> and "Morris the slob" <joan@joan.com>
  */
-Quotient.Compose.EmailAddressAutoCompleteModel = Quotient.AutoComplete.Model.subclass('Quotient.Compose.EmailAddressAutoCompleteModel');
+Quotient.Compose.EmailAddressAutoCompleteModel = Mantissa.AutoComplete.Model.subclass('Quotient.Compose.EmailAddressAutoCompleteModel');
 Quotient.Compose.EmailAddressAutoCompleteModel.methods(
     /**
      * Given an email address C{addr}, and a pair containing [displayName,
@@ -228,13 +228,13 @@ Quotient.Compose._Controller.methods(
 
         self.inline = inline;
 
-        self.toAutoCompleteController = Quotient.AutoComplete.Controller(
+        self.toAutoCompleteController = Mantissa.AutoComplete.Controller(
             Quotient.Compose.EmailAddressAutoCompleteModel(allPeople),
             Quotient.Compose.EmailAddressAutoCompleteView(
                 self.firstNodeByAttribute("name", "toAddresses"),
                 self.firstNodeByAttribute("class", "address-completions")));
 
-        self.ccAutoCompleteController = Quotient.AutoComplete.Controller(
+        self.ccAutoCompleteController = Mantissa.AutoComplete.Controller(
             Quotient.Compose.EmailAddressAutoCompleteModel(allPeople),
             Quotient.Compose.EmailAddressAutoCompleteView(
                 self.firstNodeByAttribute("name", "cc"),
@@ -569,8 +569,8 @@ Quotient.Compose.Controller.methods(
         var e = self.nodeByAttribute("class", "compose-message-body");
 
         e.style.height = (Divmod.Runtime.theRuntime.getElementSize(node).h -
-                          (Quotient.Common.Util.findPosY(e) -
-                           Quotient.Common.Util.findPosY(self.node)) -
+                          (Divmod.Runtime.theRuntime.findPosY(e) -
+                           Divmod.Runtime.theRuntime.findPosY(self.node)) -
                           1)+ "px";
     },
 

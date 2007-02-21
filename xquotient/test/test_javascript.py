@@ -89,9 +89,6 @@ class QuotientJavaScriptTestSuite(JavaScriptTestSuite):
     """
     path = FilePath(__file__).parent()
 
-    def test_jsAutoComplete(self):
-        return self.onetest('test_autocomplete.js')
-
     def test_utils(self):
         return self.onetest('test_utils.js')
 

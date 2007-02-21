@@ -132,7 +132,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         self.model.addObserver(self);
 
         self._scrollViewport.style.maxHeight = "";
-        self.ypos = Quotient.Common.Util.findPosY(self._scrollViewport.parentNode);
+        self.ypos = Divmod.Runtime.theRuntime.findPosY(self._scrollViewport.parentNode);
         try {
             self.throbberNode = Nevow.Athena.FirstNodeByAttribute(self.node.parentNode, "class", "throbber");
         } catch (err) {
@@ -755,8 +755,8 @@ Quotient.Mailbox.Controller.methods(
         self.deferForm = self.nodeByAttribute("class", "defer-form");
         self.deferSelect = self.nodeByAttribute("class", "defer");
 
-        self.ypos = Quotient.Common.Util.findPosY(self.messageDetail);
-        self.messageBlockYPos = Quotient.Common.Util.findPosY(self.messageDetail.parentNode);
+        self.ypos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail);
+        self.messageBlockYPos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail.parentNode);
 
         self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-cell");
         self.viewShortcutSelect = self.firstWithClass(self.node, "view-shortcut-container");

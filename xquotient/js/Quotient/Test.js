@@ -3601,7 +3601,7 @@ Quotient.Test.ComposeTestCase.methods(
 Quotient.Test.ComposeAutoCompleteTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ComposeAutoCompleteTestCase');
 Quotient.Test.ComposeAutoCompleteTestCase.methods(
     /**
-     * Make a L{Quotient.AutoComplete.Controller} with a
+     * Make a L{Mantissa.AutoComplete.Controller} with a
      * L{Quotient.Compose.EmailAddressAutoCompleteModel} and a
      * L{Quotient.Compose.EmailAddressAutoCompleteView}
      */
@@ -3611,7 +3611,7 @@ Quotient.Test.ComposeAutoCompleteTestCase.methods(
         self.completionsNode = document.createElement("div");
         self.node.appendChild(self.completionsNode);
 
-        self.controller = Quotient.AutoComplete.Controller(
+        self.controller = Mantissa.AutoComplete.Controller(
                             Quotient.Compose.EmailAddressAutoCompleteModel(
                                 [['Larry', 'larry@host'],
                                  ['Larry Joey', 'larryjoey@host'],

@@ -222,36 +222,6 @@ Quotient.Common.Util.uniq = function(array) {
     return uniq;
 }
 
-Quotient.Common.Util.findPosX = function(obj) {
-    var curleft = 0;
-    if (obj.offsetParent)
-    {
-        while (obj.offsetParent)
-        {
-            curleft += obj.offsetLeft
-            obj = obj.offsetParent;
-        }
-    }
-    else if (obj.x)
-        curleft += obj.x;
-    return curleft;
-}
-
-Quotient.Common.Util.findPosY = function(obj) {
-    var curtop = 0;
-    if (obj.offsetParent)
-    {
-        while (obj.offsetParent)
-        {
-            curtop += obj.offsetTop
-            obj = obj.offsetParent;
-        }
-    }
-    else if (obj.y)
-        curtop += obj.y;
-    return curtop;
-}
-
 Quotient.Common.Util.stripLeadingTrailingWS = function(str) {
     return str.replace(/^\s+/, "").replace(/\s+$/, "");
 }
