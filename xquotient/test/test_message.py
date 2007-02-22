@@ -141,6 +141,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
 
         return deferredRender(pd, req)
 
+
     def testPartDisplayerScrubbingDoesntAlterInnocuousHTML(self):
         """
         Test that PartDisplayer/scrubber doesn't alter HTML
@@ -153,6 +154,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
 
     suspectHTML = u'<html><script>hi</script><body>hi</body></html>'
 
+
     def testPartDisplayerScrubs(self):
         """
         Test that the PartDisplayer/scrubber alters HTML that
@@ -161,6 +163,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         D = self._testPartDisplayerScrubbing(self.suspectHTML)
         D.addCallback(lambda s: self.failIf('<script>' in s))
         return D
+
 
     def testPartDisplayerObservesNoScrubArg(self):
         """
@@ -171,6 +174,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         D.addCallback(lambda s: self.assertEqual(s, self.suspectHTML))
         return D
 
+
     def testZipFileName(self):
         """
         Test L{xquotient.exmess.MessageDetail._getZipFileName}
@@ -180,6 +184,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         installOn(QuotientPreferenceCollection(store=s), s)
         md = MessageDetail(Message(store=s, subject=u'a/b/c', sender=u'foo@bar'))
         self.assertEqual(md.zipFileName, 'foo@bar-abc-attachments.zip')
+
 
     def testPreferredFormat(self):
         """
@@ -208,6 +213,86 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         self.assertEqual(
             f.source(None, None),
             PartMaker('text/html', '0x0 0x1 hi').make() + '\n')
+
+
+
+class PartLinkTest(TestCase):
+    """
+    Tests for linking to attachments of the message.
+    """
+
+    def setUp(self):
+        """
+        Create an entirely fake MessageDetail, circumventing the rather complex
+        constructor, so we can call the one method we're interested in.
+        """
+        self.messageDetail = MessageDetail.__new__(MessageDetail)
+        self.messageDetail.original = self
+        self.messageDetail.translator = self
+        self.storeID = 1234
+
+
+    def linkTo(self, fakeStoreID):
+        """
+        Implement 'linkTo' method so this test can act as a translator for the
+        message detail it is testing.
+        """
+        self.assertEqual(fakeStoreID, self.storeID) # sanity check
+        return '/translator-link'
+
+
+    def toWebID(self, part):
+        """
+        Implement 'toWebID' method so this test can act as a translator for the
+        message detail it is testing.
+        """
+        return 'attachment-id'
+
+
+    def getFilename(self):
+        """
+        Behave as a part.
+        """
+        return self.filename
+
+
+    def checkLink(self, expectedLink, filename):
+        """
+        Verify that a link to a part with the given filename looks like the expected link.
+        """
+        self.filename = filename
+        pl = self.messageDetail._partLink(self)
+        self.failUnless(isinstance(pl, str))
+        self.assertEqual(pl, expectedLink)
+
+
+    def test_partLinkBasic(self):
+        """
+        Verify that part links have the expected structure of
+        /link-to-message/attachments/part-id/part-filename
+        """
+        self.checkLink(
+            '/translator-link/attachments/attachment-id/attachment-filename',
+            u'attachment-filename')
+
+
+    def test_partLinkQuotesSpaces(self):
+        """
+        Verify that filenames with spaces are quoted appropriately.
+        """
+        self.checkLink(
+            '/translator-link/attachments/attachment-id/attachment%20filename',
+            u'attachment filename')
+
+
+    def test_partLinkQuotesUnicode(self):
+        """
+        Veirfy that _partLink quotes unicode filenames in the URL as per
+        http://www.w3.org/International/O-URL-code.html
+        """
+        self.checkLink(
+            '/translator-link/attachments/attachment-id/unicode%E1%88%B4filename',
+            u'unicode\u1234filename')
 
 
 

@@ -12,7 +12,7 @@ from os import path
 import re
 import pytz
 import zipfile
-import itertools
+import urllib
 
 from zope.interface import implements
 
@@ -1982,10 +1982,24 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
 
     def _partLink(self, part):
+        """
+        Return a string which describes absolute URL path, that provides a
+        hyperlink to the given part.  This URL path's final segment should
+        approximate the attachment's filename, so that the download dialog
+        presented to the user will include a filename that makes sense.
+
+        @param part: an L{xquotient.mimepart.Part} instance which is attached
+        to my message.
+
+        @return: a string beginning in / which, when clicked from a URL
+        rendering this message detail, will result in a
+
+        @rtype: str
+        """
         return (self.translator.linkTo(self.original.storeID)
                 + '/attachments/'
                 + self.translator.toWebID(part)
-                + '/' + part.getFilename())
+                + '/' + urllib.quote(part.getFilename().encode('utf-8')))
 
 
     def _thumbnailLink(self, image):
