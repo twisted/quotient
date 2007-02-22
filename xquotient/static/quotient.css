@@ -241,11 +241,6 @@ ul.file-list, ul.file-list li {
     margin-right: 4px;
 }
 
-.header-panel {
-    margin-bottom: 6px;
-    border-bottom: solid 1px #CACACA;
-}
-
 .view-pane-header {
     background-color: #D9F0F7;
 }
@@ -671,7 +666,13 @@ img.collapse-arrow {
 
 .message-body {
     font-family: monospace;
+    border-top: solid 1px #CACACA;
+    margin-top: 6px;
     font-size: 1.6em;
+}
+
+.complexity-2-inbox .message-body, .complexity-3-inbox .message-body {
+    font-size: 1.3em;
 }
 
 .message-source {

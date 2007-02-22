@@ -367,7 +367,7 @@ class Part(item.Item):
 
     def readableParts(self, shallow=False):
         '''return all parts with a content type of text/*'''
-        return (part for part in self.walk(shallow=shallow) is part.isReadable())
+        return (part for part in self.walk(shallow=shallow) if part.isReadable())
 
     def readablePart(self, prefer, shallow=False):
         '''return one text/* part, preferably of type prefer.  or None'''
@@ -523,6 +523,21 @@ class Part(item.Item):
 
         return default
 
+
+    def getAlternates(self):
+        """
+        If any exist, return the alternate versions of this part body.
+
+        @return: a sequence of pairs, the first element holding the MIME type,
+        the second a L{Part}
+        """
+        if (self.parent is not None and
+                self.parent.getContentType() == 'multipart/alternative'):
+            siblings = self.parent.walk(shallow=True)
+            for sibling in siblings:
+                if sibling is self:
+                    continue
+                yield (sibling.getContentType(), sibling)
 
 
 

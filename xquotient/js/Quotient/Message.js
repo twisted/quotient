@@ -260,6 +260,83 @@ Quotient.Message.MessageDetail.methods(
         return D;
     });
 
+/**
+ * Message body control code which interacts with the DOM
+ */
+Quotient.Message.BodyView = Divmod.Class.subclass('Quotient.Message.BodyView');
+Quotient.Message.BodyView.methods(
+    function __init__(self, node) {
+        self.node = node;
+    },
+
+    /**
+     * Figure out the alternate MIME type linked to by node C{node}
+     *
+     * @param node: the alternate MIME type link
+     * @type node: <a> node
+     *
+     * @return: the MIME type
+     * @rtype: C{String}
+     */
+    function getMIMETypeFromNode(self, node) {
+        return node.firstChild.nodeValue;
+    },
+
+    /**
+     * Replace our node with another node
+     *
+     * @type node: node
+     *
+     * @rtype: C{undefined}
+     */
+    function replaceNode(self, node) {
+        self.node.parentNode.insertBefore(node, self.node);
+        self.node.parentNode.removeChild(self.node);
+    });
+
+/**
+ * Message body control code which responds to events
+ */
+Quotient.Message.BodyController = Nevow.Athena.Widget.subclass('Quotient.Message.BodyController');
+Quotient.Message.BodyController.methods(
+    function __init__(self, node) {
+        self.view = Quotient.Message.BodyView(node);
+        Quotient.Message.BodyController.upcall(self, '__init__', node);
+    },
+
+    /**
+     * Retrieve and display the component of this message with MIME type
+     * C{type}
+     *
+     * @param type: MIME type
+     * @type type: C{String}
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function chooseDisplayMIMEType(self, type) {
+        var D = self.callRemote('getAlternatePartBody', type);
+
+        D.addCallback(
+            function(widget_info) {
+                return self.addChildWidgetFromWidgetInfo(widget_info);
+            });
+        D.addCallback(
+            function(widget) {
+                self.view.replaceNode(widget.node);
+                return widget;
+            });
+        return D;
+    },
+
+    /**
+     * DOM event handler which wraps L{chooseDisplayMIMEType}
+     */
+    function dom_chooseDisplayMIMEType(self, node) {
+        var type = self.view.getMIMETypeFromNode(node);
+        self.chooseDisplayMIMEType(type);
+        return false;
+    });
+
 Quotient.Message.Source = Nevow.Athena.Widget.subclass('Quotient.Message.Source');
 /**
  * Responds to events originating from message source DOM.  Assumes a widget

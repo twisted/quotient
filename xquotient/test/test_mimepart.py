@@ -366,6 +366,24 @@ class PersistenceMixin(MIMEReceiverMixin):
 
 
 class PersistenceTestCase(unittest.TestCase, MessageTestMixin, PersistenceMixin):
+    alternative = PartMaker('multipart/alternative', 'alt',
+                    PartMaker('text/plain', 'plain-1'),
+                    PartMaker('text/html', 'html-1'),
+                    PartMaker('image/jpeg', 'hi')).make()
+
+    def test_readableParts(self):
+        """
+        Test that L{xquotient.mimestorage.Part.readableParts} returns the
+        text/plain and text/html parts inside a multipart/alternative
+        """
+        def checkReadable(part):
+            self.assertEquals(
+                list(p.getContentType() for p in part.readableParts()),
+                ['text/plain', 'text/html'])
+        self._messageTest(self.alternative, checkReadable)
+
+
+
     def assertIndexability(self, msg):
         fi = ixmantissa.IFulltextIndexable(msg.message)
         self.assertEquals(fi.uniqueIdentifier(), unicode(msg.message.storeID))
@@ -982,6 +1000,22 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
             self.assertEqual(list(msg.relatedAddresses()), [])
 
         self._messageTest(msgSource, checkRelations)
+
+    alternateMessage = PartMaker('multipart/alternative', 'alt',
+        PartMaker('text/plain', 'plain'),
+        PartMaker('text/html', 'html')).make()
+
+    def test_getAlternatesAlternate(self):
+        """
+        Test that L{xquotient.mimestorage.Part.getAlternates} returns
+        C{text/html} as the alternate for a C{text/plain} part inside a
+        C{multipart/alternative} part
+        """
+        def checkAlternates(p):
+            (alt, plain, html) = p.walk()
+            self.assertEqual(
+                list(plain.getAlternates()), [('text/html', html)])
+        self._messageTest(self.alternateMessage, checkAlternates)
 
 flowedParagraphExample = """\
 On Tuesday 2 Jan 2007, Bob wrote:

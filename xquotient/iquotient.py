@@ -162,4 +162,12 @@ class IMessageData(Interface):
         @param default: the object to return if the sent time is not guessable.
         """
 
+    def getAlternates():
+        """
+        Get alternate versions of the message body
+
+        @return: a sequence of pairs, the first element holding a descriptive
+        label, and the second an L{IMessageData}
+        """
+
 

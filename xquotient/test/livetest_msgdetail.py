@@ -13,9 +13,10 @@ from nevow.athena import expose
 from xmantissa.webtheme import getLoader
 from xmantissa import people
 
-from xquotient.exmess import Message, MessageDetail
+from xquotient.exmess import Message, MessageDetail, MessageBodyFragment
 from xquotient.inbox import Inbox
 from xquotient import equotient
+from xquotient.test.util import MIMEReceiverMixin, PartMaker
 
 class _Header(Item):
     part = attributes.reference()
@@ -44,6 +45,11 @@ class _Part(Item):
 
     def guessSentTime(self, default):
         return Time()
+
+    def getContentType(self):
+        return u'text/plain'
+
+
 
 def _docFactoryFactory(testName, renderMethod='msgDetail'):
     return loaders.stan(tags.div[
@@ -279,5 +285,26 @@ class MsgDetailCorrespondentPeopleTestCase(testcase.TestCase, _MsgDetailHeadersT
         f = MessageDetail(msg)
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
+        return f
+    expose(setUp)
+
+
+
+class MsgBodyTestCase(testcase.TestCase, MIMEReceiverMixin):
+    """
+    Tests for the selection and rendering of alternate text parts
+    """
+    jsClass = u'Quotient.Test.MsgBodyTestCase'
+
+    def setUp(self, key):
+        # is there a better way?  TestCase.mktemp() doesn't work otherwise
+        self._testMethodName = key
+        self.setUpMailStuff()
+        p = self.createMIMEReceiver().feedStringNow(
+            PartMaker('multipart/alternative', 'alt',
+                PartMaker('text/plain', 'this is the text/plain'),
+                PartMaker('text/html', 'this is the text/html')).make())
+        f = MessageBodyFragment(p.message, 'text/plain')
+        f.setFragmentParent(self)
         return f
     expose(setUp)

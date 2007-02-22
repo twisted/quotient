@@ -16,8 +16,10 @@ from xmantissa import people
 
 from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               _addMessageSource, getMessageSources,
-                              MessageSourceFragment, SENDER_RELATION)
-from xquotient.exmess import MessageDisplayPreferenceCollection
+                              MessageSourceFragment, SENDER_RELATION,
+                              MessageDisplayPreferenceCollection,
+                              MessageBodyFragment)
+
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import mimeutil
 from xquotient.actions import SenderPersonFragment
@@ -302,3 +304,69 @@ class DraftCorrespondentTestCase(TestCase):
                         Correspondent.address == addr.email,
                         Correspondent.message == self.message)).count(), 1,
                 'no Correspondent for rel %r with addr %r' % (rel, addr.email))
+
+
+
+class MessageBodyFragmentTestCase(TestCase, MIMEReceiverMixin):
+    """
+    Test L{xquotient.exmess.MessageBodyFragment}
+    """
+
+    altInsideMixed = PartMaker('multipart/mixed', 'mixed',
+        PartMaker('multipart/alternative', 'alt',
+            PartMaker('text/plain', 'plain'),
+            PartMaker('text/html', '<html />')),
+        PartMaker('text/plain', 'plain')).make()
+
+
+    def test_alternateMIMETypesAltMixed(self):
+        """
+        Test that C{text/html} is the only alternate MIME type returned by
+        L{xquotient.exmess.MessageBodyFragment.getAlternateMIMETypes} for
+        L{altInsideMixed}
+        """
+        self.setUpMailStuff()
+        m = self.createMIMEReceiver().feedStringNow(
+            self.altInsideMixed).message
+        messageBody = MessageBodyFragment(m, 'text/plain')
+
+        self.assertEqual(
+            list(messageBody.getAlternateMIMETypes()), ['text/html'])
+
+
+    def test_getAlternatePartBodyAltMixed(self):
+        """
+        Test that the parts returned from
+        L{xquotient.exmess.MessageBodyFragment.getAlternatePartBody} are of
+        the type C{text/html} and C{text/plain}, in that order, when asked for
+        C{text/html} part bodies from L{altInsideMixed}
+        """
+        self.setUpMailStuff()
+        m = self.createMIMEReceiver().feedStringNow(
+            self.altInsideMixed).message
+        messageBody = MessageBodyFragment(m, 'text/plain')
+        messageBody = messageBody.getAlternatePartBody('text/html')
+
+        self.assertEqual(
+            list(p.type for p in messageBody.parts),
+            ['text/html', 'text/plain'])
+
+
+    mixed = PartMaker('multipart/mixed', 'mixed',
+        PartMaker('text/plain', 'plain'),
+        PartMaker('text/html', 'html')).make()
+
+
+    def test_getAlternateMIMETypesMixed(self):
+        """
+        Test that there are no alternate MIME types returned by
+        L{xquotient.exmess.MessageBodyFragment.getAlternateMIMETypes} for
+        L{mixed}
+        """
+        self.setUpMailStuff()
+        m = self.createMIMEReceiver().feedStringNow(
+            self.mixed).message
+        messageBody = MessageBodyFragment(m, 'text/plain')
+
+        self.assertEqual(
+            list(messageBody.getAlternateMIMETypes()), [])

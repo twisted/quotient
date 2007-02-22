@@ -4788,3 +4788,68 @@ Quotient.Test.DraftsTestCase.methods(
                 }
             });
     });
+
+Quotient.Test.MsgBodyTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.Test.MsgBodyTestCase');
+/**
+ * Tests for L{Quotient.Message.BodyController}
+ */
+Quotient.Test.MsgBodyTestCase.methods(
+    function setUp(self, key) {
+        var D = self.callRemote('setUp', key);
+        D.addCallback(
+            function (widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        D.addCallback(
+            function (widget) {
+                self.node.appendChild(widget.node);
+                self.msgBody = widget;
+            });
+        return D;
+    },
+
+    /**
+     * Get the text of the current message body, stripped of leading and
+     * trailing whitespace
+     *
+     * @rtype: C{String}
+     */
+    function getBody(self) {
+        var node = self.msgBody.firstNodeByAttribute(
+            'class', 'message-body');
+        return Quotient.Common.Util.stripLeadingTrailingWS(
+            node.firstChild.nodeValue);
+    },
+
+    /**
+     * Test that the initial message body text corresponds to the text of the
+     * text/plain part in the message
+     */
+    function test_initialTextPlain(self) {
+        var D = self.setUp('initialTextPlain');
+        D.addCallback(
+            function(ignored) {
+                self.assertEquals(self.getBody(), 'this is the text/plain');
+            });
+        return D;
+    },
+
+    /**
+     * Test changing the type of the rendered part
+     */
+    function test_changeType(self) {
+        var D = self.setUp('changeType');
+        D.addCallback(
+            function(ignored) {
+                return self.msgBody.chooseDisplayMIMEType('text/html');
+            });
+        D.addCallback(
+            function(newWidget) {
+                self.assertEquals(
+                    newWidget.node.getElementsByTagName('iframe').length, 1);
+                self.assertEquals(
+                    self.msgBody.node.parentNode, null);
+            });
+        return D;
+    });

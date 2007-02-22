@@ -12,6 +12,7 @@ from os import path
 import re
 import pytz
 import zipfile
+import itertools
 
 from zope.interface import implements
 
@@ -1610,7 +1611,8 @@ class PartDisplayer(ItemGrabber):
 
     def renderablePart(self, part, scrub=True):
         """
-        Convert a L{xquotient.mimestorage.Part} into something renderable by nevow
+        Convert a L{xquotient.mimestorage.Part} into something renderable by
+        nevow
 
         @param part: the part
         @type part: L{xquotient.mimestorage.Part}
@@ -1715,6 +1717,100 @@ class MessageSourceFragment(ThemedElement):
     page.renderer(source)
 
 
+
+class MessageBodyFragment(ThemedElement):
+    """
+    Renderer of L{Message} bodies
+    """
+    jsClass = u'Quotient.Message.BodyController'
+    fragmentName = 'message-body'
+
+    def __init__(self, message, preferredMimeType=None):
+        """
+        @type message: L{Message}
+        @param preferredMimeType: display the body of the part with this MIME
+        type, if one is available
+        @type preferredMimeType: C{str}
+        """
+        self.message = message
+        self.preferredMimeType = preferredMimeType
+        self.parts = list(message.walkMessage(preferredMimeType))
+
+        ThemedElement.__init__(self)
+
+    def body(self, req, tag):
+        """
+        Render the message body
+        """
+        paragraphs = list()
+        for part in self.parts:
+            renderable = inevow.IRenderer(part, None)
+            if renderable is None:
+                for child in part.children:
+                    child = inevow.IRenderer(child)
+                    paragraphs.append(child)
+            else:
+                paragraphs.append(renderable)
+
+        return tag.fillSlots('paragraphs', paragraphs)
+    page.renderer(body)
+
+
+    def getAlternateMIMETypes(self):
+        """
+        Look at our parts and try to figure out what alternate MIME types are
+        available for the message body
+
+        @return: the MIME types
+        @rtype: C{set} of C{unicode}
+        """
+        types = set()
+        for part in self.parts:
+            alts = part.part.getAlternates()
+            for (type, alt) in alts:
+                if type in ('text/plain', 'text/html'):
+                    types.add(type)
+
+        return types
+
+    def mimeTypeChooser(self, req, tag):
+        """
+        Render the MIME-type chooser, if this a multipart message
+        """
+        alternates = list(self.getAlternateMIMETypes())
+        if len(alternates) == 0:
+            return ''
+
+        iq = inevow.IQ(tag)
+        choices = list()
+
+        for type in alternates:
+            choices.append(
+                iq.onePattern('mime-type-choice').fillSlots(
+                    'type', type))
+
+        return iq.onePattern('mime-type-choices').fillSlots(
+            'choices', choices)
+    page.renderer(mimeTypeChooser)
+
+
+    def getAlternatePartBody(self, mimeType):
+        """
+        Return another L{MessageBodyFragment}, initialized to favor the
+        MIME-type C{mimeType}
+
+        @param mimeType: a MIME type
+        @type mimeType: C{str}
+
+        @rtype: L{MessageBodyFragment}
+        """
+        f = self.__class__(self.message, mimeType)
+        f.setFragmentParent(self)
+        return f
+    expose(getAlternatePartBody)
+
+
+
 class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     '''i represent the viewable facet of some kind of message'''
 
@@ -1732,7 +1828,6 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         self.patterns = PatternDictionary(getLoader('message-detail-patterns'))
         self.prefs = ixmantissa.IPreferenceAggregator(original.store)
 
-        self.messageParts = list(original.walkMessage())
         self.attachmentParts = list(original.walkAttachments())
 
         self.translator = ixmantissa.IWebTranslator(original.store)
@@ -1800,7 +1895,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
 
     def render_scrubbedDialog(self, ctx, data):
-        if 'text/html' in (p.type for p in self.messageParts):
+        if 'text/html' in (p.type for p in self.original.walkMessage()):
             return self.patterns['scrubbed-dialog']()
         return ''
 
@@ -1945,6 +2040,11 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
                                   ziplink=ziplink,
                                   size=formatSize(totalSize)))
 
+    def render_messageBody(self, ctx, data):
+        f = MessageBodyFragment(self.original)
+        f.setFragmentParent(self)
+        return f
+
 
     def render_imagePanel(self, ctx, data):
         images = self.original.store.query(
@@ -1957,20 +2057,6 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
             yield dictFillSlots(self.patterns['image-attachment'],
                                 {'location': location,
                                  'thumbnail-location': self._thumbnailLink(image)})
-
-
-    def render_messageBody(self, ctx, data):
-        paragraphs = list()
-        for part in self.messageParts:
-            renderable = inevow.IRenderer(part, None)
-            if renderable is None:
-                for child in part.children:
-                    child = inevow.IRenderer(child)
-                    paragraphs.append(child)
-            else:
-                paragraphs.append(renderable)
-
-        return ctx.tag.fillSlots('paragraphs', paragraphs)
 
 
     inbox = None

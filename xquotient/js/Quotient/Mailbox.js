@@ -1476,7 +1476,6 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _setComplexityVisibility(self, c) {
-        var fontSize;
         var messageBody;
 
         if (c == 1) {
@@ -1488,21 +1487,18 @@ Quotient.Mailbox.Controller.methods(
             /* use the default font-size, because complexity 1 is the default
              * complexity.
              */
-            fontSize = "";
         } else if (c == 2) {
             self.contentTableGrid[0][0].style.display = "none";
             self.contentTableGrid[1][0].style.display = "none";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
             self.viewShortcutSelect.style.display = "";
-            fontSize = "1.3em";
         } else if (c == 3) {
             self.viewShortcutSelect.style.display = "none";
             self.contentTableGrid[0][0].style.display = "";
             self.contentTableGrid[1][0].style.display = "";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
-            fontSize = "1.3em";
         }
 
         try {
@@ -1511,10 +1507,7 @@ Quotient.Mailbox.Controller.methods(
         } catch (e) {
             0;
         }
-
-        /* store this for next time we load a message in this complexity level
-         */
-        self.fontSize = fontSize;
+        self.node.className = "complexity-" + c + "-inbox";
     },
 
     function setScrollTablePosition(self, p) {
@@ -2535,8 +2528,5 @@ Quotient.Mailbox.Controller.methods(
                 } catch(e) {
                     return;
                 }
-                /* set the font size to the last value used in
-                   _setComplexityVisibility() */
-                messageBody.style.fontSize = self.fontSize;
             });
     });

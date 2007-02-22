@@ -1,4 +1,5 @@
-<nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1">
+<nevow:invisible xmlns:nevow="http://nevow.com/ns/nevow/0.1"
+  xmlns:athena="http://divmod.org/ns/nevow/0.7">
 
   <tr nevow:pattern="redirected-from">
     <td class="msg-detail-field-name">Resent From:</td>
@@ -17,7 +18,7 @@
   </tr>
 
   <div nevow:pattern="scrubbed-dialog" class="scrubbed-dialog">
-    <div>Message HTML has been modified for your safety.</div>
+    Message HTML has been modified for your safety.
     <a href="#"
       onclick="Quotient.Message.MessageDetail.get(this).showOriginalHTML(); return false"
       >Show original HTML</a>.
