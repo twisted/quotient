@@ -127,3 +127,15 @@ class ScrubberTestCase(TestCase):
         spans = getElementsByTagName(scrubbed, 'span')
         self.assertEquals(len(spans), 1)
         self.assertEquals(gatherTextNodes(spans[0]).strip(), "Hello")
+
+
+    def test_scrubTrustsH1(self):
+        """
+        Test that L{xquotient.scrubber.Scrubber} considers h1 to be a safe tag.
+        Added because of #1895.
+        """
+        node = parseString("<h1>Foo</h1>").documentElement
+        scrubbed = scrub(node)
+        h1s = getElementsByTagName(scrubbed, 'h1')
+        self.assertEquals(len(h1s), 1)
+        self.assertEquals(gatherTextNodes(h1s[0]).strip(), "Foo")
