@@ -1,4 +1,5 @@
 import quopri
+from StringIO import StringIO
 
 from twisted.trial import unittest
 from twisted.python.filepath import FilePath
@@ -75,7 +76,8 @@ class StubStoredMessageAndImplAndSource(item.Item):
 
     calledStartedSending = attributes.boolean(default=False)
     impl = property(lambda s: s)
-    source = property(lambda s: FilePath(__file__))
+    source = property(lambda self: self._source or FilePath(__file__))
+    _source = None
     headers = attributes.inmemory()
     def open(self):
         return "HI DUDE"
@@ -145,7 +147,42 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
         m = Parser.Parser().parse(msg.impl.source.open())
         self.assertEquals(m['Resent-To'], 'testuser@localhost')
         self.assertEquals(m['Resent-From'], self.defaultFromAddr.address)
+        self.failIfEqual(m['Resent-Date'], None)
+        self.failIfEqual(m['Resent-Message-ID'], None)
 
+    def test_redirectHeaderOrdering(self):
+        """
+        Test that Resent headers get added after Received headers but
+        before the rest.
+        """
+        msgtext = """\
+Received: from bob by example.com with smtp (SuparMTA 9.99)
+        id 1BfraZ-0001D0-QA
+        for alice@example.com; Thu, 01 Jul 2004 02:46:15 +0000
+received: from bob by example.com with smtp (SuparMTA 9.99)
+        id 1BfraZ-0001D0-QA
+        for alice@example.com; Thu, 01 Jul 2004 02:46:17 +0000
+From: <bob@example.com>
+To: <alice@example.com>
+Subject: Hi
+
+Hi
+""".replace('\n','\r\n')
+        class StubMsgFile:
+            def open(self):
+                return StringIO(msgtext)
+        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message.__dict__['_source'] = StubMsgFile()
+        msg = self.composer.createRedirectedMessage(
+                self.defaultFromAddr,
+                [mimeutil.EmailAddress(
+                    u'testuser@localhost',
+                    mimeEncoded=False)],
+                message)
+        m = Parser.Parser().parse(msg.impl.source.open())
+        self.assertEqual(len(m._headers), 9)
+        self.assertEqual(m._headers[0][0].lower(), "received")
+        self.assertEqual(m._headers[6][0].lower(), "from")
 
     def test_redirect(self):
         """

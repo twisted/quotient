@@ -214,9 +214,22 @@ class Composer(item.Item):
         @rtype: L{Message}
         """
         m = P.Parser().parse(message.impl.source.open())
-        m['Resent-From'] = MH.Header(fromAddress.address).encode()
-        m['Resent-To']  = MH.Header(mimeutil.flattenEmailAddresses(toAddresses)).encode()
-
+        def insertResentHeaders(i):
+            m._headers.insert(i, ('resent-from', MH.Header(
+                fromAddress.address).encode()))
+            m._headers.insert(i, ('resent-to', MH.Header(
+                mimeutil.flattenEmailAddresses(toAddresses)).encode()))
+            m._headers.insert(i, ('resent-date', EU.formatdate()))
+            m._headers.insert(i, ('resent-message-id',
+                                  smtp.messageid('divmod.xquotient')))
+        for (i, (name, _)) in enumerate(m._headers):
+            #insert Resent-* headers after all Received headers but
+            #before the rest
+            if name.lower() != "received":
+                insertResentHeaders(i)
+                break
+        else:
+            insertResentHeaders(0)
         s = S.StringIO()
         G.Generator(s).flatten(m)
         s.seek(0)
