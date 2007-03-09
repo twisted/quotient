@@ -31,7 +31,7 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
         if self.searchResults:
             f = scrolltable.StoreIDSequenceScrollingFragment(
                 self.store,
-                self.searchResults,
+                map(int, self.searchResults),
                 (scrolltable.UnsortableColumn(
                     exmess.Message.senderDisplay),
                  scrolltable.UnsortableColumn(
