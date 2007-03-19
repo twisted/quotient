@@ -418,12 +418,39 @@ class MailboxSelector(object):
 
 def frozen(status):
     """
-    Return the frozen version of the given status.
+    Return the frozen version of the given status name.
 
     @type status: C{unicode}
     @rtype: C{unicode}
     """
     return u'.' + status
+
+
+
+def unfrozen(status):
+    """
+    Return the unfrozen version of the given status name.
+
+    @type status: C{unicode}
+
+    @param status: a status returned from L{frozen}, which is to say, one for
+    which L{isFrozen} is true.
+
+    @rtype: C{unicode}
+    """
+    return status[1:]
+
+
+
+def isFrozen(status):
+    """
+    Return a boolean indicating whether the given status name is frozen or not.
+
+    @type status: C{unicode}
+    @rtype: C{bool}
+    """
+    return status.startswith(u'.')
+
 
 
 class Message(item.Item):
@@ -443,7 +470,7 @@ class Message(item.Item):
     implements(ixmantissa.IFulltextIndexable)
 
     typeName = 'quotient_message'
-    schemaVersion = 4
+    schemaVersion = 5
 
     # Schema.
 
@@ -558,6 +585,11 @@ class Message(item.Item):
         implementation fully.)
         """)
 
+    _frozenWith = attributes.text(
+        doc="""
+        The currently frozen status, None if the message is not frozen.
+        """, allowNone=True, default=None)
+
     _prefs = attributes.inmemory()
 
     # End of schema.
@@ -657,41 +689,20 @@ class Message(item.Item):
 
     # End of creation APIs.
 
-    # Message status manipulation APIs.
+    # Internal status manipulation API.
 
-    def addStatus(self, statusName):
-        """Add a status to this message.
+    def addHardStatus(self, statusName):
+        """
+        Add a status to this message unconditionally.
 
         @type statusName: unicode
         @param statusName: the name of the status to add.
+
         @return: None
         """
-        # Querying for _MessageStatus items which apply to a particular
-        # message and have a particular name ends up being rather
-        # inefficient using SQLite and our particular schema.  While there
-        # is an index (the compound index on statusName, message) which can
-        # efficiently satisfy this particular query, SQLite's query planner
-        # passes over it in favor of a much, much less suitable index (the
-        # compound index on statusName, statusDate, message).  It does this
-        # because the less suitable index happens to contain every column in
-        # the table; this makes it appear desirable, since a query using it
-        # will not have to touch the main table b-tree to load results, but
-        # can instead load them all directly out of the index.  It turns out
-        # that, in this case, that optimization is a major performance lose.
-
-        # Instead, we query for only the storeID of _MessageStatus items,
-        # Since there are no additional columns to load for the result, the
-        # bad index (statusName, statusDate, message) is no longer looked
-        # upon favorably, and the good index (statusName, message) is
-        # selected. -exarkun
-        statuses = list(self.store.query(
-                _MessageStatus,
-                attributes.AND(_MessageStatus.message == self,
-                               _MessageStatus.statusName == statusName),
-                limit=1).getColumn('storeID'))
-        if statuses:
-            status = self.store.getItemByID(statuses[0])
-            status.statusDate = self.receivedWhen
+        statusItem = self._getSelfStatus(statusName)
+        if statusItem:
+            statusItem.statusDate = self.receivedWhen
         else:
             _MessageStatus(
                 store=self.store,
@@ -701,11 +712,33 @@ class Message(item.Item):
         return None
 
 
-    def removeStatus(self, statusName):
-        """Remove a status from this message.
+    def addStatus(self, statusName):
+        """
+        Add a status to this message, or, if the message is currently frozen, add
+        the frozen version of the status.
 
         @type statusName: unicode
         @param statusName: the name of the status to add.
+
+        @return: None
+        """
+        if statusName in FREEZING_STATUSES + STICKY_STATUSES:
+            self.addHardStatus(statusName)
+        elif self.statusesFrozen():
+            self.addHardStatus(frozen(statusName))
+        else:
+            self.addHardStatus(statusName)
+        return None
+
+
+
+    def removeHardStatus(self, statusName):
+        """
+        Remove an exact status from this message.
+
+        @type statusName: unicode @param statusName: the name of the status to
+        add.
+
         @return: None
         """
         self.store.query(
@@ -716,29 +749,97 @@ class Message(item.Item):
         return None
 
 
-    def freezeStatus(self):
+    def removeStatus(self, statusName):
+        """
+        Remove a status from this message, taking into account whether the frozen
+        version of the status should be removed.
+        """
+        if (self.statusesFrozen() and statusName not in STICKY_STATUSES):
+            statusName = frozen(statusName)
+        self.removeHardStatus(statusName)
+        return None
+
+
+    def freezeStatus(self, freezeType):
         """
         Remove all statuses that might make this message interesting to the user.
         This is for use when putting the message into a spam/trash state.
 
+        @param freezeType: a member of FREEZING_STATUSES.
+
         @return: None
         """
+        if freezeType == self._frozenWith:
+            raise ValueError("Currently frozen with " + freezeType)
+        elif self.hasStatus(freezeType):
+            raise ValueError("Previously frozen with" + freezeType)
+        elif self._frozenWith is not None:
+            currentFroze = self._getSelfStatus(self._frozenWith)
+            assert currentFroze is not None
+            thisPriority = FREEZING_STATUSES.index(freezeType)
+            oldPriority = FREEZING_STATUSES.index(self._frozenWith)
+            if thisPriority > oldPriority:
+                currentFroze.statusName = frozen(currentFroze.statusName)
+                self._frozenWith = freezeType
+                self.addHardStatus(freezeType)
+            else:
+                self.addHardStatus(frozen(freezeType))
+            return
         for statobj in self.store.query(_MessageStatus,
                                         _MessageStatus.message == self):
             if statobj.statusName not in STICKY_STATUSES:
                 statobj.statusName = frozen(statobj.statusName)
+        # If we haven't earlied out by here, then we're applying the first
+        # frozen status.  Freeze everything else.
+        self._frozenWith = freezeType
+        self.addHardStatus(freezeType)
 
 
-    def unfreezeStatus(self):
+    def unfreezeStatus(self, freezeType):
         """
         Restore statuses previously frozen by freezeStatus.
 
+        @param freezeType: a member of FREEZING_STATUSES, one of which must
+        have been passed previously.
+
         @return: None
         """
-        for statobj in self.store.query(_MessageStatus,
-                                        _MessageStatus.message == self):
-            if statobj.statusName.startswith(u'.'):
-                statobj.statusName = statobj.statusName[1:]
+        if freezeType == self._frozenWith:
+            otherFreezers = FREEZING_STATUSES[:]
+            otherFreezers.remove(freezeType)
+            otherFreezers.reverse()
+            self.removeHardStatus(self._frozenWith)
+            for otherFreezer in otherFreezers:
+                if self.hasStatus(otherFreezer):
+                    self._frozenWith = otherFreezer
+                    uf = self._getSelfStatus(frozen(otherFreezer))
+                    uf.statusName = otherFreezer
+                    break
+            else:
+                self._unfreezeAll()
+        elif self.hasStatus(freezeType):
+            self.removeStatus(freezeType)
+        else:
+            raise ValueError("Message not frozen with %r status" % (freezeType,))
+
+
+    def _unfreezeAll(self):
+        """
+        Mutate all status objects associated with this message such that their
+        statuses are no longer frozen.
+        """
+        self._frozenWith = None
+        for s in self.store.query(_MessageStatus,
+                                  _MessageStatus.message == self):
+            if isFrozen(s.statusName):
+                s.statusName = unfrozen(s.statusName)
+
+
+    def statusesFrozen(self):
+        """
+        @return: a boolean indicating whether this message's statuses are frozen.
+        """
+        return self._frozenWith is not None
 
 
     def iterStatuses(self):
@@ -751,19 +852,85 @@ class Message(item.Item):
             'statusName')
 
 
+    def _getSelfStatus(self, statusName):
+        """
+        Retrieve a L{_MessageStatus} object of the given status name that applies
+        to myself; return None if none exists.
+
+        @param statusName: a STATUS constant
+        @type statusName: L{unicode}
+
+        @return: None if this message does not have this status, a
+        L{_MessageStatus} item if it does.
+        """
+        # Querying for _MessageStatus items which apply to a particular message
+        # and have a particular name ends up being rather inefficient using
+        # SQLite and our particular schema.  While there is an index (the
+        # compound index on statusName, message) which can efficiently satisfy
+        # this particular query, SQLite's query planner passes over it in favor
+        # of a much, much less suitable index (the compound index on
+        # statusName, statusDate, message).  It does this because the less
+        # suitable index happens to contain every column in the table; this
+        # makes it appear desirable, since a query using it will not have to
+        # touch the main table b-tree to load results, but can instead load
+        # them all directly out of the index.  It turns out that, in this case,
+        # that optimization is a major performance lose.
+
+        # Instead, we query for only the storeID of _MessageStatus items, Since
+        # there are no additional columns to load for the result, the bad index
+        # (statusName, statusDate, message) is no longer looked upon favorably,
+        # and the good index (statusName, message) is selected. -exarkun
+        statuses = list(self.store.query(
+                _MessageStatus,
+                attributes.AND(_MessageStatus.message == self,
+                               _MessageStatus.statusName == statusName),
+                limit=1).getColumn('storeID'))
+        if statuses:
+            status = self.store.getItemByID(statuses[0])
+            return status
+        else:
+            return None
+
+
+    def hasHardStatus(self, statusName):
+        """
+        @param statusName: a STATUS constant
+        @type statusName: L{unicode}
+
+        @return: a boolean indicating whether this message has the exact given
+        status or not, regardless of its state.
+        """
+        return bool(self._getSelfStatus(statusName))
+
+
     def hasStatus(self, statusName):
         """
-        @return: a boolean indicating whether this message has the given status or
-        not.
-        """
-        return bool(list(self.store.query(
-                    _MessageStatus,
-                    attributes.AND(
-                        _MessageStatus.message == self,
-                        _MessageStatus.statusName == statusName),
-                    limit=1)))
+        Determine whether this message has the given status, depending on its
+        state.  If the message is frozen, we check for the frozen version of
+        the status, unless it is currently frozen with that exact status.  If
+        the message is not frozen, we check for this exact status.
 
-    # status manipulation methods
+        Put more simply, it is intended that x.hasStatus(Y) is always true iff
+        x.addStatus(Y) has been called and x.removeStatus(Y) has not been
+        called.
+
+        @param statusName: a STATUS constant
+        @type statusName: L{unicode}
+
+        @rtype: C{bool}
+        @return: whether this message has the given status.
+        """
+        if self.statusesFrozen():
+            if self._frozenWith == statusName:
+                return True
+            elif statusName not in STICKY_STATUSES:
+                return self.hasHardStatus(frozen(statusName))
+        return self.hasHardStatus(statusName)
+
+    # End of internal status manipulation API.
+
+    # Public status manipulation API.
+
     def classifyClean(self):
         """
         Automated filters should call this method to indicate that the message
@@ -777,12 +944,12 @@ class Message(item.Item):
         if wasSpam is None:
             # This message has never been classified before.
             self.addStatus(CLEAN_STATUS)
-            self.addStatus(INBOX_STATUS)
+            if not self.hasStatus(ARCHIVE_STATUS):
+                self.addStatus(INBOX_STATUS)
             self.removeStatus(INCOMING_STATUS)
         elif wasSpam:
             # This message was previously classified as spam.
-            self.unfreezeStatus()
-            self.removeStatus(SPAM_STATUS)
+            self.unfreezeStatus(SPAM_STATUS)
         else:
             # No-op: this message was previously classified as clean, and is
             # currently classified as clean.
@@ -801,19 +968,18 @@ class Message(item.Item):
         self._spam = True
         if wasSpam is None:
             # This message has never been classified before.
-            self.addStatus(CLEAN_STATUS)
-            self.addStatus(INBOX_STATUS)
             self.removeStatus(INCOMING_STATUS)
-            self.freezeStatus()
-            self.addStatus(SPAM_STATUS)
+            self.addStatus(CLEAN_STATUS)
+            if not self.hasStatus(ARCHIVE_STATUS):
+                self.addStatus(INBOX_STATUS)
+            self.freezeStatus(SPAM_STATUS)
         elif wasSpam:
             # No-op: this message was previously classified as spam, and is
             # currently classified as spam.
             return
         else:
             # This message was previously classified as clean.
-            self.freezeStatus()
-            self.addStatus(SPAM_STATUS)
+            self.freezeStatus(SPAM_STATUS)
 
 
     def spamStatus(self):
@@ -879,8 +1045,8 @@ class Message(item.Item):
 
         @return: C{None}
         """
-        for s in self.iterStatuses():
-            if s in UNFOCUSABLE_STATUSES:
+        for s in UNFOCUSABLE_STATUSES:
+            if self.hasStatus(s):
                 self.addStatus(EVER_FOCUSED_STATUS)
                 return
         self.addStatus(FOCUS_STATUS)
@@ -893,6 +1059,7 @@ class Message(item.Item):
         @return: C{None}
         """
         self.removeStatus(FOCUS_STATUS)
+        self.removeStatus(EVER_FOCUSED_STATUS)
 
 
     def moveToTrash(self):
@@ -901,8 +1068,7 @@ class Message(item.Item):
 
         @return: None
         """
-        self.freezeStatus()
-        self.addStatus(TRASH_STATUS)
+        self.freezeStatus(TRASH_STATUS)
 
 
     def removeFromTrash(self):
@@ -911,8 +1077,7 @@ class Message(item.Item):
 
         @return: None
         """
-        self.unfreezeStatus()
-        self.removeStatus(TRASH_STATUS)
+        self.unfreezeStatus(TRASH_STATUS)
 
 
     def markRead(self):
@@ -957,7 +1122,8 @@ class Message(item.Item):
 
     def deferFor(self, duration, timeFactory=Time):
         """
-        Defer this message for the given amount of time.
+        Re-deliver this message to the Inbox after given amount of time.  If this
+        message was already archived, remove it from the archive.
 
         @type duration: L{timedelta}
 
@@ -970,9 +1136,12 @@ class Message(item.Item):
 
         @return: None
         """
+        if self.hasStatus(DEFERRED_STATUS):
+            raise ValueError("message deferred twice")
         self._focusCheck()
         self.addStatus(DEFERRED_STATUS)
         self.removeStatus(INBOX_STATUS)
+        self.removeStatus(ARCHIVE_STATUS)
         self.everDeferred = True
         self.addStatus(EVER_DEFERRED_STATUS)
         task = _UndeferTask(store=self.store,
@@ -983,10 +1152,13 @@ class Message(item.Item):
 
     def undefer(self):
         """
-        Re-deliver this message from the inbox.
+        Re-deliver this message to the inbox from having been Deferred, marking it
+        unread.
 
         @return: None
         """
+        if not self.hasStatus(DEFERRED_STATUS):
+            raise ValueError("message undeferred before being deferred")
         self._everFocusedCheck()
         self.removeStatus(DEFERRED_STATUS)
         self.addStatus(INBOX_STATUS)
@@ -1003,6 +1175,7 @@ class Message(item.Item):
         """
         self._focusCheck()
         self.removeStatus(INBOX_STATUS)
+        # This should be the _only_ place that ever adds the archive status.
         self.addStatus(ARCHIVE_STATUS)
 
 
@@ -1057,7 +1230,7 @@ class Message(item.Item):
         self.addStatus(BOUNCED_STATUS)
 
 
-    # end status manipulation methods
+    # End of public status manipulation API.
 
     def stored(self):
         """
@@ -1224,12 +1397,12 @@ registerAttributeCopyingUpgrader(Message, 1, 2)
 registerAttributeCopyingUpgrader(Message, 2, 3)
 
 
-def _message3to4(m):
+def _message3to5(m):
     """
     Upgrade between L{Message} schema v3 (flags) to L{Message} schema v4
     (statuses).
     """
-    self = m.upgradeVersion(Message.typeName, 3, 4,
+    self = m.upgradeVersion(Message.typeName, 3, 5,
                             sentWhen=m.sentWhen,
                             receivedWhen=m.receivedWhen,
                             sender=m.sender,
@@ -1239,7 +1412,9 @@ def _message3to4(m):
                             read=m.read,
                             everDeferred=m.everDeferred,
                             shouldBeClassified=not m.trained,
-                            impl=m.impl)
+                            impl=m.impl,
+                            # XXX FIXME
+                            _frozenWith=None)
     if m.source is not None:
         _associateMessageSource(self, m.source)
     if m.subject is not None:
@@ -1276,18 +1451,66 @@ def _message3to4(m):
         self.archive()
     if m.deferred:
         # We have to assume that there is _already_ an UndeferTask for this
-        # item.
+        # item - these lines are copied from deferFor.
+        self._focusCheck()
         self.addStatus(DEFERRED_STATUS)
-        self.freezeStatus()
+        self.removeStatus(INBOX_STATUS)
+        self.everDeferred = True
+        self.addStatus(EVER_DEFERRED_STATUS)
     if m.everDeferred:
         self.addStatus(EVER_DEFERRED_STATUS)
     if m.trash:
         self.moveToTrash()
     self._extractRelatedAddresses()
     return self
-registerUpgrader(_message3to4, Message.typeName, 3, 4)
+registerUpgrader(_message3to5, Message.typeName, 3, 5)
 
 
+item.declareLegacyItem(Message.typeName, 4,
+                       dict(_spam=attributes.boolean(),
+                            attachments=attributes.integer(),
+                            everDeferred=attributes.boolean(),
+                            impl=attributes.reference(),
+                            read=attributes.boolean(),
+                            receivedWhen=attributes.timestamp(),
+                            recipient=attributes.text(),
+                            sender=attributes.text(),
+                            senderDisplay=attributes.text(),
+                            sentWhen=attributes.timestamp(),
+                            shouldBeClassified=attributes.boolean(),
+                            subject=attributes.text()))
+
+
+def _message4to5(m):
+    """
+    Upgrader for Message to add the _frozenWith attribute.
+    """
+    self = m.upgradeVersion(Message.typeName, 4, 5,
+                            _spam=m._spam,
+                            attachments=m.attachments,
+                            everDeferred=m.everDeferred,
+                            # impl=m.impl,
+                            read=m.read,
+                            receivedWhen=m.receivedWhen,
+                            recipient=m.recipient,
+                            sender=m.sender,
+                            senderDisplay=m.senderDisplay,
+                            sentWhen=m.sentWhen,
+                            shouldBeClassified=m.shouldBeClassified,
+                            subject=m.subject,
+                            _frozenWith=None)
+    if self.hasStatus(SPAM_STATUS):
+        self._frozenWith = SPAM_STATUS
+    if self.hasStatus(TRASH_STATUS):
+        self._frozenWith = TRASH_STATUS
+    # we used to freeze deferred messages, but then they'd never get unfrozen.
+    # Only messages in version 4 which were upgraded from version 3 have this
+    # problem because it was a bug in 3to4.
+    if self.hasStatus(DEFERRED_STATUS) and not self.statusesFrozen():
+        self._unfreezeAll()
+    return self
+
+registerUpgrader(_message4to5, Message.typeName, 4, 5)
 
 class _UndeferTask(item.Item):
     """
@@ -1342,7 +1565,7 @@ def _undeferTask1to2(task):
     self = task.upgradeVersion(_UndeferTask.typeName, 1, 2,
                                message=task.message,
                                deferredUntil=task.deferredUntil)
-    self.message.unfreezeStatus()
+    self.message.unfreezeStatus(DEFERRED_STATUS)
     self.message.removeStatus(INBOX_STATUS)
 registerUpgrader(_undeferTask1to2, _UndeferTask.typeName, 1, 2)
 
@@ -1499,16 +1722,26 @@ TRAINED_STATUS = u'trained'
 # These statuses are 'sticky': they 'stick' to messages and don't go away when
 # messages are placed into exclusive "bad" states such as the trash or spam.
 # (XXX: this list needs a revisit at some point; it was half decided by choice,
-# half by existing requirements of view code before the 'status' system was
-# introduced)
+# half by existing implementation details of view code before the 'status'
+# system was introduced)
 
 STICKY_STATUSES = [READ_STATUS, UNREAD_STATUS, TRAINED_STATUS,
                    DEFERRED_STATUS, EVER_DEFERRED_STATUS,
                    EVER_FOCUSED_STATUS]
 
+# These statuses are used to 'freeze' other statuses, that is, they are special
+# because they are mutually exclusive with everything else.  Although the other
+# lists here are really sets, this ordering of this list is actually important;
+# it is ordered by ascending priority.  Trash, for example, will trump spam,
+# meaning that since trash appears later in the list, it will always be the
+# status which is visible to the user.  I.E. if a user puts a message in the
+# trash, then classifies it as spam, it will show up as spam and not trash.
+
+FREEZING_STATUSES = [SPAM_STATUS, TRASH_STATUS]
 
 # Applying any of these statuses removes FOCUS_STATUS and applies
 # EVER_FOCUSED_STATUS.  Removing all of them reverses this operation.
+
 UNFOCUSABLE_STATUSES = [ARCHIVE_STATUS, DEFERRED_STATUS]
 
 class _MessageStatus(item.Item):

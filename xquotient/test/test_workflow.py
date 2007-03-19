@@ -155,10 +155,160 @@ class MailboxSelectorTest(_WorkflowMixin, TestCase):
         sq.refineByStatus(DUMMY_STATUS)
         self.assertEquals(list(sq), [m])
         self.assertEquals(list(ursq), [m])
-        m.freezeStatus()
+        m.freezeStatus(SPAM_STATUS)
         self.assertEquals(list(sq), [])
         self.assertEquals(list(ursq), [m])
-        m.unfreezeStatus()
+        m.unfreezeStatus(SPAM_STATUS)
+
+
+    def test_manipulateWhileFrozen(self):
+        """
+        Verify that statuses which are manipulated while an item is frozen come
+        back when it is unfrozen.
+        """
+        unpreserved = STICKY_STATUSES[0]
+        m = self.makeMessage()
+        m.freezeStatus(SPAM_STATUS)
+        m.addStatus(DUMMY_STATUS)
+        m.addStatus(unpreserved)
+        sq = MailboxSelector(self.store)
+        ursq = MailboxSelector(self.store)
+        ursq.refineByStatus(unpreserved)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [])
+        self.assertEquals(list(ursq), [m])
+        m.unfreezeStatus(SPAM_STATUS)
+        self.assertEquals(list(sq), [m])
+        self.assertEquals(list(ursq), [m])
+
+
+    def test_manipulateWhileDoubleFrozen(self):
+        """
+        Verify that statuses applied when frozen as both spam and trash are
+        reapplied when completely unfrozen.
+        """
+        unpreserved = STICKY_STATUSES[0]
+        m = self.makeMessage()
+        m.freezeStatus(SPAM_STATUS)
+        m.freezeStatus(TRASH_STATUS)
+        m.addStatus(DUMMY_STATUS)
+        m.addStatus(unpreserved)
+        sq = MailboxSelector(self.store)
+        ursq = MailboxSelector(self.store)
+        ursq.refineByStatus(unpreserved)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [])
+        self.assertEquals(list(ursq), [m])
+        m.unfreezeStatus(SPAM_STATUS)
+        m.unfreezeStatus(TRASH_STATUS)
+        self.assertEquals(list(sq), [m])
+        self.assertEquals(list(ursq), [m])
+
+
+    def test_freezeTwiceTheSameWay(self):
+        """
+        Verify that freezing the message twice with the same status is an error,
+        and that unfreezing it will work.
+        """
+        m = self.makeMessage()
+        m.addStatus(DUMMY_STATUS)
+        m.freezeStatus(SPAM_STATUS)
+        self.assertRaises(ValueError, m.freezeStatus, SPAM_STATUS)
+        m.unfreezeStatus(SPAM_STATUS)
+        sq = MailboxSelector(self.store)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [m])
+
+
+    def test_freezeTooMuchTwice(self):
+        """
+        Verify that freezing the message twice with the same status is an error,
+        even if a higher-priority frozen status has taken over.
+        """
+        m = self.makeMessage()
+        m.addStatus(DUMMY_STATUS)
+        m.freezeStatus(SPAM_STATUS)
+        self.assertRaises(ValueError, m.freezeStatus, SPAM_STATUS)
+        m.freezeStatus(TRASH_STATUS)
+        self.assertRaises(ValueError, m.freezeStatus, SPAM_STATUS)
+        m.unfreezeStatus(SPAM_STATUS)
+        m.unfreezeStatus(TRASH_STATUS)
+        sq = MailboxSelector(self.store)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [m])
+
+
+    def test_freezeTwiceUnfreezeLow(self):
+        """
+        Verify that freezing with two statuses, but unfreezing with the
+        lower-priority one, doesn't unfreeze other things.
+        """
+        m = self.makeMessage()
+        m.addStatus(DUMMY_STATUS)
+        m.freezeStatus(SPAM_STATUS)
+        m.freezeStatus(TRASH_STATUS)
+        m.unfreezeStatus(SPAM_STATUS)
+        sq = MailboxSelector(self.store)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [])
+
+
+    def test_freezeTwiceUnfreezeHigh(self):
+        """
+        Verify that freezing with two statuses, but unfreezing with the
+        lower-priority one, doesn't unfreeze other things.
+        """
+        m = self.makeMessage()
+        m.addStatus(DUMMY_STATUS)
+        m.freezeStatus(SPAM_STATUS)
+        m.freezeStatus(TRASH_STATUS)
+        m.unfreezeStatus(TRASH_STATUS)
+        sq = MailboxSelector(self.store)
+        sq.refineByStatus(DUMMY_STATUS)
+        self.assertEquals(list(sq), [])
+
+
+    def test_freezeHasFrozenStatus(self):
+        """
+        Verify that after freezing with a particular status, the message has that
+        status according to 'hasStatus'.
+        """
+        m = self.makeMessage()
+        m.freezeStatus(SPAM_STATUS)
+        self.failUnless(m.hasStatus(SPAM_STATUS))
+
+
+    def test_freezeHasNormalStatus(self):
+        """
+        Verify that after freezing with a particular status, the message has that
+        status according to 'hasStatus'.
+        """
+        m = self.makeMessage()
+        m.addStatus(DUMMY_STATUS)
+        m.freezeStatus(SPAM_STATUS)
+        self.failUnless(m.hasStatus(DUMMY_STATUS))
+
+
+    def test_freezeHasStickyStatus(self):
+        """
+        Verify that after freezing with a particular status, the message has that
+        status according to 'hasStatus'.
+        """
+        unpreserved = STICKY_STATUSES[0]
+        m = self.makeMessage()
+        m.addStatus(unpreserved)
+        m.freezeStatus(SPAM_STATUS)
+        self.failUnless(m.hasStatus(unpreserved))
+
+
+    def test_unfreezeNothing(self):
+        """
+        verify that unfreezing a status which has not been frozen raises a
+        ValueError.
+        """
+        m = self.makeMessage()
+        self.assertRaises(ValueError, m.unfreezeStatus, SPAM_STATUS)
+
 
     def test_oneStatusOneMessage(self):
         """
@@ -1016,6 +1166,21 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
         self.failIf(self.message.shouldBeClassified)
 
 
+    def test_trashThenTrainSpam(self):
+        """
+        Verify that a message which is classified as clean, then moved to the
+        trash, then trained as spam will still have the trash status, but not
+        the spam status, as trash trumps the spam status.
+        """
+        self.message.classifyClean()
+        self.message.moveToTrash()
+        self.message.trainSpam()
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(SPAM_STATUS, stats)
+        self.failUnlessIn(TRASH_STATUS, stats)
+
+
     def _deferMessage(self):
         """
         Defer C{self.message}. Used in L{test_deferral} and friends.
@@ -1238,6 +1403,97 @@ class IncomingStatusChangeMethodTests(_WorkflowMixin, TestCase):
 
         self.failIfIn(FOCUS_STATUS, stats)
         self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_archiveBeforeClassifyClean(self):
+        """
+        Verify that messages archived before being classified clean (as those being
+        grabbed by a grabber) receive only the 'archived' status, not both
+        'archived' and 'inbox'.
+        """
+        self.message.archive()
+        self.message.classifyClean()
+        self.message.focus()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failIfIn(INBOX_STATUS, stats)
+        self.failUnlessIn(ARCHIVE_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_earlyArchiveFocusWhileSpam(self):
+        """
+        Verify that messages archived before being classified spam, focused, then
+        trained clean (as those being grabbed by a grabber, classified by the
+        filter, and focused by the user and then trained by the user) receive
+        only the 'archived' status, not both 'archived' and 'inbox'.
+        """
+        self.message.archive()
+        self.message.classifySpam()
+        self.message.focus()
+        self.message.trainClean()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failIfIn(FOCUS_STATUS, stats)
+        self.failIfIn(INBOX_STATUS, stats)
+        self.failUnlessIn(ARCHIVE_STATUS, stats)
+        self.failUnlessIn(EVER_FOCUSED_STATUS, stats)
+
+
+    def test_focusArchiveUnfocusUnarchive(self):
+        """
+        Verify that a message which is focused, then archived, then unfocused, then
+        unarchived, will arrive in the inbox but not in 'focus' when
+        unarchived.
+        """
+        self.message.focus()
+        self.message.archive()
+        self.message.unfocus()
+        self.message.unarchive()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(INBOX_STATUS, stats)
+        self.failIfIn(FOCUS_STATUS, stats)
+
+
+    def test_archiveDeferUndefer(self):
+        """
+        Verify that a message which is archived, then deferred, then undeferred, is
+        in the inbox and not the archive.  Undeferral should always move to the
+        inbox.
+        """
+        self.message.classifyClean()
+        self.message.focus()
+        self.message.archive()
+        self.message.deferFor(timedelta(days=1))
+        self.message.undefer()
+
+        stats = set(self.message.iterStatuses())
+
+        self.failUnlessIn(INBOX_STATUS, stats)
+        self.failUnlessIn(FOCUS_STATUS, stats)
+        self.failIfIn(ARCHIVE_STATUS, stats)
+
+
+    def test_isolatedUndefer(self):
+        """
+        Verify that 'undefer' on a message which has not been Deferred will raise
+        an exception.
+        """
+        self.assertRaises(ValueError, self.message.undefer)
+
+
+    def test_doubleDefer(self):
+        """
+        Verify that 'defer' on a message which has already been Deferred will raise
+        an exception.
+        """
+        self.message.deferFor(timedelta(days=1))
+        self.assertRaises(ValueError, self.message.deferFor, timedelta(days=1))
 
 
 class DeletionTest(_WorkflowMixin, TestCase):

@@ -1,4 +1,9 @@
 
+"""
+Tests for the upgrader from version 4 to version 5 of quotient's Message
+item.
+"""
+
 from axiom.test.historic.stubloader import StubbedTest
 
 from xquotient.exmess import (Message, MailboxSelector,
@@ -10,8 +15,6 @@ from xquotient.exmess import (Message, MailboxSelector,
                               DRAFT_STATUS,
                               CLEAN_STATUS,
                               SENT_STATUS)
-
-from xmantissa.people import Person, EmailAddress as PersonEmailAddress
 
 class MessageUpgradeTest(StubbedTest):
 
@@ -55,7 +58,7 @@ class MessageUpgradeTest(StubbedTest):
         return r.addCallback(setupList)
 
 
-    def test_upgradeFlagsToStatuses(self):
+    def test_statusesStayTheSame(self):
         """
         Verify that messages upgraded from the stub have appropriate statuses.
         """
@@ -65,25 +68,10 @@ class MessageUpgradeTest(StubbedTest):
         self.assertMessages([READ_STATUS], [2])
         self.assertMessages([DEFERRED_STATUS], [2])
         self.assertMessages([DRAFT_STATUS], [4])
+        # this next check here verifies that the 'CLEAN_STATUS' was unfrozen by
+        # the upgrader.
         self.assertMessages([CLEAN_STATUS], [0, 1, 2])
         # Really tested by workflow tests, but sanity check:
         self.assertMessages([UNREAD_STATUS, CLEAN_STATUS], [0, 1])
         self.assertMessages([SENT_STATUS], [3])
 
-
-    def test_upgradeCorrespondents(self):
-        """
-        Verify that Correspondent items are created for each incoming message,
-        so that 'view from person' still works.
-        """
-        ms = MailboxSelector(self.store)
-        newPerson = Person(store=self.store, name=u'test bob')
-        PersonEmailAddress(store=self.store, person=newPerson,
-                           address=u'bob@b.example.com')
-        ms.refineByPerson(newPerson)
-        # As it currently stands, outgoing and draft messages are both not
-        # considered for the addition of Correspondent items.  This might not
-        # be correct, but it is the current behavior and at the time of writing
-        # this test the goal was to ensure that the behavior would not change
-        # across this upgrade.  -glyph
-        self.assertMessageQuery(ms, [0, 1, 2, 5, 6, 7])
