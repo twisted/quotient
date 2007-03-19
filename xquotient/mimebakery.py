@@ -114,7 +114,7 @@ def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
     return msg
 
 
-def sendMail(_savedDraft, composer, cabinet, parentMessage,
+def sendMail(_savedDraft, composer, cabinet, parentMessage, parentAction,
              fromAddress, toAddresses, subject, messageBody, cc, bcc,
              files):
     """
@@ -122,8 +122,9 @@ def sendMail(_savedDraft, composer, cabinet, parentMessage,
     """
     # overwrite the previous draft of this message with another draft
     _savedDraft = saveDraft(_savedDraft, composer, cabinet,
-                      parentMessage, fromAddress, toAddresses,
-                      subject, messageBody, cc, bcc, files)
+                      parentMessage, parentAction, fromAddress,
+                      toAddresses, subject, messageBody, cc, bcc,
+                      files)
 
     addresses = [addr.pseudoFormat() for addr in toAddresses + cc + bcc]
 
@@ -134,10 +135,12 @@ def sendMail(_savedDraft, composer, cabinet, parentMessage,
     # drafts in the lifetime of this fragment as being drafts of a
     # different message
     _savedDraft.deleteFromStore()
+    if parentMessage is not None and parentAction is not None:
+        parentMessage.addStatus(parentAction)
     return _savedDraft
 
 
-def saveDraft(_savedDraft, composer, cabinet, parentMessage,
+def saveDraft(_savedDraft, composer, cabinet, parentMessage, parentAction,
                fromAddress, toAddresses, subject, messageBody, cc,
                bcc, files):
     """
