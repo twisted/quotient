@@ -110,7 +110,7 @@ class StubComposeFragment(LiveFragment):
     jsClass = ComposeFragment.jsClass
     fragmentName = ComposeFragment.fragmentName
 
-    def __init__(self, composer, recipients, subject, messageBody, attachments, inline, parentMessage):
+    def __init__(self, composer, recipients, subject, messageBody, attachments, inline, parentMessage, parentAction):
         self.composer = composer
         self.recipients = recipients
         self.subject = subject
@@ -119,6 +119,7 @@ class StubComposeFragment(LiveFragment):
         self.inline = inline
         self.invokeArguments = []
         self.parentMessage = parentMessage
+        self.parentAction = parentAction
 
     def getInvokeArguments(self):
         """
