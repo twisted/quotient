@@ -26,8 +26,7 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
 
 from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
                              MailboxScrollingFragment, TOUCH_ONCE_VIEWS)
-from xquotient import compose, smtpout, exmess, mimeutil
-from xquotient.mimepart import Header, MIMEPart
+from xquotient import compose, smtpout
 from xquotient.test.util import (DummyMessageImplementation,
                                  DummyMessageImplWithABunchOfAddresses)
 
@@ -858,54 +857,6 @@ class ComposeActionsTestCase(TestCase):
              'cc': ['copy@host'],
              'to': ['sender@host', 'recipient2@host']})
 
-class MoreComposeActionsTestCase(TestCase):
-    """
-    Test compose-action related stuff that requires an on-disk store.
-    """
-
-    def setUp(self):
-        self.store = Store(dbdir=self.mktemp())
-        self.inbox = Inbox(store=self.store)
-        installOn(self.inbox, self.store)
-        self.privateApplication = self.inbox.privateApplication
-        self.inboxScreen = InboxScreen(self.inbox)
-        fromAddr = smtpout.FromAddress(address=u'recipient@host',
-                                       store=self.store)
-        self.msg = testMessageFactory(
-                    store=self.store,
-                    spam=False,
-                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
-    def test_setStatus(self):
-        """
-        Test that statuses requested for parent messages get set after
-        the created message is sent.
-        """
-        composer = compose.Composer(store=self.store)
-        installOn(composer, self.store)
-        composer.__dict__['sendMessage'] = lambda fromA, toA, msg: None
-        class MsgStub:
-            impl = MIMEPart()
-            statuses = None
-            def addStatus(self, status):
-                if self.statuses is None:
-                    self.statuses = [status]
-                else:
-                    self.statuses.append(status)
-        parent = MsgStub()
-        parent.impl.headers = [Header("message-id", "<msg99@example.com>"),
-                               Header("references", "<msg98@example.com>"),
-                               Header("references", "<msg97@example.com>")]
-
-        toAddresses = [mimeutil.EmailAddress(
-            'testuser@example.com',
-            mimeEncoded=False)]
-        cf = self.inboxScreen._composeSomething(
-            toAddresses,
-            u'Sup dood', u'A body', [], parent, exmess.REPLIED_STATUS)
-        cf._sendOrSave(self.store.findFirst(smtpout.FromAddress),
-                       toAddresses, u'Sup dood', u'A body',
-                       [], [], [], False)
-        self.assertEqual(parent.statuses, [exmess.REPLIED_STATUS])
 
 
 class ScrollingFragmentTestCase(TestCase):

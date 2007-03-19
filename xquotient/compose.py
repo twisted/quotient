@@ -28,7 +28,7 @@ from xquotient import iquotient, equotient, renderers, mimeutil
 from smtpout import (FromAddress, MessageDelivery,
                      _getFromAddressFromStore, FromAddressConfigFragment)
 
-from xquotient.exmess import MessageDetail, REDIRECTED_STATUS
+from xquotient.exmess import MessageDetail
 from xquotient.mimestorage import Part
 from xquotient.mail import MailDeliveryAgent, DeliveryAgent
 from xquotient.mimebakery import saveDraft, sendMail
@@ -247,7 +247,7 @@ class Composer(item.Item):
         msg = self.createRedirectedMessage(fromAddress, toAddresses, message)
         addresses = [addr.email for addr in toAddresses]
         self.sendMessage(fromAddress, addresses, msg)
-        message.addStatus(REDIRECTED_STATUS)
+
 
 def upgradeCompose1to2(oldComposer):
     """
@@ -461,8 +461,7 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
     fragmentName = 'compose'
 
     def __init__(self, composer, recipients=None, subject=u'', messageBody=u'',
-                 attachments=(), inline=False, parentMessage=None,
-                 parentAction=None):
+                 attachments=(), inline=False, parentMessage=None):
         """
         @type composer: L{Composer}
 
@@ -485,13 +484,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         @param inline: whether the compose widget is being displayed inline,
         e.g. as a child of another widget
         @type inline: boolean
-
-        @param parentMessage: The existing message this message is in
-        response to, if any; otherwise None.
-
-        @param parentAction: The status that should be set on the
-        parent message, if any, once this message is delivered. Should
-        be a value from L{xquotient.exmess} that ends in C{_STATUS}.
 
         C{toAddresses}, C{subject}, C{messageBody} and C{attachments} should
         be considered as presets - their values can be manipulated via the
@@ -535,7 +527,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
         self.docFactory = None
         self.parentMessage = parentMessage
-        self.parentAction = parentAction
 
     def invoke(self, formPostEmulator):
         coerced = self._coerced(formPostEmulator)
@@ -585,7 +576,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
             f = sendMail
         self._savedDraft = f(self._savedDraft, self.composer,
                              self.cabinet, self.parentMessage,
-                             self.parentAction,
                              fromAddress, toAddresses,
                              subject, messageBody, cc, bcc, files)
 

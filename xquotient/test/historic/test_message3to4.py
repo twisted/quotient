@@ -65,7 +65,7 @@ class MessageUpgradeTest(StubbedTest):
         self.assertMessages([READ_STATUS], [2])
         self.assertMessages([DEFERRED_STATUS], [2])
         self.assertMessages([DRAFT_STATUS], [4])
-        self.assertMessages([CLEAN_STATUS], [0, 1, 2])
+        self.assertMessages([CLEAN_STATUS], [0, 1])
         # Really tested by workflow tests, but sanity check:
         self.assertMessages([UNREAD_STATUS, CLEAN_STATUS], [0, 1])
         self.assertMessages([SENT_STATUS], [3])

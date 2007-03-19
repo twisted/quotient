@@ -79,18 +79,11 @@ class StubStoredMessageAndImplAndSource(item.Item):
     source = property(lambda self: self._source or FilePath(__file__))
     _source = None
     headers = attributes.inmemory()
-    statuses = attributes.inmemory()
     def open(self):
         return "HI DUDE"
 
     def startedSending(self):
         self.calledStartedSending = True
-
-    def addStatus(self, status):
-        if not hasattr(self, 'statuses'):
-            self.statuses = [status]
-        else:
-            self.statuses.append(status)
 
 class Reactor(object):
     """
@@ -217,7 +210,6 @@ Hi
 
         self.assertEquals(m['Resent-From'], self.defaultFromAddr.address)
         self.assertEquals(m['Resent-To'], 'testuser@localhost')
-        self.assertEquals(message.statuses, [exmess.REDIRECTED_STATUS])
 
     def test_redirectNameAddr(self):
         """
@@ -268,16 +260,6 @@ Hi
             exmess.RESENT_FROM_RELATION, self.defaultFromAddr.address)
         checkCorrespondents(exmess.RESENT_TO_RELATION, RESENT_TO_ADDRESS.email)
 
-class MsgStub:
-    impl = MIMEPart()
-    statuses = None
-    def addStatus(self, status):
-        if self.statuses is None:
-            self.statuses = [status]
-        else:
-            self.statuses.append(status)
-
-
 class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
     """
     Test the L{ComposeFragment}.
@@ -298,7 +280,9 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         Ensure that References and In-Reply-To headers are added to
         outgoing messages.
         """
-        parent = MsgStub()
+        class msgStub:
+            impl = MIMEPart()
+        parent = msgStub()
         parent.impl.headers = [Header("message-id", "<msg99@example.com>"),
                                Header("references", "<msg98@example.com>"),
                                Header("references", "<msg97@example.com>")]
@@ -343,7 +327,6 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         sendMail(self.cf._savedDraft,
                  self.composer,
                  self.cabinet,
-                 None,
                  None,
                  self.defaultFromAddr,
             [mimeutil.EmailAddress(
@@ -423,7 +406,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             bcc=[],
             files=[],
             draft=False)
-
+ 
         msg = self.store.findUnique(smtpout.DeliveryToAddress
                                         )._getMessageSource()
         m = Parser.Parser().parse(msg)

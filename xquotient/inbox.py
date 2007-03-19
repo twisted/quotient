@@ -34,8 +34,7 @@ from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
                               SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS,
-                              RECIPIENT_RELATION, FOCUS_STATUS, REPLIED_STATUS,
-                              FORWARDED_STATUS, REDIRECTED_STATUS)
+                              RECIPIENT_RELATION, FOCUS_STATUS)
 
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
@@ -891,7 +890,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     composeFragmentFactory = compose.ComposeFragment
 
-    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None, parentAction=None):
+    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None):
         composer = self.inbox.store.findUnique(compose.Composer)
         cf = self.composeFragmentFactory(composer,
                                          recipients=recipients,
@@ -899,8 +898,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                                          messageBody=messageBody,
                                          attachments=attachments,
                                          inline=True,
-                                         parentMessage=parentMessage,
-                                         parentAction=parentAction)
+                                         parentMessage=parentMessage)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
         return cf
@@ -941,8 +939,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return self._composeSomething({'to': replyTo(curmsg)},
                                       reSubject(curmsg),
                                       self._getBodyForReply(curmsg),
-                                      parentMessage=curmsg,
-                                      parentAction=REPLIED_STATUS)
+                                      parentMessage=curmsg)
     expose(replyToMessage)
 
 
@@ -961,8 +958,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return self._composeSomething(replyToAll(curmsg),
                                       reSubject(curmsg),
                                       self._getBodyForReply(curmsg),
-                                      parentMessage=curmsg,
-                                      parentAction=REPLIED_STATUS)
+                                      parentMessage=curmsg)
     expose(replyAllToMessage)
 
 
@@ -996,8 +992,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return self._composeSomething(
             subject=reSubject(curmsg, 'Fwd: '),
             messageBody='\n\n' + '\n> '.join(reply),
-            attachments=currentMessageDetail.attachmentParts,
-            parentMessage=curmsg, parentAction=FORWARDED_STATUS)
+            attachments=currentMessageDetail.attachmentParts)
     expose(forwardMessage)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
