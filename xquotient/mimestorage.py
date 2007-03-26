@@ -11,7 +11,7 @@ from epsilon.extime import Time
 
 from axiom import item, attributes, iaxiom
 
-from xquotient import mimepart, equotient, mimeutil, exmess, iquotient
+from xquotient import mimepart, equotient, mimeutil, exmess, iquotient, smtpout
 
 
 class Header(item.Item):
@@ -522,6 +522,47 @@ class Part(item.Item):
                         return Time.fromStructTime(when)
 
         return default
+
+
+    def getAllReplyAddresses(self):
+        """
+        Figure out the address(es) that a reply to all people involved this
+        message should go to
+
+        @return: Mapping of header names to sequences of
+        L{xquotient.mimeutil.EmailAddress} instances.  Keys are 'to', 'cc' and
+        'bcc'.
+        @rtype: C{dict}
+        """
+        fromAddrs = list(self.store.query(smtpout.FromAddress))
+        fromAddrs = set(a.address for a in fromAddrs)
+
+        relToKey = {exmess.SENDER_RELATION: 'to',
+                    exmess.RECIPIENT_RELATION: 'to',
+                    exmess.COPY_RELATION: 'cc',
+                    exmess.BLIND_COPY_RELATION: 'bcc'}
+        addrs = {}
+
+        for (rel, addr) in self.relatedAddresses():
+            if rel not in relToKey or addr.email in fromAddrs:
+                continue
+            addrs.setdefault(relToKey[rel], []).append(addr)
+        return addrs
+
+
+    def getReplyAddresses(self):
+        """
+        Figure out the address(es) that a reply to this message should be sent
+        to.
+
+        @rtype: sequence of L{xquotient.mimeutil.EmailAddress}
+        """
+        try:
+            recipient = self.getHeader(u'reply-to')
+        except equotient.NoSuchHeader:
+            recipient = dict(self.relatedAddresses())[
+                exmess.SENDER_RELATION].email
+        return mimeutil.parseEmailAddresses(recipient, mimeEncoded=False)
 
 
     def getAlternates(self):

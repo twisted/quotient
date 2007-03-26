@@ -23,7 +23,7 @@ from xmantissa.people import Organizer, Person, EmailAddress
 from xquotient.inbox import Inbox, InboxScreen, MailboxScrollingFragment
 from xquotient import equotient
 
-from xquotient.exmess import MessageDetail
+from xquotient.exmess import MessageDetail, ActionlessMessageDetail
 from xquotient.exmess import _UndeferTask as UndeferTask
 from xquotient.exmess import (ARCHIVE_STATUS, TRASH_STATUS, SPAM_STATUS,
                               DEFERRED_STATUS, TRAINED_STATUS)
@@ -33,6 +33,8 @@ from xquotient.qpeople import MessageLister
 
 
 from xquotient.test.test_inbox import testMessageFactory
+
+
 
 class ThrobberTestCase(testcase.TestCase):
     """
@@ -104,7 +106,11 @@ class _Part(Item):
     def guessSentTime(self, default):
         return Time()
 
+    def getAllReplyAddresses(self):
+        return {}
 
+    def getReplyAddresses(self):
+        return []
 
 class StubComposeFragment(LiveFragment):
     jsClass = ComposeFragment.jsClass
@@ -179,6 +185,14 @@ class StubComposeFragment(LiveFragment):
         return ctx.tag
 
 
+class ActionlessMsgDetailWithStubCompose(ActionlessMessageDetail):
+    """
+    L{xquotient.exmess.ActionlessMessageDetail} subclass which sets
+    L{StubComposeFragment} as the factory for compose fragments
+    """
+    composeFragmentFactory = StubComposeFragment
+
+
 
 class _ControllerMixin:
     aliceEmail = u'alice@example.com'
@@ -213,7 +227,7 @@ class _ControllerMixin:
         Create and return an InboxScreen for the given inbox.
         """
         fragment = InboxScreen(inbox)
-        fragment.composeFragmentFactory = StubComposeFragment
+        fragment.messageDetailFragmentFactory = ActionlessMsgDetailWithStubCompose
         fragment.setFragmentParent(self)
         return fragment
 

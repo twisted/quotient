@@ -123,6 +123,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
             "account": null};
         self.columnAliases = {"receivedWhen": "Date", "senderDisplay": "Sender"};
 
+        self._messageDetailUpdatedDeferred = Divmod.Defer.Deferred();
+
         Quotient.Mailbox.ScrollingWidget.upcall(self, "__init__", node, metadata);
 
         /*
@@ -244,7 +246,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         node.style.fontWeight = "";
         node.style.backgroundColor = '#FFFFFF';
 
-        self.updateMessageDetail(row.__id__);
+        return self.updateMessageDetail(row.__id__);
     },
 
     /**
@@ -259,7 +261,21 @@ Quotient.Mailbox.ScrollingWidget.methods(
     },
 
     function updateMessageDetail(self, webID) {
-        return self.widgetParent.updateMessageDetail(webID);
+        var result = self.widgetParent.updateMessageDetail(webID);
+        result.addCallback(
+            function(result) {
+                self._messageDetailUpdatedDeferred.callback(result);
+            });
+        result.addErrback(
+            function(result) {
+                self._messageDetailUpdatedDeferred.errback(result);
+            });
+        result.addBoth(
+            function(passThrough) {
+                self._messageDetailUpdatedDeferred = Divmod.Defer.Deferred();
+                return passThrough;
+            });
+        return result;
     },
 
     function updateMessagePreview(self, previewData) {
@@ -325,11 +341,8 @@ Quotient.Mailbox.ScrollingWidget.methods(
     function activateFirstRow(self) {
         if (self.model.rowCount()) {
             self.model.activateRow(self.model.getRowData(0)['__id__']);
+            return self._messageDetailUpdatedDeferred;
         }
-        /*
-         * XXX We should actually wait for the message detail to show up before
-         * firing this Deferred.
-         */
         return Divmod.Defer.succeed(null);
     },
 
@@ -666,15 +679,15 @@ Quotient.Mailbox.Controller.methods(
 
         self.viewToActions = {
             "all": ["defer", "delete", "forward",
-                    "reply", "train-spam", "unarchive"],
+                    "reply", "trainSpam", "unarchive"],
             "inbox": ["archive", "defer", "delete",
-                      "forward", "reply", "train-spam"],
+                      "forward", "reply", "trainSpam"],
             "focus": ["archive", "defer", "delete",
-                      "forward", "reply", "train-spam"],
+                      "forward", "reply", "trainSpam"],
             "archive": ["unarchive", "delete", "forward",
-                        "reply", "train-spam"],
+                        "reply", "trainSpam"],
             "draft": ["delete"],
-            "spam": ["delete", "train-ham"],
+            "spam": ["delete", "trainHam"],
             "deferred": ["forward", "reply"],
             "bounce": ['delete', 'forward'],
             "outbox": [],
@@ -750,10 +763,8 @@ Quotient.Mailbox.Controller.methods(
         self.progressBar = self.firstWithClass(
             self.contentTableGrid[1][2], "progress-bar");
 
-        self.messageActions = self.firstNodeByAttribute("class", "message-actions");
-
-        self.deferForm = self.nodeByAttribute("class", "defer-form");
-        self.deferSelect = self.nodeByAttribute("class", "defer");
+        self.messageActionsNode = self.firstNodeByAttribute(
+            "class", "message-actions");
 
         self.ypos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail);
         self.messageBlockYPos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail.parentNode);
@@ -784,14 +795,6 @@ Quotient.Mailbox.Controller.methods(
             self.contentTableGrid[1][2],
             "next-message-preview");
 
-        /*
-         * See L{_getActionButtons} for description of the structure of
-         * C{actions}.
-         */
-        self.actions = self._getActionButtons();
-
-        self._setupActionButtonsForView(self.scrollWidget.viewSelection['view']);
-
         self.status = Quotient.Mailbox.Status(
                         self.firstNodeByAttribute(
                             "class", "mailbox-status-container"));
@@ -800,11 +803,23 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Replace the message detail with a compose widget.
+     * Register the actions controller for this widget.
      *
-     * @param composeInfo: widget info for a L{Quotient.Compose.Controller}.
-     * If not passed, then a new, empty compose widget will be retrieved from
-     * the server
+     * @param controller: actions controller
+     * @type controller: L{Quotient.Message.ActionsController}
+     */
+    function setActionsController(self, controller) {
+        self.messageActions = controller;
+        self.messageActions.setActionListener(self);
+        self.initializationDeferred.addCallback(
+            function(passThrough) {
+                self._setupActionButtonsForView(
+                    self.scrollWidget.viewSelection['view']);
+            });
+    },
+
+    /**
+     * Replace the message detail with a compose widget.
      *
      * @param reloadMessage: if true, the currently selected message will be
      * reloaded and displayed after the compose widget has been dismissed
@@ -813,12 +828,11 @@ Quotient.Mailbox.Controller.methods(
      * has been loaded, or after it has been dismissed if C{reloadMessage} is
      * true
      */
-    function splatComposeWidget(self, composeInfo/*=undefined*/, reloadMessage/*=false*/) {
-        if(composeInfo) {
-            var result = Divmod.Defer.succeed(composeInfo);
-        } else {
-            var result = self.callRemote("getComposer");
+    function compose(self, reloadMessage/*=true*/) {
+        if(reloadMessage == undefined) {
+            reloadMessage = true;
         }
+        var result = self.callRemote("getComposer");
 
         result.addCallback(
             function(composeInfo) {
@@ -837,6 +851,16 @@ Quotient.Mailbox.Controller.methods(
                 });
         }
         return result;
+    },
+
+    /**
+     * DOM event handler for compose.  Call L{compose} and return C{false}
+     *
+     * @return C{false}
+     */
+    function dom_compose(self) {
+        self.compose();
+        return false;
     },
 
     /**
@@ -884,84 +908,6 @@ Quotient.Mailbox.Controller.methods(
         }
         node.className = "selected-complexity-icon";
         self.recalculateMsgDetailWidth(false);
-    },
-
-    /**
-     * Return an object with view names as keys and objects defining the
-     * actions available to those views as values.  The value objects have
-     * action names as keys and objects with two properties as values:
-     * C{button}, bound to the DOM node which represents the action's button;
-     * C{enable}, bound to a boolean indicating whether this action is
-     * available to this view.
-     */
-    function _getActionButtons(self) {
-        /*
-         * Compute list of all button names from the self.viewToActions structured.
-         */
-        var view, i, j;
-        var allButtonNames = [];
-        for (view in self.viewToActions) {
-            for (i = 0; i < self.viewToActions[view].length; ++i) {
-                /*
-                 * Try to find this button in the list of all button names
-                 */
-                for (j = 0; j < allButtonNames.length; ++j) {
-                    if (self.viewToActions[view][i] == allButtonNames[j]) {
-                        break;
-                    }
-                }
-                /*
-                 * Didn't break out of the loop -- didn't find the name, so add
-                 * it.
-                 */
-                if (j == allButtonNames.length) {
-                    allButtonNames.push(self.viewToActions[view][i]);
-                }
-            }
-        }
-
-        function difference(minuend, subtrahend) {
-            var i, j;
-            var diff = [];
-            for (i = 0; i < minuend.length; ++i) {
-                for (j = 0; j < subtrahend.length; ++j) {
-                    if (minuend[i] == subtrahend[j]) {
-                        break;
-                    }
-                }
-                if (j == subtrahend.length) {
-                    diff.push(minuend[i]);
-                }
-            }
-            return diff;
-        }
-
-        function getActionButton(name) {
-            return Divmod.Runtime.theRuntime.firstNodeByAttribute(
-                self.messageActions, "class", name + "-button");
-        }
-
-        var views = {};
-        var actions;
-        var actionName;
-        for (view in self.viewToActions) {
-            actions = {};
-            for (i = 0; i < self.viewToActions[view].length; ++i) {
-                actionName = self.viewToActions[view][i];
-                actions[actionName] = {
-                    "button": getActionButton(actionName),
-                    "enable": true};
-            }
-            hide = difference(allButtonNames, self.viewToActions[view]);
-            for (i = 0; i < hide.length; ++i) {
-                actionName = hide[i];
-                actions[actionName] = {
-                    "button": getActionButton(actionName),
-                    "enable": false};
-            }
-            views[view] = actions;
-        }
-        return views;
     },
 
     function _getViewCountNode(self, view) {
@@ -1064,33 +1010,6 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Call a method on this object, extracting the method name from the value
-     * of the currently selected <option> of the <select> node C{selectNode}
-     * and returning the result of the selected method.  The first option in
-     * the <select> is selected after the method returns.
-     *
-     * @type selectNode: a <select> node
-     * @return: the return value of the method, or null if the currently
-     * selected <option> doesn't have a "value" attribute
-     *
-     */
-    function methodCallFromSelect(self, selectNode) {
-        var opts = selectNode.getElementsByTagName("option"),
-            opt = opts[selectNode.selectedIndex];
-        if(opt.value == "") {
-            return null;
-        }
-        try {
-            var result = self[opt.value]();
-        } catch(e) {
-            selectNode.selectedIndex = 0;
-            throw e;
-        }
-        selectNode.selectedIndex = 0;
-        return result;
-    },
-
-    /**
      * XXX
      */
     function changeBatchSelection(self, to) {
@@ -1147,18 +1066,6 @@ Quotient.Mailbox.Controller.methods(
         }
         return [include, exclude];
     },
-
-
-    /**
-     * Set each of the rows in the selection as deferred.
-     */
-    function _deferSelectedRows(self) {
-        self.scrollWidget.model.visitSelectedRows(
-            function(row) {
-                self.scrollWidget.setAsDeferred(row);
-            });
-    },
-
 
     function _removeRows(self, rows) {
         /*
@@ -1494,11 +1401,11 @@ Quotient.Mailbox.Controller.methods(
             self.setScrollTablePosition("static");
             self.viewShortcutSelect.style.display = "";
         } else if (c == 3) {
-            self.viewShortcutSelect.style.display = "none";
             self.contentTableGrid[0][0].style.display = "";
             self.contentTableGrid[1][0].style.display = "";
             self.showAll(self._getContentTableColumn(1));
             self.setScrollTablePosition("static");
+            self.viewShortcutSelect.style.display = "none";
         }
 
         try {
@@ -1561,9 +1468,9 @@ Quotient.Mailbox.Controller.methods(
         return self.scrollWidget.changeViewSelection(key, value).addCallback(
             function(messageCount) {
                 if (messageCount) {
-                    self.messageActions.style.visibility = "";
+                    self.messageActionsNode.style.visibility = "";
                 } else {
-                    self.messageActions.style.visibility = "hidden";
+                    self.messageActionsNode.style.visibility = "hidden";
                 }
                 self.changeBatchSelection('none');
             });
@@ -1703,20 +1610,11 @@ Quotient.Mailbox.Controller.methods(
     },
 
     function _setupActionButtonsForView(self, viewName) {
-        var enableActionNames = [];
-
-        var actions = self.actions[viewName];
+        var actions = self.viewToActions[viewName];
         if (actions === undefined) {
             throw new Error("Unknown view: " + viewName);
         }
-        for (var actionName in actions) {
-            if (actions[actionName].enable) {
-                enableActionNames.push(actionName);
-                actions[actionName].button.style.display = "";
-            } else {
-                actions[actionName].button.style.display = "none";
-            }
-        }
+        self.messageActions.enableOnlyActions(actions);
     },
 
     /**
@@ -1932,188 +1830,173 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Disable the currently enabled action buttons (e.g. reply, archive,
-     * etc.) until C{deferred} fires.
-     *
-     * @type deferred: C{Divmod.Defer.Deferred}
-     * @return: C{deferred}
+     * 'Printable' message action.  Delegate to
+     * L{Quotient.Message.MessageDetail}
      */
-    function disableActionButtonsUntilFires(self, deferred) {
-        var view = self.scrollWidget.viewSelection.view,
-            actions = self.actions[view],
-            buttons;
-
-        for(var actionName in actions) {
-            buttons = Nevow.Athena.NodesByAttribute(
-                actions[actionName].button, "class", "button");
-            if(buttons.length == 1) {
-                Quotient.Common.ButtonToggler(
-                    buttons[0]).disableUntilFires(deferred);
-            }
-        }
-        return deferred;
+    function messageAction_printable(self) {
+        return self._getMessageDetail().messageAction_printable();
     },
 
     /**
-     * Call L{archive} and don't return its result
-     *
-     * @return: false
+     * 'Message source' message action. Delegate to
+     * L{Quotient.Message.MessageDetail}
      */
-    function dom_archive(self, n) {
-        self.archive(n);
-        return false;
+    function messageAction_messageSource(self) {
+        return self._getMessageDetail().messageAction_messageSource();
     },
 
-    function archive(self, n) {
+    /**
+     * 'Archive' message action
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_archive(self) {
         /*
          * Archived messages show up in the "all" view.  So, if we are in any
          * view other than that, this action should make the message
          * disappear.
          */
-        return self.disableActionButtonsUntilFires(
-            self.touch(
-                "archive",
-                self.scrollWidget.viewSelection["view"] != "archive"));
+        return self.touch(
+            "archive",
+            self.scrollWidget.viewSelection["view"] != "archive");
     },
 
     /**
-     * Call L{unarchive} and don't return its result
+     * 'Unarchive' message action
      *
-     * @return: false
+     * @rtype: L{Divmod.Defer.Deferred}
      */
-    function dom_unarchive(self, n) {
-        self.unarchive(n);
-        return false;
-    },
-
-    function unarchive(self, n) {
-        return self.disableActionButtonsUntilFires(
-            self.touch(
-                "unarchive",
-                self.scrollWidget.viewSelection["view"] == "archive"));
+    function messageAction_unarchive(self) {
+        return self.touch(
+            "unarchive",
+            self.scrollWidget.viewSelection["view"] == "archive");
     },
 
     /**
-     * Call L{trash} and don't return its result
+     * 'Delete' message action
      *
-     * @return: false
+     * @rtype: L{Divmod.Defer.Deferred}
      */
-    function dom_trash(self, n) {
-        self.trash(n);
-        return false;
-    },
-
-    function trash(self, n) {
-        return self.disableActionButtonsUntilFires(
-            self.touch(
-                "delete",
-                self.scrollWidget.viewSelection["view"] != "trash"));
+    function messageAction_delete(self) {
+        return self.touch(
+            "delete",
+            self.scrollWidget.viewSelection["view"] != "trash");
     },
 
     /**
-     * Call L{untrash} and don't return its result
+     * 'Undelete' message action
      *
-     * @return: false
+     * @rtype: L{Divmod.Defer.Deferred}
      */
-    function dom_untrash(self, n) {
-        self.untrash(n);
-        return false;
-    },
-
-    function untrash(self, n) {
-        return self.disableActionButtonsUntilFires(
-            self.touch(
-                "undelete",
-                self.scrollWidget.viewSelection["view"] == "trash"));
-    },
-
-    function showDeferForm(self) {
-        return self.deferForm.style.display = "";
-    },
-
-    function hideDeferForm(self) {
-        self.deferForm.style.display = "none";
-        return false;
-    },
-
-    function _deferralStringToPeriod(self, value) {
-        if (value == "other...") {
-            self.showDeferForm();
-            return null;
-        }
-        if (value == "Defer") {
-            return null;
-        }
-        var args;
-        if (value == "1 day") {
-            return {"days": 1,
-                    "hours": 0,
-                    "minutes": 0};
-        } else if (value == "1 hour") {
-            return {"days": 0,
-                    "hours": 1,
-                    "minutes": 0};
-        } else if (value == "12 hours") {
-            return {"days": 0,
-                    "hours": 12,
-                    "minutes": 0};
-        } else if (value == "1 week") {
-            return {"days": 7,
-                    "hours": 0,
-                    "minutes": 0};
-        } else {
-            throw new Error("Invalid Deferral state:" + value);
-        }
-    },
-
-    /**
-     * Return an object describing the deferral period represented by the given
-     * node, or null if it indicates no deferral should be performed or
-     * something else if we should show the defer form.
-     */
-    function _getDeferralSelection(self, node) {
-        var options = self.deferSelect.getElementsByTagName("option");
-        var value = options[self.deferSelect.selectedIndex].firstChild.nodeValue;
-        return self._deferralStringToPeriod(value);
-    },
-
-    function selectDeferByNode(self, node) {
-        try {
-            self.selectDefer();
-        } catch (err) {
-            node.selectedIndex = 0;
-            throw err;
-        }
-        node.selectedIndex = 0;
-        return false;
-    },
-
-    function selectDefer(self) {
-        var period = self._getDeferralSelection();
-        if (period === null) {
-            return;
-        }
-        return self._doDefer(period);
-    },
-
-    /**
-     * Return an object with three properties giving the current state of the
-     * defer period form.
-     */
-    function _getDeferralPeriod(self) {
-        var form = self.deferForm;
-        return {'days': parseInt(form.days.value),
-                'hours': parseInt(form.hours.value),
-                'minutes': parseInt(form.minutes.value)};
-    },
-
-    function formDeferByNode(self, node) {
-        self.formDefer();
-        return false;
+    function messageAction_undelete(self) {
+        return self.touch(
+            "undelete",
+            self.scrollWidget.viewSelection["view"] == "trash");
     },
 
 
     /**
+     * 'Reply' message action
+     *
+     * @param reloadMessage: if true, the currently selected message will be
+     * reloaded and displayed after the compose widget has been dismissed
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_reply(self, reloadMessage) {
+        /*
+         * This brings up a composey widget thing.  When you *send* that
+         * message (or save it as a draft or whatever, I suppose), *then* this
+         * action is considered to have been taken, and the message should be
+         * archived and possibly removed from the view.  But nothing happens
+         * *here*.
+         *
+         * Forward this action to the message detail, since reply only works
+         * on one message at a time.
+         */
+        return self._getMessageDetail().messageAction_reply(reloadMessage);
+    },
+
+    /**
+     * 'Forward' message action
+     *
+     * @param reloadMessage: if true, the currently selected message will be
+     * reloaded and displayed after the compose widget has been dismissed
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_forward(self, reloadMessage) {
+        /*
+         * See messageAction_reply
+         */
+        return self._getMessageDetail().messageAction_forward(reloadMessage);
+    },
+
+    /**
+     * 'Reply All' message action
+     *
+     * Load a compose widget with the "To" field set to all of the addresses
+     * in the "From", "To", "CC" and "BCC" headers of the message we're
+     * looking at
+     *
+     * @param reloadMessage: if true, the currently selected message will be
+     * reloaded and displayed after the compose widget has been dismissed
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_replyAll(self, reloadMessage) {
+        return self._getMessageDetail().messageAction_replyAll(reloadMessage);
+    },
+
+    /**
+     * 'Redirect' message action
+     *
+     * @param reloadMessage: if true, the currently selected message will be
+     * reloaded and displayed after the compose widget has been dismissed
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_redirect(self, reloadMessage) {
+        return self._getMessageDetail().messageAction_redirect(reloadMessage);
+    },
+
+    /**
+     * 'Train Spam' message action
+     *
+     * Instruct the server to train the spam filter using the current message
+     * as an example of spam.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: A Deferred which fires when the training action has been
+     * completed.
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_trainSpam(self) {
+        return self.touch(
+            "trainSpam",
+            (self.scrollWidget.viewSelection["view"] != "spam"));
+    },
+
+    /**
+     * 'Train Ham' message action
+     *
+     * Instruct the server to train the spam filter using the current message
+     * as an example of ham.  Remove the message from the message list if
+     * appropriate.
+     *
+     * @return: A Deferred which fires when the training action has been
+     * completed.
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_trainHam(self) {
+        return self.touch(
+            "trainHam",
+            (self.scrollWidget.viewSelection["view"] == "spam"));
+    },
+
+    /**
+     * 'Defer' message action
+     *
      * Defer the currently selected rows and update the display to indicate
      * that this has been done.
      *
@@ -2123,8 +2006,9 @@ Quotient.Mailbox.Controller.methods(
      * @param period: The period of time to defer the selected rows.
      * @return: A L{Divmod.Base.Deferred} that is passed through from
      * L{touch}.
+     * @rtype: L{Divmod.Defer.Deferred}
      */
-    function _doDefer(self, period) {
+    function messageAction_defer(self, period) {
         var widget = self.scrollWidget;
         var batchAction = self._batchSelection != null;
         var destructive = widget.viewSelection["view"] != 'all';
@@ -2140,13 +2024,15 @@ Quotient.Mailbox.Controller.methods(
         return d;
     },
 
-
-    function formDefer(self) {
-        var period = self._getDeferralPeriod();
-        self.deferForm.style.display = "none";
-        return self._doDefer(period);
+    /**
+     * Set each of the rows in the selection as deferred.
+     */
+    function _deferSelectedRows(self) {
+        self.scrollWidget.model.visitSelectedRows(
+            function(row) {
+                self.scrollWidget.setAsDeferred(row);
+            });
     },
-
 
     /**
      * Remove all content from the message detail area and add the given node.
@@ -2156,126 +2042,6 @@ Quotient.Mailbox.Controller.methods(
             self.messageDetail.removeChild(self.messageDetail.firstChild);
         }
         self.messageDetail.appendChild(node);
-    },
-
-    function _doComposeAction(self, remoteMethodName, reloadMessage/*=true*/) {
-         if(reloadMessage == undefined) {
-            reloadMessage = true;
-        }
-        var result = self.callRemote(
-            remoteMethodName, self.scrollWidget.getActiveRow().__id__);
-
-        self.disableActionButtonsUntilFires(result);
-
-        result.addCallback(
-            function(composeInfo) {
-                return self.splatComposeWidget(composeInfo, reloadMessage);
-            });
-        return result;
-    },
-
-    /**
-     * Call L{replyTo} and don't return its result
-     *
-     * @return: false
-     */
-    function dom_replyTo(self) {
-        self.replyTo();
-        return false;
-    },
-
-    function replyTo(self, reloadMessage/*=undefined*/) {
-        /*
-         * This brings up a composey widget thing.  When you *send* that
-         * message (or save it as a draft or whatever, I suppose), *then* this
-         * action is considered to have been taken, and the message should be
-         * archived and possibly removed from the view.  But nothing happens
-         * *here*.
-         */
-         return self._doComposeAction("replyToMessage", reloadMessage);
-    },
-
-    /**
-     * Load a compose widget with the "To" field set to all of the addresses
-     * in the "From", "To", "CC" and "BCC" headers of the message we're
-     * looking at
-     */
-    function replyToAll(self, reloadMessage/*=undefined*/) {
-        return self._doComposeAction("replyAllToMessage", reloadMessage);
-    },
-
-    function redirect(self, reloadMessage/*=undefined*/) {
-        return self._doComposeAction("redirectMessage", reloadMessage);
-    },
-
-    /**
-     * Call L{forward} and don't return its result
-     *
-     * @return false
-     */
-    function dom_forward(self) {
-        self.forward();
-        return false;
-    },
-
-    function forward(self, reloadMessage/*=undefined*/) {
-        /*
-         * See replyTo
-         */
-         return self._doComposeAction("forwardMessage", reloadMessage);
-    },
-
-    /**
-     * Instruct the server to train the spam filter using the current message
-     * as an example of spam.  Remove the message from the message list if
-     * appropriate.
-     *
-     * @return: A Deferred which fires when the training action has been
-     * completed.
-     */
-    function _trainSpam(self) {
-        return self.disableActionButtonsUntilFires(
-            self.touch(
-                "trainSpam",
-                (self.scrollWidget.viewSelection["view"] != "spam")));
-    },
-
-    /**
-     * Instruct the server to train the spam filter using the current message
-     * as an example of spam.  Remove the message from the message list if
-     * appropriate.
-     *
-     * @return: C{false}
-     */
-    function trainSpam(self) {
-        self._trainSpam();
-        return false;
-    },
-
-    /**
-     * Instruct the server to train the spam filter using the current message
-     * as an example of ham.  Remove the message from the message list if
-     * appropriate.
-     *
-     * @return: A Deferred which fires when the training action has been
-     * completed.
-     */
-    function _trainHam(self) {
-        return self.touch(
-            "trainHam",
-            (self.scrollWidget.viewSelection["view"] == "spam"));
-    },
-
-    /**
-     * Instruct the server to train the spam filter using the current message
-     * as an example of ham.  Remove the message from the message list if
-     * appropriate.
-     *
-     * @return: C{false}
-     */
-    function trainHam(self) {
-        self._trainHam();
-        return false;
     },
 
     function intermingle(self, string, regex, transformation) {
@@ -2366,22 +2132,6 @@ Quotient.Mailbox.Controller.methods(
         return Quotient.Message.MessageDetail.get(
                 self.firstWithClass(
                     self.messageDetail, "message-detail-fragment"));
-    },
-
-    /**
-     * Fragment-boundary-crossing proxy for
-     * L{Quotient.Message.MessageDetail.printable}
-     */
-    function printable(self) {
-        return self._getMessageDetail().printable();
-    },
-
-    /**
-     * Fragment-boundary-crossing proxy for
-     * L{Quotient.Message.MessageDetail.messageSource}
-     */
-    function messageSource(self) {
-        return self._getMessageDetail().messageSource();
     },
 
     /**
@@ -2528,5 +2278,8 @@ Quotient.Mailbox.Controller.methods(
                 } catch(e) {
                     return;
                 }
+                /* set the font size to the last value used in
+                   _setComplexityVisibility() */
+                messageBody.style.fontSize = self.fontSize;
             });
     });

@@ -366,7 +366,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 .view-shortcut-container {
     white-space: nowrap;
     float: left;
-    margin: 0px 4px 0px 2px;
+    margin: 1px 4px 0px 2px;
 }
 
 .message-block {
@@ -445,7 +445,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 .masthead-bl { margin: -7px 0px 0px -1px; }
 .masthead-br { margin: -7px -1px 0px 0px; }
 
-.message-detail-fragment { padding-left: 8px }
+.message-detail-content { padding-left: 8px }
 .masthead-tr { margin: -1px -1px 0px 0px }
 .view-pane-tl { margin: 0px 0px 0px -1px }
 

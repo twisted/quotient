@@ -13,6 +13,7 @@ import re
 import pytz
 import zipfile
 import urllib
+from datetime import timedelta
 
 from zope.interface import implements
 
@@ -37,9 +38,9 @@ from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
 from xmantissa.webtheme import ThemedElement
 
-from xquotient import gallery, equotient, scrubber, mimeutil
+from xquotient import gallery, equotient, scrubber, mimeutil, mimepart, renderers
 from xquotient.actions import SenderPersonFragment
-from xquotient.renderers import replaceIllegalChars
+from xquotient.renderers import replaceIllegalChars, ButtonRenderingMixin
 
 
 LOCAL_ICON_PATH = sibpath(__file__, path.join('static', 'images', 'attachment-types'))
@@ -450,6 +451,35 @@ def isFrozen(status):
     @rtype: C{bool}
     """
     return status.startswith(u'.')
+
+
+
+class MessageActions(ThemedElement, ButtonRenderingMixin):
+    """
+    I render UI for actions that can be performed on L{Message} objects
+    """
+    fragmentName = 'message-actions'
+    jsClass = u'Quotient.Message.ActionsController'
+
+    def getInitialArguments(self):
+        """
+        Initial arguments for JS class is a sequence of all action names
+        """
+        return ((ARCHIVE_ACTION, UNARCHIVE_ACTION, DELETE_ACTION,
+            UNDELETE_ACTION, DEFER_ACTION, REPLY_ACTION, FORWARD_ACTION,
+            TRAIN_SPAM_ACTION, TRAIN_HAM_ACTION),)
+
+
+
+ARCHIVE_ACTION = u'archive'
+UNARCHIVE_ACTION = u'unarchive'
+DELETE_ACTION = u'delete'
+UNDELETE_ACTION = u'undelete'
+DEFER_ACTION = u'defer'
+REPLY_ACTION = u'reply'
+FORWARD_ACTION = u'forward'
+TRAIN_SPAM_ACTION = u'trainSpam'
+TRAIN_HAM_ACTION = u'trainHam'
 
 
 
@@ -1354,6 +1384,130 @@ class Message(item.Item):
         return self.typeName
 
 
+    def getAllReplyAddresses(self):
+        """
+        Figure out the address(es) that a reply to all people involved this
+        message should go to
+
+        @return: Mapping of header names to sequences of
+        L{xquotient.mimeutil.EmailAddress} instances.  Keys are 'to', 'cc' and
+        'bcc'.
+        @rtype: C{dict}
+        """
+        return self.impl.getAllReplyAddresses()
+
+
+    def getReplyAddresses(self):
+        """
+        Figure out the address(es) that a reply to this messages should be sent to.
+
+        @type m: L{xquotient.exmess.Message}
+        @rtype: sequence of L{xquotient.mimeutil.EmailAddress}
+        """
+        return self.impl.getReplyAddresses()
+
+
+    def getReplySubject(self, pfx='Re: '):
+        """
+        Prefix the subject of this message with a string indicating that it is
+        a reply, unless the prefix already exists
+
+        @param pfx: prefix.  defaults to 'Re: '
+        @type pfx: C{str}
+
+        @return: the new subject
+        @rtype: C{unicode}
+        """
+        newsubject = self.subject
+        if not newsubject.lower().startswith(pfx.lower()):
+            newsubject = pfx + newsubject
+        return newsubject
+
+
+    def getReplyBody(self):
+        """
+        Figure out helpful default body text for a reply to this message
+
+        @type msg: L{xquotient.exmess.Message}
+        """
+        if self.sender is not None:
+            origfrom = self.sender
+        else:
+            origfrom = "someone who chose not to be identified"
+
+        if self.sentWhen is not None:
+            origdate = self.sentWhen.asHumanly()
+        else:
+            origdate = "an indeterminate time in the past"
+
+        replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
+
+        return '\n\n\n' + replyhead + '\n> '.join(self.getQuotedBody())
+
+
+    def getQuotedBody(self, maxwidth=78):
+        """
+        Quote the body of this message and return the result
+
+        @param maxwidth: maximum line width (default 78)
+        @type maxwidth: C{int}
+
+        @return: ?
+        """
+        for part in self.walkMessage(prefer='text/plain'):
+            if part.type is None or part.type == 'text/plain':
+                break
+        else:
+            return ''
+
+        format = part.part.getParam('format')
+        payload = part.part.getUnicodeBody()
+        if format == 'flowed':
+            para = mimepart.FlowedParagraph.fromRFC2646(payload)
+        else:
+            para = mimepart.FixedParagraph.fromString(payload)
+        newtext = renderers.replaceIllegalChars(para.asRFC2646(maxwidth-2))
+
+        return [ '\n>'.join(newtext.split('\r\n')) ]
+
+
+    def getActions(self):
+        """
+        Figure out which actions can be performed on this message
+
+        @return: sequence of C{_ACTION} constants
+        @rtype: C{set}
+        """
+        inboxyActions = (DEFER_ACTION, FORWARD_ACTION,
+            REPLY_ACTION, TRAIN_SPAM_ACTION, DELETE_ACTION)
+
+        # this is the same thing as Mailbox.Controller's 'viewToActions'
+        # mapping.  maybe that isn't good
+
+        statusToActions = (
+            (INBOX_STATUS, inboxyActions + (ARCHIVE_ACTION,)),
+            (ARCHIVE_STATUS, inboxyActions + (UNARCHIVE_ACTION,)),
+            (DEFERRED_STATUS, (FORWARD_ACTION, REPLY_ACTION)),
+            (TRASH_STATUS, (UNDELETE_ACTION, FORWARD_ACTION, REPLY_ACTION)),
+            # CLEAN_STATUS is the least specific of the incoming statuses.
+            # will a message ever have CLEAN_STATUS without something more
+            # specific?
+            (CLEAN_STATUS, inboxyActions + (UNARCHIVE_ACTION,)),
+            (SPAM_STATUS, (DELETE_ACTION, TRAIN_HAM_ACTION)),
+            (SENT_STATUS, (DELETE_ACTION, FORWARD_ACTION, REPLY_ACTION)),
+            (BOUNCED_STATUS, (DELETE_ACTION, FORWARD_ACTION)),
+            (OUTBOX_STATUS, ()),
+            (DRAFT_STATUS, (DELETE_ACTION,)))
+
+
+        for (status, actions) in statusToActions:
+            if self.hasStatus(status):
+                return set(actions)
+        raise TypeError(
+            '%r does not have any of the statuses i know about' % (self,))
+
+
+
 item.declareLegacyItem(Message.typeName, 3,
                        dict(archived=attributes.boolean(),
                             attachments=attributes.integer(),
@@ -2044,7 +2198,7 @@ class MessageBodyFragment(ThemedElement):
 
 
 
-class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
+class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingMixin):
     '''i represent the viewable facet of some kind of message'''
 
     implements(ixmantissa.INavigableFragment)
@@ -2079,7 +2233,8 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
 
     def getInitialArguments(self):
         return (list(self.catalog.tagsOf(self.original)),
-                self.getMoreDetailSetting())
+                self.getMoreDetailSetting(),
+                list(self.original.getActions()))
 
 
     def _getZipFileName(self):
@@ -2090,6 +2245,13 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
         return '%s-%s-attachments.zip' % (self.original.sender,
                                           ''.join(c for c in self.original.subject
                                                     if c.isalnum() or c in ' -_@'))
+
+
+    def render_actions(self, ctx, data):
+        f = MessageActions()
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
 
 
     def render_addPersonFragment(self, ctx, data):
@@ -2357,4 +2519,157 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin):
     expose(modifyTags)
 
 
+    # message-mutating actions
+
+
+    def archive(self):
+        self.original.archive()
+    expose(archive)
+
+    def unarchive(self):
+        self.original.unarchive()
+    expose(unarchive)
+
+    def delete(self):
+        self.original.moveToTrash()
+    expose(delete)
+
+    def undelete(self):
+        self.original.removeFromTrash()
+    expose(undelete)
+
+    def defer(self, days, hours, minutes):
+        self.original.deferFor(timedelta(days=days, hours=hours, minutes=minutes))
+    expose(defer)
+
+    def trainSpam(self):
+        self.original.trainSpam()
+    expose(trainSpam)
+
+    def trainHam(self):
+        self.original.trainHam()
+    expose(trainHam)
+
+
+    composeFragmentFactory = None
+
+
+    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None, parentAction=None):
+        """
+        Return an L{xquotient.compose.ComposeFragment}, optionally preloaded
+        with some information about the message to be composed.
+
+        Arguments the same as L{xquotient.compose.ComposeFragment}'s constructor
+
+        @rtype: L{xquotient.compose.ComposeFragment}
+        """
+        # XXX cyclic dependency between compose.py and exmess.py.  compose
+        # depends on MessageDetail, and Part from mimestorage.py, which
+        # depends on Message
+        from xquotient import compose
+        if self.composeFragmentFactory is None:
+            composeFragmentFactory = compose.ComposeFragment
+        else:
+            composeFragmentFactory = self.composeFragmentFactory
+
+        composer = self.original.store.findUnique(compose.Composer)
+        cf = composeFragmentFactory(composer,
+                                    recipients=recipients,
+                                    subject=subject,
+                                    messageBody=messageBody,
+                                    attachments=attachments,
+                                    inline=True,
+                                    parentMessage=parentMessage,
+                                    parentAction=parentAction)
+        cf.setFragmentParent(self)
+        cf.docFactory = getLoader(cf.fragmentName)
+        return cf
+
+
+    # compose actions
+
+
+    def replyAll(self):
+        """
+        Return a L{xquotient.compose.ComposeFragment} loaded with presets that
+        might be useful for sending a reply to all of the people involved in
+        this message
+
+        @rtype: L{xquotient.compose.ComposeFragment}
+        """
+        return self._composeSomething(
+            self.original.getAllReplyAddresses(),
+            self.original.getReplySubject(),
+            self.original.getReplyBody(),
+            parentMessage=self.original,
+            parentAction=REPLIED_STATUS)
+    expose(replyAll)
+
+
+    def reply(self):
+        """
+        Return a fragment which provides UI for replying to this message
+
+        @rtype: L{xquotient.compose.ComposeFragment}
+        """
+        return self._composeSomething(
+            {'to': self.original.getReplyAddresses()},
+            self.original.getReplySubject(),
+            self.original.getReplyBody(),
+            parentMessage=self.original,
+            parentAction=REPLIED_STATUS)
+    expose(reply)
+
+
+    def forward(self):
+        """
+        Return a fragment which provides UI for forwarding this message
+
+        @rtype: L{xquotient.compose.ComposeFragment}
+        """
+        # this 'reply' stuff belongs in Message
+        reply = ['\nBegin forwarded message:\n']
+        for hdr in u'From Date To Subject Reply-to'.split():
+            try:
+                val = self.original.impl.getHeader(hdr)
+            except equotient.NoSuchHeader:
+                continue
+            reply.append('%s: %s' % (hdr, val))
+        reply.append('')
+        reply.extend(self.original.getQuotedBody())
+
+        return self._composeSomething(
+            subject=self.original.getReplySubject('Fwd: '),
+            messageBody='\n\n' + '\n> '.join(reply),
+            attachments=self.attachmentParts,
+            parentAction=FORWARDED_STATUS)
+    expose(forward)
+
+
+    def redirect(self):
+        """
+        Return a fragment which provides UI for redirecting this message
+
+        @rtype: L{xquotient.compose.RedirectingComposeFragment}
+        """
+        from xquotient import compose
+
+        composer = self.original.store.findUnique(compose.Composer)
+        redirect = compose.RedirectingComposeFragment(composer, self.original)
+        redirect.setFragmentParent(self)
+        redirect.docFactory = getLoader(redirect.fragmentName)
+        return redirect
+    expose(redirect)
+
+
+
 registerAdapter(MessageDetail, Message, ixmantissa.INavigableFragment)
+
+
+
+class ActionlessMessageDetail(MessageDetail):
+    """
+    L{MessageDetail} subclass without an action bar
+    """
+    def render_actions(self, ctx, data):
+        return ''

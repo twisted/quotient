@@ -22,6 +22,7 @@ from xquotient.inbox import Inbox
 from xquotient.mail import DeliveryAgent
 from xquotient.iquotient import IMessageData
 from xquotient.mimeutil import EmailAddress
+from xquotient import smtpout
 
 from xquotient.exmess import (SENDER_RELATION, RECIPIENT_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
@@ -149,6 +150,12 @@ class DummyMessageImplementationMixin:
     def guessSentTime(self, default):
         return Time()
 
+    def getReplyAddresses(self):
+        return []
+
+    def getAllReplyAddresses(self):
+        return {}
+
 
 
 class DummyMessageImplementation(Item, DummyMessageImplementationMixin):
@@ -178,3 +185,19 @@ class DummyMessageImplWithABunchOfAddresses(Item, DummyMessageImplementationMixi
                             (COPY_RELATION, 'copy@host'),
                             (BLIND_COPY_RELATION, 'blind-copy@host')):
             yield (rel, EmailAddress(addr, False))
+
+    def getAllReplyAddresses(self):
+        fromAddrs = list(self.store.query(smtpout.FromAddress))
+        fromAddrs = set(a.address for a in fromAddrs)
+
+        relToKey = {SENDER_RELATION: 'to',
+                    RECIPIENT_RELATION: 'to',
+                    COPY_RELATION: 'cc',
+                    BLIND_COPY_RELATION: 'bcc'}
+        addrs = {}
+
+        for (rel, addr) in self.relatedAddresses():
+            if rel not in relToKey or addr.email in fromAddrs:
+                continue
+            addrs.setdefault(relToKey[rel], []).append(addr)
+        return addrs

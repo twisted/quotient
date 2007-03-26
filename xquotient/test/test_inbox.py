@@ -24,12 +24,9 @@ from xquotient.exmess import (Message, _UndeferTask as UndeferTask,
                               ARCHIVE_STATUS, TRASH_STATUS, INBOX_STATUS,
                               EVER_DEFERRED_STATUS, DRAFT_STATUS)
 
-from xquotient.inbox import (Inbox, InboxScreen, VIEWS, replyToAll,
+from xquotient.inbox import (Inbox, InboxScreen, VIEWS,
                              MailboxScrollingFragment, TOUCH_ONCE_VIEWS)
-from xquotient import compose, smtpout, exmess, mimeutil
-from xquotient.mimepart import Header, MIMEPart
-from xquotient.test.util import (DummyMessageImplementation,
-                                 DummyMessageImplWithABunchOfAddresses)
+from xquotient.test.util import DummyMessageImplementation
 
 
 
@@ -240,20 +237,6 @@ class InboxTestCase(InboxTest):
         self.inbox.action_defer(message, 365, 0, 0)
         message.deleteFromStore()
         self.assertEquals(self.store.count(UndeferTask), 0)
-
-
-    def test_getComposer(self):
-        """
-        Test L{xquotient.inbox.InboxScreen.getComposer}
-        """
-        installOn(compose.Composer(store=self.store), self.store)
-        composer = self.inboxScreen.getComposer()
-        self.failIf(composer.recipients)
-        self.failIf(composer.subject)
-        self.failIf(composer.messageBody)
-        self.failIf(composer.attachments)
-
-        self.failUnless(composer.inline)
 
 
 
@@ -774,138 +757,6 @@ class MessagesByPersonRetrievalTestCase(_MessageRetrievalMixin, TestCase):
             self.inbox.scrollingFragment.requestCurrentSize(),
             1)
 
-
-
-class ComposeActionsTestCase(TestCase):
-    """
-    Tests for the compose-related actions of L{xquotient.inbox.InboxScreen}
-    (reply, forward, etc) and related functionality
-    """
-
-    def setUp(self):
-        self.store = Store()
-
-        self.inbox = Inbox(store=self.store)
-        installOn(self.inbox, self.store)
-        self.privateApplication = self.inbox.privateApplication
-        self.inboxScreen = InboxScreen(self.inbox)
-        fromAddr = smtpout.FromAddress(address=u'recipient@host',
-                                       store=self.store)
-        self.msg = testMessageFactory(
-                    store=self.store,
-                    spam=False,
-                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
-
-
-    def _recipientsToStrings(self, recipients):
-        """
-        Convert a mapping of "strings to lists of
-        L{xquotient.mimeutil.EmailAddress} instances" into a mapping of
-        "strings to lists of string email addresses"
-        """
-        result = {}
-        for (k, v) in recipients.iteritems():
-            result[k] = list(e.email for e in v)
-        return result
-
-    def test_replyToAll(self):
-        """
-        Test L{xquotient.inbox.replyToAll}
-        """
-        self.assertEquals(
-            self._recipientsToStrings(
-                replyToAll(self.msg)),
-            {'bcc': ['blind-copy@host'],
-             'cc': ['copy@host'],
-             'to': ['sender@host', 'recipient2@host']})
-
-
-    def test_replyToAllFromAddress(self):
-        """
-        Test that L{xquotient.inbox.replyToAll} doesn't include addresses of
-        L{xquotient.smtpout.FromAddress} items that exist in the same store as
-        the message that is being replied to
-        """
-        addrs = set(u'blind-copy@host copy@host sender@host recipient2@host'.split())
-        for addr in addrs:
-            fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
-            gotAddrs = set()
-            for l in replyToAll(self.msg).itervalues():
-                gotAddrs.update(e.email for e in l)
-            self.assertEquals(
-                gotAddrs,
-                addrs - set([addr]))
-            fromAddr.deleteFromStore()
-
-
-    def test_replyAllToMessage(self):
-        """
-        Test L{xquotient.inbox.InboxScreen.replyAllToMessage}
-        """
-        def _composeSomething(recipients, *a, **k):
-            _composeSomething.recipients = recipients
-        self.inboxScreen._composeSomething = _composeSomething
-
-        webID = self.privateApplication.toWebID(self.msg)
-        self.inboxScreen.replyAllToMessage(webID)
-
-        recipients = self._recipientsToStrings(
-            _composeSomething.recipients)
-
-        self.assertEquals(
-            recipients,
-            {'bcc': ['blind-copy@host'],
-             'cc': ['copy@host'],
-             'to': ['sender@host', 'recipient2@host']})
-
-class MoreComposeActionsTestCase(TestCase):
-    """
-    Test compose-action related stuff that requires an on-disk store.
-    """
-
-    def setUp(self):
-        self.store = Store(dbdir=self.mktemp())
-        self.inbox = Inbox(store=self.store)
-        installOn(self.inbox, self.store)
-        self.privateApplication = self.inbox.privateApplication
-        self.inboxScreen = InboxScreen(self.inbox)
-        fromAddr = smtpout.FromAddress(address=u'recipient@host',
-                                       store=self.store)
-        self.msg = testMessageFactory(
-                    store=self.store,
-                    spam=False,
-                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
-    def test_setStatus(self):
-        """
-        Test that statuses requested for parent messages get set after
-        the created message is sent.
-        """
-        composer = compose.Composer(store=self.store)
-        installOn(composer, self.store)
-        composer.__dict__['sendMessage'] = lambda fromA, toA, msg: None
-        class MsgStub:
-            impl = MIMEPart()
-            statuses = None
-            def addStatus(self, status):
-                if self.statuses is None:
-                    self.statuses = [status]
-                else:
-                    self.statuses.append(status)
-        parent = MsgStub()
-        parent.impl.headers = [Header("message-id", "<msg99@example.com>"),
-                               Header("references", "<msg98@example.com>"),
-                               Header("references", "<msg97@example.com>")]
-
-        toAddresses = [mimeutil.EmailAddress(
-            'testuser@example.com',
-            mimeEncoded=False)]
-        cf = self.inboxScreen._composeSomething(
-            toAddresses,
-            u'Sup dood', u'A body', [], parent, exmess.REPLIED_STATUS)
-        cf._sendOrSave(self.store.findFirst(smtpout.FromAddress),
-                       toAddresses, u'Sup dood', u'A body',
-                       [], [], [], False)
-        self.assertEqual(parent.statuses, [exmess.REPLIED_STATUS])
 
 
 class ScrollingFragmentTestCase(TestCase):

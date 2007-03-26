@@ -428,7 +428,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.messageSource();
+                return self.controllerWidget.messageAction_messageSource();
             });
         result.addCallback(
             function(ignored) {
@@ -484,49 +484,6 @@ Quotient.Test.ControllerTestCase.methods(
                 var ctc = self.controllerWidget.firstNodeByAttribute(
                     "class", "content-table-container");
                 self.assertEqual(ctc.style.paddingRight, "");
-            });
-        return result;
-    },
-
-    /**
-     * Test L{Quotient.Mailbox.Controller.disableActionButtonsUntilFires}
-     */
-    function test_disableActionButtonsUntilFires(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function(result) {
-                var buttons = [];
-                for(var k in self.controllerWidget.actions['inbox']) {
-                    /* special-case defer because it isn't really a button */
-                    if(k == 'defer') {
-                        continue;
-                    }
-                    buttons.push(
-                        Nevow.Athena.NodeByAttribute(
-                            self.controllerWidget.actions['inbox'][k].button,
-                            'class',
-                            'button'));
-
-                    self.assertEqual(
-                        buttons[buttons.length-1].style.opacity, '');
-                }
-
-                var d = Divmod.Defer.Deferred();
-                self.controllerWidget.disableActionButtonsUntilFires(d);
-
-                for(var i = 0; i < buttons.length; i++) {
-                    self.assertNotEqual(buttons[i].style.opacity, '');
-                    self.failUnless(parseFloat(buttons[i].style.opacity) < 1);
-                }
-
-                d.callback(buttons);
-                return d;
-            });
-        result.addCallback(
-            function(buttons) {
-                for(var i = 0; i < buttons.length; i++) {
-                    self.assertEqual(parseFloat(buttons[i].style.opacity), 1);
-                }
             });
         return result;
     },
@@ -1161,7 +1118,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(0).__id__,
                     model.getRowData(1).__id__];
 
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function(ignored) {
@@ -1314,31 +1271,25 @@ Quotient.Test.ControllerTestCase.methods(
                  * Make sure that each individual action's button is displayed,
                  * and any action not explicitly mentioned is hidden.
                  */
-                var actions = self.controllerWidget.actions[viewName];
-                var allActionNames = Divmod.dir(actions);
-                var excludedActionNames = Divmod.dir(actions);
+                var actionsController = self.controllerWidget.messageActions,
+                    enabledActions = actionsController.model.getEnabledActions(),
+                    allActionNames = actionsController.model.actions,
+                    excludedActionNames = Quotient.Common.Util.difference(
+                        allActionNames, individualActionNames);
 
                 for (var i = 0; i < individualActionNames.length; ++i) {
-                    self.assertEqual(
-                        actions[individualActionNames[i]].button.style.display,
-                        "");
-
-                    for (var j = 0; j < excludedActionNames.length; ++j) {
-                        if (excludedActionNames[j] == individualActionNames[i]) {
-                            excludedActionNames.splice(j, 1);
-                            break;
-                        }
-                    }
+                    self.failUnless(
+                        actionsController.view.isButtonVisible(
+                            individualActionNames[i]));
                 }
 
                 /*
                  * All the other actions should be hidden.
                  */
                 for (var i = 0; i < excludedActionNames.length; ++i) {
-                    self.assertEqual(
-                        actions[excludedActionNames[i]].button.style.display,
-                        "none",
-                        excludedActionNames[i] + " was available in " + viewName + " view.");
+                    self.failIf(
+                        actionsController.view.isButtonVisible(
+                            excludedActionNames[i]));
                 }
             });
         return result;
@@ -1350,8 +1301,8 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForInbox(self) {
         return self._actionTest(
             "inbox",
-            ["archive", "defer", "delete", "forward", "reply", "train-spam"],
-            ["archive", "delete", "train-spam"]);
+            ["archive", "defer", "delete", "forward", "reply", "trainSpam"],
+            ["archive", "delete", "trainSpam"]);
     },
 
     /**
@@ -1360,8 +1311,8 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForArchive(self) {
         return self._actionTest(
             'archive',
-            ['unarchive', 'delete', 'forward', 'reply', 'train-spam'],
-            ['unarchive', 'delete', 'train-spam']);
+            ['unarchive', 'delete', 'forward', 'reply', 'trainSpam'],
+            ['unarchive', 'delete', 'trainSpam']);
     },
 
     /**
@@ -1370,8 +1321,8 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForAll(self) {
         return self._actionTest(
             "all",
-            ["unarchive", "defer", "delete", "forward", "reply", "train-spam"],
-            ["unarchive", "delete", "train-spam"]);
+            ["unarchive", "defer", "delete", "forward", "reply", "trainSpam"],
+            ["unarchive", "delete", "trainSpam"]);
     },
 
     /**
@@ -1390,8 +1341,8 @@ Quotient.Test.ControllerTestCase.methods(
     function test_actionsForSpam(self) {
         return self._actionTest(
             "spam",
-            ["delete", "train-ham"],
-            ["delete", "train-ham"]);
+            ["delete", "trainHam"],
+            ["delete", "trainHam"]);
     },
 
     /**
@@ -1444,7 +1395,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.changeBatchSelection("unread");
-                return self.controllerWidget.trash(null);
+                return self.controllerWidget.messageAction_delete();
             });
         result.addCallback(
             function(ignored) {
@@ -1479,7 +1430,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.changeBatchSelection("all");
-                return self.controllerWidget.trash(null);
+                return self.controllerWidget.messageAction_delete();
             });
         result.addCallback(
             function(ignored) {
@@ -1519,7 +1470,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.changeBatchSelection("unread");
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function(ignored) {
@@ -1547,7 +1498,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection("read");
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive(null);
             });
         result.addCallback(
             function(ignored) {
@@ -1583,7 +1534,7 @@ Quotient.Test.ControllerTestCase.methods(
                 scroller.groupSelectRow(rowIdentifiers[0]);
                 scroller.groupSelectRow(rowIdentifiers[1]);
 
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function(ignored) {
@@ -1618,7 +1569,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[1]);
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function(ignored) {
@@ -1662,7 +1613,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 self.assertEqual(model.totalRowCount(), 1);
                 self.controllerWidget.changeBatchSelection("all");
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         // display all messages regardless of tag.
         d.addCallback(
@@ -1673,7 +1624,7 @@ Quotient.Test.ControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 self.assertEqual(model.totalRowCount(), 1);
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         // there should be no more messages in this view.
         d.addCallback(
@@ -1705,7 +1656,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__];
 
                 self.controllerWidget.scrollWidget.groupSelectRow(rowIdentifiers[0]);
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function(ignored) {
@@ -1739,7 +1690,7 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(1).__id__
                     ];
 
-                return self.controllerWidget._trainSpam();
+                return self.controllerWidget.messageAction_trainSpam();
             });
         result.addCallback(
             function(ignored) {
@@ -1799,7 +1750,7 @@ Quotient.Test.ControllerTestCase.methods(
 
                 rowIdentifiers = [model.getRowData(0).__id__];
 
-                return self.controllerWidget._trainHam();
+                return self.controllerWidget.messageAction_trainHam();
             });
         result.addCallback(
             function(ignored) {
@@ -1825,107 +1776,6 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
-
-    /**
-     * Test that the utility method L{_getDeferralPeriod} returns the correct
-     * values from the form in the document.
-     */
-    function test_getDeferralPeriod(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function(ignored) {
-                var period;
-                var form = self.controllerWidget.deferForm;
-                var days = form.days;
-                var hours = form.hours;
-                var minutes = form.minutes;
-
-                days.value = hours.value = minutes.value = 1;
-                period = self.controllerWidget._getDeferralPeriod();
-                self.assertEqual(period.days, 1);
-                self.assertEqual(period.hours, 1);
-                self.assertEqual(period.minutes, 1);
-
-                days.value = 2;
-                period = self.controllerWidget._getDeferralPeriod();
-                self.assertEqual(period.days, 2);
-                self.assertEqual(period.hours, 1);
-                self.assertEqual(period.minutes, 1);
-
-                hours.value = 3;
-                period = self.controllerWidget._getDeferralPeriod();
-                self.assertEqual(period.days, 2);
-                self.assertEqual(period.hours, 3);
-                self.assertEqual(period.minutes, 1);
-
-                minutes.value = 4;
-                period = self.controllerWidget._getDeferralPeriod();
-                self.assertEqual(period.days, 2);
-                self.assertEqual(period.hours, 3);
-                self.assertEqual(period.minutes, 4);
-            });
-        return result;
-    },
-
-    /**
-     * Like L{test_getDeferralPeriod}, but for the utility method
-     * L{_deferralStringToPeriod} and L{_getDeferralSelection} (Sorry for
-     * putting these together, I think this is a really icky test and I didn't
-     * want to type out all this boilerplate twice -exarkun).
-     */
-    function test_deferralStringtoPeriod(self) {
-        var result = self.setUp(self);
-        result.addCallback(
-            function(ignored) {
-                var period;
-                var node = self.controllerWidget.deferSelect;
-
-                var deferralPeriods = {
-                    "one-day": {
-                        "days": 1,
-                        "hours": 0,
-                        "minutes": 0},
-                    "one-hour": {
-                        "days": 0,
-                        "hours": 1,
-                        "minutes": 0},
-                    "twelve-hours": {
-                        "days": 0,
-                        "hours": 12,
-                        "minutes": 0},
-                    "one-week": {
-                        "days": 7,
-                        "hours": 0,
-                        "minutes": 0}
-                };
-
-                var option;
-                var allOptions = node.getElementsByTagName("option");
-                for (var cls in deferralPeriods) {
-                    option = Divmod.Runtime.theRuntime.firstNodeByAttribute(node, "class", cls);
-                    period = self.controllerWidget._deferralStringToPeriod(option.value);
-                    self.assertEqual(period.days, deferralPeriods[cls].days);
-                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
-                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
-
-                    for (var i = 0; i < allOptions.length; ++i) {
-                        if (allOptions[i] === option) {
-                            node.selectedIndex = i;
-                            break;
-                        }
-                    }
-                    if (i == allOptions.length) {
-                        self.fail("Could not find option node to update selection index.");
-                    }
-                    period = self.controllerWidget._getDeferralSelection();
-                    self.assertEqual(period.days, deferralPeriods[cls].days);
-                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
-                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
-                }
-            });
-        return result;
-    },
-
     /**
      * Test the message deferral functionality.
      */
@@ -1942,7 +1792,8 @@ Quotient.Test.ControllerTestCase.methods(
                     model.getRowData(0).__id__,
                     model.getRowData(1).__id__];
 
-                return self.controllerWidget.formDefer();
+                return self.controllerWidget.messageAction_defer({
+                    days: 0, hours: 1, minutes: 0});
             });
         result.addCallback(
             function(ignored) {
@@ -1989,7 +1840,8 @@ Quotient.Test.ControllerTestCase.methods(
             });
         d.addCallback(
             function(ignored) {
-                return self.controllerWidget.formDefer();
+                return self.controllerWidget.messageAction_defer({
+                    days: 0, hours: 1, minutes: 0});
             });
         d.addCallback(
             function(ignored) {
@@ -2019,18 +1871,22 @@ Quotient.Test.ControllerTestCase.methods(
                            model.getRowData(1).__id__];
                 self.controllerWidget.scrollWidget.groupSelectRow(ids[0]);
                 self.controllerWidget.scrollWidget.groupSelectRow(ids[1]);
-                return self.controllerWidget.formDefer();
+                return self.controllerWidget.messageAction_defer({
+                    days: 0, hours: 1, minutes: 0});
             });
         d.addCallback(
             function(ignored) {
+                function boomerangCount(node) {
+                    return Nevow.Athena.NodesByAttribute(
+                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        ).length;
+                }
                 var node = widget.findCellElement(model.getRowData(0));
-                self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                self.assertEqual(boomerangCount(node), 1);
                 node = widget.findCellElement(model.getRowData(1));
-                self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                self.assertEqual(boomerangCount(node), 1);
                 node = widget.findCellElement(model.getRowData(2));
-                self.assertEqual(node.childNodes.length, 2);
+                self.assertEqual(boomerangCount(node), 0);
             });
         return d;
     },
@@ -2051,7 +1907,8 @@ Quotient.Test.ControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 self.controllerWidget.changeBatchSelection('all');
-                return self.controllerWidget.formDefer();
+                return self.controllerWidget.messageAction_defer({
+                    days: 0, hours: 1, minutes: 0});
             });
         d.addCallback(
             function(ignored) {
@@ -2066,40 +1923,6 @@ Quotient.Test.ControllerTestCase.methods(
         return d;
     },
 
-
-    /**
-     * Same as test_deferDisplay, but use the
-     * L{Quotient.Mailbox.Controller.selectDefer} method instead.
-     */
-    function test_selectDeferDisplay(self) {
-        var model, widget;
-        var d = self.setUp();
-        d.addCallback(
-            function(ignored) {
-                widget = self.controllerWidget.scrollWidget;
-                model = widget.model;
-                return self.controllerWidget.chooseMailView('all');
-            });
-        d.addCallback(
-            function(ignored) {
-                var deferSelect = self.controllerWidget.deferSelect;
-                var opts = deferSelect.getElementsByTagName('option');
-                opts[1].selected = true; // deferSelect.selectedIndex = 1;
-                // sanity check
-                self.assertNotEqual(self.controllerWidget._getDeferralSelection(),
-                                    null);
-                return self.controllerWidget.selectDefer();
-            });
-        d.addCallback(
-            function(ignored) {
-                var node = widget.findCellElement(model.getRowData(0));
-                self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
-            });
-        return d;
-    },
-
-
     /**
      * Test that selecting the reply-to action for a message brings up a
      * compose widget.
@@ -2108,7 +1931,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyTo(false);
+                return self.controllerWidget.messageAction_reply(false);
             });
         result.addCallback(self._makeComposeTester());
         return result;
@@ -2122,7 +1945,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forward(false);
+                return self.controllerWidget.messageAction_forward(false);
             });
         result.addCallback(self._makeComposeTester());
         return result;
@@ -2136,7 +1959,7 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyToAll(false);
+                return self.controllerWidget.messageAction_replyAll(false);
             });
         result.addCallback(self._makeComposeTester());
     },
@@ -2149,12 +1972,18 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.redirect(false);
+                return self.controllerWidget.messageAction_redirect(false);
             });
         result.addCallback(
             function(ignored) {
-                var children = self.controllerWidget.childWidgets;
-                var lastChild = children[children.length - 1];
+                var msgDetailNodes = self.controllerWidget.nodesByAttribute(
+                    "class", "message-detail-fragment"),
+                    /* redirect contains a msg detail, inserted before the
+                     * original msg detail */
+                    msgDetail = Quotient.Message.MessageDetail.get(
+                        msgDetailNodes[1]),
+                    children = msgDetail.childWidgets,
+                    lastChild = children[children.length - 1];
                 self.failUnless(lastChild instanceof Quotient.Compose.RedirectingController);
 
                 var parentNode = lastChild.node;
@@ -2175,11 +2004,12 @@ Quotient.Test.ControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.replyTo(false);
+                return self.controllerWidget.messageAction_reply(false);
             });
         result.addCallback(
             function(ignored) {
-                var children = self.controllerWidget.childWidgets;
+                var msgDetail = self.controllerWidget._getMessageDetail(),
+                    children = msgDetail.childWidgets;
                 composer = children[children.length - 1];
                 /*
                  * Sanity check.
@@ -2232,7 +2062,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.untrash(null);
+                return self.controllerWidget.messageAction_undelete();
             });
         result.addCallback(
             function(ignored) {
@@ -2264,7 +2094,7 @@ Quotient.Test.ControllerTestCase.methods(
         result.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.unarchive(null);
+                return self.controllerWidget.messageAction_unarchive();
             });
         result.addCallback(
             function(ignored) {
@@ -2296,7 +2126,7 @@ Quotient.Test.ControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.unarchive(null);
+                return self.controllerWidget.messageAction_unarchive();
             });
         d.addCallback(
             function(ignored) {
@@ -2324,7 +2154,7 @@ Quotient.Test.ControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.unarchive(null);
+                return self.controllerWidget.messageAction_unarchive();
             });
         d.addCallback(
             function(ignored) {
@@ -2349,7 +2179,7 @@ Quotient.Test.ControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 rowIdentifier = model.getRowData(0).__id__;
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         d.addCallback(
             function(ignored) {
@@ -2369,40 +2199,6 @@ Quotient.Test.ControllerTestCase.methods(
         var model = self.controllerWidget.scrollWidget.model;
         self.failUnless(model.getRowData(0).sender);
     },
-
-    /**
-     * Test that changing the view from the view shortcut selector
-     * changes the view and selects the corresponding list-item in
-     * the main view selector.  Also test the inverse.
-     */
-    function test_viewShortcut(self) {
-        var select = self.controllerWidget.viewShortcutSelect;
-        var options = select.getElementsByTagName("option");
-        var changeView = function(name) {
-            for(var i = 0; i < options.length; i++) {
-                if(options[i].value == name) {
-                    select.selectedIndex = i;
-                    return;
-                }
-            }
-        }
-        changeView("all");
-        var D = self.controllerWidget.chooseMailViewByShortcutNode(select);
-        return D.addCallback(
-            function() {
-                var viewSelectorNode = self.controllerWidget.mailViewNodes["all"];
-                self.assertEqual(
-                    viewSelectorNode.parentNode.className,
-                    "selected-list-option");
-
-                return self.controllerWidget.chooseMailViewByNode(
-                            self.controllerWidget.mailViewNodes["inbox"].parentNode);
-        }).addCallback(
-            function() {
-                self.assertEqual(select.value, "inbox");
-        });
-    },
-
 
     /**
      * Test that the private helper method _findPreviewRow returns the correct
@@ -2521,8 +2317,9 @@ Quotient.Test.ControllerTestCase.methods(
      */
     function _makeComposeTester(self) {
         return function(composer) {
-            var children = self.controllerWidget.childWidgets;
-            var lastChild = children[children.length - 1];
+            var msgDetail = self.controllerWidget._getMessageDetail(),
+                children = msgDetail.childWidgets;
+                lastChild = children[children.length - 1];
             self.failUnless(lastChild instanceof Quotient.Compose.Controller);
 
             /*
@@ -2543,119 +2340,6 @@ Quotient.Test.ControllerTestCase.methods(
             self.failUnless(lastChild.inline);
             return lastChild;
         }
-    },
-
-    /**
-     * Test L{Quotient.Mailbox.Controller.splatComposeWidget} when not passed
-     * composeInfo or reloadMessage.
-     */
-    function test_splatCompose(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function() {
-                return self.controllerWidget.splatComposeWidget();
-            });
-        result.addCallback(self._makeComposeTester());
-        return result;
-    },
-
-    /**
-     * Test L{Quotient.Mailbox.Controller.splatComposeWidget} when passed a
-     * composeInfo argument
-     */
-    function test_splatComposeComposeInfo(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function() {
-                return self.controllerWidget.callRemote("getComposer");
-            });
-        result.addCallback(
-            function(composeInfo) {
-                return self.controllerWidget.splatComposeWidget(composeInfo);
-            });
-        result.addCallback(self._makeComposeTester());
-    },
-
-    /**
-     * Test L{Quotient.Mailbox.Controller.reloadMessageAfterComposeCompleted}
-     */
-    function test_reloadMessageAfterComposeCompleted(self) {
-        var cancelled = false;
-
-        var result = self.setUp();
-        result.addCallback(
-            function() {
-                return self.controllerWidget.splatComposeWidget();
-            });
-        result.addCallback(
-            function(composer) {
-                var controller = self.controllerWidget;
-                var curmsg = controller.scrollWidget.getActiveRow();
-                var reload = controller.reloadMessageAfterComposeCompleted(composer);
-
-                setTimeout(
-                    function() {
-                        composer.cancel();
-                        cancelled = true;
-                    }, 1000);
-
-                return reload.addCallback(
-                    function() {
-                        return curmsg;
-                    });
-            });
-        result.addCallback(
-            function(curmsg) {
-                self.failUnless(cancelled);
-
-                /* check that the compose widget has been replaced with a
-                 * message detail, and that the current message in the
-                 * scrolltable is still curmsg */
-
-                Nevow.Athena.Widget.get(
-                    Nevow.Athena.FirstNodeByAttribute(
-                        self.controllerWidget.messageDetail,
-                        "athena:class",
-                        "Quotient.Message.MessageDetail"));
-
-                self.assertEqual(
-                    self.controllerWidget.scrollWidget.getActiveRow().__id__,
-                    curmsg.__id__);
-            });
-        return result;
-    },
-
-    /**
-     * Tests for L{Quotient.Mailbox.Controller.methodCallFromSelect}
-     */
-    function test_methodCallFromSelect(self) {
-        var result = self.setUp();
-        result.addCallback(
-            function() {
-                var called = 0;
-                self.controllerWidget.__counterMethod = function() {
-                    called++;
-                    return "HI!";
-                }
-
-                var select = document.createElement("select");
-                var option = document.createElement("option");
-                option.value = "__counterMethod";
-                select.appendChild(option);
-
-                self.assertEqual(
-                    self.controllerWidget.methodCallFromSelect(select),
-                    "HI!");
-                self.assertEqual(called, 1);
-
-                option.removeAttribute("value");
-
-                self.assertEqual(
-                    self.controllerWidget.methodCallFromSelect(select),
-                    null);
-                self.assertEqual(called, 1);
-            });
-        return result;
     });
 
 
@@ -2706,7 +2390,7 @@ Quotient.Test.FullControllerTestCase.methods(
         d.addCallback(
             function(ignored) {
                 self.controller.changeBatchSelection('all');
-                return self.controller.archive(null);
+                return self.controller.messageAction_archive();
             });
         d.addCallback(
             function(ignored) {
@@ -2714,7 +2398,7 @@ Quotient.Test.FullControllerTestCase.methods(
             });
         d.addCallback(
             function(ignored) {
-                return self.controller.archive(null);
+                return self.controller.messageAction_archive();
             });
         d.addCallback(
             function(ignored) {
@@ -2746,7 +2430,7 @@ Quotient.Test.FullControllerTestCase.methods(
                  * Batch select everything and delete it.
                  */
                 self.controller.changeBatchSelection("all");
-                return self.controller.trash(null);
+                return self.controller.messageAction_delete();
             });
         result.addCallback(
             function(ignored) {
@@ -2813,7 +2497,7 @@ Quotient.Test.FullControllerTestCase.methods(
                 var webID = self.controller.scrollWidget.model.getRowData(18).__id__;
                 self.controller.scrollWidget.groupSelectRow(webID);
                 /* and archive it */
-                result = self.controller.archive();
+                result = self.controller.messageAction_archive();
                 return result.addCallback(
                     function(ignored) {
                         return webID;
@@ -2868,12 +2552,13 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function(ignored) {
-                return self.controllerWidget.forward(false);
+                return self.controllerWidget.messageAction_forward(false);
             });
         result.addCallback(
             function(ignored) {
-                var children = self.controllerWidget.childWidgets;
-                var lastChild = children[children.length - 1];
+                var msgDetail = self.controllerWidget._getMessageDetail(),
+                    children = msgDetail.childWidgets;
+                    lastChild = children[children.length - 1];
                 self.failUnless(lastChild instanceof Quotient.Compose.Controller);
 
                 /*
@@ -3039,7 +2724,7 @@ Quotient.Test.FocusControllerTestCase.methods(
         var result = self.setUp();
         result.addCallback(
             function cbSetUp(ignored) {
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function cbArchived(ignored) {
@@ -3063,7 +2748,7 @@ Quotient.Test.FocusControllerTestCase.methods(
             });
         result.addCallback(
             function cbViewChanged(ignored) {
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function cbArchived(ignored) {
@@ -3083,7 +2768,7 @@ Quotient.Test.FocusControllerTestCase.methods(
         result.addCallback(
             function cbSetUp(ignored) {
                 model = self.controllerWidget.scrollWidget.model;
-                return self.controllerWidget.archive(null);
+                return self.controllerWidget.messageAction_archive();
             });
         result.addCallback(
             function cbArchived(ignored) {
@@ -3092,7 +2777,7 @@ Quotient.Test.FocusControllerTestCase.methods(
             });
         result.addCallback(
             function cbArchiveView(ignored) {
-                return self.controllerWidget.unarchive(null);
+                return self.controllerWidget.messageAction_unarchive();
             });
         result.addCallback(
             function cbUnarchived(ignored) {
@@ -3117,7 +2802,7 @@ Quotient.Test.FocusControllerTestCase.methods(
         result.addCallback(
             function cbSetUp(ignored) {
                 model = self.controllerWidget.scrollWidget.model;
-                return self.controllerWidget.trash(null);
+                return self.controllerWidget.messageAction_delete();
             });
         result.addCallback(
             function cbTrashed(ignored) {
@@ -3131,7 +2816,7 @@ Quotient.Test.FocusControllerTestCase.methods(
                 self.assertEqual(model.rowCount(), 1);
                 self.assertEqual(
                     model.getRowData(0).subject, 'focused message');
-                return self.controllerWidget.untrash(null);
+                return self.controllerWidget.messageAction_undelete();
             });
         result.addCallback(
             function cbUntrashed(ignored) {
@@ -3161,7 +2846,7 @@ Quotient.Test.FocusControllerTestCase.methods(
             });
         result.addCallback(
             function cbFocusView(ignored) {
-                return self.controllerWidget.trash(null);
+                return self.controllerWidget.messageAction_delete();
             });
         result.addCallback(
             function cbTrashed(ignored) {
@@ -3173,7 +2858,7 @@ Quotient.Test.FocusControllerTestCase.methods(
                 self.assertEqual(model.rowCount(), 1);
                 self.assertEqual(
                     model.getRowData(0).subject, 'focused message');
-                return self.controllerWidget.untrash(null);
+                return self.controllerWidget.messageAction_undelete();
             });
         result.addCallback(
             function cbUntrashed(ignored) {
@@ -3198,7 +2883,7 @@ Quotient.Test.FocusControllerTestCase.methods(
         result.addCallback(
             function cbSetUp(ignored) {
                 model = self.controllerWidget.scrollWidget.model;
-                return self.controllerWidget._trainSpam(null);
+                return self.controllerWidget.messageAction_trainSpam();
             });
         result.addCallback(
             function cbTrained(ignored) {
@@ -3212,7 +2897,7 @@ Quotient.Test.FocusControllerTestCase.methods(
                 self.assertEqual(model.rowCount(), 1);
                 self.assertEqual(
                     model.getRowData(0).subject, 'focused message');
-                return self.controllerWidget._trainHam(null);
+                return self.controllerWidget.messageAction_trainHam();
             });
         result.addCallback(
             function cbTrained(ignored) {
@@ -3242,7 +2927,7 @@ Quotient.Test.FocusControllerTestCase.methods(
             });
         result.addCallback(
             function cbFocusView(ignored) {
-                return self.controllerWidget._trainSpam(null);
+                return self.controllerWidget.messageAction_trainSpam();
             });
         result.addCallback(
             function cbSpammed(ignored) {
@@ -3254,7 +2939,7 @@ Quotient.Test.FocusControllerTestCase.methods(
                 self.assertEqual(model.rowCount(), 1);
                 self.assertEqual(
                     model.getRowData(0).subject, 'focused message');
-                return self.controllerWidget._trainHam(null);
+                return self.controllerWidget.messageAction_trainHam();
             });
         result.addCallback(
             function cbHammed(ignored) {
@@ -4852,4 +4537,201 @@ Quotient.Test.MsgBodyTestCase.methods(
                     self.msgBody.node.parentNode, null);
             });
         return D;
+    });
+
+
+Quotient.Test.ActionsTestCase = Nevow.Athena.Test.TestCase.subclass(
+    'Quotient.Test.ActionsTestCase');
+/**
+ * Tests for the L{Quotient.Message} actions classes
+ * (L{Quotient.Message.ActionsController}, L{Quotient.Message.ActionsView})
+ */
+Quotient.Test.ActionsTestCase.methods(
+    function setUp(self) {
+        var result = self.callRemote('setUp');
+        result.addCallback(
+            function(widgetInfo) {
+                return self.addChildWidgetFromWidgetInfo(widgetInfo);
+            });
+        result.addCallback(
+            function(widget) {
+                self.actions = widget
+            });
+        return result;
+    },
+
+    function test_getDeferralPeriod(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var period;
+                var form = self.actions.view.deferForm;
+                var days = form.days;
+                var hours = form.hours;
+                var minutes = form.minutes;
+
+                days.value = hours.value = minutes.value = 1;
+                period = self.actions.view._getDeferralPeriod();
+                self.assertEqual(period.days, 1);
+                self.assertEqual(period.hours, 1);
+                self.assertEqual(period.minutes, 1);
+
+                days.value = 2;
+                period = self.actions.view._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 1);
+                self.assertEqual(period.minutes, 1);
+
+                hours.value = 3;
+                period = self.actions.view._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 3);
+                self.assertEqual(period.minutes, 1);
+
+                minutes.value = 4;
+                period = self.actions.view._getDeferralPeriod();
+                self.assertEqual(period.days, 2);
+                self.assertEqual(period.hours, 3);
+                self.assertEqual(period.minutes, 4);
+            });
+        return result;
+    },
+
+    /**
+     * Like L{test_getDeferralPeriod}, but for the utility method
+     * L{_deferralStringToPeriod} and L{_getDeferralSelection} (Sorry for
+     * putting these together, I think this is a really icky test and I didn't
+     * want to type out all this boilerplate twice -exarkun).
+     */
+    function test_deferralStringtoPeriod(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                var period;
+                var node = self.actions.view.deferSelect;
+
+                var deferralPeriods = {
+                    "one-day": {
+                        "days": 1,
+                        "hours": 0,
+                        "minutes": 0},
+                    "one-hour": {
+                        "days": 0,
+                        "hours": 1,
+                        "minutes": 0},
+                    "twelve-hours": {
+                        "days": 0,
+                        "hours": 12,
+                        "minutes": 0},
+                    "one-week": {
+                        "days": 7,
+                        "hours": 0,
+                        "minutes": 0}
+                };
+
+                var option;
+                var allOptions = node.getElementsByTagName("option");
+                for (var cls in deferralPeriods) {
+                    option = Divmod.Runtime.theRuntime.firstNodeByAttribute(node, "class", cls);
+                    period = self.actions.view._deferralStringToPeriod(option.value);
+                    self.assertEqual(period.days, deferralPeriods[cls].days);
+                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
+                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
+
+                    for (var i = 0; i < allOptions.length; ++i) {
+                        if (allOptions[i] === option) {
+                            node.selectedIndex = i;
+                            break;
+                        }
+                    }
+                    if (i == allOptions.length) {
+                        self.fail("Could not find option node to update selection index.");
+                    }
+                    period = self.actions.view._getDeferralSelection();
+                    self.assertEqual(period.days, deferralPeriods[cls].days);
+                    self.assertEqual(period.hours, deferralPeriods[cls].hours);
+                    self.assertEqual(period.minutes, deferralPeriods[cls].minutes);
+                }
+            });
+        return result;
+    },
+
+    /**
+     * Test L{Quotient.Message.ActionsView.disableAllUntilFires}
+     */
+    function test_disableActionButtonsUntilFires(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(result) {
+                var buttons = [],
+                    actionNames = self.actions.model.actions;
+                for(var i = 0; i < actionNames.length; i++) {
+                    /* special-case defer because it isn't really a button */
+                    if(actionNames[i] == 'defer') {
+                        continue;
+                    }
+                    buttons.push(
+                        Nevow.Athena.NodeByAttribute(
+                            self.actions.view._buttonNodes[actionNames[i]],
+                            'class',
+                            'button'));
+
+                    self.assertEqual(
+                        buttons[buttons.length-1].style.opacity, '');
+                }
+
+                var d = Divmod.Defer.Deferred();
+                self.actions.view.disableAllUntilFires(d);
+
+                for(var i = 0; i < buttons.length; i++) {
+                    self.assertNotEqual(buttons[i].style.opacity, '');
+                    self.failUnless(parseFloat(buttons[i].style.opacity) < 1);
+                }
+
+                d.callback(buttons);
+                return d;
+            });
+        result.addCallback(
+            function(buttons) {
+                for(var i = 0; i < buttons.length; i++) {
+                    self.assertEqual(parseFloat(buttons[i].style.opacity), 1);
+                }
+            });
+        return result;
+    },
+
+    /**
+     * Tests for L{Quotient.Message.ActionsView.dispatchActionFromSelect}
+     */
+    function test_dispatchActionFromSelect(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function() {
+                var called = 0,
+                    handler = function() {
+                        called++;
+                        return 'HI!';
+                    },
+                    listener = {messageAction_foo: handler},
+                    select = document.createElement('select'),
+                    option = document.createElement('option');
+
+                option.value = 'foo';
+                select.appendChild(option);
+
+                self.actions.model.setActionListener(listener);
+
+                self.assertEqual(
+                    self.actions.view.dispatchActionFromSelect(select),
+                    'HI!');
+                self.assertEqual(called, 1);
+
+                option.removeAttribute('value');
+
+                self.assertEqual(
+                    self.actions.view.dispatchActionFromSelect(select),
+                    null);
+                self.assertEqual(called, 1);
+            });
+        return result;
     });

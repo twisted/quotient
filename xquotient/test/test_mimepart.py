@@ -9,7 +9,7 @@ from epsilon import extime
 
 from axiom import store
 
-from xquotient import mimepart
+from xquotient import mimepart, smtpout
 from xquotient.mimestorage import Part
 from xquotient.test import test_grabber
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
@@ -1049,3 +1049,95 @@ class FlowedParagraphTestCase(unittest.TestCase):
                                        "esh is heir to, 'tis a consummation De"
                                        "voutly to be wish'd."], 0)
         self.assertEqual(p1.asRFC2646(), flowedParagraphExample)
+
+
+
+class ReplyAddressesTestCase(unittest.TestCase, PersistenceMixin):
+    """
+    Tests for the reply-address-getting methods of
+    L{xquotient.mimestorage.Part}
+    """
+
+    msgWithABunchOfAddresses = """\
+From: sender@host
+To: recipient@host, recipient2@host
+Cc: copy@host
+Bcc: blind-copy@host
+Content-Type: text/plain
+
+Hi
+""".strip()
+
+
+    def setUpMailStuff(self):
+        mr = PersistenceMixin.setUpMailStuff(self)
+        smtpout.FromAddress(store=mr.store, address=u'recipient@host')
+        return mr
+
+
+    def _recipientsToStrings(self, recipients):
+        """
+        Convert a mapping of "strings to lists of
+        L{xquotient.mimeutil.EmailAddress} instances" into a mapping of
+        "strings to lists of string email addresses"
+        """
+        result = {}
+        for (k, v) in recipients.iteritems():
+            result[k] = list(e.email for e in v)
+        return result
+
+    def checkGetAllReplyAddresses(self, part):
+        """
+        Check that the reply addresses of C{part} match up with the addresses
+        in C{self.msgWithABunchOfAddresses}
+
+        @param part: a part
+        @type part: L{xquotient.mimestorage.Part}
+        """
+        self.assertEquals(
+            self._recipientsToStrings(
+                part.getAllReplyAddresses()),
+            {'bcc': ['blind-copy@host'],
+             'cc': ['copy@host'],
+             'to': ['sender@host', 'recipient2@host']})
+
+
+    def test_getAllReplyAddresses(self):
+        """
+        Check that L{xquotient.mimestorage.Part} returns the right reply
+        addresses
+        """
+        return self._messageTest(
+            self.msgWithABunchOfAddresses,
+            self.checkGetAllReplyAddresses)
+
+
+    def checkNoFromAddresses(self, part):
+        """
+        Check that the reply addresses of C{part} don't coincide with an
+        L{xquotient.smtpout.FromAddress} items in the store
+
+        @param part: a part
+        @type part: L{xquotient.mimestorage.Part}
+        """
+        addrs = set(u'blind-copy@host copy@host sender@host recipient2@host'.split())
+        for addr in addrs:
+            fromAddr = smtpout.FromAddress(address=addr, store=part.store)
+            gotAddrs = set()
+            for l in part.getAllReplyAddresses().itervalues():
+                gotAddrs.update(e.email for e in l)
+            self.assertEquals(
+                gotAddrs,
+                addrs - set([addr]))
+            fromAddr.deleteFromStore()
+
+
+    def test_getAllReplyAddressesNoFromAddresses(self):
+        """
+        Test that L{xquotient.inbox.replyToAll} doesn't include addresses of
+        L{xquotient.smtpout.FromAddress} items that exist in the same store as
+        the message that is being replied to
+        """
+        return self._messageTest(
+            self.msgWithABunchOfAddresses,
+            self.checkNoFromAddresses)

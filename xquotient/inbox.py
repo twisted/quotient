@@ -25,17 +25,16 @@ from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import Scrollable, ScrollableView
 
-from xquotient import mimepart, equotient, compose, renderers, mimeutil, smtpout, spam
+from xquotient import renderers, spam
 from xquotient.filter import Focus
-from xquotient.exmess import Message, getMessageSources, MailboxSelector
-
+from xquotient.exmess import (Message, getMessageSources, MailboxSelector,
+                              MessageActions, ActionlessMessageDetail)
 from xquotient.exmess import (READ_STATUS, UNREAD_STATUS, CLEAN_STATUS,
                               INBOX_STATUS, ARCHIVE_STATUS, DEFERRED_STATUS,
                               OUTBOX_STATUS, BOUNCED_STATUS, SENT_STATUS,
-                              SPAM_STATUS, TRASH_STATUS, SENDER_RELATION,
-                              COPY_RELATION, BLIND_COPY_RELATION, DRAFT_STATUS,
-                              RECIPIENT_RELATION, FOCUS_STATUS, REPLIED_STATUS,
-                              FORWARDED_STATUS, REDIRECTED_STATUS)
+                              SPAM_STATUS, TRASH_STATUS, DRAFT_STATUS,
+                              FOCUS_STATUS)
+from xquotient.compose import Composer, ComposeFragment
 
 from xquotient.mail import MessageSource, DeliveryAgent
 from xquotient.quotientapp import QuotientPreferenceCollection, MessageDisplayPreferenceCollection
@@ -48,73 +47,6 @@ VIEWS = [FOCUS_STATUS, INBOX_STATUS, ARCHIVE_STATUS, u'all', DEFERRED_STATUS,
 # messages first
 TOUCH_ONCE_VIEWS = [INBOX_STATUS, FOCUS_STATUS]
 
-
-
-def quoteBody(m, maxwidth=78):
-    for part in m.walkMessage(prefer='text/plain'):
-        if part.type is None or part.type == 'text/plain':
-            break
-    else:
-        return ''
-
-    format = part.part.getParam('format')
-    payload = part.part.getUnicodeBody()
-    if format == 'flowed':
-        para = mimepart.FlowedParagraph.fromRFC2646(payload)
-    else:
-        para = mimepart.FixedParagraph.fromString(payload)
-    newtext = renderers.replaceIllegalChars(para.asRFC2646(maxwidth-2))
-
-    return [ '\n>'.join(newtext.split('\r\n')) ]
-
-
-def reSubject(m, pfx='Re: '):
-    newsubject = m.subject
-    if not newsubject.lower().startswith(pfx.lower()):
-        newsubject = pfx + newsubject
-    return newsubject
-
-
-def replyTo(m):
-    """
-    Figure out the address(es) that a reply to the message C{m} should be sent to.
-
-    @type m: L{xquotient.exmess.Message}
-    @rtype: sequence of L{xquotient.mimeutil.EmailAddress}
-    """
-    # FIXME this should be a method on Message or something
-    try:
-        recipient = m.impl.getHeader(u'reply-to')
-    except equotient.NoSuchHeader:
-        recipient = m.sender
-    return mimeutil.parseEmailAddresses(recipient, mimeEncoded=False)
-
-
-def replyToAll(m):
-    """
-    Figure out the address(es) that a reply to all people involved in message
-    C{m} should be sent to.
-
-    @type m: L{xquotient.exmess.Message}
-    @return: Mapping of header names to sequences of
-    L{xquotient.mimeutil.EmailAddress} instances.  Keys are 'to', 'cc' and
-    'bcc'.
-    @rtype: C{dict}
-    """
-    fromAddrs = list(m.store.query(smtpout.FromAddress))
-    fromAddrs = set(a.address for a in fromAddrs)
-
-    relToKey = {SENDER_RELATION: 'to',
-                RECIPIENT_RELATION: 'to',
-                COPY_RELATION: 'cc',
-                BLIND_COPY_RELATION: 'bcc'}
-    addrs = {}
-
-    for (rel, addr) in m.impl.relatedAddresses():
-        if rel not in relToKey or addr.email in fromAddrs:
-            continue
-        addrs.setdefault(relToKey[rel], []).append(addr)
-    return addrs
 
 
 def _viewSelectionToMailboxSelector(store, viewSelection):
@@ -571,6 +503,10 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     renders.
 
     @ivar inbox: The L{Inbox} which serves as the model for this view.
+
+    @ivar messageDetailFragmentFactory: the class which should be used to
+    render L{xquotient.exmess.Message} objects.  Defaults to
+    L{ActionlessMessageDetail}
     """
     implements(ixmantissa.INavigableFragment)
 
@@ -632,8 +568,21 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         return (self.inbox.uiComplexity,)
 
 
+
+    messageDetailFragmentFactory = ActionlessMessageDetail
+
+
+
     def _messageFragment(self, message):
-        f = ixmantissa.INavigableFragment(message)
+        """
+        Return a fragment which will render C{message}
+
+        @param message: the message to render
+        @type message: L{xquotient.exmess.Message}
+
+        @rtype: L{messageDetailFragmentFactory}
+        """
+        f = self.messageDetailFragmentFactory(message)
         f.setFragmentParent(self)
         return f
 
@@ -642,6 +591,18 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         if currentMessage is None:
             return ''
         return self._messageFragment(currentMessage)
+
+
+    def messageActions(self, request, tag):
+        """
+        Renderer which returns a fragment which renders actions for the inbox
+
+        @rtype: L{MessageActions}
+        """
+        f = MessageActions()
+        f.setFragmentParent(self)
+        return f
+    renderer(messageActions)
 
 
     def messageDetail(self, request, tag):
@@ -889,115 +850,23 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
     expose(actOnMessageBatch)
 
 
-    composeFragmentFactory = compose.ComposeFragment
-
-    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None, parentAction=None):
-        composer = self.inbox.store.findUnique(compose.Composer)
-        cf = self.composeFragmentFactory(composer,
-                                         recipients=recipients,
-                                         subject=subject,
-                                         messageBody=messageBody,
-                                         attachments=attachments,
-                                         inline=True,
-                                         parentMessage=parentMessage,
-                                         parentAction=parentAction)
-        cf.setFragmentParent(self)
-        cf.docFactory = getLoader(cf.fragmentName)
-        return cf
-
-
     def getComposer(self):
         """
         Return an inline L{xquotient.compose.ComposeFragment} instance with
         empty to address, subject, message body and attacments
         """
-        return self._composeSomething()
+        f = ComposeFragment(
+            self.inbox.store.findUnique(Composer),
+            recipients=None,
+            subject=u'',
+            messageBody=u'',
+            attachments=(),
+            inline=True)
+        f.setFragmentParent(self)
+        f.docFactory = getLoader(f.fragmentName)
+        return f
     expose(getComposer)
 
-    def _getBodyForReply(self, msg):
-        """
-        Figure out helpful default body text for a reply to C{msg}
 
-        @type msg: L{xquotient.exmess.Message}
-        @rtype: C{unicode}
-        """
-        # XXX this method probably doesn't belong on InboxScreen
-        if msg.sender is not None:
-            origfrom = msg.sender
-        else:
-            origfrom = "someone who chose not to be identified"
-
-        if msg.sentWhen is not None:
-            origdate = msg.sentWhen.asHumanly()
-        else:
-            origdate = "an indeterminate time in the past"
-
-        replyhead = 'On %s, %s wrote:\n>' % (origdate, origfrom.strip())
-
-        return '\n\n\n' + replyhead + '\n> '.join(quoteBody(msg))
-
-    def replyToMessage(self, messageIdentifier):
-        curmsg = self.translator.fromWebID(messageIdentifier)
-        return self._composeSomething({'to': replyTo(curmsg)},
-                                      reSubject(curmsg),
-                                      self._getBodyForReply(curmsg),
-                                      parentMessage=curmsg,
-                                      parentAction=REPLIED_STATUS)
-    expose(replyToMessage)
-
-
-    def replyAllToMessage(self, messageIdentifier):
-        """
-        Return a L{xquotient.compose.ComposeFragment} loaded with presets that
-        might be useful for sending a reply to the message identified by
-        C{messageIdentifier} to all of the people involved in it
-
-        @param messageIdentifier: web ID
-        @type messageIdentifier: C{unicode}
-
-        @rtype: L{xquotient.compose.ComposeFragment}
-        """
-        curmsg = self.translator.fromWebID(messageIdentifier)
-        return self._composeSomething(replyToAll(curmsg),
-                                      reSubject(curmsg),
-                                      self._getBodyForReply(curmsg),
-                                      parentMessage=curmsg,
-                                      parentAction=REPLIED_STATUS)
-    expose(replyAllToMessage)
-
-
-    def redirectMessage(self, messageIdentifier):
-        msg = self.translator.fromWebID(messageIdentifier)
-
-        composer = self.inbox.store.findUnique(compose.Composer)
-
-        redirect = compose.RedirectingComposeFragment(composer, msg)
-        redirect.setFragmentParent(self)
-        redirect.docFactory = getLoader(redirect.fragmentName)
-        return redirect
-    expose(redirectMessage)
-
-
-    def forwardMessage(self, messageIdentifier):
-        curmsg = self.translator.fromWebID(messageIdentifier)
-
-        reply = ['\nBegin forwarded message:\n']
-        for hdr in u'From Date To Subject Reply-to'.split():
-            try:
-                val = curmsg.impl.getHeader(hdr)
-            except equotient.NoSuchHeader:
-                continue
-            reply.append('%s: %s' % (hdr, val))
-        reply.append('')
-        reply.extend(quoteBody(curmsg))
-
-        currentMessageDetail = self._messageFragment(curmsg)
-
-        return self._composeSomething(
-            subject=reSubject(curmsg, 'Fwd: '),
-            messageBody='\n\n' + '\n> '.join(reply),
-            attachments=currentMessageDetail.attachmentParts,
-            parentMessage=curmsg, parentAction=FORWARDED_STATUS)
-    expose(forwardMessage)
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)

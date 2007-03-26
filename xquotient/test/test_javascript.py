@@ -92,4 +92,7 @@ class QuotientJavaScriptTestSuite(JavaScriptTestSuite):
     def test_utils(self):
         return self.onetest('test_utils.js')
 
+    def test_messageActions(self):
+        return self.onetest('test_messageActions.js')
+
 setJavascriptInterpreterOrSkip(QuotientJavaScriptTestSuite)

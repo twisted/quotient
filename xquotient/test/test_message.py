@@ -6,6 +6,7 @@ from axiom.store import Store
 from axiom.item import Item
 from axiom.attributes import text, inmemory, AND
 from axiom.dependency import installOn
+from axiom.userbase import LoginMethod
 
 from nevow.testutil import AccumulatingFakeRequest as makeRequest
 from nevow.test.test_rend import deferredRender
@@ -18,14 +19,141 @@ from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               _addMessageSource, getMessageSources,
                               MessageSourceFragment, SENDER_RELATION,
                               MessageDisplayPreferenceCollection,
-                              MessageBodyFragment)
+                              MessageBodyFragment, Correspondent,
+                              REPLIED_STATUS)
 
 from xquotient.quotientapp import QuotientPreferenceCollection
-from xquotient import mimeutil
+from xquotient import mimeutil, smtpout, inbox, compose
 from xquotient.actions import SenderPersonFragment
 from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  DummyMessageImplWithABunchOfAddresses)
-from xquotient.exmess import Correspondent
+from xquotient.test.test_inbox import testMessageFactory
+from xquotient.mimepart import Header, MIMEPart
+
+
+class ComposeActionsTestCase(TestCase):
+    """
+    Tests for the compose-related actions of L{xquotient.exmess.MessageDetail}
+    (reply, forward, etc) and related functionality
+    """
+
+    def setUp(self):
+        self.store = Store()
+
+        LoginMethod(store=self.store, internal=False, protocol=u'email',
+                localpart=u'recipient', domain=u'host', verified=True,
+                account=self.store)
+
+        fromAddr = smtpout.FromAddress(
+            address=u'recipient@host', store=self.store)
+        installOn(inbox.Inbox(store=self.store), self.store)
+        installOn(compose.Composer(store=self.store), self.store)
+
+        self.msg = testMessageFactory(
+                    store=self.store,
+                    spam=False,
+                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
+        installOn(self.msg, self.store)
+        self.msgDetail = MessageDetail(self.msg)
+
+    def _recipientsToStrings(self, recipients):
+        """
+        Convert a mapping of "strings to lists of
+        L{xquotient.mimeutil.EmailAddress} instances" into a mapping of
+        "strings to lists of string email addresses"
+        """
+        result = {}
+        for (k, v) in recipients.iteritems():
+            result[k] = list(e.email for e in v)
+        return result
+
+    def test_replyToAll(self):
+        """
+        Test L{xquotient.exmess.MessageDetail.replyAll}
+        """
+        self.assertEquals(
+            self._recipientsToStrings(
+                self.msgDetail.replyAll().recipients),
+            {'bcc': ['blind-copy@host'],
+             'cc': ['copy@host'],
+             'to': ['sender@host', 'recipient2@host']})
+
+
+    def test_replyToAllFromAddress(self):
+        """
+        Test that L{xquotient.exmess.MessageDetail.replyAll} doesn't include
+        addresses of L{xquotient.smtpout.FromAddress} items that exist in the
+        same store as the message that is being replied to
+        """
+        addrs = set(u'blind-copy@host copy@host sender@host recipient2@host'.split())
+        for addr in addrs:
+            fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
+            gotAddrs = set()
+            for l in self.msgDetail.replyAll().recipients.itervalues():
+                gotAddrs.update(e.email for e in l)
+            self.assertEquals(
+                gotAddrs,
+                addrs - set([addr]))
+            fromAddr.deleteFromStore()
+
+
+
+class MoreComposeActionsTestCase(TestCase):
+    """
+    Test compose-action related stuff that requires an on-disk store.
+    """
+
+    def setUp(self):
+        self.store = Store(dbdir=self.mktemp())
+
+        installOn(inbox.Inbox(store=self.store), self.store)
+        self.composer = compose.Composer(store=self.store)
+        installOn(self.composer, self.store)
+
+        LoginMethod(store=self.store, internal=False, protocol=u'email',
+                localpart=u'recipient', domain=u'host', verified=True,
+                account=self.store)
+
+        self.msg = testMessageFactory(
+                    store=self.store,
+                    spam=False,
+                    impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
+        self.msgDetail = MessageDetail(self.msg)
+
+
+
+    def test_setStatus(self):
+        """
+        Test that statuses requested for parent messages get set after
+        the created message is sent.
+        """
+        self.composer.__dict__['sendMessage'] = lambda fromA, toA, msg: None
+        class MsgStub:
+            impl = MIMEPart()
+            statuses = None
+            def addStatus(self, status):
+                if self.statuses is None:
+                    self.statuses = [status]
+                else:
+                    self.statuses.append(status)
+
+        parent = MsgStub()
+        parent.impl.headers = [Header("message-id", "<msg99@example.com>"),
+                               Header("references", "<msg98@example.com>"),
+                               Header("references", "<msg97@example.com>")]
+
+        toAddresses = [mimeutil.EmailAddress(
+            'testuser@example.com',
+            mimeEncoded=False)]
+        cf = self.msgDetail._composeSomething(
+            toAddresses,
+            u'Sup dood', u'A body', [], parent, REPLIED_STATUS)
+        cf._sendOrSave(self.store.findFirst(smtpout.FromAddress),
+                       toAddresses, u'Sup dood', u'A body',
+                       [], [], [], False)
+        self.assertEqual(parent.statuses, [REPLIED_STATUS])
+
+
 
 class UtilityTestCase(TestCase):
     """

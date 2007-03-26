@@ -86,6 +86,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         Test rendering of message detail for an extremely complex message.
         """
         msg = self.store.findUnique(Message)
+        msg.classifyClean()
         return renderLivePage(
                    ThemedFragmentWrapper(
                        MessageDetail(msg)))
@@ -118,7 +119,7 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
     def test_inboxComposeFragmentRendering(self):
         """
         Test rendering of the L{xquotient.compose.ComposeFragment} returned
-        from L{xquotient.inbox.Inbox.getComposer}
+        from L{xquotient.inbox.InboxScreen.getComposer}
         """
         installOn(compose.Composer(store=self.store), self.store)
 

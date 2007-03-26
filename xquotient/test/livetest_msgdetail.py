@@ -13,7 +13,7 @@ from nevow.athena import expose
 from xmantissa.webtheme import getLoader
 from xmantissa import people
 
-from xquotient.exmess import Message, MessageDetail, MessageBodyFragment
+from xquotient.exmess import Message, MessageDetail, MessageBodyFragment, MessageActions
 from xquotient.inbox import Inbox
 from xquotient import equotient
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
@@ -46,8 +46,11 @@ class _Part(Item):
     def guessSentTime(self, default):
         return Time()
 
-    def getContentType(self):
-        return u'text/plain'
+    def getAllReplyAddresses(self):
+        return {}
+
+    def getReplyAddresses(self):
+        return []
 
 
 
@@ -79,14 +82,17 @@ class _MsgDetailTestMixin(object):
         """
         s = self._setUpStore()
 
-        return Message(store=s,
-                       sender=u'sender@host',
-                       senderDisplay=u'Sender',
-                       recipient=u'recipient@host',
-                       subject=u'the subject',
-                       impl=_Part(store=s),
-                       sentWhen=Time.fromPOSIXTimestamp(0),
-                       receivedWhen=Time.fromPOSIXTimestamp(1))
+        m = Message.createIncoming(s, _Part(store=s), u'test://test')
+        m.subject = u'the subject'
+        m.sender = u'sender@host'
+        m.senderDisplay = u'Sender'
+        m.recipient = u'recipient@host'
+        m.sentWhen = Time.fromPOSIXTimestamp(0)
+        m.receivedWhen = Time.fromPOSIXTimestamp(1)
+        m.classifyClean()
+        return m
+
+
 
 class MsgDetailTestCase(testcase.TestCase, _MsgDetailTestMixin):
     """
@@ -305,6 +311,21 @@ class MsgBodyTestCase(testcase.TestCase, MIMEReceiverMixin):
                 PartMaker('text/plain', 'this is the text/plain'),
                 PartMaker('text/html', 'this is the text/html')).make())
         f = MessageBodyFragment(p.message, 'text/plain')
+        f.setFragmentParent(self)
+        return f
+    expose(setUp)
+
+
+
+class ActionsTestCase(testcase.TestCase):
+    """
+    Tests for Quotient.Message's actions stuff
+    """
+    jsClass = u'Quotient.Test.ActionsTestCase'
+
+
+    def setUp(self):
+        f = MessageActions()
         f.setFragmentParent(self)
         return f
     expose(setUp)

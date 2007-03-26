@@ -1,7 +1,7 @@
 # -*- test-case-name: xquotient.test.test_compose -*-
 from email import (Parser as P, Generator as G, MIMEMultipart as MMP,
-                   MIMEText as MT, MIMEMessage as MM, MIMEBase as MB,
-                   Header as MH, Charset as MC, Utils as EU, Encoders as EE)
+                   MIMEText as MT, MIMEMessage as MM, Header as MH,
+                   Utils as EU)
 
 import StringIO as S
 
@@ -20,7 +20,6 @@ from axiom.dependency import dependsOn
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa import webnav, ixmantissa, people, liveform, prefs
 from xmantissa.webapp import PrivateApplication
-from xmantissa.scrolltable import ScrollingFragment
 from xmantissa.webtheme import getLoader
 
 from xquotient import iquotient, equotient, renderers, mimeutil
@@ -28,8 +27,7 @@ from xquotient import iquotient, equotient, renderers, mimeutil
 from smtpout import (FromAddress, MessageDelivery,
                      _getFromAddressFromStore, FromAddressConfigFragment)
 
-from xquotient.exmess import MessageDetail, REDIRECTED_STATUS
-from xquotient.mimestorage import Part
+from xquotient.exmess import ActionlessMessageDetail, REDIRECTED_STATUS
 from xquotient.mail import MailDeliveryAgent, DeliveryAgent
 from xquotient.mimebakery import saveDraft, sendMail
 
@@ -720,7 +718,13 @@ class RedirectingComposeFragment(liveform.LiveFormFragment, renderers.ButtonRend
 
 
     def _getMessageBody(self):
-        f = MessageDetail(self.message)
+        """
+        Get a widget which will be used to render the body of the message
+        we're redirecting
+
+        @rtype: L{ActionlessMessageDetail}
+        """
+        f = ActionlessMessageDetail(self.message)
         f.setFragmentParent(self)
         f.docFactory = getLoader(f.fragmentName)
         return f

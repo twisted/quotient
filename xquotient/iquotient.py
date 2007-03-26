@@ -170,4 +170,22 @@ class IMessageData(Interface):
         label, and the second an L{IMessageData}
         """
 
+    def getAllReplyAddresses():
+        """
+        Figure out the address(es) that a reply to all people involved this
+        message should go to
 
+        @return: Mapping of header names to sequences of
+        L{xquotient.mimeutil.EmailAddress} instances.  Keys are 'to', 'cc' and
+        'bcc'.
+        @rtype: C{dict}
+        """
+
+
+    def getReplyAddresses():
+        """
+        Figure out the address(es) that a reply to this message should be sent
+        to.
+
+        @rtype: sequence of L{xquotient.mimeutil.EmailAddress}
+        """
