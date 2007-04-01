@@ -42,7 +42,7 @@
     <span class="delete-button" style="display: none">
       <nevow:invisible nevow:render="button">
         <a href="#">
-          <athena:handler event="onclick" handler="dom_trash" />
+          <athena:handler event="onclick" handler="dom_delete" />
           delete
         </a>
       </nevow:invisible>
@@ -50,7 +50,7 @@
     <span class="undelete-button" style="display: none">
       <nevow:invisible nevow:render="button">
         <a href="#">
-          <athena:handler event="onclick" handler="dom_untrash" />
+          <athena:handler event="onclick" handler="dom_undelete" />
           undelete
         </a>
       </nevow:invisible>
