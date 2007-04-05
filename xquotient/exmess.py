@@ -2331,7 +2331,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         return personStan
 
     def render_headerPanel(self, ctx, data):
-        tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone'))
+        tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone').encode('ascii'))
         sentWhen = self.original.sentWhen
 
         sentWhenTerse = sentWhen.asHumanly(tzinfo)
