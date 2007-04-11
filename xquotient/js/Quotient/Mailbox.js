@@ -755,8 +755,6 @@ Quotient.Mailbox.Controller.methods(
         self.contentTable = contentTableNodes.table;
         self.contentTableGrid = contentTableNodes.grid;
 
-        self.setupMailViewNodes();
-
         self.messageDetail = self.firstWithClass(self.contentTableGrid[0][2], "message-detail");
 
 
@@ -769,7 +767,6 @@ Quotient.Mailbox.Controller.methods(
         self.ypos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail);
         self.messageBlockYPos = Divmod.Runtime.theRuntime.findPosY(self.messageDetail.parentNode);
 
-        self.viewPaneCell = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-cell");
         self.viewShortcutSelect = self.firstWithClass(self.node, "view-shortcut-container");
 
         var scrollNode = self.firstNodeByAttribute("athena:class", "Quotient.Mailbox.ScrollingWidget");
@@ -908,30 +905,6 @@ Quotient.Mailbox.Controller.methods(
         }
         node.className = "selected-complexity-icon";
         self.recalculateMsgDetailWidth(false);
-    },
-
-    function _getViewCountNode(self, view) {
-        var viewNode = self.mailViewNodes[view];
-        if (viewNode === undefined || viewNode === null) {
-            throw new Error("Request for invalid view: " + view);
-        }
-        var count = Divmod.Runtime.theRuntime.firstNodeByAttribute(
-            viewNode.parentNode, 'class', 'count').firstChild;
-        return count;
-    },
-
-    /**
-     * Return the count of unread messages in the given view.
-     *
-     * @param view: One of "all", "inbox", "spam" or "sent".
-     */
-    function getUnreadCountForView(self, view) {
-        return parseInt(self._getViewCountNode(view).nodeValue);
-    },
-
-    function setUnreadCountForView(self, view, count) {
-        var countNode = self._getViewCountNode(view);
-        countNode.nodeValue = String(count);
     },
 
     /**
@@ -1199,9 +1172,9 @@ Quotient.Mailbox.Controller.methods(
      * @return: undefined
      */
     function decrementMailViewCount(self, viewName, byHowMuch) {
-        self.setUnreadCountForView(
-            viewName,
-            self.getUnreadCountForView(viewName) - byHowMuch);
+        /*
+         * XXX Re-implement this
+         */
     },
 
     /**
@@ -1217,21 +1190,6 @@ Quotient.Mailbox.Controller.methods(
 
         self.decrementMailViewCount(
             self.scrollWidget.viewSelection["view"], byHowMuch);
-    },
-
-    /**
-     * Update the counts that are displayed next
-     * to the names of mailbox views in the view selector
-     *
-     * @param counts: mapping of view names to unread
-     *                message counts
-     */
-    function updateMailViewCounts(self, counts) {
-        var cnode;
-        for(var k in counts) {
-            cnode = self.firstWithClass(self.mailViewNodes[k], "count");
-            cnode.firstChild.nodeValue = counts[k];
-        }
     },
 
     function delayedLoad(self, complexityLevel) {
@@ -1576,16 +1534,6 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Call chooseMailView with the view name contained in the child node of
-     * C{viewNode} with class "opt-name".
-     */
-    function chooseMailViewByNode(self, viewNode) {
-        var view = Divmod.Runtime.theRuntime.firstNodeByAttribute(
-            viewNode, 'class', 'opt-name');
-        return self.chooseMailView(view.firstChild.nodeValue.toLowerCase());
-    },
-
-    /**
      * Call chooseMailView with the view contained in the value of attribute
      * of the view shortcut <select> C{shortcutNode}
      */
@@ -1603,7 +1551,6 @@ Quotient.Mailbox.Controller.methods(
      */
     function chooseMailView(self, viewName) {
         self._selectViewShortcut(viewName);
-        self._selectListOption(self.mailViewNodes[viewName].parentNode);
         self._setupActionButtonsForView(viewName);
 
         return self.changeViewSelection("view", viewName);
@@ -1681,36 +1628,6 @@ Quotient.Mailbox.Controller.methods(
             personKey = null;
         }
         return self.changeViewSelection("person", personKey);
-    },
-
-    function setupMailViewNodes(self) {
-        if (!self.mailViewBody) {
-            var mailViewPane = self.firstWithClass(self.contentTableGrid[0][0], "view-pane-content");
-            var mailViewBody = self.firstWithClass(mailViewPane, "pane-body");
-            self.mailViewBody = self.getFirstElementByTagNameShallow(mailViewBody, "div");
-        }
-
-        var nodes = {};
-        for (var view in self.viewToActions) {
-            nodes[view] = null;
-        }
-        var e, nameNode, name;
-
-        for(var i = 0; i < self.mailViewBody.childNodes.length; i++) {
-            e = self.mailViewBody.childNodes[i];
-            try {
-                nameNode = Divmod.Runtime.theRuntime.firstNodeByAttribute(
-                    e, 'class', 'opt-name');
-            } catch (err) {
-                if (err instanceof Divmod.Runtime.NodeAttributeError) {
-                    continue;
-                }
-                throw err;
-            }
-            name = nameNode.firstChild.nodeValue.toLowerCase();
-            nodes[name] = e.firstChild.nextSibling;
-        }
-        self.mailViewNodes = nodes;
     },
 
 

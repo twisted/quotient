@@ -44,7 +44,8 @@
         ><nevow:slot name="personKey" /></span></div>
   </div>
 
-  <div nevow:pattern="mailViewChooser" class="view-chooser">
+<!--
+    <div nevow:pattern="mailViewChooser" class="view-chooser">
     <div nevow:pattern="mailViewChoice" class="list-option">
       <athena:handler event="onclick" handler="chooseMailViewByNode" />
       <span class="opt-name"><nevow:slot name="mailViewName" /></span>
@@ -53,6 +54,7 @@
       ><span class="opt-name"><nevow:slot name="mailViewName" /></span>
       (<span class="count"><nevow:slot name="count" /></span>)</div>
   </div>
+-->
 
   <div class="pane-body" nevow:pattern="pane-body"
     style="position: absolute; top: -1000px; left: -1000px;">
@@ -128,6 +130,7 @@
       <table style="height: 100%; width: 100%" cellpadding="0" cellspacing="0" class="content-table">
         <tbody>
           <tr valign="top">
+<!--
             <td class="view-pane-cell" style="display: none">
               <div class="view-pane-container">
                 <div class="view-pane">
@@ -138,6 +141,7 @@
                 </div>
               </div>
             </td>
+-->
             <td class="scrolltable-cell">
               <div class="scrolltable-container" style="top: -1000px; left: -1000px">
                 <div style="position: absolute; z-index: 99; display: none" class="throbber">
