@@ -1077,3 +1077,26 @@ Quotient.Message.Source.methods(
         self.widgetParent.showMessageBody();
         return false;
     });
+
+
+/*
+ * And now for some model code.
+ */
+
+/**
+ * Model object representing message data.
+ *
+ * @ivar headers: An object mapping header keys to header values.  Value types
+ * are determined by their keys.
+ *
+ * @ivar body: An object representing the body of the message.  The type
+ * depends.
+ *
+ */
+Quotient.Message.Message = Divmod.Class.subclass('Quotient.Message.Message');
+Quotient.Message.Message.methods(
+    function __init__(self, webID, headers, body) {
+        self.webID = webID;
+        self.headers = headers;
+        self.body = body;
+    });

@@ -24,6 +24,7 @@ from xmantissa.webapp import PrivateApplication
 from xmantissa.fragmentutils import dictFillSlots
 from xmantissa.publicresource import getLoader
 from xmantissa.scrolltable import Scrollable, ScrollableView
+from xmantissa.webtheme import ThemedElement
 
 from xquotient import renderers, spam
 from xquotient.filter import Focus
@@ -870,3 +871,4 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
 
 registerAdapter(InboxScreen, Inbox, ixmantissa.INavigableFragment)
+

@@ -23,6 +23,7 @@ from xquotient.mail import DeliveryAgent
 from xquotient.iquotient import IMessageData
 from xquotient.mimeutil import EmailAddress
 from xquotient import smtpout
+from xquotient.equotient import NoSuchHeader
 
 from xquotient.exmess import (SENDER_RELATION, RECIPIENT_RELATION,
                               COPY_RELATION, BLIND_COPY_RELATION)
@@ -156,6 +157,8 @@ class DummyMessageImplementationMixin:
     def getAllReplyAddresses(self):
         return {}
 
+    def getHeader(self, name):
+        raise NoSuchHeader(name)
 
 
 class DummyMessageImplementation(Item, DummyMessageImplementationMixin):

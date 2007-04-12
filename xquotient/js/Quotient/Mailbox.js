@@ -2283,3 +2283,38 @@ Quotient.Mailbox.Controller.methods(
                 messageBody.style.fontSize = self.fontSize;
             });
     });
+
+
+/*
+ * New things begin here.
+ */
+Quotient.Mailbox.Mailbox = Nevow.Athena.Widget.subclass('Quotient.Mailbox.Mailbox');
+Quotient.Mailbox.Mailbox.methods(
+    function __init__(self, node, webID) {
+        Quotient.Mailbox.Mailbox.upcall(self, '__init__', node);
+        self.webID = webID;
+    },
+
+    /**
+     * Hook the initial load event to retrieve the first message from the
+     * server and display it.
+     */
+    function loaded(self) {
+        self.activeMessageChanged({webID: self.webID});
+    },
+
+    function activeMessageChanged(self, message) {
+        var d = self.callRemote('getMessageDetail', message.webID);
+        d.addCallback(
+            function(messageDetailInfo) {
+                return self.addChildWidgetFromWidgetInfo(messageDetailInfo);
+            });
+        d.addCallback(
+            function(widget) {
+                if (self.widget !== undefined) {
+                    self.widget.detach();
+                }
+                self.widget = widget;
+                self.node.appendChild(widget.node);
+            });
+    });

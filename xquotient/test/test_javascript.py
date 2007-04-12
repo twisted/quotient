@@ -17,6 +17,7 @@ from twisted.internet import reactor
 
 from nevow.testutil import setJavascriptInterpreterOrSkip
 from nevow.jsutil import generateTestScript
+from nevow.testutil import JavaScriptTestCase
 
 # XXX TODO: Rewrite all of this use Divmod.UnitTest instead.
 class _JavaScriptTestSuiteProtocol(ProcessProtocol):
@@ -96,3 +97,9 @@ class QuotientJavaScriptTestSuite(JavaScriptTestSuite):
         return self.onetest('test_messageActions.js')
 
 setJavascriptInterpreterOrSkip(QuotientJavaScriptTestSuite)
+
+
+
+class MailboxJavaScriptTests(JavaScriptTestCase):
+    def test_mailbox(self):
+        return 'Quotient.Tests.TestMailbox'

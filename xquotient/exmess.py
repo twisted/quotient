@@ -2474,13 +2474,16 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
     def getMoreDetailSetting(self):
         if self.inbox is None:
             from xquotient.inbox import Inbox
-            self.inbox = self.original.store.findUnique(Inbox)
+            self.inbox = self.original.store.findUnique(Inbox, default=None)
+            if self.inbox is None:
+                return True
         return self.inbox.showMoreDetail
     expose(getMoreDetailSetting)
 
 
     def persistMoreDetailSetting(self, value):
-        self.inbox.showMoreDetail = value
+        if self.inbox is not None:
+            self.inbox.showMoreDetail = value
     expose(persistMoreDetailSetting)
 
 
