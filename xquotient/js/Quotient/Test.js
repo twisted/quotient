@@ -1852,6 +1852,34 @@ Quotient.Test.ControllerTestCase.methods(
         return d;
     },
 
+    /**
+     * Test that a boomerang never appears on any messages in the inbox view
+     * when a message is deferred
+     */
+    function test_noInboxBoomerang(self) {
+        var d = self.setUp();
+        d.addCallback(
+            function(ignored) {
+                return self.controllerWidget.messageAction_defer({
+                    days: 0, hours: 1, minutes: 0});
+            });
+        d.addCallback(
+            function(ignored) {
+                function boomerangCount(node) {
+                    return Nevow.Athena.NodesByAttribute(
+                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        ).length;
+                }
+                self.assertEqual(
+                    Nevow.Athena.NodesByAttribute(
+                        self.controllerWidget.scrollWidget.node,
+                        'src',
+                        '/Quotient/static/images/boomerang.gif').length,
+                    0);
+            });
+        return d;
+
+    },
 
     /**
      * Same as test_deferDisplay, except for a whole group.

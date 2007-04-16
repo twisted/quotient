@@ -2016,7 +2016,7 @@ Quotient.Mailbox.Controller.methods(
         var d = self.touch("defer", destructive, period);
         d.addCallback(
             function(passThrough) {
-                if (!batchAction) {
+                if (!destructive) {
                     self._deferSelectedRows();
                 }
                 return passThrough;
