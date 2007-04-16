@@ -8,7 +8,7 @@ from axiom.attributes import text, inmemory, AND
 from axiom.dependency import installOn
 from axiom.userbase import LoginMethod
 
-from nevow.testutil import AccumulatingFakeRequest as makeRequest
+from nevow.testutil import AccumulatingFakeRequest as makeRequest, renderPage
 from nevow.test.test_rend import deferredRender
 
 from xmantissa.webapp import PrivateApplication
@@ -20,7 +20,8 @@ from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               MessageSourceFragment, SENDER_RELATION,
                               MessageDisplayPreferenceCollection,
                               MessageBodyFragment, Correspondent,
-                              REPLIED_STATUS)
+                              REPLIED_STATUS, PrintableMessageResource,
+                              ActionlessMessageDetail)
 
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import mimeutil, smtpout, inbox, compose
@@ -583,3 +584,25 @@ class MessageBodyFragmentTestCase(TestCase, MIMEReceiverMixin):
 
         self.assertEqual(
             list(messageBody.getAlternateMIMETypes()), [])
+
+
+
+class PrintableMessageResourceTestCase(TestCase, MIMEReceiverMixin):
+    """
+    Tests for L{xquotient.exmess.PrintableMessageResource}
+    """
+    def setUp(self):
+        self.setUpMailStuff()
+
+    boringMessage = PartMaker('text/plain', 'plain').make()
+
+    def test_noActions(self):
+        """
+        Test that L{PrintableMessageResource.renderHTTP} returns something
+        wrapping an L{ActionlessMessageDetail}
+        """
+        # not the best test.
+        m = self.createMIMEReceiver().feedStringNow(
+            self.boringMessage).message
+        res = PrintableMessageResource(m).renderHTTP(None)
+        self.failUnless(isinstance(res.fragment, ActionlessMessageDetail))

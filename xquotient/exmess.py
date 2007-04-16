@@ -2048,7 +2048,7 @@ class PrintableMessageResource(rend.Page):
 
         privapp = self.message.store.findUnique(webapp.PrivateApplication)
 
-        frag = ixmantissa.INavigableFragment(self.message)
+        frag = ActionlessMessageDetail(self.message)
         frag.printing = True
 
         res = webapp.GenericNavigationAthenaPage(
