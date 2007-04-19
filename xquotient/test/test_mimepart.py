@@ -450,9 +450,21 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, PersistenceMixin)
         def checkAttachments(msgitem):
             for att in msgitem.walkAttachments():
                 self.assertNotEquals(att.part.bodyLength, None)
+                self.assertNotEquals(att.part.bodyLength, 0)
         self._messageTest(messageWithEmbeddedMessage, checkAttachments)
         self._messageTest(truncatedMultipartMessage, checkAttachments)
 
+
+    def testRFC822PartLength(self):
+        """
+        Ensure that message/rfc822 parts have the correct bodyLength.
+        """
+
+        def checkAttachments(msgitem):
+            for att in msgitem.walkAttachments():
+                if att.part.getContentType() == u"message/rfc822":
+                    self.assertEquals(att.part.bodyLength, 3428)
+        self._messageTest(messageWithEmbeddedMessage, checkAttachments)
 
     def testPartIDs(self):
         mr = self.setUpMailStuff()

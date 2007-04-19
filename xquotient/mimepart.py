@@ -483,6 +483,10 @@ class HeaderBodyParser(object):
         return getattr(self, "parse_" + self.bodyMode)(line, linebegin, lineend)
 
 class MIMEMessageParser(HeaderBodyParser):
+    """
+    Parser for MIME messages. Produces a Part object (with various
+    child parts, if a multipart message).
+    """
     bodyFile = None
     def startBody(self, linebegin, lineend):
         HeaderBodyParser.startBody(self, linebegin, lineend)
@@ -528,6 +532,13 @@ class MIMEMessageParser(HeaderBodyParser):
         return self
 
     def parse_rfc822(self, line, b, e):
+        """
+        Parse a message whose body is of type message/rfc822.
+
+        Note that this is distinct from parsing a multipart message
+        with a message/rfc822 part. For that, see
+        L{MIMEPartParser.parse_rfc822}.
+        """
         np = self.subpart(parent=self, factory=MIMEMessageParser)
         np.lineReceived(line, b, e)
         return np
@@ -563,20 +574,42 @@ class MIMEMessageParser(HeaderBodyParser):
         return self
 
 class MIMEPartParser(MIMEMessageParser):
+    """
+    Parser for multipart MIME content. Creates a child Part object for
+    the headers and body of each part. A notable special case is
+    message/rfc822 parts, for which a further subpart is produced,
+    containing the result of parsing the contents as a MIME message.
+    """
+
+    ## extraPart, when parsing a message/rfc822 part, refers to the
+    ## intermediate Part object -- that is, the child of a multipart
+    ## and the parent of the message object itself. It's required so
+    ## that bodyLength can be set on it properly, so that it can be
+    ## displayed to the user.
+    extraPart = None
     def parseBody(self, line, linebegin, lineend):
         if line.strip('\r\n') == self.parent.boundary:
             # my body is over now - this is a boundary line so don't count it
             self.part.bodyLength = linebegin - self.part.bodyOffset
+            if self.extraPart is not None:
+                self.extraPart.bodyLength = (linebegin -
+                                             self.extraPart.bodyOffset)
+                self.extraPart = None
             return self.parent
         elif line == self.parent.finalBoundary:
             self.parent.bodyMode = 'postamble'
             self.part.bodyLength = linebegin - self.part.bodyOffset
+            if self.extraPart is not None:
+                self.extraPart.bodyLength = (linebegin -
+                                             self.extraPart.bodyOffset)
+                self.extraPart = None
             return self.parent
         else:
             return MIMEMessageParser.parseBody(self, line, linebegin, lineend)
 
     def parse_rfc822(self, line, linebegin, lineend):
         np = self.subpart(parent=self.parent)
+        np.extraPart = self.part
         np.lineReceived(line, linebegin, lineend)
         return np
 
