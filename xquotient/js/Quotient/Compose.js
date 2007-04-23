@@ -277,13 +277,21 @@ Quotient.Compose.Controller.methods(
         self.draftNotification = self.nodeByAttribute("class", "draft-notification");
 
         self.attachDialog = self.nodeByAttribute("class", "attach-dialog");
-        self.autoSaveInterval = 30000; /* 30 seconds */
+        self.autoSaveInterval = 30;
         self.inboxURL = self.nodeByAttribute("class", "inbox-link").href;
 
         self.startSavingDrafts();
 
         self.makeFileInputs();
         self._storeButtons();
+    },
+
+    /**
+     * Stop the draft-saving loop when the widget is removed from the page.
+     */
+    function detach(self) {
+        self.stopSavingDrafts();
+        return Quotient.Compose.Controller.upcall(self, 'detach');
     },
 
     /**
@@ -315,26 +323,23 @@ Quotient.Compose.Controller.methods(
 
     /**
      * Arrange for the state of the message being composed to be saved as a
-     * draft every C{self.autoSaveInterval} milliseconds.
+     * draft every C{self.autoSaveInterval} seconds.
      */
     function startSavingDrafts(self) {
         self._savingDrafts = true;
 
         var saveDraftLoop = function saveDraftLoop() {
             self._draftCall = null;
-            if (self._savingDrafts) {
-                var saved = self.saveDraft(false);
-                saved.addCallback(
-                    function(ignored) {
-                        self._draftCall = setTimeout(saveDraftLoop, self.autoSaveInterval);
-                    });
-            }
+            var saved = self.saveDraft();
+            saved.addCallback(
+                function(ignored) {
+                    if (self._savingDrafts) {
+                        self._draftCall = self.callLater(self.autoSaveInterval, saveDraftLoop);
+                    }
+                });
         };
 
-        /*
-         * XXX We need a scheduling API
-         */
-        self._draftCall = setTimeout(saveDraftLoop, self.autoSaveInterval);
+        self._draftCall = self.callLater(self.autoSaveInterval, saveDraftLoop);
     },
 
     /**
@@ -342,11 +347,8 @@ Quotient.Compose.Controller.methods(
      */
     function stopSavingDrafts(self) {
         self._savingDrafts = false;
-        /*
-         * XXX We need a scheduling API
-         */
         if (self._draftCall != null) {
-            clearTimeout(self._draftCall);
+            self._draftCall.cancel();
             self._draftCall = null;
         }
     },
@@ -442,7 +444,7 @@ Quotient.Compose.Controller.methods(
      * Send the current message state to the server to be saved as a draft.
      * Announce when this begins and ends graphically.
      */
-    function saveDraft(self, userInitiated) {
+    function saveDraft(self) {
         var showDialog = function(text, fade) {
             var elem = MochiKit.DOM.DIV({"class": "draft-dialog"}, text);
             MochiKit.DOM.replaceChildNodes(self.draftNotification, elem);

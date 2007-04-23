@@ -2038,8 +2038,25 @@ Quotient.Mailbox.Controller.methods(
      * Remove all content from the message detail area and add the given node.
      */
     function setMessageDetail(self, node) {
-        while (self.messageDetail.firstChild) {
-            self.messageDetail.removeChild(self.messageDetail.firstChild);
+        var innerNode;
+        var widget;
+        while ((innerNode = self.messageDetail.firstChild)) {
+            /*
+             * Find any widget which might own the node about to be removed and
+             * detach it.
+             */
+            try {
+                widget = Nevow.Athena.Widget.get(innerNode);
+            } catch (err) {
+                /*
+                 * Nothing here, fine.
+                 */
+                widget = null;
+            }
+            if (widget && widget.node === innerNode) {
+                widget.detach();
+            }
+            self.messageDetail.removeChild(innerNode);
         }
         self.messageDetail.appendChild(node);
     },

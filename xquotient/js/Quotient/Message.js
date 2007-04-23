@@ -808,6 +808,11 @@ Quotient.Message.MessageDetail.methods(
         var result = self.addChildWidgetFromWidgetInfo(composeInfo);
         result.addCallback(
             function(composer) {
+                if (self.composer) {
+                    self.composer.node.parentNode.removeChild(self.composer.node);
+                    self.composer.detach();
+                }
+                self.composer = composer;
                 var parentNode = self.node.parentNode;
                 parentNode.insertBefore(composer.node, self.node);
                 composer.fitInsideNode(parentNode);
@@ -821,6 +826,7 @@ Quotient.Message.MessageDetail.methods(
                 });
             result.addCallback(
                 function(ignore) {
+                    self.composer = null;
                     self.node.style.display = "";
                 });
         }

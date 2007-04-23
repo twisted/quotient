@@ -1990,6 +1990,7 @@ Quotient.Test.ControllerTestCase.methods(
                 return self.controllerWidget.messageAction_replyAll(false);
             });
         result.addCallback(self._makeComposeTester());
+        return result;
     },
 
     /**
@@ -2073,6 +2074,97 @@ Quotient.Test.ControllerTestCase.methods(
             });
         return result;
     },
+
+    /**
+     * Helper for draft saving tests.
+     *
+     * @param expectedCallCount: The number of DelayedCalls which are expected
+     * to be pending after the compose widget is obscured by the supplied
+     * function.
+     *
+     * @param occult: A function which should get rid of the compose widget
+     * somehow.
+     */
+    function _stopSavingDraftsTest(self, expectedCallCount, occult) {
+        var DelayedCall = Divmod.Runtime.DelayedCall;
+        var calls = [];
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * Steal the delayed call system.
+                 */
+                Divmod.Runtime.DelayedCall = function(delay, callable) {
+                    calls.push({
+                          delay: delay,
+                          callable: callable});
+                    function cancel() {
+                        for (var i = 0; i < calls.length; ++i) {
+                            if (calls[i].delay === delay &&
+                                calls[i].callable === callable) {
+                                calls.splice(i, 1);
+                                return;
+                            }
+                        }
+                        throw new Error("Cancelled already-cancelled event.");
+                    };
+                    return {cancel: cancel};
+                };
+                return self.controllerWidget.messageAction_reply(false);
+            });
+        result.addCallback(occult);
+        result.addCallback(
+            function(ignored) {
+                /*
+                 * There should be only one delayed call now.
+                 */
+                self.assertEqual(calls.length, expectedCallCount);
+            });
+        result.addBoth(
+            function(passthrough) {
+                /*
+                 * Put the real DelayedCall back.
+                 */
+                Divmod.Runtime.DelayedCall = DelayedCall;
+                return passthrough;
+            });
+        return result;
+    },
+
+    /**
+     * Verify that if a second compose widget is dumped on top of a first, the
+     * first stops scheduling drafts to be saved.
+     */
+    function test_doubleCompose(self) {
+        return self._stopSavingDraftsTest(
+            1,
+            function(ignored) {
+                /*
+                 * Dump another compose widget on top of the existing one.
+                 */
+                return self.controllerWidget.messageAction_reply(false);
+            });
+    },
+
+    /**
+     * Verify that if a message detail is requested while a compose widget is
+     * up, the compose widget stops scheduling draft saving calls.
+     */
+    function test_messageDetailOverCompose(self) {
+        return self._stopSavingDraftsTest(
+            0,
+            function(ignored) {
+                /*
+                 * Request that the detail for a message be displayed.
+                 */
+                var scrollWidget = self.controllerWidget.scrollWidget;
+                var scrollModel = scrollWidget.model;
+                var row = scrollModel.getRowData(0);
+                var webID = row.__id__;
+                return self.controllerWidget.fastForward(webID);
+            });
+    },
+
 
     /**
      * Test that a message in the trash can be undeleted.

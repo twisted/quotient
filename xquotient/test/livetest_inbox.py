@@ -117,6 +117,7 @@ class StubComposeFragment(LiveFragment):
     fragmentName = ComposeFragment.fragmentName
 
     def __init__(self, composer, recipients, subject, messageBody, attachments, inline, parentMessage, parentAction):
+        LiveFragment.__init__(self)
         self.composer = composer
         self.recipients = recipients
         self.subject = subject
