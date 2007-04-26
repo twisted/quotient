@@ -1643,7 +1643,7 @@ def _message4to5(m):
                             _spam=m._spam,
                             attachments=m.attachments,
                             everDeferred=m.everDeferred,
-                            # impl=m.impl,
+                            impl=m.impl,
                             read=m.read,
                             receivedWhen=m.receivedWhen,
                             recipient=m.recipient,

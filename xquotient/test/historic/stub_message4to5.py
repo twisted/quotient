@@ -8,7 +8,8 @@ from datetime import timedelta
 
 template = """From: bob@b.example.com
 To: alice@a.example.com
-Subject: message number %d
+Subject: message number %(index)d
+Date: Thu, 26 Apr 2001 22:01:%(index)02d GMT
 
 This is the body of the message.
 """
@@ -23,9 +24,10 @@ def createDatabase(s):
         mms = MIMEMessageStorer(s, s.newFile("mail", "%d.eml" % (x,)),
                                 u'migration://migration',
                                 draft = (x == 3 or x == 4))
-        for line in (template % x).splitlines():
+        for line in (template % {'index': x}).splitlines():
             mms.lineReceived(line)
         mms.messageDone()
+        mms.message.attachments = x * 2
         messages.append(mms.message)
     messages[0].classifyClean()
 
@@ -53,6 +55,8 @@ def createDatabase(s):
     messages[6].moveToTrash()
 
     messages[7].classifySpam()
+    messages[7].trainSpam()
+
 
 if __name__ == '__main__':
     saveStub(createDatabase, 11812)
