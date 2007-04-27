@@ -1,3 +1,19 @@
+0.2.1 (2007-02-23):
+  - Selection and activation tracking has been moved out of
+    Quotient.Mailbox to Mantissa.Scrolltable.
+  - Autocomplete has been moved out of Quotient into Mantissa.
+  - In-Reply-To and References headers are now added to outgoing replies.
+  - Special Focus/Spam and Focus/Trash interaction has been
+    removed. Special Focus/Outgoing interaction has been added.
+  - 'Reply all' now adds additional recipients of the original message
+    to the recipient list of the reply.
+  - Outgoing message plaintext parts are now sent as format=flowed.
+  - Messages with invalidly encoded headers are no longer rejected.
+  - The different parts of a multipart/alternative message can now be
+    chosen for display.
+  - Resent-* headers are added in the proper order now.
+  - The message scrubber has been extended with more safe tags.
+
 0.2.0  (2007-01-23):
   - Messages are now fulltext indexed on "to" addresses. The "sender" indexing
     field has been renamed to "from", for consistency.
