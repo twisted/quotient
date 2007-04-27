@@ -4,7 +4,7 @@ from twisted.trial.unittest import TestCase
 
 from axiom.store import Store
 from axiom.item import Item
-from axiom.attributes import text, inmemory, AND
+from axiom.attributes import text, inmemory, AND, integer
 from axiom.dependency import installOn
 from axiom.userbase import LoginMethod
 
@@ -203,6 +203,7 @@ class PartItem(Item):
 
     contentType = text()
     body = text()
+    bodyLength = integer()
     preferred = inmemory()
 
     def walkAttachments(self):
@@ -216,6 +217,9 @@ class PartItem(Item):
     def getUnicodeBody(self):
         assert self.body is not None
         return self.body
+
+    def getBody(self, decode=True):
+        return self.getUnicodeBody().encode('ascii')
 
     def walkMessage(self, preferred):
         self.preferred = preferred
@@ -244,6 +248,49 @@ class MessageTestCase(TestCase):
 
 
 class WebTestCase(TestCase, MIMEReceiverMixin):
+    def test_partDisplayerContentLength(self):
+        """
+        Test that L{PartDisplayer} sets the C{Content-Length} header
+        on the request.
+        """
+        s = Store()
+        installOn(PrivateApplication(store=s), s)
+        part = PartItem(
+            store=s, contentType=u'text/plain', bodyLength=31, body=u'x' * 31)
+        partDisplayer = PartDisplayer(None)
+        partDisplayer.item = part
+
+        req = makeRequest()
+        D = deferredRender(partDisplayer, req)
+        def checkLength(ign):
+            self.assertEqual(int(req.getHeader('content-length')), 31)
+        D.addCallback(checkLength)
+        return D
+
+
+    def test_partDisplayerScrubbedContentLength(self):
+        """
+        Test that L{PartDisplayer} sets the C{Content-Length} header
+        to the length of the content after it has been transformed by
+        the scrubber.
+        """
+        s = Store()
+        installOn(PrivateApplication(store=s), s)
+        body = u'<div><script>haha</script>this is ok</div>'
+        part = PartItem(
+            store=s, contentType=u'text/html', bodyLength=len(body), body=body)
+        partDisplayer = PartDisplayer(None)
+        partDisplayer.item = part
+
+        req = makeRequest()
+        D = deferredRender(partDisplayer, req)
+        def checkLength(renderedBody):
+            self.assertEqual(int(req.getHeader('content-length')),
+                             len(renderedBody))
+        D.addCallback(checkLength)
+        return D
+
+
     def _testPartDisplayerScrubbing(self, input, scrub=True):
         """
         Set up a store, a PartItem with a body of C{input},

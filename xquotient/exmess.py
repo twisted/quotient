@@ -2028,8 +2028,9 @@ class PartDisplayer(ItemGrabber):
         request = inevow.IRequest(ctx)
         ctype = self.item.getContentType()
         request.setHeader('content-type', ctype)
-        return self.renderablePart(self.item, not 'noscrub' in request.args)
-
+        tag = self.renderablePart(self.item, not 'noscrub' in request.args)
+        request.setHeader('content-length', len(tag.content))
+        return tag
 
 
 
