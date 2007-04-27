@@ -29,9 +29,9 @@ class SearchAggregatorFragment(webtheme.ThemedElement):
 
     def search(self, ctx, data):
         if self.searchResults:
-            f = scrolltable.StoreIDSequenceScrollingFragment(
+            f = scrolltable.SearchResultScrollingFragment(
                 self.store,
-                map(int, self.searchResults),
+                self.searchResults,
                 (scrolltable.UnsortableColumn(
                     exmess.Message.senderDisplay),
                  scrolltable.UnsortableColumn(
