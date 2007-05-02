@@ -686,7 +686,7 @@ Quotient.Mailbox.Controller.methods(
                       "forward", "reply", "trainSpam"],
             "archive": ["unarchive", "delete", "forward",
                         "reply", "trainSpam"],
-            "draft": ["delete"],
+            "draft": ["delete", "editDraft"],
             "spam": ["delete", "trainHam"],
             "deferred": ["forward", "reply"],
             "bounce": ['delete', 'forward'],
@@ -1958,6 +1958,16 @@ Quotient.Mailbox.Controller.methods(
      */
     function messageAction_redirect(self, reloadMessage) {
         return self._getMessageDetail().messageAction_redirect(reloadMessage);
+    },
+
+
+    /**
+     * 'Edit' message action, allow user to edit a message as a draft.
+     *
+     * @rtype: L{Divmod.Defer.Deferred}
+     */
+    function messageAction_editDraft(self) {
+        return self._getMessageDetail().messageAction_editDraft();
     },
 
     /**

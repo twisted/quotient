@@ -10,7 +10,7 @@ from axiom.dependency import installOn
 from xquotient.exmess import SPAM_STATUS, CLEAN_STATUS
 
 from xquotient import spam
-from xquotient.mimestorage import MIMEMessageStorer
+from xquotient.mimestorage import IncomingMIMEMessageStorer
 
 
 MESSAGE = """Return-path: <cannataumaybe@lib.dote.hu>
@@ -124,7 +124,7 @@ class MessageCreationMixin:
     counter = 0
     def _message(self):
         self.counter += 1
-        return MIMEMessageStorer(
+        return IncomingMIMEMessageStorer(
             self.store, self.store.newFile(str(self.counter)), u'').feedStringNow(MESSAGE).message
 
 

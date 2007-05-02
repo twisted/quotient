@@ -98,9 +98,11 @@ Quotient.Message.ActionsModel.methods(
     },
 
     /**
-     * Tell our action listener that an action needs to happen, by calling
-     * with the supplied arguments the method on the listener that corresponds
-     * to the action C{name}
+     * Tell our action listener that an action needs to happen, by calling with
+     * the supplied arguments the method on the listener that corresponds to
+     * the action C{name}.  To handle the action, a method on the current
+     * action listener (as set by C{setActionListener} will be called.  The
+     * method called is C{messageAction_<action name>}.
      *
      * @param name: the name of the action
      * @type name: C{String}
@@ -158,6 +160,11 @@ Quotient.Message.ActionsView.methods(
 
     /**
      * Fetch the node for each button that the model knows about.
+     *
+     * Buttons are retrieved from the document based on class attributes.  For
+     * each action, a node which a class of C{<action name>-button} should
+     * exist.  For example, for an action named C{archive}, a node with a class
+     * of C{archive-button} should exist.
      *
      * @rtype: object mapping button names to button nodes
      */
@@ -450,7 +457,11 @@ Quotient.Message.ActionsController.methods(
     },
 
     /**
-     * Set up a DOM event handler for each action the model knows about
+     * Set up a DOM event handler for each action the model knows about.
+     *
+     * This creates a number of methods with the C{dom_} prefix in order to
+     * handle actions from the user-interface.  One such method is created for
+     * each action which C{self.model} knows about.
      */
     function _setUpHandlers(self) {
         function makeHandler(actionName) {
@@ -988,7 +999,16 @@ Quotient.Message.MessageDetail.methods(
      */
     function messageAction_redirect(self, reloadMessage) {
         return self._doComposeAction('redirect', reloadMessage);
+    },
+
+    /**
+     * Open a compose window to use to edit the currently selected
+     * draft message.
+     */
+    function messageAction_editDraft(self) {
+        return self._doComposeAction("editDraft", false);
     });
+
 
 /**
  * Message body control code which interacts with the DOM

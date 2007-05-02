@@ -466,11 +466,13 @@ class MessageActions(ThemedElement, ButtonRenderingMixin):
         Initial arguments for JS class is a sequence of all action names
         """
         return ((ARCHIVE_ACTION, UNARCHIVE_ACTION, DELETE_ACTION,
-            UNDELETE_ACTION, DEFER_ACTION, REPLY_ACTION, FORWARD_ACTION,
-            TRAIN_SPAM_ACTION, TRAIN_HAM_ACTION),)
+                 UNDELETE_ACTION, DEFER_ACTION, REPLY_ACTION, FORWARD_ACTION,
+                 TRAIN_SPAM_ACTION, TRAIN_HAM_ACTION, EDIT_ACTION),)
 
 
 
+# Strings uniquely identifying the actions which it is possible to perform on a
+# message.
 ARCHIVE_ACTION = u'archive'
 UNARCHIVE_ACTION = u'unarchive'
 DELETE_ACTION = u'delete'
@@ -480,6 +482,7 @@ REPLY_ACTION = u'reply'
 FORWARD_ACTION = u'forward'
 TRAIN_SPAM_ACTION = u'trainSpam'
 TRAIN_HAM_ACTION = u'trainHam'
+EDIT_ACTION = u'editDraft'
 
 
 
@@ -625,6 +628,23 @@ class Message(item.Item):
     # End of schema.
 
     # Creation APIs.
+    def _associateWithImplementation(self, impl, source):
+        """
+        Hook the given IMessageData provider up to this Message as its
+        implementation.
+
+        @param impl: an L{IMessageData} provider.
+
+        @param source: a unicode string naming the source of this message.
+        """
+        impl.associateWithMessage(self)
+        self.impl = impl
+        _associateMessageSource(self, source)
+
+        now = Time()
+        self.receivedWhen = now
+        self.sentWhen = impl.guessSentTime(default=now)
+
 
     def _createBasicMessage(cls, store, impl, source):
         """
@@ -638,13 +658,7 @@ class Message(item.Item):
         @param source: a unicode string naming the source of this message.
         """
         self = cls(store=store)
-        impl.associateWithMessage(self)
-        self.impl = impl
-        _associateMessageSource(self, source)
-
-        now = Time()
-        self.receivedWhen = now
-        self.sentWhen = impl.guessSentTime(default=now)
+        self._associateWithImplementation(impl, source)
         return self
     _createBasicMessage = classmethod(_createBasicMessage)
 
@@ -2553,14 +2567,19 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
 
 
     composeFragmentFactory = None
+    draftComposeFragmentFactory = None
 
 
-    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None, parentAction=None):
+    def _composeSomething(self, recipients=None, subject=u'', messageBody=u'', attachments=(), parentMessage=None, parentAction=None, draft=None):
         """
         Return an L{xquotient.compose.ComposeFragment}, optionally preloaded
         with some information about the message to be composed.
 
-        Arguments the same as L{xquotient.compose.ComposeFragment}'s constructor
+        @type draft: L{exmess.Message}
+        @param draft: If specified, an existing Message item which is
+        to be edited in-place.
+
+        Other arguments the same as L{xquotient.compose.ComposeFragment}'s constructor
 
         @rtype: L{xquotient.compose.ComposeFragment}
         """
@@ -2572,16 +2591,23 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
             composeFragmentFactory = compose.ComposeFragment
         else:
             composeFragmentFactory = self.composeFragmentFactory
-
+        if self.draftComposeFragmentFactory is None:
+            draftComposeFragmentFactory = compose.DraftComposeFragment
+        else:
+            draftComposeFragmentFactory = self.draftComposeFragmentFactory
         composer = self.original.store.findUnique(compose.Composer)
-        cf = composeFragmentFactory(composer,
-                                    recipients=recipients,
-                                    subject=subject,
-                                    messageBody=messageBody,
-                                    attachments=attachments,
-                                    inline=True,
-                                    parentMessage=parentMessage,
-                                    parentAction=parentAction)
+
+        if draft is None:
+            cf = composeFragmentFactory(composer,
+                                        recipients=recipients,
+                                        subject=subject,
+                                        messageBody=messageBody,
+                                        attachments=attachments,
+                                        inline=True,
+                                        parentMessage=parentMessage,
+                                        parentAction=parentAction)
+        else:
+            cf = draftComposeFragmentFactory(composer, draft)
         cf.setFragmentParent(self)
         cf.docFactory = getLoader(cf.fragmentName)
         return cf
@@ -2661,6 +2687,14 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         redirect.docFactory = getLoader(redirect.fragmentName)
         return redirect
     expose(redirect)
+
+
+    def editDraft(self):
+        """
+        Retrieve a compose fragment suitable for use to edit this message.
+        """
+        return self._composeSomething(draft=self.original)
+    expose(editDraft)
 
 
 

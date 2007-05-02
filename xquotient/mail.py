@@ -163,8 +163,9 @@ class DeliveryAgent(item.Item):
         """
         Basic implementation of L{iquotient.IMIMEDelivery.createMIMEReceiver}.
         """
-        return SafeMIMEParserWrapper(mimestorage.MIMEMessageStorer(
+        return SafeMIMEParserWrapper(mimestorage.IncomingMIMEMessageStorer(
             self.store, self._createMIMESourceFile(), source))
+
 
     def _createMIMEDraftReceiver(self, source):
         """
@@ -174,12 +175,32 @@ class DeliveryAgent(item.Item):
         This should really be refactored ASAP to separate the steps of MIME
         message parsing and message delivery.
         """
-        return mimestorage.MIMEMessageStorer(
-            self.store, self._createMIMESourceFile(), source,
-            draft=True)
+        return mimestorage.DraftMIMEMessageStorer(
+            self.store, self._createMIMESourceFile(), source)
 
 
+    def _createDraftUpdateReceiver(self, message, source):
+        """
 
+        Temporary hack because the compose system is hideously complex
+        and drafts are touching too much state in the system.
+
+        This interface is wrong because::
+
+            The composer has no business knowing about the object
+            lifetimes of draft messages.  It is responsible for
+            creating them and sending them, what happens in between is
+            the concern of the user interface and the mimebakery
+            module.
+
+            The composer should not have MIME text pushed through it
+            in order to create message objects.  It should be possible
+            to create these in a much simpler way, both for ease of
+            programming and because it may be necessary to create
+            message objects when no Composer exists.
+        """
+        return mimestorage.ExistingMessageMIMEStorer(
+            self.store, self._createMIMESourceFile(), source, message)
 
 
 
@@ -443,7 +464,7 @@ class OutgoingMessageWrapper(object):
     @ivar mimeReceiver: The wrapped L{smtp.IMessage} provider.  In addition to
     providing that interface, it must also have a C{message} attribute after
     C{messageDone} returns.  This is typically expected to be an instance of
-    L{xquotient.mimestorage.MIMEMessageStorer}.
+    L{xquotient.mimestorage.IncomingMIMEMessageStorer}.
     """
     implements(smtp.IMessage)
 

@@ -30,32 +30,36 @@ from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  DummyMessageImplWithABunchOfAddresses)
 from xquotient.test.test_inbox import testMessageFactory
 from xquotient.mimepart import Header, MIMEPart
-
+from xquotient.mimebakery import createMessage
 
 class ComposeActionsTestCase(TestCase):
     """
     Tests for the compose-related actions of L{xquotient.exmess.MessageDetail}
     (reply, forward, etc) and related functionality
     """
-
     def setUp(self):
-        self.store = Store()
+        # XXX Incorrect setup.  See xquotient.test.test_compose.CompositionTestMixin
+        self.store = Store(self.mktemp())
 
         LoginMethod(store=self.store, internal=False, protocol=u'email',
                 localpart=u'recipient', domain=u'host', verified=True,
                 account=self.store)
 
-        fromAddr = smtpout.FromAddress(
+        self.fromAddr = smtpout.FromAddress(
             address=u'recipient@host', store=self.store)
-        installOn(inbox.Inbox(store=self.store), self.store)
-        installOn(compose.Composer(store=self.store), self.store)
+        self.inbox = inbox.Inbox(store=self.store)
+        installOn(self.inbox, self.store)
+        self.composer = compose.Composer(store=self.store)
+        installOn(self.composer, self.store)
+        self.defaultFromAddress = self.store.findUnique(
+            smtpout.FromAddress, smtpout.FromAddress._address == None)
 
-        self.msg = testMessageFactory(
+        self.message = testMessageFactory(
                     store=self.store,
                     spam=False,
                     impl=DummyMessageImplWithABunchOfAddresses(store=self.store))
-        installOn(self.msg, self.store)
-        self.msgDetail = MessageDetail(self.msg)
+        self.messageDetail = MessageDetail(self.message)
+
 
     def _recipientsToStrings(self, recipients):
         """
@@ -68,13 +72,14 @@ class ComposeActionsTestCase(TestCase):
             result[k] = list(e.email for e in v)
         return result
 
+
     def test_replyToAll(self):
         """
         Test L{xquotient.exmess.MessageDetail.replyAll}
         """
         self.assertEquals(
             self._recipientsToStrings(
-                self.msgDetail.replyAll().recipients),
+                self.messageDetail.replyAll().recipients),
             {'bcc': ['blind-copy@host'],
              'cc': ['copy@host'],
              'to': ['sender@host', 'recipient2@host']})
@@ -88,14 +93,60 @@ class ComposeActionsTestCase(TestCase):
         """
         addrs = set(u'blind-copy@host copy@host sender@host recipient2@host'.split())
         for addr in addrs:
-            fromAddr = smtpout.FromAddress(address=addr, store=self.msg.store)
+            fromAddr = smtpout.FromAddress(address=addr, store=self.message.store)
             gotAddrs = set()
-            for l in self.msgDetail.replyAll().recipients.itervalues():
+            for l in self.messageDetail.replyAll().recipients.itervalues():
                 gotAddrs.update(e.email for e in l)
             self.assertEquals(
                 gotAddrs,
                 addrs - set([addr]))
             fromAddr.deleteFromStore()
+
+
+    def test_createDraftComposeFragment(self):
+        """
+        Verify that an instance of L{DraftComposeFragment} which refers
+        to the correct draft item is returned by L{InboxScreen.editDraft}.
+        """
+        fragment = self.messageDetail.editDraft()
+        self.failUnless(
+            isinstance(fragment, compose.DraftComposeFragment),
+            "Got %r instead of DraftComposeFragment" % (fragment,))
+        self.assertIdentical(fragment._savedDraft, self.message)
+
+
+    def test_slotData(self):
+        """
+        Verify that L{DraftComposeFragment.slotData} returns a dictionary
+        which reflects the message which was used as the draft.
+        """
+        subject = u'subject text'
+        body = u'hello, world?\n\n'
+        to = u'alice@example.net'
+        cc = u'bob@example.net'
+        bcc = u'carol@example.net'
+        message = createMessage(
+            self.composer,
+            None,
+            None,
+            self.defaultFromAddress,
+            [mimeutil.EmailAddress(to, mimeEncoded=False)],
+            subject,
+            body,
+            [mimeutil.EmailAddress(cc, mimeEncoded=False)],
+            [mimeutil.EmailAddress(bcc, mimeEncoded=False)],
+            [],
+            )
+        fragment = self.messageDetail._composeSomething(draft=message)
+        slotData = fragment.slotData()
+        self.assertEqual(slotData['to'], to)
+        self.assertEqual(slotData['from'][0], self.defaultFromAddress)
+        self.assertEqual(slotData['subject'], subject)
+        self.assertEqual(slotData['message-body'], body)
+        self.assertEqual(slotData['cc'], cc)
+
+        # XXX This assertion should succeed.
+        # self.assertEqual(slotData['bcc'], bcc)
 
 
 

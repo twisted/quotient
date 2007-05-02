@@ -14,7 +14,9 @@ from nevow import inevow, rend, json
 from nevow.athena import expose
 
 from axiom import attributes, item, scheduler
-from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
+from axiom.upgrade import (
+    registerUpgrader, registerAttributeCopyingUpgrader,
+    registerDeletionUpgrader)
 from axiom.dependency import dependsOn
 
 from xmantissa.fragmentutils import dictFillSlots
@@ -81,6 +83,75 @@ registerUpgrader(drafts1to2, Drafts.typeName, 1, 2)
 
 
 
+class File(item.Item):
+    typeName = 'quotient_file'
+    schemaVersion = 1
+
+    type = attributes.text(allowNone=False)
+    body = attributes.path(allowNone=False)
+    name = attributes.text(allowNone=False)
+
+    message = attributes.reference()
+    cabinet = attributes.reference(allowNone=False)
+
+class FileCabinet(item.Item):
+    typeName = 'quotient_file_cabinet'
+    schemaVersion = 1
+
+    name = attributes.text()
+    filesCount = attributes.integer(default=0)
+
+    def createFileItem(self, name, type, data):
+        """
+        @param name: file name
+        @param type: content-type
+        @param data: file contents
+
+        @return: C{File} item
+        """
+        outf = self.store.newFile('cabinet-'+str(self.storeID),
+                                  str(self.filesCount))
+        outf.write(data)
+        outf.close()
+
+        f = File(store=self.store,
+                 body=outf.finalpath,
+                 name=name,
+                 type=type,
+                 cabinet=self)
+
+        self.filesCount += 1
+        return f
+
+class FileCabinetPage(rend.Page):
+    lastFile = None
+
+    def __init__(self, original):
+        rend.Page.__init__(self, original, docFactory=getLoader('file-upload'))
+
+    def renderHTTP(self, ctx):
+        req = inevow.IRequest(ctx)
+        if req.method == 'POST':
+            uploadedFileArg = req.fields['uploaddata']
+            def txn():
+                self.lastFile = self.original.createFileItem(
+                                        name=unicode(uploadedFileArg.filename),
+                                        type=unicode(uploadedFileArg.type),
+                                        data=uploadedFileArg.file.read())
+            self.original.store.transact(txn)
+
+        return rend.Page.renderHTTP(self, ctx)
+
+    def render_lastFileData(self, ctx, data):
+        if self.lastFile is None:
+            return ''
+        return json.serialize({u'id': self.lastFile.storeID,
+                               u'name': self.lastFile.name})
+
+registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
+
+
+
 class Composer(item.Item):
     implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
@@ -94,7 +165,6 @@ class Composer(item.Item):
     mda = dependsOn(MailDeliveryAgent)
     deliveryAgent = dependsOn(DeliveryAgent)
     prefs = dependsOn(ComposePreferenceCollection)
-
 
     def installed(self):
         defaultFrom = self.store.findOrCreate(FromAddress, _address=None)
@@ -185,7 +255,6 @@ class Composer(item.Item):
         @rtype: L{xquotient.exmess.Message}
         """
         def deliverMIMEMessage():
-            # this doesn't seem to get called (yet?)
             md = iquotient.IMIMEDelivery(self.store)
             if draft:
                 mr = md._createMIMEDraftReceiver('sent://' + fromAddress)
@@ -196,6 +265,28 @@ class Composer(item.Item):
             mr.messageDone()
             return mr.message
         return self.store.transact(deliverMIMEMessage)
+
+
+    def updateDraftMessage(self, fromAddress, messageFile, message):
+        """
+        Change the IMessageData associated with the given message to a
+        L{mimestorage.Part} created by parsing C{messageFile}.
+
+        @type fromAddress: C{unicode}
+        @param fromAddress: RFC 2821 address from which to send the email
+
+        @param messageFile: an iterable of lines from the new MIME message
+
+        @param message: The existing L{exmess.Message} with which to
+        associate the new IMessageData.
+        """
+        md = iquotient.IMIMEDelivery(self.store)
+        mr = md._createDraftUpdateReceiver(message, 'sent://' + fromAddress)
+        for L in messageFile:
+            mr.lineReceived(L.strip('\n'))
+        mr.messageDone()
+        return None
+    updateDraftMessage = item.transacted(updateDraftMessage)
 
 
     def createRedirectedMessage(self, fromAddress, toAddresses, message):
@@ -321,73 +412,6 @@ registerUpgrader(composer4to5, Composer.typeName, 4, 5)
 
 
 
-class File(item.Item):
-    typeName = 'quotient_file'
-    schemaVersion = 1
-
-    type = attributes.text(allowNone=False)
-    body = attributes.path(allowNone=False)
-    name = attributes.text(allowNone=False)
-
-    message = attributes.reference()
-    cabinet = attributes.reference(allowNone=False)
-
-class FileCabinet(item.Item):
-    typeName = 'quotient_file_cabinet'
-    schemaVersion = 1
-
-    name = attributes.text()
-    filesCount = attributes.integer(default=0)
-
-    def createFileItem(self, name, type, data):
-        """
-        @param name: file name
-        @param type: content-type
-        @param data: file contents
-
-        @return: C{File} item
-        """
-        outf = self.store.newFile('cabinet-'+str(self.storeID),
-                                  str(self.filesCount))
-        outf.write(data)
-        outf.close()
-
-        f = File(store=self.store,
-                 body=outf.finalpath,
-                 name=name,
-                 type=type,
-                 cabinet=self)
-
-        self.filesCount += 1
-        return f
-
-class FileCabinetPage(rend.Page):
-    lastFile = None
-
-    def __init__(self, original):
-        rend.Page.__init__(self, original, docFactory=getLoader('file-upload'))
-
-    def renderHTTP(self, ctx):
-        req = inevow.IRequest(ctx)
-        if req.method == 'POST':
-            uploadedFileArg = req.fields['uploaddata']
-            def txn():
-                self.lastFile = self.original.createFileItem(
-                                        name=unicode(uploadedFileArg.filename),
-                                        type=unicode(uploadedFileArg.type),
-                                        data=uploadedFileArg.file.read())
-            self.original.store.transact(txn)
-
-        return rend.Page.renderHTTP(self, ctx)
-
-    def render_lastFileData(self, ctx, data):
-        if self.lastFile is None:
-            return ''
-        return json.serialize({u'id': self.lastFile.storeID,
-                               u'name': self.lastFile.name})
-
-registerAdapter(FileCabinetPage, FileCabinet, inevow.IResource)
-
 class _ComposeFragmentMixin:
     """
     Mixin which provides some stuff that might be useful to fragments which do
@@ -410,11 +434,10 @@ class _ComposeFragmentMixin:
         """
         return mimeutil.parseEmailAddresses(s, mimeEncoded=False)
 
-    def _getFromAddressStan(self):
+
+    def _getFromAddresses(self):
         """
-        Turn the L{smtpout.FromAddress} items in the L{Composer}'s store into some
-        stan, using the C{from-select} and C{from-select-option} patterns from
-        the template
+        Return a list of L{FromAddress} instances, in order of preference.
         """
         fromAddrs = []
         for fromAddress in self.composer.store.query(FromAddress):
@@ -422,15 +445,22 @@ class _ComposeFragmentMixin:
                 fromAddrs.insert(0, fromAddress)
             else:
                 fromAddrs.append(fromAddress)
+        return fromAddrs
 
+
+    def _formatFromAddressSelection(self, fromAddresses):
+        """
+        Turn the given L{smtpout.FromAddress} items into some stan,
+        using the C{from-select} and C{from-select-option} patterns
+        from the template
+        """
         iq = inevow.IQ(self.docFactory)
         return iq.onePattern('from-select').fillSlots(
                         'options', [iq.onePattern(
                                     'from-select-option').fillSlots(
                                         'address', addr.address).fillSlots(
                                         'value', self.translator.toWebID(addr))
-                                        for addr in fromAddrs])
-
+                                        for addr in fromAddresses])
 
 
     def getPeople(self):
@@ -576,7 +606,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         the other arguments to this function should be saved as a draft or sent
         as an outgoing message.  True for save, False for send.
         """
-
         if draft:
             f = saveDraft
         else:
@@ -586,7 +615,6 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
                              self.parentAction,
                              fromAddress, toAddresses,
                              subject, messageBody, cc, bcc, files)
-
 
 
     def getInitialArguments(self):
@@ -600,67 +628,74 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         from xquotient.inbox import Inbox
         return self.translator.linkTo(self.composer.store.findUnique(Inbox).storeID)
 
-    def render_compose(self, ctx, data):
-        req = inevow.IRequest(ctx)
-        draftWebID = req.args.get('draft', [None])[0]
 
-        iq = inevow.IQ(self.docFactory)
-        attachmentPattern = iq.patternGenerator('attachment')
+    def slotData(self):
+        """
+        @return: a C{dict} of data to be used to fill slots during
+        rendering.  The keys in this dictionary will be::
+
+            C{'to'}: a C{unicode} string giving a comma-delimited list
+                     of addresses to which this message is directly
+                     addressed.
+
+            C{'from'}: a C{list} of C{FromAddress} instances giving
+                       the possible values for the from address for
+                       this message.
+
+            C{'subject'}: the subject of this message.
+
+            C{'message-body'}: a C{unicode} string giving the body of
+                               this message.
+
+            C{'cc'}: a C{unicode} string giving a comma-delimited list
+                     of address to which this message is indirectly
+                     addressed.
+
+            C{'bcc'}: a C{unicode} string giving a comma-delimited
+                      list of addresses to which this message is
+                      secretly addressed.
+
+            C{'attachments'}: a C{list} of C{dict} which the keys
+                              C{'id'} and C{'name'} giving storeIDs
+                              and filenames for the attachments of
+                              this message.
+        """
         attachments = []
+        for a in self.attachments:
+            attachments.append(dict(id=a.part.storeID, name=a.filename))
+        addrs = {}
+        for k in ('to', 'cc', 'bcc'):
+            if k in self.recipients:
+                # XXX This is mis-factored.  The calling code should
+                # be flattening this, if it wants it flattened.
+                addrs[k] = mimeutil.flattenEmailAddresses(
+                    self.recipients[k])
+            else:
+                addrs[k] = ''
 
+        return {'to': addrs['to'],
+                'from': self._getFromAddresses(),
+                'subject': self.subject,
+                'message-body': self.messageBody,
+                'cc': addrs['cc'],
+                'bcc': addrs['bcc'],
+                'attachments': attachments}
+
+
+    def render_compose(self, ctx, data):
+        iq = inevow.IQ(self.docFactory)
         bodyPattern = iq.onePattern('message-body')
         subjectPattern = iq.onePattern('subject')
+        attachmentPattern = iq.patternGenerator('attachment')
 
-        if draftWebID is not None:
-            draft = self.translator.fromWebID(draftWebID)
-            # i think this will suffice until we have a rich text compose
-            (alt,) = list(draft.message.impl.getTypedParts('multipart/alternative'))
-            (txt,) = list(alt.getTypedParts('text/plain'))
-            try:
-                cc = draft.message.impl.getHeader(u'cc')
-            except equotient.NoSuchHeader:
-                cc = ''
-
-            for f in draft.store.query(File, File.message == draft.message):
-                attachments.append(attachmentPattern.fillSlots(
-                                    'id', f.storeID).fillSlots(
-                                    'name', f.name))
-
-            slotData = {'to': draft.message.recipient,
-                        'from': self._getFromAddressStan(),
-                        'subject': subjectPattern.fillSlots(
-                                        'subject', draft.message.subject),
-                        'message-body': bodyPattern.fillSlots(
-                                            'body', txt.getBody(decode=True)),
-                        'cc': cc,
-                        'bcc': '',
-                        'attachments': attachments}
-
-            # make subsequent edits overwrite the draft we're editing
-            self._savedDraft = draft
-        else:
-            for a in self.attachments:
-                attachments.append(attachmentPattern.fillSlots(
-                                    'id', a.part.storeID).fillSlots(
-                                    'name', a.filename or 'No Name'))
-
-            addrs = {}
-            for k in ('to', 'cc', 'bcc'):
-                if k in self.recipients:
-                    addrs[k] = mimeutil.flattenEmailAddresses(
-                        self.recipients[k])
-                else:
-                    addrs[k] = ''
-
-            slotData = {'to': addrs['to'],
-                        'from': self._getFromAddressStan(),
-                        'subject': subjectPattern.fillSlots(
-                                    'subject', self.subject),
-                        'message-body': bodyPattern.fillSlots(
-                                            'body', self.messageBody),
-                        'cc': addrs['cc'],
-                        'bcc': addrs['bcc'],
-                        'attachments': attachments}
+        slotData = self.slotData()
+        slotData['from'] = self._formatFromAddressSelection(slotData['from'])
+        slotData['subject'] = subjectPattern.fillSlots('subject', slotData['subject'])
+        slotData['message-body'] = bodyPattern.fillSlots('body', slotData['message-body'])
+        slotData['attachments'] = [
+            attachmentPattern.fillSlots('id', d['id']).fillSlots('name', d['name'] or 'No Name')
+            for d
+            in slotData['attachments']]
 
         return dictFillSlots(ctx.tag, slotData)
 
@@ -674,6 +709,45 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
 
 
 registerAdapter(ComposeFragment, Composer, ixmantissa.INavigableFragment)
+
+
+class DraftComposeFragment(ComposeFragment):
+    """
+    Composition UI initialized from a draft.
+    """
+    def __init__(self, composer, draft):
+        ComposeFragment.__init__(self, composer)
+        self._savedDraft = draft
+
+    def slotData(self):
+        """
+        @see ComposeFragment.slotData
+        """
+        message = self._savedDraft
+
+        attachments = []
+
+        # i think this will suffice until we have a rich text compose
+        (alt,) = list(message.impl.getTypedParts('multipart/alternative'))
+        (txt,) = list(alt.getTypedParts('text/plain'))
+        try:
+            cc = message.impl.getHeader(u'cc')
+        except equotient.NoSuchHeader:
+            cc = u''
+
+        for f in message.store.query(File, File.message == message):
+            attachments.append(dict(id=f.storeID, name=f.name))
+
+        return {
+            'to': message.recipient,
+            # XXX WRONG - we have to save from address information somewhere
+            'from': self._getFromAddresses(),
+            'subject': message.subject,
+            'message-body': txt.getBody(decode=True),
+            'cc': cc,
+            # XXX WRONG - we have to save bcc information somewhere
+            'bcc': u'',
+            'attachments': attachments}
 
 
 
@@ -739,7 +813,7 @@ class RedirectingComposeFragment(liveform.LiveFormFragment, renderers.ButtonRend
         """
         return dictFillSlots(ctx.tag,
                 {'to': '',
-                 'from': self._getFromAddressStan(),
+                 'from': self._formatFromAddressSelection(self._getFromAddresses()),
                  'subject': '',
                  'message-body': self._getMessageBody(),
                  'cc': '',
@@ -812,15 +886,17 @@ registerUpgrader(composePreferenceCollection2to3,
                  2, 3)
 
 
-
 class Draft(item.Item):
     """
-    i only exist so my storeID can be exposed, instead of exposing the storeID
-    of the underlying Message (which gets overwritten with each draft save).
-    this stops draft-editing URLs from being invalidated every 30 seconds
+    No longer used. Exists only for upgrade purposes.
     """
 
     typeName = 'quotient_draft'
-    schemaVersion = 1
+    schemaVersion = 2
 
-    message = attributes.reference(allowNone=False)
+    empty = attributes.reference()
+
+item.declareLegacyItem('quotient_draft', 1,
+                       dict(message=attributes.reference(allowNone=False)))
+
+registerDeletionUpgrader(Draft, 1, 2)

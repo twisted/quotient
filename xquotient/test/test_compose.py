@@ -7,10 +7,11 @@ from twisted.python.filepath import FilePath
 from email import Parser
 
 from axiom import store
-from axiom import scheduler
 from axiom import item
 from axiom import attributes
 from axiom.dependency import installOn
+from axiom.plugins.userbasecmd import Create
+from axiom.plugins.mantissacmd import Mantissa
 
 from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
@@ -37,18 +38,31 @@ class CompositionTestMixin(object):
         self._originalSendmail = smtpout._esmtpSendmail
         smtpout._esmtpSendmail = self._esmtpSendmail
 
-        self.store = store.Store(dbdir=dbdir)
-        installOn(scheduler.Scheduler(store=self.store), self.store)
-        self.defaultFromAddr = smtpout.FromAddress(
-                                store=self.store,
-                                smtpHost=u'example.org',
-                                smtpUsername=u'radix',
-                                smtpPassword=u'secret',
-                                address=u'radix@example')
-        self.defaultFromAddr.setAsDefault()
+        try:
+            self.dbdir = self.mktemp()
+            self.siteStore = store.Store(self.dbdir)
+            Mantissa().installSite(self.siteStore, '/')
 
-        self.composer = compose.Composer(store=self.store)
-        installOn(self.composer, self.store)
+            self.userAccount = Create().addAccount(
+                self.siteStore, u'testuser', u'example.org', u'password')
+            self.userStore = self.userAccount.avatars.open()
+
+            self.composer = compose.Composer(store=self.userStore)
+            installOn(self.composer, self.userStore)
+
+            # Make another address and make it the default (XXX There
+            # should probably be tests covering the behavior when
+            # there /isn't/ another from address like this).
+            self.defaultFromAddr = smtpout.FromAddress(
+                                    store=self.userStore,
+                                    smtpHost=u'mail.example.com',
+                                    smtpUsername=u'radix',
+                                    smtpPassword=u'secret',
+                                    address=u'radix@example.com')
+            self.defaultFromAddr.setAsDefault()
+        except:
+            smtpout._esmtpSendmail = self._esmtpSendmail
+            raise
 
 
     def _esmtpSendmail(self, *args, **kwargs):
@@ -111,7 +125,7 @@ class ComposeFromTest(CompositionTestMixin, unittest.TestCase):
         configured port.
         """
         self.defaultFromAddr.smtpPort = 26
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         self.composer.sendMessage(
             self.defaultFromAddr, [u'testuser@example.com'], message)
         self.assertEquals(self.reactor.port, 26)
@@ -122,7 +136,7 @@ class ComposeFromTest(CompositionTestMixin, unittest.TestCase):
         If there are smarthost preferences, the from address that they
         specify should be used.
         """
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         self.composer.sendMessage(
             self.defaultFromAddr, [u'targetuser@example.com'], message)
         self.failUnless(message.calledStartedSending)
@@ -136,15 +150,15 @@ class RedirectTestCase(CompositionTestMixin, unittest.TestCase):
     Tests for mail redirection
     """
     def setUp(self):
-        CompositionTestMixin.setUp(self, dbdir=self.mktemp())
-        installOn(mail.DeliveryAgent(store=self.store), self.store)
+        CompositionTestMixin.setUp(self)
+        installOn(mail.DeliveryAgent(store=self.userStore), self.userStore)
 
     def test_createRedirectedMessage(self):
         """
         Test that L{compose.Composer.createRedirectedMessage} sets the right
         headers
         """
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         msg = self.composer.createRedirectedMessage(
                 self.defaultFromAddr,
                 [mimeutil.EmailAddress(
@@ -178,7 +192,7 @@ Hi
         class StubMsgFile:
             def open(self):
                 return StringIO(msgtext)
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         message.__dict__['_source'] = StubMsgFile()
         msg = self.composer.createRedirectedMessage(
                 self.defaultFromAddr,
@@ -195,7 +209,7 @@ Hi
         """
         Test L{compose.Composer.redirect}
         """
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         msg = self.composer.redirect(
                 self.defaultFromAddr,
                 [mimeutil.EmailAddress(
@@ -212,7 +226,7 @@ Hi
             ['testuser@localhost'])
 
         m = Parser.Parser().parse(
-                self.store.findUnique(
+                self.userStore.findUnique(
                     exmess.Message).impl.source.open())
 
         self.assertEquals(m['Resent-From'], self.defaultFromAddr.address)
@@ -225,7 +239,7 @@ Hi
         portion of an email address if present before trying to deliver
         directed mail to it
         """
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
         msg = self.composer.redirect(
                 self.defaultFromAddr,
                 [mimeutil.EmailAddress(
@@ -243,7 +257,7 @@ Hi
         Test that an outgoing redirected message has the resent from/to
         addresses stored
         """
-        message = StubStoredMessageAndImplAndSource(store=self.store)
+        message = StubStoredMessageAndImplAndSource(store=self.userStore)
 
         RESENT_TO_ADDRESS = mimeutil.EmailAddress(
             u'Joe <joe@nowhere>', False)
@@ -252,11 +266,11 @@ Hi
             [RESENT_TO_ADDRESS],
             message)
 
-        msg = self.store.findUnique(exmess.Message)
+        msg = self.userStore.findUnique(exmess.Message)
 
         def checkCorrespondents(relation, address):
             self.assertEquals(
-                self.store.query(
+                self.userStore.query(
                     exmess.Correspondent,
                     attributes.AND(
                         exmess.Correspondent.message == msg,
@@ -285,12 +299,13 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
     def setUp(self):
         """
-        Create an *on-disk* store (XXX This is hella slow)
+        Add a DeliveryAgent and a FileCabinet to the user created by
+        CompositionTestMixin.setUp.
         """
-        CompositionTestMixin.setUp(self, dbdir=self.mktemp())
-        da = mail.DeliveryAgent(store=self.store)
-        installOn(da, self.store)
-        self.cabinet = compose.FileCabinet(store=self.store)
+        CompositionTestMixin.setUp(self)
+        da = mail.DeliveryAgent(store=self.userStore)
+        installOn(da, self.userStore)
+        self.cabinet = compose.FileCabinet(store=self.userStore)
         self.cf = compose.ComposeFragment(self.composer)
 
     def test_createReply(self):
@@ -358,7 +373,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                 mimeEncoded=False)],
             u'')
         self.assertEquals(
-            list(self.store.query(
+            list(self.userStore.query(
                     smtpout.DeliveryToAddress).getColumn('toAddress')),
             ['to@example.com', 'bcc1@example.com', 'bcc2@example.com'])
 
@@ -424,7 +439,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             files=[],
             draft=False)
 
-        msg = self.store.findUnique(smtpout.DeliveryToAddress
+        msg = self.userStore.findUnique(smtpout.DeliveryToAddress
                                         )._getMessageSource()
         m = Parser.Parser().parse(msg)
         textPart = m.get_payload()[0]
@@ -595,7 +610,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         anything into the 'incoming' state, so the spam filter will not be
         triggered.
         """
-        sq = exmess.MailboxSelector(self.store)
+        sq = exmess.MailboxSelector(self.userStore)
         msg = createMessage(
             self.composer,
             self.cabinet,
@@ -629,10 +644,10 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             bcc=[],
             files=[],
             draft=True)
-        m = self.store.findUnique(exmess.Message)
+        m = self.userStore.findUnique(exmess.Message)
         self.assertEquals(set(m.iterStatuses()),
                           set([exmess.UNREAD_STATUS, exmess.DRAFT_STATUS]))
-        self.assertEquals(list(self.store.query(smtpout.DeliveryToAddress)),
+        self.assertEquals(list(self.userStore.query(smtpout.DeliveryToAddress)),
                           [])
 
 
@@ -654,8 +669,8 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
             bcc=[],
             files=[],
             draft=False)
-        m = self.store.findUnique(exmess.Message)
+        m = self.userStore.findUnique(exmess.Message)
         self.assertEquals(set(m.iterStatuses()),
                           set([exmess.UNREAD_STATUS, exmess.OUTBOX_STATUS]))
-        nd = self.store.findUnique(smtpout.DeliveryToAddress)
+        nd = self.userStore.findUnique(smtpout.DeliveryToAddress)
         self.assertIdentical(nd.message, m)

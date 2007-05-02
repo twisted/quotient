@@ -37,10 +37,16 @@ def _fileItemToEmailPart(fileItem):
 
 
 def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
-                  toAddresses, subject, messageBody, cc, bcc, files):
+                  toAddresses, subject, messageBody, cc, bcc, files,
+                  createMessageObject=None):
     """
     Create an outgoing message, format the body into MIME parts, and
     populate its headers.
+
+    @param createMessageObject: A one-argument callable which will be
+    invoked with a file-like object containing MIME text and which
+    should return a Message instance associated with objects
+    representing that MIME data.
     """
     MC.add_charset('utf-8', None, MC.QP, 'utf-8')
 
@@ -104,7 +110,11 @@ def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
     G.Generator(s).flatten(m)
     s.seek(0)
 
-    msg = composer.createMessageAndQueueIt(fromAddress.address, s, True)
+    if createMessageObject is None:
+        def createMessageObject(messageFile):
+            return composer.createMessageAndQueueIt(
+                fromAddress.address, messageFile, True)
+    msg = createMessageObject(s)
 
     # there is probably a better way than this, but there
     # isn't a way to associate the same file item with multiple
@@ -120,24 +130,18 @@ def sendMail(_savedDraft, composer, cabinet, parentMessage, parentAction,
     """
     Construct and send a message over SMTP.
     """
-    # overwrite the previous draft of this message with another draft
-    _savedDraft = saveDraft(_savedDraft, composer, cabinet,
-                      parentMessage, parentAction, fromAddress,
-                      toAddresses, subject, messageBody, cc, bcc,
-                      files)
+    message = saveDraft(
+        _savedDraft, composer, cabinet, parentMessage, parentAction,
+        fromAddress, toAddresses, subject, messageBody, cc, bcc, files)
 
     addresses = [addr.pseudoFormat() for addr in toAddresses + cc + bcc]
 
     # except we are going to send this draft
-    composer.sendMessage(fromAddress, addresses, _savedDraft.message)
+    composer.sendMessage(fromAddress, addresses, message)
 
-    # once the user has sent a message, we'll consider all subsequent
-    # drafts in the lifetime of this fragment as being drafts of a
-    # different message
-    _savedDraft.deleteFromStore()
     if parentMessage is not None and parentAction is not None:
         parentMessage.addStatus(parentAction)
-    return _savedDraft
+
 
 
 def saveDraft(_savedDraft, composer, cabinet, parentMessage, parentAction,
@@ -145,17 +149,21 @@ def saveDraft(_savedDraft, composer, cabinet, parentMessage, parentAction,
                bcc, files):
     """
     Construct a message and save it in the database.
+
+    @return: The Message which has been saved as a draft.
     """
-    msg = createMessage(composer, cabinet, parentMessage, fromAddress,
-                        toAddresses, subject, messageBody, cc, bcc,
-                        files)
+    def updateMessageObject(messageFile):
+        return composer.updateDraftMessage(
+            fromAddress.address, messageFile, _savedDraft)
 
-    if _savedDraft is not None:
-        oldmsg = _savedDraft.message
-        oldmsg.deleteFromStore()
-        _savedDraft.message = msg
-        return _savedDraft
+    # overwrite the previous draft of this message with another draft
+    if _savedDraft is None:
+        _savedDraft = createMessage(
+            composer, cabinet, parentMessage, fromAddress,
+            toAddresses, subject, messageBody, cc, bcc, files)
     else:
-        from xquotient.compose import Draft
-        return Draft(store=composer.store, message=msg)
-
+        createMessage(
+            composer, cabinet, parentMessage, fromAddress,
+            toAddresses, subject, messageBody, cc, bcc, files,
+            updateMessageObject)
+    return _savedDraft

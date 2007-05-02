@@ -3,7 +3,7 @@ from axiom.dependency import installOn
 from axiom.scheduler import SubScheduler
 from axiom.test.historic.stubloader import saveStub
 
-from xquotient.mimestorage import MIMEMessageStorer
+from xquotient.mimestorage import IncomingMIMEMessageStorer
 from datetime import timedelta
 
 template = """From: bob@b.example.com
@@ -21,9 +21,10 @@ def createDatabase(s):
     installOn(SubScheduler(store=s), s)
     messages = []
     for x in range(8):
-        mms = MIMEMessageStorer(s, s.newFile("mail", "%d.eml" % (x,)),
-                                u'migration://migration',
-                                draft = (x == 3 or x == 4))
+        mms = IncomingMIMEMessageStorer(
+            s, s.newFile("mail", "%d.eml" % (x,)),
+            u'migration://migration',
+            draft = (x == 3 or x == 4))
         for line in (template % {'index': x}).splitlines():
             mms.lineReceived(line)
         mms.messageDone()

@@ -1,4 +1,4 @@
-
+from StringIO import StringIO
 import os
 import email.quopriMIME
 
@@ -6,11 +6,10 @@ from twisted.trial import unittest
 from twisted.python import filepath
 
 from epsilon import extime
-
-from axiom import store
+from axiom.store import Store, AtomicFile
 
 from xquotient import mimepart, smtpout
-from xquotient.mimestorage import Part
+from xquotient.mimestorage import Part, ExistingMessageMIMEStorer
 from xquotient.test import test_grabber
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.exmess import (
@@ -347,7 +346,7 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         deliveryDir = self.mktemp()
         os.makedirs(deliveryDir)
-        f = store.AtomicFile(
+        f = AtomicFile(
             filepath.FilePath(deliveryDir).child('tmp.eml').path,
             filepath.FilePath(deliveryDir).child('message.eml'))
         mr = mimepart.MIMEMessageReceiver(f)
@@ -1153,3 +1152,39 @@ Hi
         return self._messageTest(
             self.msgWithABunchOfAddresses,
             self.checkNoFromAddresses)
+
+
+
+class ExistingMessageStorerTests(unittest.TestCase):
+    """
+    Verify that L{ExistingMessageMIMEStorer} correctly associates the
+    Part which results from parsing a MIME message with the existing
+    Message instance it is constructed with.
+    """
+    def test_(self):
+        """
+        Verify that C{_associateWithImplementation} is called on the
+        message passed to L{ExistingMessageMIMEStorer.__init__} with
+        the correct values after parsing is finished.
+
+        WHITEBOX.
+        """
+        mime = PartMaker('text/plain', 'Hello, world.')
+        class Message:
+            def _associateWithImplementation(self, impl, source):
+                self.impl = impl
+                self.source = source
+        store = Store()
+        deliveryDir = self.mktemp()
+        os.makedirs(deliveryDir)
+        fObj = AtomicFile(
+            filepath.FilePath(deliveryDir).child('tmp.eml').path,
+            filepath.FilePath(deliveryDir).child('message.eml'))
+        source = u'test://blarg'
+        message = Message()
+        storer = ExistingMessageMIMEStorer(store, fObj, source, message)
+        part = storer.feedStringNow(mime.make())
+        self.assertIdentical(message.impl, part)
+        self.assertEqual(message.source, source)
+        self.assertEqual(message.recipient, u'<No Recipient>')
+        self.assertEqual(message.subject, u'<No Subject>')

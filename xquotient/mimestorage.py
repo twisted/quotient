@@ -581,11 +581,13 @@ class Part(item.Item):
                 yield (sibling.getContentType(), sibling)
 
 
-
-class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
-    def __init__(self, store, fObj, source, draft=False):
+class _MIMEMessageStorerBase(mimepart.MIMEMessageReceiver):
+    """
+    Base class for different kinds of persistent MIME parser classes.
+    """
+    def __init__(self, store, fObj, source):
         partCounter = itertools.count().next
-        super(MIMEMessageStorer, self).__init__(
+        super(_MIMEMessageStorerBase, self).__init__(
             fObj,
             lambda *a, **kw: Part(_partCounter=partCounter,
                                   partID=partCounter(),
@@ -593,25 +595,24 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
                                   **kw))
         self.store = store
         self.source = source
-        self._isDraft = draft
 
 
     def messageDone(self):
-        r = super(MIMEMessageStorer, self).messageDone()
+        result = super(_MIMEMessageStorerBase, self).messageDone()
         self.part.source = self.file.finalpath
+        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1,
+                userstore=self.store)
+        return result
 
-        if self._isDraft:
-            self.message = exmess.Message.createDraft(self.store, self.part,
-                                                      self.source)
-        else:
-            self.message = exmess.Message.createIncoming(self.store, self.part,
-                                                         self.source)
 
+    def setMessageAttributes(self):
+        """
+        Assign some values to some attributes of the created Message object.
+        """
         ##### XXX XXX XXX this should really be stuff that Message does but the
         ##### ambiguity of the purpose of the 'recipients' field makes me
         ##### reluctant to remove it until there is some better coverage for
         ##### that.  -glyph
-
         try:
             to = self.part.getHeader(u'to')
         except equotient.NoSuchHeader:
@@ -627,8 +628,58 @@ class MIMEMessageStorer(mimepart.MIMEMessageReceiver):
             self.message.subject = subject
 
 
-        log.msg(interface=iaxiom.IStatEvent, stat_messagesReceived=1,
-                userstore=self.store)
-        return r
+
+class DraftMIMEMessageStorer(_MIMEMessageStorerBase):
+    """
+    Persistent MIME parser/storage class for draft messages.
+    """
+    def messageDone(self):
+        """
+        Create a draft Message and associate the Part with it.
+        """
+        result = super(DraftMIMEMessageStorer, self).messageDone()
+        self.message = exmess.Message.createDraft(
+            self.store, self.part, self.source)
+        self.setMessageAttributes()
+        return result
     messageDone = item.transacted(messageDone)
 
+
+
+class IncomingMIMEMessageStorer(_MIMEMessageStorerBase):
+    """
+    Persistent MIME parser/storage class for messages received by the
+    system from external entities.
+    """
+    def messageDone(self):
+        """
+        Create an Incoming message and associate the Part with it.
+        """
+        result = super(IncomingMIMEMessageStorer, self).messageDone()
+        self.message = exmess.Message.createIncoming(
+            self.store, self.part, self.source)
+        self.setMessageAttributes()
+        return result
+    messageDone = item.transacted(messageDone)
+
+
+class ExistingMessageMIMEStorer(_MIMEMessageStorerBase):
+    """
+    Persistent MIME parser/storage class which associates the created
+    Part with an existing Message instance.
+    """
+    def __init__(self, store, fObj, source, message):
+        super(ExistingMessageMIMEStorer, self).__init__(store, fObj, source)
+        self.message = message
+
+
+    def messageDone(self):
+        """
+        Associate the Part which resulted from parsing the message
+        with the message which was passed to our initializer.
+        """
+        result = super(ExistingMessageMIMEStorer, self).messageDone()
+        # XXX Should there be a public API for this?
+        self.message._associateWithImplementation(self.part, self.source)
+        self.setMessageAttributes()
+        return result

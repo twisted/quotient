@@ -55,6 +55,14 @@
         </a>
       </nevow:invisible>
     </span>
+    <span class="editDraft-button">
+      <nevow:invisible nevow:render="button">
+        <a href="#">
+          <athena:handler event="onclick" handler="dom_editDraft" />
+          edit
+        </a>
+      </nevow:invisible>
+    </span>
     <span class="defer-button" style="display: none">
       <select class="defer">
         <athena:handler event="onchange" handler="dom_selectDefer" />

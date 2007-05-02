@@ -1,7 +1,7 @@
 
 from axiom.test.historic.stubloader import saveStub
 
-from xquotient.mimestorage import MIMEMessageStorer
+from xquotient.mimestorage import IncomingMIMEMessageStorer
 
 template = """From: bob@b.example.com
 To: alice@a.example.com
@@ -20,8 +20,9 @@ def createDatabase(s):
     # concerned about upgrading. --glyph
     messages = []
     for x in range(8):
-        mms = MIMEMessageStorer(s, s.newFile("mail", "%d.eml" % (x,)),
-                                u'migration://migration')
+        mms = IncomingMIMEMessageStorer(
+            s, s.newFile("mail", "%d.eml" % (x,)),
+            u'migration://migration')
         for line in (template % x).splitlines():
             mms.lineReceived(line)
         # Previously there was no notion of a separate initial 'draft' state
