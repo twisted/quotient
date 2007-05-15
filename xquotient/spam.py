@@ -94,13 +94,14 @@ class Filter(item.Item):
         Postini spam headers look like this:
         X-pstn-levels: (S:99.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )
         X-pstn-levels: (S: 0.0901 R:95.9108 P:95.9108 M:99.5542 C:79.5348 )
+        X-pstn-levels: (S:99.9000/99.9000 R:95.9108 P:91.9078 M:100.0000 C:96.6797 )
+        S means "spam level".  Smaller is spammier. Value after the slash is
+        the 'blatant spam blocking' score, ignored by this code.
 
-        S means "spam level".  Smaller is spammier.
-
-        R means ???
-        P means ???
-        M means ???
-        C means ???
+        R means "Racially insensitive spam score"
+        P means "Sexually explicit (pornography) spam score"
+        M means "Make-money-fast (MMF) spam score"
+        C means "Commercial or 'special offer' spam score"
 
         @return: A mapping from 'R', 'P', 'M', 'C', and 'S' to the values
         from the header, or None if the header could not be parsed.
@@ -108,6 +109,8 @@ class Filter(item.Item):
         s = s.strip()
         if s[:1] == '(' and s[-1:] == ')':
             parts = filter(None, s[1:-1].replace(':', ' ').split())
+            if '/' in parts[1]:
+                parts[1], _ = parts[1].split('/')
             return dict((parts[i], Decimal(parts[i + 1]))
                         for i
                         in (0, 2, 4, 6, 8))

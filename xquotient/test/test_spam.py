@@ -115,7 +115,14 @@ class FilterTestCase(TestCase):
              'P': Decimal('95.9108'),
              'M': Decimal('99.5542'),
              'C': Decimal('79.5348')})
-
+        self.assertEquals(
+            f._parsePostiniHeader(
+            '(S:99.90000/99.90000 R:95.9108 P:95.9108 M:97.0282 C:98.6951 )'),
+            {'S': Decimal('99.9'),
+             'R': Decimal('95.9108'),
+             'P': Decimal('95.9108'),
+             'M': Decimal('97.0282'),
+             'C': Decimal('98.6951')})
 
     def test_retrain(self):
         """
