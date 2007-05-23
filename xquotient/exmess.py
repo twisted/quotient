@@ -2270,11 +2270,21 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
 
 
     def render_addPersonFragment(self, ctx, data):
+        """
+        Render a form for creating a new person in the address book.
+
+        # XXX This is backwards or inside-out or something.  What if the
+        # person looking at the message _doesn't have_ an address book?
+        """
         from xquotient.qpeople import AddPersonFragment
-        frag = AddPersonFragment(self.original)
-        frag.setFragmentParent(self)
-        frag.docFactory = getLoader(frag.fragmentName)
-        return frag
+        from xmantissa.people import AddPerson
+        adder = self.original.store.findUnique(AddPerson, default=None)
+        if adder is not None:
+            fragment = AddPersonFragment(adder)
+            fragment.setFragmentParent(self)
+            fragment.docFactory = getLoader(fragment.fragmentName)
+            return frag
+        return ''
 
 
     def render_tags(self, ctx, data):
