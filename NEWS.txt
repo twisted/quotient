@@ -1,3 +1,19 @@
+0.2.2 (2007-04-27):
+  - Message-status code improved so that status-manipulation methods
+    are not sensitive to call-ordering.
+  - Messages now received forwarded, replied, or redirected statuses
+    when a user takes these actions on it.
+  - Message detail actions UI is now in a separate fragment.
+  - Message detail action buttons are now removed from the printable
+    version of a message.
+  - Boomerang no longer appears when a message is deferred from the inbox.
+  - message/rfc822 attachments now appear with their correct sizes.
+  - HTML messages with long lines are now wrapped properly.
+  - The Compose widget now stops saving drafts after it's been removed
+    from the display.
+  - Content-Length header now set appropriately for attachment
+    downloads in Quotient.
+
 0.2.1 (2007-02-23):
   - Selection and activation tracking has been moved out of
     Quotient.Mailbox to Mantissa.Scrolltable.
