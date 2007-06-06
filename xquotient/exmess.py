@@ -2493,6 +2493,24 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
                                  'thumbnail-location': self._thumbnailLink(image)})
 
 
+    def render_attachedMessages(self, ctx, data):
+        """
+        Wrap any message/rfc822 message parts and display them inline.
+        """
+        from xquotient.mimestorage import Part
+        for attachment in self.attachmentParts:
+            if attachment.type == 'message/rfc822':
+                # This part just has the content-type/content-disposition
+                # headers; we need to get the child part, which is the actual
+                # message
+                actualAttachedMessage = self.original.store.findFirst(
+                    Part, Part.parent == attachment.part)
+                amd = ActionlessMessageDetail(
+                    MessageWrapperForPart(actualAttachedMessage,
+                                          self.original.receivedWhen))
+                amd.setFragmentParent(self)
+                yield amd
+
     inbox = None
 
 
@@ -2718,3 +2736,78 @@ class ActionlessMessageDetail(MessageDetail):
     """
     def render_actions(self, ctx, data):
         return ''
+
+
+class MessageWrapperForPart(object):
+    """
+    I provide enough of the Message API to allow a Part of type
+    message/rfc822 to be rendered by the MessageDetail widget.
+
+    @ivar original: the Part being wrapped.
+    @ivar impl: also the Part being wrapped (required by certain users
+    of Message)
+    @ivar sentWhen: the time at which this message was created.
+    @ivar receivedWhen: the time this message entered Quotient.
+    @ivar sender: the email address of this message's sender.
+    @ivar recipient: the email address of this message's recipient.
+    @ivar subject: the message's subject.
+    """
+    def __init__(self, original, receivedWhen):
+        self.store = original.store
+        self.storeID = original.storeID
+        self.original = original
+        self.impl = original
+        self.sentWhen = original.guessSentTime(default=Time())
+        self.receivedWhen = receivedWhen
+        for rel, addrObj in original.relatedAddresses():
+            if rel == SENDER_RELATION:
+                self.sender = addrObj.email
+                if addrObj.display:
+                    self.senderDisplay = addrObj.display
+                else:
+                    self.senderDisplay = self.sender
+        self.setMessageAttributes()
+
+    def getActions(self):
+        """
+        No action buttons on an inline message.
+        """
+        return []
+
+    def walkMessage(self, prefer=None):
+        """
+        Wraps the message part's walkMessage method.
+        """
+        if prefer is None:
+            _prefs = ixmantissa.IPreferenceAggregator(self.store)
+            prefer = _prefs.getPreferenceValue('preferredFormat')
+        return self.original.walkMessage(prefer)
+
+    def walkAttachments(self):
+        """
+        Wraps the message part's walkAttachment method.
+        """
+        return self.original.walkAttachments()
+
+
+    def setMessageAttributes(self):
+        """
+        Assign some values to some attributes of the created Message object.
+        """
+        ##### XXX XXX XXX near-duplicate of
+        ##### mimestorage._MIMEMessageStorerBase.setMessageAttributes. How
+        ##### to unduplicate this is not clear.
+
+        try:
+            to = self.original.getHeader(u'to')
+        except equotient.NoSuchHeader:
+            self.recipient = u'<No Recipient>'
+        else:
+            self.recipient = to
+
+        try:
+            subject = self.original.getHeader(u'subject')
+        except equotient.NoSuchHeader:
+            self.subject = u'<No Subject>'
+        else:
+            self.subject = subject

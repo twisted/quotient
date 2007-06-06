@@ -311,6 +311,11 @@ class Part(item.Item):
                 return part
 
     def walkAttachments(self):
+        """
+        Collect all the subparts of this part regarded as attachments
+        (i.e., all non-text parts, or parts whose content disposition
+        is"attachment").
+        """
         for part in self.walk():
             try:
                 disposition = part.getHeader(u'content-disposition')

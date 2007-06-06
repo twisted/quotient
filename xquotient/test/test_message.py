@@ -1,6 +1,13 @@
-import zipfile
+"""
+Tests for L{xquotient.exmess.Message}, L{xquotient.exmess.MessageDetail}, and
+associated compose/draft behaviour.
+"""
+import zipfile, itertools
 
 from twisted.trial.unittest import TestCase
+from twisted.python.filepath import FilePath
+
+from epsilon.extime import Time
 
 from axiom.store import Store
 from axiom.item import Item
@@ -21,7 +28,7 @@ from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               MessageDisplayPreferenceCollection,
                               MessageBodyFragment, Correspondent,
                               REPLIED_STATUS, PrintableMessageResource,
-                              ActionlessMessageDetail)
+                              ActionlessMessageDetail, MessageWrapperForPart)
 
 from xquotient.quotientapp import QuotientPreferenceCollection
 from xquotient import mimeutil, smtpout, inbox, compose
@@ -29,7 +36,9 @@ from xquotient.actions import SenderPersonFragment
 from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  DummyMessageImplWithABunchOfAddresses)
 from xquotient.test.test_inbox import testMessageFactory
+from xquotient.test.test_mimepart import messageWithEmbeddedMessage
 from xquotient.mimepart import Header, MIMEPart
+from xquotient.mimestorage import Part
 from xquotient.mimebakery import createMessage
 
 class ComposeActionsTestCase(TestCase):
@@ -297,6 +306,109 @@ class MessageTestCase(TestCase):
         self.assertEqual(zf.read('bar.baz'), 'YYY')
 
 
+class PartWrapperTestCase(TestCase):
+    """
+    Tests for L{xquotient.exmess.MessageWrapperForPart}.
+    """
+    def setUp(self):
+        """
+        Create a store and a MIME message with a message/rfc822 attachment.
+        """
+        self.dbdir = self.mktemp()
+        self.store = Store(dbdir=self.dbdir)
+        partCounter = itertools.count().next
+        self.parent = Part(_partCounter=partCounter)
+        msgContainer = self.parent.newChild()
+        msgContainer.addHeader(u"content-type", u"message/rfc822")
+        msgContainer.addHeader(u"content-disposition", u"inline")
+        self.msg = msgContainer.newChild()
+
+
+    def createMIMEStructure(self):
+        """
+        Insert some contents into the attached message.
+        """
+        self.msg.addHeader(u"from", u"alice@example.com")
+        self.msg.addHeader(u"to", u"bob@example.com")
+        self.msg.addHeader(u"date", u"Fri, 13 Feb 2004 13:43:48 +0100")
+        self.msg.addHeader(u"content-type", u"multipart/mixed")
+        self.msg.addHeader(u"subject", u"Awesome Email")
+        subpart = self.msg.newChild()
+        subpart.addHeader(u"content-type", u"text/html")
+        attachment = self.msg.newChild()
+        attachment.addHeader(u"content-type", u"image/png")
+        attachment.addHeader(u"content-disposition",
+                             u'attachment; filename="foo.png"')
+
+        self.parent._addToStore(self.store,
+                           Message(store=self.store),
+                           FilePath(self.dbdir).child("files").child("msg"))
+        self.wrapper = MessageWrapperForPart(self.msg, Time())
+
+
+    def test_wrapperAttributes(self):
+        """
+        Test that wrapper attributes are sufficiently like Message's.
+        """
+        self.createMIMEStructure()
+        self.assertEqual(self.wrapper.impl, self.msg)
+        self.assertEqual(self.wrapper.recipient, u'bob@example.com')
+        self.assertEqual(self.wrapper.sender, u'alice@example.com')
+        self.assertEqual(self.wrapper.subject, u'Awesome Email')
+
+
+    def test_moreWrapperAttributes(self):
+        """
+        Test that wrapper attributes are sufficiently like Message's
+        when certain headers aren't present.
+        """
+        self.msg.addHeader(u"from", u"alice@example.com")
+        self.msg.addHeader(u"date", u"Fri, 13 Feb 2004 13:43:48 +0100")
+        self.msg.addHeader(u"content-type", u"multipart/mixed")
+        subpart = self.msg.newChild()
+        subpart.addHeader(u"content-type", u"text/html")
+        attachment = self.msg.newChild()
+        attachment.addHeader(u"content-type", u"image/png")
+        attachment.addHeader(u"content-disposition",
+                             u'attachment; filename="foo.png"')
+
+        self.parent._addToStore(self.store,
+                           Message(store=self.store),
+                           FilePath(self.dbdir).child("files").child("msg"))
+        self.wrapper = MessageWrapperForPart(self.msg, Time())
+        self.assertEqual(self.wrapper.recipient, u'<No Recipient>')
+        self.assertEqual(self.wrapper.subject, u'<No Subject>')
+
+
+    def test_wrapperWalkAttachments(self):
+        """
+        Test that walkAttachments on the message/rfc822 part returns
+        the same thing as the wrapper's walkAttachments.
+        """
+        self.createMIMEStructure()
+        self.assertEqual([m.part for m in self.wrapper.walkAttachments()],
+                         [m.part for m in self.msg.walkAttachments()])
+
+
+    def test_wrapperWalkMessage(self):
+        """
+        Test that walkMessage on the message/rfc822 part returns the
+        same thing as the wrapper's walkMessage.
+        """
+        self.createMIMEStructure()
+        self.assertEqual([m.part for m in
+                          self.wrapper.walkMessage('text/html')],
+                         [m.part for m in self.msg.walkMessage('text/html')])
+
+
+    def test_actions(self):
+        """
+        Ensure that no action buttons get rendered.
+        """
+        self.createMIMEStructure()
+        self.assertEqual(self.wrapper.getActions(), [])
+
+
 
 class WebTestCase(TestCase, MIMEReceiverMixin):
     def test_partDisplayerContentLength(self):
@@ -426,6 +538,19 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         installOn(mdp, s)
         m.walkMessage()
         self.assertEqual(impl.preferred, 'text/html')
+
+
+    def test_inlineMessageAttachments(self):
+        """
+        Test that message/rfc822 parts get rendered inline in message
+        detail.
+        """
+        mr = self.setUpMailStuff()
+        msg = mr.feedStringNow(messageWithEmbeddedMessage).message
+        md = MessageDetail(msg)
+        am = list(md.render_attachedMessages(None, None))
+        self.assertEqual(len(am), 1)
+        self.assertEqual(type(am[0]), ActionlessMessageDetail)
 
 
     def test_messageSourceReplacesIllegalChars(self):
