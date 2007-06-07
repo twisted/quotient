@@ -281,22 +281,46 @@ Quotient.Common.SenderPerson.methods(
         }
 
         var name = getValueOfNodeWithClass("sender-person-name");
-        var values = {lastname: [""]};
+        var firstname = "";
+        var lastname = "";
 
         if(name.match(/\s+/)) {
             var split = name.split(/\s+/, 2);
-            values["firstname"] = [split[0]];
-            values["lastname"]  = [split[1]];
+            firstname = split[0];
+            lastname  = split[1];
         } else if(name.match(/@/)) {
-            values["firstname"] = [name.split(/@/, 2)[0]];
+            firstname = name.split(/@/, 2)[0];
         } else {
-            values["firstname"] = [name];
+            firstname = name;
         }
 
         self.email = getValueOfNodeWithClass("person-identifier");
-        values["email"] = [self.email];
 
-        self.addPersonFormWidget.setInputValues(values);
+        /*
+         * The proportions of this hack are complete and utter.  The
+         * apportionment of responsibilities in this code are precisely
+         * reversed from what they should be.  Rather than application code
+         * (vis-a-vis a Quotient-specific UI for displaying a pre-populated
+         * person creation form) presuming knowledge of the inner workings of
+         * the person creation form, the person creation form should supply an
+         * interface for populating itself based on some external information.
+         * Should the supplied information be relevant to a portion of the
+         * form, the implementation for that portion of the form can adjust its
+         * own state in the appropriate manner. -exarkun
+         */
+        var values = {
+            'xmantissa.people.NameContactType': {
+                'firstname': [firstname],
+                'lastname': [lastname]},
+            'xmantissa.people.EmailContactType': {
+                'email': [self.email]}};
+        var widgets = self.addPersonFormWidget.childWidgets;
+        for (var i = 0; i < widgets.length; ++i) {
+            var child = widgets[i];
+            if (values[child.formName] !== undefined) {
+                child.setInputValues(values[child.formName]);
+            }
+        }
     },
 
     /**

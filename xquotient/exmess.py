@@ -2283,7 +2283,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
             fragment = AddPersonFragment(adder)
             fragment.setFragmentParent(self)
             fragment.docFactory = getLoader(fragment.fragmentName)
-            return frag
+            return fragment
         return ''
 
 

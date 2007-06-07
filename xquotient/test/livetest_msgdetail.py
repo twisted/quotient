@@ -158,7 +158,7 @@ class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
 
     def _setUpStore(self):
         s = super(MsgDetailAddPersonTestCase, self)._setUpStore()
-        installOn(people.Organizer(store=s), s)
+        installOn(people.AddPerson(store=s), s)
         return s
 
     def verifyPerson(self, key):
