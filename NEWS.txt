@@ -1,3 +1,7 @@
+0.2.3 (2007-05-24):
+  - Draft editing now enabled.
+  - The new Postini header format is now parsed correctly.
+
 0.2.2 (2007-04-27):
   - Message-status code improved so that status-manipulation methods
     are not sensitive to call-ordering.
