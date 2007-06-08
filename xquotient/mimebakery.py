@@ -100,13 +100,16 @@ def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
                 refs = irt
             else:
                 refs = []
-        msgid = msgRepliedTo.impl.getHeader("Message-ID")
-        refs.append(msgid)
-        #As far as I can tell, the email package doesn't handle
-        #multiple values for headers automatically, so here's some
-        #continuation whitespace.
-        m['References'] = u'\n\t'.join(refs)
-        m['In-Reply-To'] = msgid
+        msgids = msgRepliedTo.impl.getHeaders("Message-ID")
+        for hdr in msgids:
+            msgid = hdr.value
+            refs.append(msgid)
+            #As far as I can tell, the email package doesn't handle
+            #multiple values for headers automatically, so here's some
+            #continuation whitespace.
+            m['References'] = u'\n\t'.join(refs)
+            m['In-Reply-To'] = msgid
+            break
     G.Generator(s).flatten(m)
     s.seek(0)
 

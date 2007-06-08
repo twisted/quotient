@@ -332,6 +332,23 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         self.assertEqual(msg.impl.getHeader("In-Reply-To"),
                          "<msg99@example.com>")
 
+    def test_createReplyNoMessageID(self):
+        """
+        Test replying to messages with no message ID.
+        """
+        parent = MsgStub()
+        parent.impl.headers = []
+        msg = createMessage(self.composer,
+                            self.cabinet,
+                            parent,
+                            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+                    'testuser@example.com',
+                    mimeEncoded=False)],
+            u'Sup dood', u'A body', (), (), u'')
+        self.assertEqual([h.value for h in msg.impl.getHeaders('References')],
+                         [])
+
     def test_createMessageHonorsSmarthostFromAddress(self):
         """
         Sending a message through the Compose UI should honor the from
