@@ -2280,7 +2280,7 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         from xmantissa.people import AddPerson
         adder = self.original.store.findUnique(AddPerson, default=None)
         if adder is not None:
-            fragment = AddPersonFragment(adder)
+            fragment = AddPersonFragment(adder.organizer)
             fragment.setFragmentParent(self)
             fragment.docFactory = getLoader(fragment.fragmentName)
             return fragment

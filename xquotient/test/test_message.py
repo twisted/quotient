@@ -159,6 +159,15 @@ class ComposeActionsTestCase(TestCase):
 
 
 
+    def test_addPersonForm(self):
+        """
+        Test that the add-person form is created correctly.
+        """
+        installOn(people.AddPerson(store=self.store), self.store)
+        apf = self.messageDetail.render_addPersonFragment(None, None)
+        self.assertEquals(apf.organizer,
+                          self.store.findUnique(people.Organizer))
+
 class MoreComposeActionsTestCase(TestCase):
     """
     Test compose-action related stuff that requires an on-disk store.

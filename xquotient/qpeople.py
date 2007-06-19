@@ -46,9 +46,14 @@ class AddPersonFragment(people.AddPersonFragment):
 
     lastPerson = None
 
-    def makePerson(self, nickname):
-        person = super(AddPersonFragment, self).makePerson(nickname)
-        makePersonExtracts(self.original.store, person)
+
+    def _addPerson(self, nickname, **allContactInfo):
+        """
+        Create a person (using L{xmantissa.people.AddPersonFragment}'s method)
+        and save it, for use by the unfortunate hack below.
+        """
+        person = people.AddPersonFragment._addPerson(self, nickname,
+                                                         **allContactInfo)
         self.lastPerson = person
         return person
 
