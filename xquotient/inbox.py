@@ -345,9 +345,13 @@ def inbox3to4(old):
     version of the schema either to a L{xquotient.spam.Filter} that exists
     in the store, or to a new one.
     """
+    privapp = old.store.findFirst(PrivateApplication)
+    if privapp is None:
+        from xmantissa.webapp import PrivateApplicationV3
+        privapp = old.store.findFirst(PrivateApplicationV3)
     new = old.upgradeVersion(
         Inbox.typeName, 3, 4,
-        privateApplication=old.store.findOrCreate(PrivateApplication),
+        privateApplication=privapp,
         scheduler=old.store.findOrCreate(SubScheduler),
         messageSource=old.store.findOrCreate(MessageSource),
         quotientPrefs=old.store.findOrCreate(QuotientPreferenceCollection),
