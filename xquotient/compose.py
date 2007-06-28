@@ -728,8 +728,7 @@ class DraftComposeFragment(ComposeFragment):
         attachments = []
 
         # i think this will suffice until we have a rich text compose
-        (alt,) = list(message.impl.getTypedParts('multipart/alternative'))
-        (txt,) = list(alt.getTypedParts('text/plain'))
+        (txt,) = list(message.impl.getTypedParts('text/plain'))
         try:
             cc = message.impl.getHeader(u'cc')
         except equotient.NoSuchHeader:

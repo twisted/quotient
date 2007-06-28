@@ -458,8 +458,7 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
 
         msg = self.userStore.findUnique(smtpout.DeliveryToAddress
                                         )._getMessageSource()
-        m = Parser.Parser().parse(msg)
-        textPart = m.get_payload()[0]
+        textPart = Parser.Parser().parse(msg)
         self.assertEqual(textPart.get_content_type(), "text/plain")
         self.assertEqual(textPart.get_param("format"), "flowed")
         body = textPart.get_payload().decode("quoted-printable")
@@ -691,3 +690,45 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
                           set([exmess.UNREAD_STATUS, exmess.OUTBOX_STATUS]))
         nd = self.userStore.findUnique(smtpout.DeliveryToAddress)
         self.assertIdentical(nd.message, m)
+
+
+
+class CreateMessage(unittest.TestCase):
+    """
+    Tests for internal message-creation APIs.
+    """
+
+    def setUp(self):
+        """
+        Install a bunch of stuff expected by L{mimebakery.createMessage}.
+        """
+        self.dbdir = self.mktemp()
+        self.store = store.Store(self.dbdir)
+        self.composer = compose.Composer(store=self.store)
+        self.defaultFromAddr = smtpout.FromAddress(
+                                store=self.store,
+                                smtpHost=u'mail.example.com',
+                                smtpUsername=u'radix',
+                                smtpPassword=u'secret',
+                                address=u'radix@example.com')
+        self.defaultFromAddr.setAsDefault()
+        da = mail.DeliveryAgent(store=self.store)
+        installOn(da, self.store)
+
+
+    def test_createsPlaintextMessage(self):
+        """
+        Test that L{mimebakery.createMessage} produces a message of
+        type text/plain.
+        """
+
+        msg = createMessage(
+            self.composer,
+            None, None,
+            self.defaultFromAddr,
+            [mimeutil.EmailAddress(
+              'testuser@example.com',
+               mimeEncoded=False)],
+            u'Sup dood', u'A body', u'', u'', u'')
+
+        self.assertEqual(msg.impl.getContentType(), 'text/plain')

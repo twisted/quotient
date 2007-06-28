@@ -130,7 +130,7 @@ class ComposeActionsTestCase(TestCase):
         which reflects the message which was used as the draft.
         """
         subject = u'subject text'
-        body = u'hello, world?\n\n'
+        body = u'hello, world?\n'
         to = u'alice@example.net'
         cc = u'bob@example.net'
         bcc = u'carol@example.net'

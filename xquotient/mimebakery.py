@@ -54,13 +54,8 @@ def createMessage(composer, cabinet, msgRepliedTo, fromAddress,
 
     s = S.StringIO()
     wrappedMsgBody = FlowedParagraph.fromRFC2646(messageBody).asRFC2646()
-    textPart = MT.MIMEText(wrappedMsgBody, 'plain', 'utf-8')
-    textPart.set_param("format", "flowed")
-    m = MMP.MIMEMultipart(
-        'alternative',
-        None,
-        [textPart,
-         MT.MIMEText(renderers.textToRudimentaryHTML(messageBody), 'html', 'utf-8')])
+    m = MT.MIMEText(wrappedMsgBody, 'plain', 'utf-8')
+    m.set_param("format", "flowed")
 
     fileItems = []
     if files:
