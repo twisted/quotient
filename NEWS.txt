@@ -1,3 +1,6 @@
+0.2.4 (2007-06-06):
+  - message/rfc822 attachments now render inline.
+
 0.2.3 (2007-05-24):
   - Draft editing now enabled.
   - The new Postini header format is now parsed correctly.
