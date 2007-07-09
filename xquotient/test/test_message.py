@@ -418,6 +418,18 @@ class PartWrapperTestCase(TestCase):
         self.assertEqual(self.wrapper.getActions(), [])
 
 
+    def test_noSender(self):
+        """
+        Test that a message with no sender headers gets handled properly.
+        """
+        self.msg.addHeader(u"to", u"bob@example.com")
+        self.msg.addHeader(u"date", u"Fri, 13 Feb 2004 13:43:48 +0100")
+        self.msg.addHeader(u"content-type", u"multipart/mixed")
+        self.msg.addHeader(u"subject", u"Awesome Email")
+        self.wrapper = MessageWrapperForPart(self.msg, Time())
+        self.assertEqual(self.wrapper.sender, u'')
+        self.assertEqual(self.wrapper.senderDisplay, u'')
+
 
 class WebTestCase(TestCase, MIMEReceiverMixin):
     def test_partDisplayerContentLength(self):

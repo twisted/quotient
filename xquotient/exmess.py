@@ -2759,6 +2759,8 @@ class MessageWrapperForPart(object):
         self.impl = original
         self.sentWhen = original.guessSentTime(default=Time())
         self.receivedWhen = receivedWhen
+        self.sender = u''
+        self.senderDisplay = u''
         for rel, addrObj in original.relatedAddresses():
             if rel == SENDER_RELATION:
                 self.sender = addrObj.email
