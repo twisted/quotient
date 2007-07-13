@@ -1,3 +1,7 @@
+0.2.5 (2007-07-06):
+  - Fixed a bug where replies couldn't be made to messages with no Message-ID.
+  - Outgoing messages are now sent as text/plain only.
+
 0.2.4 (2007-06-06):
   - message/rfc822 attachments now render inline.
 
