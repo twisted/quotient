@@ -27,7 +27,7 @@ plugin = offering.Offering(
     name = u'Quotient',
 
     description = u'''
-    Quotient is really great, you should install it
+    A mail system with a web UI, supporting SMTP and POP3.
     ''',
 
     siteRequirements = (
