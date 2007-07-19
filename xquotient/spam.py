@@ -417,7 +417,6 @@ class SpambayesFilter(item.Item):
             p.remove()
             self.classifier = classifier.Classifier()
             self.guesser = hammie.Hammie(self.classifier)
-            self.installedOn.retrain()
 
 
 item.declareLegacyItem(SpambayesFilter.typeName, 1, dict(

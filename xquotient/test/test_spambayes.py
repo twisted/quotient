@@ -31,3 +31,10 @@ class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
         self.df.classify(m)
         self.df.train(True, m)
 
+    def test_messageRetraining(self):
+        """
+        Test that removing the training data and rebuilding it succeeds.
+        """
+        self.testMessageTraining()
+        self.df.forgetTraining()
+
