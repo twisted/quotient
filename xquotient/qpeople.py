@@ -47,13 +47,12 @@ class AddPersonFragment(people.AddPersonFragment):
     lastPerson = None
 
 
-    def _addPerson(self, nickname, **allContactInfo):
+    def _addPerson(self, *a, **kw):
         """
         Create a person (using L{xmantissa.people.AddPersonFragment}'s method)
         and save it, for use by the unfortunate hack below.
         """
-        person = people.AddPersonFragment._addPerson(self, nickname,
-                                                         **allContactInfo)
+        person = people.AddPersonFragment._addPerson(self, *a, **kw)
         self.lastPerson = person
         return person
 
