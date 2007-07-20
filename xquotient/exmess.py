@@ -2277,14 +2277,10 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         # person looking at the message _doesn't have_ an address book?
         """
         from xquotient.qpeople import AddPersonFragment
-        from xmantissa.people import AddPerson
-        adder = self.original.store.findUnique(AddPerson, default=None)
-        if adder is not None:
-            fragment = AddPersonFragment(adder.organizer)
-            fragment.setFragmentParent(self)
-            fragment.docFactory = getLoader(fragment.fragmentName)
-            return fragment
-        return ''
+        fragment = AddPersonFragment(self.organizer)
+        fragment.setFragmentParent(self)
+        fragment.docFactory = getLoader(fragment.fragmentName)
+        return fragment
 
 
     def render_tags(self, ctx, data):

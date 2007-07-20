@@ -163,7 +163,8 @@ class ComposeActionsTestCase(TestCase):
         """
         Test that the add-person form is created correctly.
         """
-        installOn(people.AddPerson(store=self.store), self.store)
+        installOn(people.Organizer(store=self.store), self.store)
+        self.messageDetail = MessageDetail(self.message)
         apf = self.messageDetail.render_addPersonFragment(None, None)
         self.assertEquals(apf.organizer,
                           self.store.findUnique(people.Organizer))
