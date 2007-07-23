@@ -500,7 +500,7 @@ class MIMEMessageParser(HeaderBodyParser):
         except equotient.NoSuchHeader:
             pass
         else:
-            if ctype.split()[0].strip().lower() == 'message/rfc822':
+            if headerParams(ctype)[0] == 'message/rfc822':
                 self.bodyMode = 'rfc822'
                 return
         self.bodyMode = 'body'

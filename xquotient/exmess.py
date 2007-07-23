@@ -1,5 +1,4 @@
 # -*- test-case-name: xquotient.test.test_workflow -*-
-
 """
 This module contains the core messaging abstractions for Quotient. L{Message},
 a transport-agnostic message metadata representation, and L{MailboxSelector}, a
@@ -13,6 +12,7 @@ import re
 import pytz
 import zipfile
 import urllib
+from StringIO import StringIO
 from datetime import timedelta
 
 from zope.interface import implements
@@ -32,7 +32,7 @@ from axiom import item, attributes, batch
 from axiom.iaxiom import IScheduler
 from axiom.upgrade import registerAttributeCopyingUpgrader, registerUpgrader
 
-from xmantissa import ixmantissa, people, webapp, liveform, webnav
+from xmantissa import ixmantissa, people, webapp, liveform, webnav 
 from xmantissa.prefs import PreferenceCollectionMixin
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
@@ -503,7 +503,7 @@ class Message(item.Item):
     implements(ixmantissa.IFulltextIndexable)
 
     typeName = 'quotient_message'
-    schemaVersion = 5
+    schemaVersion = 6
 
     # Schema.
 
@@ -1564,25 +1564,10 @@ item.declareLegacyItem(Message.typeName, 2,
 registerAttributeCopyingUpgrader(Message, 1, 2)
 registerAttributeCopyingUpgrader(Message, 2, 3)
 
-
-def _message3to5(m):
+def _fixStatus3(m, self):
     """
-    Upgrade between L{Message} schema v3 (flags) to L{Message} schema v4
-    (statuses).
+    Convert version 3 Message flags to statuses.
     """
-    self = m.upgradeVersion(Message.typeName, 3, 5,
-                            sentWhen=m.sentWhen,
-                            receivedWhen=m.receivedWhen,
-                            sender=m.sender,
-                            senderDisplay=m.senderDisplay,
-                            recipient=m.recipient,
-                            attachments=m.attachments,
-                            read=m.read,
-                            everDeferred=m.everDeferred,
-                            shouldBeClassified=not m.trained,
-                            impl=m.impl,
-                            # XXX FIXME
-                            _frozenWith=None)
     if m.source is not None:
         _associateMessageSource(self, m.source)
     if m.subject is not None:
@@ -1631,7 +1616,6 @@ def _message3to5(m):
         self.moveToTrash()
     self._extractRelatedAddresses()
     return self
-registerUpgrader(_message3to5, Message.typeName, 3, 5)
 
 
 item.declareLegacyItem(Message.typeName, 4,
@@ -1649,24 +1633,10 @@ item.declareLegacyItem(Message.typeName, 4,
                             subject=attributes.text()))
 
 
-def _message4to5(m):
+def _fixStatus4(self):
     """
-    Upgrader for Message to add the _frozenWith attribute.
+    Adjust message status flags of version 4 Message objects.
     """
-    self = m.upgradeVersion(Message.typeName, 4, 5,
-                            _spam=m._spam,
-                            attachments=m.attachments,
-                            everDeferred=m.everDeferred,
-                            impl=m.impl,
-                            read=m.read,
-                            receivedWhen=m.receivedWhen,
-                            recipient=m.recipient,
-                            sender=m.sender,
-                            senderDisplay=m.senderDisplay,
-                            sentWhen=m.sentWhen,
-                            shouldBeClassified=m.shouldBeClassified,
-                            subject=m.subject,
-                            _frozenWith=None)
     if self.hasStatus(SPAM_STATUS):
         self._frozenWith = SPAM_STATUS
     if self.hasStatus(TRASH_STATUS):
@@ -1676,9 +1646,90 @@ def _message4to5(m):
     # problem because it was a bug in 3to4.
     if self.hasStatus(DEFERRED_STATUS) and not self.statusesFrozen():
         self._unfreezeAll()
+
+
+def _reparseMessages5(msg):
+    """
+    Reparse messages from schema version 5 that did not have all child parts of
+    message/rfc822 parts.
+    """
+    #placed here to avoid circular import
+    from xquotient.mimestorage import Part, Header, ExistingMessageMIMEStorer
+    #some tests don't have complete messages in them.
+    if msg.impl is None:
+        return
+    for part in msg.impl.walk():
+        ctype = list(part.getHeaders('content-type'))
+        if ctype:
+            ctype = ctype[0].value
+        else:
+            continue
+        if u'message/rfc822;' in ctype:
+            msg.store.query(Header, Header.message == msg).deleteFromStore()
+            msg.store.query(Part, Part.message == msg).deleteFromStore()
+            msgfile = msg.impl.source.open()
+            f = StringIO()
+            f.finalpath = msg.impl.source
+            mr = ExistingMessageMIMEStorer(msg.store, f, msg.impl.source.path, msg)
+            for line in msgfile:
+              mr.lineReceived(line.strip('\n'))
+            mr.messageDone()
+            return
+
+registerAttributeCopyingUpgrader(Message, 5, 6,
+                                 postCopy=_reparseMessages5)
+
+def _reparseMessages4(msg):
+    """
+    Run the item-modifying code for the version 5 and version 6 upgraders.
+    """
+    _fixStatus4(msg)
+    _reparseMessages5(msg)
+
+registerAttributeCopyingUpgrader(Message, 4, 6,
+                                 postCopy=_reparseMessages4)
+
+
+def _message3to6(m):
+    """
+    Upgrade between L{Message} schema v3 (flags) to L{Message} schema v4
+    (statuses).
+    """
+    self = m.upgradeVersion(Message.typeName, 3, 6,
+                            sentWhen=m.sentWhen,
+                            receivedWhen=m.receivedWhen,
+                            sender=m.sender,
+                            senderDisplay=m.senderDisplay,
+                            recipient=m.recipient,
+                            attachments=m.attachments,
+                            read=m.read,
+                            everDeferred=m.everDeferred,
+                            shouldBeClassified=not m.trained,
+                            impl=m.impl,
+                            # XXX FIXME
+                            _frozenWith=None)
+    _fixStatus3(m, self)
+    _fixStatus4(self)
+    _reparseMessages5(self)
     return self
 
-registerUpgrader(_message4to5, Message.typeName, 4, 5)
+registerUpgrader(_message3to6, Message.typeName, 3, 6)
+
+item.declareLegacyItem(Message.typeName, 5,
+                       dict(_spam=attributes.boolean(),
+                            attachments=attributes.integer(),
+                            everDeferred=attributes.boolean(),
+                            impl=attributes.reference(),
+                            read=attributes.boolean(),
+                            receivedWhen=attributes.timestamp(),
+                            recipient=attributes.text(),
+                            sender=attributes.text(),
+                            senderDisplay=attributes.text(),
+                            sentWhen=attributes.timestamp(),
+                            shouldBeClassified=attributes.boolean(),
+                            subject=attributes.text(),
+                            _frozenWith=attributes.text()))
+
 
 class _UndeferTask(item.Item):
     """
@@ -2277,14 +2328,10 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         # person looking at the message _doesn't have_ an address book?
         """
         from xquotient.qpeople import AddPersonFragment
-        from xmantissa.people import AddPerson
-        adder = self.original.store.findUnique(AddPerson, default=None)
-        if adder is not None:
-            fragment = AddPersonFragment(adder.organizer)
-            fragment.setFragmentParent(self)
-            fragment.docFactory = getLoader(fragment.fragmentName)
-            return fragment
-        return ''
+        fragment = AddPersonFragment(self.organizer)
+        fragment.setFragmentParent(self)
+        fragment.docFactory = getLoader(fragment.fragmentName)
+        return fragment
 
 
     def render_tags(self, ctx, data):
