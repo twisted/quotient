@@ -1,3 +1,4 @@
+from StringIO import StringIO
 import os
 import email.quopriMIME
 
@@ -15,8 +16,6 @@ from xquotient.exmess import (
     SENDER_RELATION, RECIPIENT_RELATION, COPY_RELATION, BLIND_COPY_RELATION,
     RESENT_TO_RELATION, RESENT_FROM_RELATION)
 
-from xquotient.test.historic.stub_message5to6 import (
-    msg as multipartMessageWithEmbeddedMultipartMessage)
 from xmantissa import ixmantissa
 
 def msg(s):
@@ -44,7 +43,7 @@ class UtilTest(unittest.TestCase):
                           mimepart._safelyDecode(u"\u1234hello world".encode("utf8"),
                                                  "ascii"))
 
-    def test_safelyDecodeMismatch(self):
+    def test_safelyDecode(self):
         """
         Verify that _safelyDecode will not raise an exception when the given string
         does not match the given encoding.
@@ -343,29 +342,6 @@ oTZw+Ovl1BvLcE+pK9VFxxY=
         self._messageTest(self.multipartMessage, self.assertMultipartMessageStructure)
 
 
-    def test_embeddedMultipartMessage(self):
-        """
-        Test the structure of a message with an attached multipart message.
-        """
-
-        self._messageTest(multipartMessageWithEmbeddedMultipartMessage,
-                          self.assertEmbeddedMultipartMessageStructure)
-
-    def assertEmbeddedMultipartMessageStructure(self, msg):
-        """
-        Ensure that all the parts of a message in an message/rfc822 part get
-        parsed.
-        """
-        parts = list(msg.walk())
-        self.assertEqual(len(parts), 6)
-        types = [(p.getHeader("content-type").split(';', 1)[0]
-                  .lower().strip().encode('ascii'))
-                 for p in parts]
-        self.assertEqual(types,
-                         ['multipart/mixed', 'text/plain',
-                          'message/rfc822', 'multipart/mixed',
-                          'text/plain', 'image/jpeg'])
-
 class ParsingTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         deliveryDir = self.mktemp()
@@ -476,7 +452,6 @@ class PersistenceTestCase(unittest.TestCase, MessageTestMixin, PersistenceMixin)
                 self.assertNotEquals(att.part.bodyLength, 0)
         self._messageTest(messageWithEmbeddedMessage, checkAttachments)
         self._messageTest(truncatedMultipartMessage, checkAttachments)
-
 
 
     def testRFC822PartLength(self):
@@ -810,7 +785,6 @@ Content-Type: text/html;
 """.strip()                     # This is important!  The message is different
                                 # when it has a trailing newline.
 #"
-
 class MessageTestCase(unittest.TestCase):
     """
     Test aspects of the L{twisted.mail.smtp.IMessage} implementation.

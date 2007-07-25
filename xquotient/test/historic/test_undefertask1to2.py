@@ -35,11 +35,6 @@ class DummyMessageImplementation(Item, DummyMessageImplementationMixin):
         """,
         default=None, allowNone=True)
 
-    def walk(self):
-        """
-        Necessary for the tests for upgrading Message to version 6.
-        """
-        return ()
 
 class UndeferTaskTest(StubbedTest):
     def setUp(self):
