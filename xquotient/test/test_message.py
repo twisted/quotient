@@ -56,6 +56,8 @@ class ComposeActionsTestCase(TestCase):
 
         self.fromAddr = smtpout.FromAddress(
             address=u'recipient@host', store=self.store)
+        self.organizer = people.Organizer(store=self.store)
+        installOn(self.organizer, self.store)
         self.inbox = inbox.Inbox(store=self.store)
         installOn(self.inbox, self.store)
         self.composer = compose.Composer(store=self.store)
@@ -163,10 +165,8 @@ class ComposeActionsTestCase(TestCase):
         """
         Test that the add-person form is created correctly.
         """
-        installOn(people.AddPerson(store=self.store), self.store)
         apf = self.messageDetail.render_addPersonFragment(None, None)
-        self.assertEquals(apf.organizer,
-                          self.store.findUnique(people.Organizer))
+        self.assertEquals(apf.organizer, self.organizer)
 
 class MoreComposeActionsTestCase(TestCase):
     """
