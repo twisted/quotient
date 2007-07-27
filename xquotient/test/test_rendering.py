@@ -9,7 +9,7 @@ from nevow.testutil import renderPage, renderLivePage
 from axiom.store import Store
 from axiom.dependency import installOn
 
-from xmantissa.people import Person, EmailAddress
+from xmantissa.people import Person, EmailAddress, Organizer
 
 from xquotient.exmess import Message, MessageDetail, PartDisplayer
 from xquotient.inbox import Inbox, InboxScreen
@@ -17,7 +17,6 @@ from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 from xquotient.qpeople import MessageList, MessageLister
 
-from xquotient.test.util import DummyMessageImplementation
 from xquotient.test.test_inbox import testMessageFactory
 
 def makeMessage(receiver, parts, impl):
@@ -85,6 +84,8 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         """
         Test rendering of message detail for an extremely complex message.
         """
+        o = Organizer(store=self.store)
+        installOn(o, self.store)
         msg = self.store.findUnique(Message)
         msg.classifyClean()
         return renderLivePage(
