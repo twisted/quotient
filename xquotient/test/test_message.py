@@ -168,6 +168,8 @@ class ComposeActionsTestCase(TestCase):
         apf = self.messageDetail.render_addPersonFragment(None, None)
         self.assertEquals(apf.organizer, self.organizer)
 
+
+
 class MoreComposeActionsTestCase(TestCase):
     """
     Test compose-action related stuff that requires an on-disk store.
