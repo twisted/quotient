@@ -33,8 +33,10 @@ class AddPersonTestCase(TestCase):
                     u'email': u'jlp@starship.enterprise'},
                keyword(PostalContactType()): {
                     u'address': u'123 Street Rd'}})
-        self.assertEqual(self.store.findUnique(Person),
+        self.assertEqual(self.store.findUnique(Person,
+            Person.storeID != self.organizer.storeOwnerPerson.storeID),
                          addPersonFrag.lastPerson)
+
 
 
 class MessageListerTestCase(TestCase):
