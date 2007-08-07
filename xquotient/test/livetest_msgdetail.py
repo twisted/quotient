@@ -167,7 +167,11 @@ class MsgDetailAddPersonTestCase(testcase.TestCase, _MsgDetailTestMixin):
         there is only one person, and that his details match those of the
         sender of the single message in our store
         """
-        p = self._stores[key].findUnique(people.Person)
+        store = self._stores[key]
+        organizer = store.findUnique(people.Organizer)
+        p = self._stores[key].findUnique(
+            people.Person,
+            people.Person.storeID != organizer.storeOwnerPerson.storeID)
         self.assertEquals(p.getEmailAddress(), 'sender@host')
         self.assertEquals(p.getDisplayName(), 'Sender')
     expose(verifyPerson)

@@ -181,6 +181,28 @@ class InboxTestCase(InboxTest):
         self.assertNotIdentical(INavigableFragment(self.inbox, None),
                                 None)
 
+
+    def test_getPeopleNoOrganizer(self):
+        """
+        L{Inbox.getPeople} should return an empty sequence if there is not an
+        L{Organizer} in the store.
+        """
+        self.assertEqual(list(self.inbox.getPeople()), [])
+
+
+
+    def test_getPeopleExcludesStoreOwner(self):
+        """
+        L{Inbox.getPeople} should return all L{Person} items in the store, with the
+        exception of L{Organizer.storeOwnerPerson}.
+        """
+        organizer = Organizer(store=self.store)
+        installOn(organizer, self.store)
+        bob = Person(store=self.store, organizer=organizer, name=u'Bob')
+        self.assertEqual(
+            list(self.inbox.getPeople()), [bob])
+
+
     def test_userTagNames(self):
         """
         Verify that tags created in the axiom tags system will show up to the

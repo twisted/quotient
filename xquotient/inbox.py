@@ -127,6 +127,21 @@ class Inbox(Item):
                 authoritative=True)]
 
 
+    def getPeople(self):
+        """
+        Find all of the people in C{self.store}, excluding
+        L{people.Organizer.storeOwnerPerson} if there is an L{people.Organizer}
+        in our store.
+
+        @return: some people.
+        @rtype: iterable of L{people.Person}.
+        """
+        organizer = self.store.findUnique(people.Organizer, default=None)
+        if organizer is None:
+            return iter(())
+        return iter(self.store.query(
+            people.Person,
+            people.Person.storeID != organizer.storeOwnerPerson.storeID))
 
 
     def getBaseComparison(self, viewSelection):
@@ -642,17 +657,17 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
                                              'renderer', T.directive(attrs['renderer']))})
     renderer(viewPane)
 
+
     def personChooser(self, request, tag):
         select = inevow.IQ(self.docFactory).onePattern('personChooser')
         option = inevow.IQ(select).patternGenerator('personChoice')
         selectedOption = inevow.IQ(select).patternGenerator('selectedPersonChoice')
 
-        for person in [None] + list(self.inbox.store.query(people.Person)):
+        for person in [None] + list(self.inbox.getPeople()):
             if person == self.viewSelection["person"]:
                 p = selectedOption
             else:
                 p = option
-
             if person:
                 name = person.getDisplayName()
                 key = self.translator.toWebID(person)
@@ -666,6 +681,7 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             select[opt]
         return select
     renderer(personChooser)
+
 
     # This is the largest unread count allowed.  Counts larger than this will
     # not be reported, to save on database work.  This is, I hope, a temporary
