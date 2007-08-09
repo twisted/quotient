@@ -342,7 +342,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         if (self.model.rowCount()) {
             self.model.activateRow(self.model.getRowData(0)['__id__']);
             return self._messageDetailUpdatedDeferred;
-        }
+        } 
         return Divmod.Defer.succeed(null);
     },
 
@@ -785,6 +785,9 @@ Quotient.Mailbox.Controller.methods(
                 return self.scrollWidget.activateFirstRow().addCallback(
                     function(ignored) {
                         self.initializationDeferred.callback(null);
+                        if (self.scrollWidget.model.rowCount() == 0) {
+                            self.updateMessagePreview(null);
+                        };
                         return passthrough;
                     });
             });
@@ -862,7 +865,6 @@ Quotient.Mailbox.Controller.methods(
         self.compose();
         return false;
     },
-
     /**
      * Reload the currently selected message after C{composer} has completed
      * (either been dismissed or sent a message)
@@ -871,13 +873,8 @@ Quotient.Mailbox.Controller.methods(
      * @rtype: L{Divmod.Defer.Deferred}
      */
     function reloadMessageAfterComposeCompleted(self, composer) {
-        composer.completionDeferred.addCallback(
-            function() {
-                var selected = self.scrollWidget.getActiveRow();
-                if(selected != null) {
-                    return self.fastForward(selected.__id__);
-                }
-            });
+        composer.completionDeferred.addCallback(function (x) {
+            return self._getMessageDetail(x)});
         return composer.completionDeferred;
     },
 
@@ -1447,7 +1444,8 @@ Quotient.Mailbox.Controller.methods(
                         }
                         if (rowData != null) {
                             rowData.read = true;
-                            return self.setMessageContent(toMessageID, newCurrentMessage);
+                            return self.setMessageContent(toMessageID,
+                                                          newCurrentMessage);
                         }
                     });
             });
@@ -1834,7 +1832,8 @@ Quotient.Mailbox.Controller.methods(
      * L{Quotient.Message.MessageDetail}
      */
     function messageAction_printable(self) {
-        return self._getMessageDetail().messageAction_printable();
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_printable()});
     },
 
     /**
@@ -1842,7 +1841,8 @@ Quotient.Mailbox.Controller.methods(
      * L{Quotient.Message.MessageDetail}
      */
     function messageAction_messageSource(self) {
-        return self._getMessageDetail().messageAction_messageSource();
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_messageSource()});
     },
 
     /**
@@ -1914,7 +1914,8 @@ Quotient.Mailbox.Controller.methods(
          * Forward this action to the message detail, since reply only works
          * on one message at a time.
          */
-        return self._getMessageDetail().messageAction_reply(reloadMessage);
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_reply(reloadMessage)});
     },
 
     /**
@@ -1929,7 +1930,8 @@ Quotient.Mailbox.Controller.methods(
         /*
          * See messageAction_reply
          */
-        return self._getMessageDetail().messageAction_forward(reloadMessage);
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_forward(reloadMessage)});
     },
 
     /**
@@ -1945,7 +1947,8 @@ Quotient.Mailbox.Controller.methods(
      * @rtype: L{Divmod.Defer.Deferred}
      */
     function messageAction_replyAll(self, reloadMessage) {
-        return self._getMessageDetail().messageAction_replyAll(reloadMessage);
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_replyAll(reloadMessage)});
     },
 
     /**
@@ -1957,7 +1960,8 @@ Quotient.Mailbox.Controller.methods(
      * @rtype: L{Divmod.Defer.Deferred}
      */
     function messageAction_redirect(self, reloadMessage) {
-        return self._getMessageDetail().messageAction_redirect(reloadMessage);
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_redirect(reloadMessage)});
     },
 
 
@@ -1967,7 +1971,8 @@ Quotient.Mailbox.Controller.methods(
      * @rtype: L{Divmod.Defer.Deferred}
      */
     function messageAction_editDraft(self) {
-        return self._getMessageDetail().messageAction_editDraft();
+        return self._getMessageDetail().addCallback(
+            function (msg) {return msg.messageAction_editDraft()});
     },
 
     /**
@@ -2152,13 +2157,18 @@ Quotient.Mailbox.Controller.methods(
     },
 
     /**
-     * Return the L{Quotient.Message.MessageDetail} instance for the message
-     * currently loaded into the inbox
+     * Return a Defered which will fire the L{Quotient.Message.MessageDetail}
+     * instance for the message currently loaded into the inbox.
      */
     function _getMessageDetail(self) {
-        return Quotient.Message.MessageDetail.get(
-                self.firstWithClass(
-                    self.messageDetail, "message-detail-fragment"));
+        var active = self.scrollWidget.getActiveRow();
+        if (active === null) {
+            active = self.scrollWidget.model.getRowData(0);
+            // XXX undefined behavior when there's no message - this should
+            // *probably* be accounted for, but I guess nobody actually calls
+            // it in this state?
+        }
+        return self.fastForward(active.__id__);
     },
 
     /**
@@ -2273,6 +2283,7 @@ Quotient.Mailbox.Controller.methods(
      * @param currentMessageDisplay: Components of a MessageDetail widget,
      * to be displayed in the message detail area of this controller.
      *
+     * @return: The MessageDetail widget displayed.
      */
     function setMessageContent(self, toMessageID, currentMessageDisplay) {
         self.messageDetail.scrollTop = 0;
@@ -2303,10 +2314,11 @@ Quotient.Mailbox.Controller.methods(
                         self.messageDetail,
                         "message-body");
                 } catch(e) {
-                    return;
+                    return widget;
                 }
                 /* set the font size to the last value used in
                    _setComplexityVisibility() */
                 messageBody.style.fontSize = self.fontSize;
+                return widget;
             });
     });

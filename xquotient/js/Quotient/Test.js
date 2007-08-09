@@ -340,6 +340,16 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
     });
 
 
+/**
+ * Fetch the message detail widget off the page.
+ */
+Quotient.Test._getMessageDetail = function _getMessageDetail(self) {
+    return Quotient.Message.MessageDetail.get(
+        self.controllerWidget.firstWithClass(
+            self.controllerWidget.messageDetail,
+            "message-detail-fragment"));
+},
+
 Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.ControllerTestCase');
 Quotient.Test.ControllerTestCase.methods(
@@ -532,21 +542,14 @@ Quotient.Test.ControllerTestCase.methods(
      */
     function test_unreadCounts(self) {
         return self.setUp().addCallback(function(ignored) {
-                /*
-                 * This is one instead of two since rendering the page marks
-                 * one of the unread messages as read.
-                 */
                 self.assertEqual(
                     self.controllerWidget.getUnreadCountForView("inbox"), 1);
 
                 self.assertEqual(
                     self.controllerWidget.getUnreadCountForView("spam"), 1);
 
-                /*
-                 * Three instead of four for the reason mentioned above.
-                 */
                 self.assertEqual(
-                    self.controllerWidget.getUnreadCountForView("all"), 1);
+                    self.controllerWidget.getUnreadCountForView("all"), 2);
 
                 self.assertEqual(
                     self.controllerWidget.getUnreadCountForView("sent"), 0);
@@ -2023,7 +2026,6 @@ Quotient.Test.ControllerTestCase.methods(
             });
         return result;
     },
-
     /**
      * Test that the send button on the compose widget returns the view to its
      * previous state.
@@ -2037,8 +2039,8 @@ Quotient.Test.ControllerTestCase.methods(
             });
         result.addCallback(
             function(ignored) {
-                var msgDetail = self.controllerWidget._getMessageDetail(),
-                    children = msgDetail.childWidgets;
+
+                var children = self._getMessageDetail().childWidgets;
                 composer = children[children.length - 1];
                 /*
                  * Sanity check.
@@ -2436,22 +2438,21 @@ Quotient.Test.ControllerTestCase.methods(
      * L{Quotient.Mailbox.Controller}, and has the "inline" attribute set
      */
     function _makeComposeTester(self) {
-        return function(composer) {
-            var msgDetail = self.controllerWidget._getMessageDetail(),
-                children = msgDetail.childWidgets;
-                lastChild = children[children.length - 1];
+        return function (composer) {
+            var children = self._getMessageDetail().childWidgets;
+            var lastChild = children[children.length - 1];
             self.failUnless(lastChild instanceof Quotient.Compose.Controller);
 
             /*
-                * XXX Stop it from saving drafts, as this most likely won't
-                * work and potentially corrupts page state in ways which will
-                * break subsequent tests.
-                */
+             * XXX Stop it from saving drafts, as this most likely won't
+             * work and potentially corrupts page state in ways which will
+             * break subsequent tests.
+             */
             lastChild.stopSavingDrafts();
 
             /*
-                * Make sure it's actually part of the page
-                */
+             * Make sure it's actually part of the page
+             */
             var parentNode = lastChild.node;
             while (parentNode != null && parentNode != self.node) {
                 parentNode = parentNode.parentNode;
@@ -2460,7 +2461,8 @@ Quotient.Test.ControllerTestCase.methods(
             self.failUnless(lastChild.inline);
             return lastChild;
         }
-    });
+    },
+    Quotient.Test._getMessageDetail);
 
 
 
@@ -2664,7 +2666,6 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
             });
         return result;
     },
-
     /**
      * Test that the forward action works in this configuration.
      */
@@ -2676,9 +2677,8 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
             });
         result.addCallback(
             function(ignored) {
-                var msgDetail = self.controllerWidget._getMessageDetail(),
-                    children = msgDetail.childWidgets;
-                    lastChild = children[children.length - 1];
+                var children = self._getMessageDetail().childWidgets;
+                var lastChild = children[children.length - 1];
                 self.failUnless(lastChild instanceof Quotient.Compose.Controller);
 
                 /*
@@ -2698,7 +2698,8 @@ Quotient.Test.EmptyInitialViewControllerTestCase.methods(
                 self.assertEqual(parentNode, self.node);
             });
         return result;
-    });
+    },
+    Quotient.Test._getMessageDetail);
 
 
 

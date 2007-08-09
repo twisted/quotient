@@ -562,15 +562,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         self.scrollingFragment = self._createScrollingFragment()
         self.scrollingFragment.setFragmentParent(self)
 
-        messages = self.scrollingFragment.performQuery(0, 2)
-        while len(messages) < 2:
-            messages.append(None)
-        self._currentMessageAtRenderTime = messages[0]
-        self._nextMessageAtRenderTime = messages[1]
-        if self._currentMessageAtRenderTime is not None:
-            self._currentMessageAtRenderTime.markRead()
-
-
     def _createScrollingFragment(self):
         """
         Create a Fragment which will display a mailbox.
@@ -622,12 +613,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
         f.setFragmentParent(self)
         return f
     renderer(messageActions)
-
-
-    def messageDetail(self, request, tag):
-        return self._currentAsFragment(self._currentMessageAtRenderTime)
-    renderer(messageDetail)
-
 
     def scroller(self, request, tag):
         return self.scrollingFragment
@@ -752,29 +737,6 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
             select[opt]
         return select
     renderer(accountChooser)
-
-
-    def _nextMessagePreview(self, currentMessage, nextMessage):
-        # XXX This template data is duplicated on the client in Athena code
-        # which dynamically updates the message preview area.  We need to be
-        # able to share templates between the client and the server.
-        if currentMessage is None:
-            return u'No more messages.'
-        onePattern = inevow.IQ(self.docFactory).onePattern
-        if nextMessage is None:
-            return onePattern('last-message')
-        m = nextMessage
-        return dictFillSlots(onePattern('next-message'),
-                             dict(sender=m.senderDisplay,
-                                  subject=m.subject,
-                                  date=m.sentWhen.asHumanly()))
-
-    def nextMessagePreview(self, request, tag):
-        currentMessage = self._currentMessageAtRenderTime
-        nextMessage = self._nextMessageAtRenderTime
-        return tag[self._nextMessagePreview(currentMessage, nextMessage)]
-    renderer(nextMessagePreview)
-
 
     def head(self):
         return None

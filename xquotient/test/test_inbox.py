@@ -665,11 +665,8 @@ class ReadUnreadTestCase(TestCase):
         screen = InboxScreen(self.inbox)
 
         # All but the first message should still be unread
-        for msg in self.messages[:-1]:
-            self.failIf(msg.read, "Subsequent messages should be unread.")
-
-        # But the first message in the mailbox should now be read
-        self.failUnless(self.messages[-1].read, "First message should be read.")
+        for msg in self.messages:
+            self.failIf(msg.read, "Messages should all be unread after inbox rendering.")
 
 
     def test_fastForward(self):
@@ -681,44 +678,22 @@ class ReadUnreadTestCase(TestCase):
 
         screen.fastForward(viewSelection, self.translator.toWebID(self.messages[-2]))
 
-        # All but the first two messages should still be unread
+        # All but the second message should still be unread.
         for msg in self.messages[:-2]:
             self.failIf(msg.read, "Subsequent messages should be unread.")
+        self.failIf(self.messages[-1].read, "First message should be unread.")
 
-        # But the first two should be read.
-        for msg in self.messages[-2:]:
-            self.failUnless(msg.read, "First two messages should be read.")
+        # But the second should be read.
+        self.failUnless(self.messages[-2], "Second message should be read.")
 
         # Jump to the end of the mailbox
         screen.fastForward(viewSelection, self.translator.toWebID(self.messages[0]))
 
-        for msg in self.messages[1:-2]:
+        for msg in self.messages[1:-2] + self.messages[-1:]:
             self.failIf(msg.read, "Middle messages should be unread.")
 
-        for msg in self.messages[:1] + self.messages[-2:]:
-            self.failUnless(msg.read, "Outter messages should be read.")
-
-
-    def test_actOnMessageIdentifierList(self):
-        """
-        Test that when an unread message is revealed as a result of performing
-        some action, that message becomes marked as read.
-        """
-        screen = InboxScreen(self.inbox)
-
-        D = screen.actOnMessageIdentifierList(
-                'archive',
-                [self.translator.toWebID(self.messages[-1])])
-
-        def check():
-            for msg in self.messages[:-1]:
-                self.failIf(msg.read, "Subsequent messages should be unread.")
-
-            for msg in self.messages[-1:]:
-                self.failUnless(msg.read, "Initial and revealed message should be read.")
-
-        D.addCallback(lambda ign: check())
-        return D
+        for msg in self.messages[:1] + [self.messages[-2]]:
+            self.failUnless(msg.read, "Second and final messages should be read.")
 
 
 
