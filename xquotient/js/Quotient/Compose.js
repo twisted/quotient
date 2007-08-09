@@ -192,7 +192,8 @@ Quotient.Compose.EmailAddressAutoCompleteModel.methods(
      * any of the words in displayName or emailAddress is a prefix of C{addr}
      */
     function isCompletion(self, addr, nameAddr) {
-        var strings = nameAddr[0].split(/\s+/).concat(nameAddr);
+        var strings = nameAddr[0].split(/\s+/).concat(
+            nameAddr).concat(nameAddr[1].split(/@/));
         for(var i = 0; i < strings.length; i++) {
             if(Quotient.Compose.EmailAddressAutoCompleteModel.upcall(
                     self, "isCompletion", addr, strings[i])) {

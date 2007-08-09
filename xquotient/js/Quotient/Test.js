@@ -3462,27 +3462,29 @@ Quotient.Test.ComposeAutoCompleteTestCase.methods(
     function test_isCompletion(self) {
         self._setUp();
 
-        var model = self.controller.model,
-            nameAddr = ['XXX Joe', 'xyz@host'];
+        var model = self.controller.model;
+        var nameAddr = ['XXX Joe', 'xyz@host.tld'];
 
         self.failUnless(model.isCompletion('jo', nameAddr));
         self.failUnless(model.isCompletion('xy', nameAddr));
         self.failUnless(model.isCompletion('xx', nameAddr));
+        self.failUnless(model.isCompletion('host', nameAddr));
+        self.failUnless(model.isCompletion('host.tld', nameAddr));
     },
 
     /**
      * Negative tests for
      * L{Quotient.Compose.EmailAddressAutoCompleteModel.isCompletion}
      */
-    function(self) {
+    function test_isNotCompletion(self) {
         self._setUp();
 
         var model = self.controller.model,
-            nameAddr = ['XXX Joe', 'xyz@host'];
+            nameAddr = ['XXX Joe', 'xyz@host.tld'];
 
-        self.failIf(model.isCompletion('host', nameAddr));
         self.failIf(model.isCompletion(' ', nameAddr));
         self.failIf(model.isCompletion('', nameAddr));
+        self.failIf(model.isCompletion('.t', nameAddr));
     },
 
     /**
