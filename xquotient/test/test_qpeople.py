@@ -26,13 +26,13 @@ class AddPersonTestCase(TestCase):
         addPersonFrag = AddPersonFragment(self.organizer)
         person = addPersonFrag.addPerson(
             u'Captain P.',
-            **{keyword(NameContactType()): {
+            **{keyword(NameContactType()): [{
                     u'firstname': u'Jean-Luc',
-                    u'lastname': u'Picard'},
-               keyword(EmailContactType(self.store)): {
-                    u'email': u'jlp@starship.enterprise'},
-               keyword(PostalContactType()): {
-                    u'address': u'123 Street Rd'}})
+                    u'lastname': u'Picard'}],
+               keyword(EmailContactType(self.store)): [{
+                    u'email': u'jlp@starship.enterprise'}],
+               keyword(PostalContactType()): [{
+                    u'address': u'123 Street Rd'}]})
         self.assertEqual(self.store.findUnique(Person,
             Person.storeID != self.organizer.storeOwnerPerson.storeID),
                          addPersonFrag.lastPerson)
