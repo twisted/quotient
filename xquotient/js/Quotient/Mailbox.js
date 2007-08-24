@@ -7,6 +7,7 @@
 // import Mantissa.People
 // import Mantissa.ScrollTable
 // import Mantissa.LiveForm
+// import Mantissa.DOMReplace
 
 // import Quotient
 // import Quotient.Common
@@ -2076,37 +2077,6 @@ Quotient.Mailbox.Controller.methods(
         self.messageDetail.appendChild(node);
     },
 
-    function intermingle(self, string, regex, transformation) {
-        var lpiece, mpiece, rpiece, piece, match;
-        var pieces = [string];
-        var matches = 0;
-
-        while(true) {
-            piece = pieces[pieces.length-1];
-            match = regex.exec(piece);
-            if(match) {
-                matches++;
-                lpiece = piece.slice(0, match.index);
-                mpiece = match[0];
-                rpiece = piece.slice(match.index+mpiece.length, piece.length);
-                pieces.pop();
-                pieces = pieces.concat([lpiece, transformation(mpiece), rpiece]);
-            } else { break }
-        }
-        if(matches) {
-            return pieces;
-        }
-        return null;
-    },
-
-    function transformURL(self, s) {
-        var target = s
-        if(Quotient.Common.Util.startswith('www', s)) {
-            target = 'http://' + target;
-        }
-        return MochiKit.DOM.A({"href":target, "target": "_blank"}, s);
-    },
-
     function highlightExtracts(self) {
         /* We have to fetch the message body node each time because it gets
          * removed from the document each time a message is loaded.  We wrap it
@@ -2119,41 +2089,7 @@ Quotient.Mailbox.Controller.methods(
             return;
         }
 
-        var replacements, replacement, replacementLen, j, elem;
-        var i = 0;
-        var regex = /(?:\w+:\/\/|www\.)[^\s\<\>\'\(\)\"]+[^\s\<\>\(\)\'\"\?\.]/;
-
-        while(true) {
-            elem = messageBody.childNodes[i];
-
-            if(!elem) {
-                break
-            }
-
-            if(elem.tagName) {
-                i++;
-                continue
-            }
-
-            replacements = self.intermingle(
-                                elem.nodeValue, regex, self.transformURL);
-
-            if(!replacements) {
-                i++;
-                continue
-            }
-
-            replacementLen = replacements.length;
-            for(j = 0; j < replacementLen; j++) {
-                replacement = replacements[j];
-                if(!replacement.tagName) {
-                    replacement = document.createTextNode(replacement);
-                }
-                messageBody.insertBefore(replacement, elem);
-            }
-            messageBody.removeChild(elem);
-            i += j;
-        }
+        Mantissa.DOMReplace.urlsToLinks(messageBody);
     },
 
     /**
