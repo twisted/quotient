@@ -32,7 +32,7 @@ from axiom import item, attributes, batch
 from axiom.iaxiom import IScheduler
 from axiom.upgrade import registerAttributeCopyingUpgrader, registerUpgrader
 
-from xmantissa import ixmantissa, people, webapp, liveform, webnav 
+from xmantissa import ixmantissa, people, webapp, liveform, webnav
 from xmantissa.prefs import PreferenceCollectionMixin
 from xmantissa.publicresource import getLoader
 from xmantissa.fragmentutils import PatternDictionary, dictFillSlots
@@ -2333,7 +2333,6 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         if adder is not None:
             fragment = AddPersonFragment(adder.organizer)
             fragment.setFragmentParent(self)
-            fragment.docFactory = getLoader(fragment.fragmentName)
             return fragment
         return ''
 
