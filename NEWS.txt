@@ -1,3 +1,8 @@
+0.2.6 (2007-08-01):
+  - Fixed a bug where message attachments with no sender headers weren't
+    rendered properly.
+  - Fixed a parsing bug for certain messages with message/rfc822 attachments.
+
 0.2.5 (2007-07-06):
   - Fixed a bug where replies couldn't be made to messages with no Message-ID.
   - Outgoing messages are now sent as text/plain only.
