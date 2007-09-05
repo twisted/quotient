@@ -309,9 +309,6 @@ Quotient.Common.SenderPerson.methods(
          * own state in the appropriate manner. -exarkun
          */
         var values = {
-            'xmantissa.people.NameContactType': {
-                'firstname': [firstname],
-                'lastname': [lastname]},
             'xmantissa.people.EmailContactType': {
                 'email': [self.email]}};
         var widgets = self.addPersonFormWidget.childWidgets;

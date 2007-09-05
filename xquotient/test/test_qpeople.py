@@ -6,7 +6,7 @@ from axiom.store import Store
 from axiom.dependency import installOn
 
 from xmantissa.people import Organizer, Person, EmailAddress, PostalContactType
-from xmantissa.people import NameContactType, EmailContactType
+from xmantissa.people import EmailContactType
 from xquotient.qpeople import MessageLister, AddPersonFragment
 
 from xquotient.test.test_inbox import testMessageFactory
@@ -26,10 +26,7 @@ class AddPersonTestCase(TestCase):
         addPersonFrag = AddPersonFragment(self.organizer)
         person = addPersonFrag.addPerson(
             u'Captain P.',
-            **{keyword(NameContactType()): [{
-                    u'firstname': u'Jean-Luc',
-                    u'lastname': u'Picard'}],
-               keyword(EmailContactType(self.store)): [{
+            **{keyword(EmailContactType(self.store)): [{
                     u'email': u'jlp@starship.enterprise'}],
                keyword(PostalContactType()): [{
                     u'address': u'123 Street Rd'}]})
