@@ -1,3 +1,8 @@
+0.2.7 (2007-09-05):
+  - Mailbox rendering does not do message rendering now, hopefully preventing a
+    message detail rendering problem from making the mailbox inaccessible.
+  - Recipient autocomplete attempts to match email address hostnames now.
+
 0.2.6 (2007-08-01):
   - Fixed a bug where message attachments with no sender headers weren't
     rendered properly.
