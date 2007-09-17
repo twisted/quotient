@@ -1,12 +1,12 @@
 # -*- test-case-name: xquotient.test.test_theme -*-
-from xmantissa import webtheme
+
 from nevow import tags
 
+from xmantissa import webtheme
+
 class QuotientTheme(webtheme.XHTMLDirectoryTheme):
-    def head(self, req, website):
-        root = website.encryptedRoot(req.getHeader('host'))
-        if root is None:
-            root = website.cleartextRoot(req.getHeader('host'))
+    def head(self, request, website):
+        root = website.rootURL(request)
         static = root.child('Quotient').child('static')
         return tags.link(
             rel='stylesheet',
