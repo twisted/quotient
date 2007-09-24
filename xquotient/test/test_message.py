@@ -18,7 +18,7 @@ from axiom.userbase import LoginMethod
 from nevow.testutil import AccumulatingFakeRequest as makeRequest, renderPage
 from nevow.test.test_rend import deferredRender
 
-from xmantissa.webapp import PrivateApplication
+from xmantissa.webapp import PrivateApplication, GenericNavigationAthenaPage
 from xmantissa.prefs import PreferenceAggregator
 from xmantissa import people
 
@@ -835,18 +835,29 @@ class PrintableMessageResourceTestCase(TestCase, MIMEReceiverMixin):
     """
     Tests for L{xquotient.exmess.PrintableMessageResource}
     """
+    boringMessage = PartMaker('text/plain', 'plain').make()
+
     def setUp(self):
         self.setUpMailStuff()
+        self.boringMessageItem = self.createMIMEReceiver().feedStringNow(
+            self.boringMessage).message
+        self.resource = PrintableMessageResource(self.boringMessageItem)
 
-    boringMessage = PartMaker('text/plain', 'plain').make()
 
     def test_noActions(self):
         """
         Test that L{PrintableMessageResource.renderHTTP} returns something
         wrapping an L{ActionlessMessageDetail}
         """
-        # not the best test.
-        m = self.createMIMEReceiver().feedStringNow(
-            self.boringMessage).message
-        res = PrintableMessageResource(m).renderHTTP(None)
+        res = self.resource.renderHTTP(None)
         self.failUnless(isinstance(res.fragment, ActionlessMessageDetail))
+
+
+    def test_username(self):
+        """
+        Verify that the L{GenericNavigationAthenaPage} returned from
+        L{PrintableMessageResource.renderHTTP} has the C{username} attribute
+        set to the right value.
+        """
+        res = self.resource.renderHTTP(None)
+        self.assertEqual(res.username, u'testuser@example.com')

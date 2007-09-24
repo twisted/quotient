@@ -2118,7 +2118,8 @@ class PrintableMessageResource(rend.Page):
         frag.printing = True
 
         res = webapp.GenericNavigationAthenaPage(
-                    privapp, frag, privapp.getPageComponents())
+            privapp, frag, privapp.getPageComponents(),
+            privapp._getUsername())
 
         res.docFactory = getLoader('printable-shell')
         return res
