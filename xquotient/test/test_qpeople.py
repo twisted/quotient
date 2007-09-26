@@ -7,11 +7,9 @@ from axiom.dependency import installOn
 
 from xmantissa.people import Organizer, Person, EmailAddress, PostalContactType
 from xmantissa.people import EmailContactType
-from xmantissa.test.test_people import createAddPersonContactInfo
-
 from xquotient.qpeople import MessageLister, AddPersonFragment
-from xquotient.test.test_inbox import testMessageFactory
 
+from xquotient.test.test_inbox import testMessageFactory
 
 class AddPersonTestCase(TestCase):
     def test_addPerson(self):
@@ -22,17 +20,19 @@ class AddPersonTestCase(TestCase):
         def keyword(contactType):
             return contactType.uniqueIdentifier().encode('ascii')
 
-        store = Store()
-        self.organizer = Organizer(store=store)
-        installOn(self.organizer, store)
+        self.store = Store()
+        self.organizer = Organizer(store=self.store)
+        installOn(self.organizer, self.store)
         addPersonFrag = AddPersonFragment(self.organizer)
         person = addPersonFrag.addPerson(
-            u'Captain P.', **createAddPersonContactInfo(store))
-        self.assertIdentical(
-            store.findUnique(
-                Person,
-                Person.storeID != self.organizer.storeOwnerPerson.storeID),
-            addPersonFrag.lastPerson)
+            u'Captain P.',
+            **{keyword(EmailContactType(self.store)): [{
+                    u'email': u'jlp@starship.enterprise'}],
+               keyword(PostalContactType()): [{
+                    u'address': u'123 Street Rd'}]})
+        self.assertEqual(self.store.findUnique(Person,
+            Person.storeID != self.organizer.storeOwnerPerson.storeID),
+                         addPersonFrag.lastPerson)
 
 
 
