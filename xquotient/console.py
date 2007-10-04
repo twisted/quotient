@@ -77,9 +77,23 @@ class LiveLog(athena.LiveElement):
         self.callRemote('newEntry', entry)
 
 
+    @athena.expose
+    def rerunExtracts(self):
+        from xquotient import mail, extract
+        source = self.console.store.findUnique(mail.MessageSource)
+        extracts = self.console.store.findUnique(extract.ExtractPowerup)
+        source.removeReliableListener(extracts)
+        source.addReliableListener(extracts)
+
+
     # INavigableFragment
     docFactory = loaders.stan(
-        tags.div(render=tags.directive('liveElement')))
+        tags.div(render=tags.directive('liveElement'))[
+            tags.button[
+                athena.handler(event='onclick', handler='rerunExtracts'),
+                'Re-run Extracts'
+            ]
+        ])
 
     fragmentName = None   # XXX
 

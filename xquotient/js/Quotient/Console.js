@@ -8,6 +8,10 @@ Quotient.Console.LiveLog.methods(
         self.callRemote('clientLoaded');
     },
 
+    function rerunExtracts(self, node) {
+        self.callRemote('rerunExtracts');
+    },
+
     function newEntry(self, entry) {
         function makeText() {
             var text;
