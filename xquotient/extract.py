@@ -90,6 +90,7 @@ class SimpleExtractMixin(object):
             for (k, v) in kw.iteritems():
                 if getattr(e, k) != v:
                     setattr(e, k, v)
+            return e
 
         for part in message.impl.getTypedParts('text/plain'):
             for match in cls.regex.finditer(part.getUnicodeBody()):
