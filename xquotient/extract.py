@@ -104,12 +104,17 @@ class SimpleExtractMixin(object):
                     else:
                         f = lambda **k: cls(store=message.store, **k)
 
-                    f(message=message,
-                      part=part,
-                      timestamp=Time(),
-                      text=extractedText,
-                      start=start,
-                      end=end)
+                    newExtract = f(message=message,
+                                   part=part,
+                                   timestamp=Time(),
+                                   text=extractedText,
+                                   start=start,
+                                   end=end)
+
+                    # Notify the console (XXX hack)
+                    from console import Console
+                    c = newExtract.store.findUnique(Console)
+                    c.newExtract(newExtract)
 
     extract = classmethod(extract)
 
