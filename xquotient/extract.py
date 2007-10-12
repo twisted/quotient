@@ -53,9 +53,9 @@ class ExtractRenderer:
 
     def rend(self, *junk):
         (l, middle, r) = self.extract.inContext()
-        return tags.div(class_='extract-container')[
+        return tags.span(class_='extract-container')[
                 l,
-                tags.div(class_='extract-text')[
+                tags.span(class_='extract-text')[
                     tags.span[middle]],
                 r]
 
@@ -111,10 +111,11 @@ class SimpleExtractMixin(object):
                                    start=start,
                                    end=end)
 
+                    print 'XXX extract ran'
                     # Notify the console (XXX hack)
-                    from console import Console
-                    c = newExtract.store.findUnique(Console)
-                    c.newExtract(newExtract)
+                    #from console import Console
+                    #c = newExtract.store.findUnique(Console)
+                    #c.newExtract(newExtract)
 
     extract = classmethod(extract)
 
