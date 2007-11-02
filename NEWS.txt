@@ -1,3 +1,6 @@
+0.2.8 (2007-10-16):
+  - Updates to match new Mantissa API.
+
 0.2.7 (2007-09-05):
   - Mailbox rendering does not do message rendering now, hopefully preventing a
     message detail rendering problem from making the mailbox inaccessible.
