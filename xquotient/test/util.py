@@ -96,9 +96,12 @@ class MIMEReceiverMixin:
     def createMIMEReceiver(self):
         return self.deliveryAgent.createMIMEReceiver(u'test://' + self.dbdir)
 
-    def setUpMailStuff(self, extraPowerups=()):
+    def setUpMailStuff(self, extraPowerups=(), onDisk=False):
         sitedir = self.mktemp()
-        s = store.Store(sitedir)
+        if onDisk:
+            s = store.Store(dbdir=sitedir)
+        else:
+            s = store.Store(filesdir=sitedir)
         def tx1():
             loginSystem = LoginSystem(store=s)
             installOn(loginSystem, s)
@@ -106,7 +109,10 @@ class MIMEReceiverMixin:
 
             account = loginSystem.addAccount(u'testuser', u'example.com', None)
             substore = account.avatars.open()
-            self.dbdir = substore.dbdir.path
+            if substore.dbdir is not None:
+                self.dbdir = substore.dbdir.path
+            else:
+                self.dbdir = substore.filesdir.path
 
             installOffering(s, quotientOffering, {})
 

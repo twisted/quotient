@@ -17,7 +17,6 @@ from xquotient.quotientapp import MessageSearchProvider
 from xquotient.exmess import Message, splitAddress
 from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  ThemedFragmentWrapper)
-from xquotient.extract import ExtractPowerup
 
 def _checkForPyLucene(indexer):
     """
@@ -111,7 +110,7 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
 class ViewTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
-                                (MessageSearchProvider,))
+                                (MessageSearchProvider,), onDisk=True)
         self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
         _checkForPyLucene(self.indexer)
 

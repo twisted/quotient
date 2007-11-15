@@ -309,7 +309,7 @@ class FromAddressTestCase(unittest.TestCase):
         """
         Test L{smtpout.FromAddress.findSystemAddress}
         """
-        s = store.Store(self.mktemp())
+        s = store.Store(filesdir=self.mktemp())
         ls = userbase.LoginSystem(store=s)
         installOn(ls, s)
 

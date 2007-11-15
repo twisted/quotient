@@ -10,12 +10,9 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.internet.address import IPv4Address
 from twisted.python import failure
 
-from epsilon.scripts import certcreate
-
 from axiom import store, userbase, scheduler
 from axiom.item import Item
 from axiom.attributes import text, reference
-from axiom.test.util import getPristineStore
 from axiom.dependency import installOn
 
 from xquotient import mail, exmess
@@ -32,7 +29,7 @@ def createStore(testCase):
     @rtype: L{axiom.store.Store}
     """
     location = testCase.mktemp()
-    s = store.Store(location)
+    s = store.Store(filesdir=location)
 
     def initializeStore():
         """
@@ -114,7 +111,7 @@ class StubSender(Item):
 
 class MailTests(unittest.TestCase):
     def setUp(self):
-        self.store = getPristineStore(self, createStore)
+        self.store = createStore(self)
         self.login = self.store.findUnique(userbase.LoginSystem)
 
         svc = service.IService(self.store)

@@ -8,10 +8,9 @@ from time import time
 from twisted.trial.unittest import TestCase
 from twisted.python.reflect import qual
 
-from axiom.scripts import axiomatic
 from axiom.store import Store
 from axiom import userbase
-from axiom.test.util import getPristineStore
+from axiom.plugins.mantissacmd import Mantissa
 
 from xmantissa import offering, signup
 from xmantissa.plugins.free_signup import freeTicket
@@ -23,9 +22,9 @@ from xquotient.inbox import Inbox
 
 def createStore(testCase):
     dbpath = testCase.mktemp()
-    axiomatic.main(['-d', dbpath, 'mantissa', '--admin-password', 'password'])
-
-    store = Store(dbpath)
+    store = Store(filesdir=dbpath)
+    Mantissa().installSite(store, "/", generateCert=False)
+    Mantissa().installAdmin(store, "admin@localhost", "password")
 
     _userbase = store.findUnique(userbase.LoginSystem)
     adminAccount = _userbase.accountByAddress(u'admin', u'localhost')
@@ -59,7 +58,7 @@ class InstallationTestCase(TestCase):
 
 
     def setUp(self):
-        self.store = getPristineStore(self, createStore)
+        self.store = createStore(self)
         self.loginSystem = self.store.findUnique(userbase.LoginSystem)
 
         adminAvatar = self.loginSystem.accountByAddress(u'admin', u'localhost')

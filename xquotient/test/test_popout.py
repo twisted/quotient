@@ -17,7 +17,7 @@ from twisted.test.iosim import connectedServerAndClient
 
 from axiom.store import Store
 from axiom.userbase import LoginSystem, LoginAccount, LoginMethod
-from axiom.test.util import getPristineStore, QueryCounter
+from axiom.test.util import QueryCounter
 from axiom.dependency import installOn
 
 from xquotient.mail import DeliveryAgent
@@ -70,7 +70,7 @@ class MailboxTestCase(TestCase):
         ]
 
     def setUp(self):
-        self.store = getPristineStore(self, createStore)
+        self.store = createStore(self)
         self.mailbox = self.store.findUnique(POP3Up)
         realm = IRealm(self.store)
         checker = ICredentialsChecker(self.store)

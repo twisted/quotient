@@ -33,14 +33,14 @@ class CompositionTestMixin(object):
     * Set up 2 from addresses
     """
 
-    def setUp(self, dbdir=None):
+    def setUp(self):
         self.reactor = Reactor()
         self._originalSendmail = smtpout._esmtpSendmail
         smtpout._esmtpSendmail = self._esmtpSendmail
 
         try:
-            self.dbdir = self.mktemp()
-            self.siteStore = store.Store(self.dbdir)
+            self.filesdir = self.mktemp()
+            self.siteStore = store.Store(filesdir=self.filesdir)
             Mantissa().installSite(self.siteStore, '/')
 
             self.userAccount = Create().addAccount(
@@ -702,8 +702,8 @@ class CreateMessage(unittest.TestCase):
         """
         Install a bunch of stuff expected by L{mimebakery.createMessage}.
         """
-        self.dbdir = self.mktemp()
-        self.store = store.Store(self.dbdir)
+        self.filesdir = self.mktemp()
+        self.store = store.Store(filesdir=self.filesdir)
         self.composer = compose.Composer(store=self.store)
         self.defaultFromAddr = smtpout.FromAddress(
                                 store=self.store,

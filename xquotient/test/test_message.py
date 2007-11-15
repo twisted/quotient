@@ -48,7 +48,7 @@ class ComposeActionsTestCase(TestCase):
     """
     def setUp(self):
         # XXX Incorrect setup.  See xquotient.test.test_compose.CompositionTestMixin
-        self.store = Store(self.mktemp())
+        self.store = Store(filesdir=self.mktemp())
 
         LoginMethod(store=self.store, internal=False, protocol=u'email',
                 localpart=u'recipient', domain=u'host', verified=True,
@@ -174,7 +174,7 @@ class MoreComposeActionsTestCase(TestCase):
     """
 
     def setUp(self):
-        self.store = Store(dbdir=self.mktemp())
+        self.store = Store(filesdir=self.mktemp())
 
         installOn(inbox.Inbox(store=self.store), self.store)
         self.composer = compose.Composer(store=self.store)
@@ -302,7 +302,7 @@ class MessageTestCase(TestCase):
         m.deleteFromStore()
 
     def testAttachmentZipping(self):
-        s = Store(self.mktemp())
+        s = Store(filesdir=self.mktemp())
 
         path = Message(store=s, impl=PartItem(store=s)).zipAttachments()
 
@@ -323,8 +323,8 @@ class PartWrapperTestCase(TestCase):
         """
         Create a store and a MIME message with a message/rfc822 attachment.
         """
-        self.dbdir = self.mktemp()
-        self.store = Store(dbdir=self.dbdir)
+        self.filesdir = self.mktemp()
+        self.store = Store(filesdir=self.filesdir)
         partCounter = itertools.count().next
         self.parent = Part(_partCounter=partCounter)
         msgContainer = self.parent.newChild()
@@ -351,7 +351,7 @@ class PartWrapperTestCase(TestCase):
 
         self.parent._addToStore(self.store,
                            Message(store=self.store),
-                           FilePath(self.dbdir).child("files").child("msg"))
+                           FilePath(self.filesdir).child("msg"))
         self.wrapper = MessageWrapperForPart(self.msg, Time())
 
 
@@ -383,7 +383,7 @@ class PartWrapperTestCase(TestCase):
 
         self.parent._addToStore(self.store,
                            Message(store=self.store),
-                           FilePath(self.dbdir).child("files").child("msg"))
+                           FilePath(self.filesdir).child("msg"))
         self.wrapper = MessageWrapperForPart(self.msg, Time())
         self.assertEqual(self.wrapper.recipient, u'<No Recipient>')
         self.assertEqual(self.wrapper.subject, u'<No Subject>')

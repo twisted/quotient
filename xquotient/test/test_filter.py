@@ -19,7 +19,7 @@ from xquotient.test.test_workflow import DummyMessageImplementation
 class HeaderRuleTest(unittest.TestCase):
     def setUp(self):
         self.storepath = self.mktemp()
-        self.store = store.Store(self.storepath)
+        self.store = store.Store(filesdir=self.storepath)
         self.headerRule = filter.HeaderRule(
             store=self.store,
             headerName=u"subject",
@@ -96,7 +96,7 @@ class MailingListRuleTest(unittest.TestCase):
 
     def setUp(self):
         self.storepath = self.mktemp()
-        self.store = store.Store(self.storepath)
+        self.store = store.Store(filesdir=self.storepath)
 
         self.rfp = filter.RuleFilteringPowerup(store=self.store)
         installOn(self.rfp, self.store)
@@ -156,8 +156,8 @@ class FocusTests(TestCase):
         Create a site store and a user store with the L{Focus} powerup.
         """
         # Make the site store within which the test user will be created.
-        self.dbdir = self.mktemp()
-        self.siteStore = Store(self.dbdir)
+        self.filesdir = self.mktemp()
+        self.siteStore = Store(filesdir=self.filesdir)
         Mantissa().installSite(self.siteStore, '/')
 
         # Create a store for the user which is set up appropriately.

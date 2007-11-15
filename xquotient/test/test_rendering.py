@@ -1,5 +1,4 @@
 from twisted.trial.unittest import TestCase
-from twisted.python.filepath import FilePath
 
 from epsilon.extime import Time
 
@@ -17,7 +16,6 @@ from xquotient import compose
 from xquotient.test.util import MIMEReceiverMixin, PartMaker, ThemedFragmentWrapper
 from xquotient.qpeople import MessageList, MessageLister
 
-from xquotient.test.util import DummyMessageImplementation
 from xquotient.test.test_inbox import testMessageFactory
 
 def makeMessage(receiver, parts, impl):
@@ -37,28 +35,6 @@ def makeMessage(receiver, parts, impl):
 
 
 
-# Trial is excruciating.  Temporary hack until Twisted ticket #1870 is
-# resolved
-_theBaseStorePath = None
-def getBaseStorePath(messageParts):
-    """
-    Create a minimal database usable for some mail functionality and place
-    a single message into it.
-    """
-    global _theBaseStorePath
-    if _theBaseStorePath is None:
-        class DBSetup(MIMEReceiverMixin, TestCase):
-            def test_x():
-                pass
-        receiver = DBSetup('test_x').setUpMailStuff()
-        store = receiver.store
-        #installOn(PrivateApplication(store=store), store)
-        makeMessage(receiver, messageParts, None)
-        store.close()
-        _theBaseStorePath = store.dbdir
-    return _theBaseStorePath
-
-
 
 class RenderingTestCase(TestCase, MIMEReceiverMixin):
     aBunchOfRelatedParts = PartMaker(
@@ -74,11 +50,9 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         Make a copy of the very minimal database for a single test method to
         mangle.
         """
-        self.dbdir = self.mktemp()
-        src = getBaseStorePath(self.aBunchOfRelatedParts)
-        dst = FilePath(self.dbdir)
-        src.copyTo(dst)
-        self.store = Store(self.dbdir)
+        receiver = self.setUpMailStuff()
+        self.store = receiver.store
+        makeMessage(receiver, self.aBunchOfRelatedParts, None)
 
 
     def test_messageRendering(self):

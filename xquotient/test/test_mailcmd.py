@@ -14,8 +14,8 @@ from xquotient.popout import POP3Listener
 
 class ConfigurationMixin(CommandStubMixin):
     def setUp(self):
-        self.dbdir = self.mktemp()
-        self.store = Store(self.dbdir)
+        self.filesdir = self.mktemp()
+        self.store = Store(filesdir=self.filesdir)
         self.server = self.createServer(self.store)
         installOn(self.server, self.store)
         self.config = self.createOptions()

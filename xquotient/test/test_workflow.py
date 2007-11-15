@@ -1502,7 +1502,7 @@ class DeletionTest(_WorkflowMixin, TestCase):
         """
         Create an on-disk store and an IMessageData implementation.
         """
-        self.store = Store(self.mktemp())
+        self.store = Store(filesdir=self.mktemp())
         self.scheduled = []
         self.fakeScheduler = FakeScheduler(store=self.store, test=self)
         self.store.powerUp(self.fakeScheduler, IScheduler)

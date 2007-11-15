@@ -12,8 +12,8 @@ from xquotient.test.test_dspam import MessageCreationMixin
 class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
 
     def setUp(self):
-        dbdir = self.mktemp()
-        self.store = s = store.Store(dbdir)
+        filesdir = self.mktemp()
+        self.store = s = store.Store(filesdir=filesdir)
         installOn(Scheduler(store=s), s)
         ls = userbase.LoginSystem(store=s)
         installOn(ls, s)
