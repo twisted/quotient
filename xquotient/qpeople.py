@@ -181,8 +181,40 @@ class MessageLister(Item):
         return list(sq)
 
 def messageLister1to2(old):
+    """
+    Upgrade the L{MessageLister} object from schema version 1 to 2, by filling
+    out its 'organizer' slot with an L{Organizer} item, creating it if
+    necessary.
+    """
     ml = old.upgradeVersion(MessageLister.typeName, 1, 2)
-    ml.organizer = old.store.findOrCreate(people.Organizer)
+    # During upgrading __init__ is run, which means that the Organizer (version
+    # 2 in the historical tests, 3 as of this writing) will try to create a
+    # Person during its creation and notify IOrganizerPlugin powerups about it.
+    #
+    # MessageLister is an IOrganizerPlugin, so it gets caught in the powerup
+    # query.  Since it's Powerup items which are being queried for,
+    # MessageLister is loaded by reference.  The load by reference triggers
+    # this upgrader.  This upgrader then finds or creates an Organizer.  If we
+    # don't check for the old not-fully-upgraded Organizer item, then we will
+    # end up with 2 Organizer items (one that was upgraded, one created by this
+    # upgrader) which causes the test - which correctly does a
+    # findUnique(Organizer) since there should only be one - to fail.
+    #
+    # This edge case (the fact that other dependencies that will be queried for
+    # might not be fully upgraded at the time that an upgrader runs) can really
+    # occur during any upgrade, and it might be worthwhile to standardize this
+    # idiom to limit the exposure of future upgraders.  However, as it stands
+    # it's a bit of a hack, so this upgrader has been modified just far enough
+    # to get its own historical tests to pass.
+    #
+    # -glyph
+    for oldSchemaVersion in range(2, people.Organizer.schemaVersion):
+        oldOrganizer = ml.store.getOldVersionOf(
+            people.Organizer.typeName, oldSchemaVersion)
+        ml.organizer = ml.store.findUnique(oldOrganizer, default=None)
+        if ml.organizer is not None:
+            return ml
+    ml.organizer = ml.store.findOrCreate(people.Organizer)
     return ml
 
 registerUpgrader(messageLister1to2, MessageLister.typeName, 1, 2)
