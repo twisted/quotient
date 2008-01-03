@@ -38,7 +38,7 @@ class RenderersTestCase(TestCase):
 
     def test_paragraphNesting(self):
         """
-        Check that L[renderers.ParagraphRenderer} doesn't explode
+        Check that L{renderers.ParagraphRenderer} doesn't explode
         if asked to render a deep tree of paragraphs
         """
         self._renderQuotedMessage(1000)

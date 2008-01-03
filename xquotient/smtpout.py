@@ -550,7 +550,7 @@ class FromAddressScrollTable(ScrollingFragment):
 
     def action_setDefaultAddress(self, item):
         """
-        Make the C[item} the default L{FromAddress} for outgoing mail
+        Make the C{item} the default L{FromAddress} for outgoing mail
         """
         item.setAsDefault()
 
