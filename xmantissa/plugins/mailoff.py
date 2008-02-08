@@ -1,13 +1,16 @@
 # -*- test-case-name: xmantissa.test.test_signup -*-
 
+from twisted.python.filepath import FilePath
+from twisted.mail.pop3 import IMailbox
+from twisted.mail.smtp import IMessageDelivery
+
 from axiom import iaxiom, scheduler, userbase
 
 from xmantissa import website, offering
+
 from xquotient.inbox import Inbox
 from xquotient.compose import Composer
 from xquotient.quotientapp import MessageSearchProvider
-
-
 from xquotient.quotienttheme import QuotientTheme
 from xquotient.grabber import GrabberConfiguration
 from xquotient.extract import ExtractPowerup
@@ -15,12 +18,8 @@ from xquotient.popout import POP3Up
 from xquotient.filter import MailingListFilteringPowerup, RuleFilteringPowerup, Focus
 from xquotient.spam import SpambayesFilter
 from xquotient.qpeople import MessageLister
-
 from xquotient import mail,  popout, publicpage
 import xquotient
-
-from twisted.mail.pop3 import IMailbox
-from twisted.mail.smtp import IMessageDelivery
 
 
 plugin = offering.Offering(
@@ -56,4 +55,5 @@ plugin = offering.Offering(
     loginInterfaces = [(IMessageDelivery, "SMTP logins"),
                        (IMailbox, "POP3 logins")],
     themes = [QuotientTheme('base', 0)],
-    version = xquotient.version)
+    version = xquotient.version,
+    staticContentPath = FilePath(xquotient.__file__).sibling('static'))

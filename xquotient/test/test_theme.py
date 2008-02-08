@@ -1,8 +1,20 @@
+
+"""
+Tests for Quotient's theme.
+"""
+
 from twisted.trial.unittest import TestCase
 
-from xmantissa.test.test_theme import testHead
+from xmantissa.test.validation import XHTMLDirectoryThemeTestsMixin
+from xmantissa.plugins.mailoff import plugin as quotientOffering
+
 from xquotient.quotienttheme import QuotientTheme
 
-class QuotientThemeTestCase(TestCase):
-    def test_head(self):
-        testHead(QuotientTheme(''))
+
+class QuotientThemeTests(TestCase, XHTMLDirectoryThemeTestsMixin):
+    """
+    Stock L{XHTMLDirectoryTheme} tests applied to the Quotient offering and its
+    theme.
+    """
+    theme = QuotientTheme('')
+    offering = quotientOffering
