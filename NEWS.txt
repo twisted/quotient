@@ -1,3 +1,7 @@
+0.2.9 (2008-02-19):
+  - The stylesheetLocation feature of XHTMLDirectoryTheme is now used
+    for Quotient's theme.
+
 0.2.8 (2007-10-16):
   - Updates to match new Mantissa API.
 
