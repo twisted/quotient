@@ -37,29 +37,6 @@ def makeMessage(receiver, parts, impl):
 
 
 
-# Trial is excruciating.  Temporary hack until Twisted ticket #1870 is
-# resolved
-_theBaseStorePath = None
-def getBaseStorePath(messageParts):
-    """
-    Create a minimal database usable for some mail functionality and place
-    a single message into it.
-    """
-    global _theBaseStorePath
-    if _theBaseStorePath is None:
-        class DBSetup(MIMEReceiverMixin, TestCase):
-            def test_x():
-                pass
-        receiver = DBSetup('test_x').setUpMailStuff()
-        store = receiver.store
-        #installOn(PrivateApplication(store=store), store)
-        makeMessage(receiver, messageParts, None)
-        store.close()
-        _theBaseStorePath = store.dbdir
-    return _theBaseStorePath
-
-
-
 class RenderingTestCase(TestCase, MIMEReceiverMixin):
     aBunchOfRelatedParts = PartMaker(
         'multipart/related', 'related',
@@ -74,18 +51,15 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         Make a copy of the very minimal database for a single test method to
         mangle.
         """
-        self.dbdir = self.mktemp()
-        src = getBaseStorePath(self.aBunchOfRelatedParts)
-        dst = FilePath(self.dbdir)
-        src.copyTo(dst)
-        self.store = Store(self.dbdir)
+        receiver = self.setUpMailStuff()
+        makeMessage(receiver, self.aBunchOfRelatedParts, None)
 
 
     def test_messageRendering(self):
         """
         Test rendering of message detail for an extremely complex message.
         """
-        msg = self.store.findUnique(Message)
+        msg = self.substore.findUnique(Message)
         msg.classifyClean()
         return renderLivePage(
                    ThemedFragmentWrapper(
@@ -98,18 +72,15 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         messages in it.
         """
         def deliverMessages():
-            from xquotient.mail import DeliveryAgent
-            cmr = self.store.findUnique(
-                DeliveryAgent).createMIMEReceiver
             for i in xrange(5):
-                makeMessage(cmr(u'test://' + self.dbdir),
-                            self.aBunchOfRelatedParts, None)
-        self.store.transact(deliverMessages)
+                makeMessage(
+                    self.createMIMEReceiver(), self.aBunchOfRelatedParts, None)
+        self.substore.transact(deliverMessages)
 
-        inbox = self.store.findUnique(Inbox)
+        inbox = self.substore.findUnique(Inbox)
 
-        composer = compose.Composer(store=self.store)
-        installOn(composer, self.store)
+        composer = compose.Composer(store=self.substore)
+        installOn(composer, self.substore)
 
         return renderLivePage(
                    ThemedFragmentWrapper(
@@ -121,9 +92,9 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
         Test rendering of the L{xquotient.compose.ComposeFragment} returned
         from L{xquotient.inbox.InboxScreen.getComposer}
         """
-        installOn(compose.Composer(store=self.store), self.store)
+        installOn(compose.Composer(store=self.substore), self.substore)
 
-        inbox = self.store.findUnique(Inbox)
+        inbox = self.substore.findUnique(Inbox)
         inboxScreen = InboxScreen(inbox)
 
         composeFrag = inboxScreen.getComposer()
@@ -133,26 +104,22 @@ class RenderingTestCase(TestCase, MIMEReceiverMixin):
 
 
     def test_peopleMessageListRendering(self):
-        mlister = MessageLister(store=self.store)
-        installOn(mlister, self.store)
+        mlister = MessageLister(store=self.substore)
+        installOn(mlister, self.substore)
 
-        p = Person(store=self.store,
-                   name=u'Bob')
+        p = Person(store=self.substore, name=u'Bob')
 
-        EmailAddress(store=self.store,
-                     person=p,
-                     address=u'bob@internet')
+        EmailAddress(store=self.substore, person=p, address=u'bob@internet')
 
         for i in xrange(5):
-            testMessageFactory(store=self.store,
-                               subject=unicode(str(i)),
-                               receivedWhen=Time(),
-                               spam=False,
-                               sender=u'bob@internet')
+            testMessageFactory(
+                store=self.substore, subject=unicode(str(i)),
+                receivedWhen=Time(), spam=False, sender=u'bob@internet')
 
 
         self.assertEqual(len(list(mlister.mostRecentMessages(p))), 5)
-        return renderPage(rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
+        return renderPage(
+            rend.Page(docFactory=loaders.stan(MessageList(mlister, p))))
 
 
 

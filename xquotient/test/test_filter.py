@@ -158,7 +158,7 @@ class FocusTests(TestCase):
         # Make the site store within which the test user will be created.
         self.dbdir = self.mktemp()
         self.siteStore = Store(self.dbdir)
-        Mantissa().installSite(self.siteStore, '/')
+        Mantissa().installSite(self.siteStore, u'example.com', u"", False)
 
         # Create a store for the user which is set up appropriately.
         self.userAccount = Create().addAccount(

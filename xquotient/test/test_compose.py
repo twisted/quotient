@@ -41,7 +41,7 @@ class CompositionTestMixin(object):
         try:
             self.dbdir = self.mktemp()
             self.siteStore = store.Store(self.dbdir)
-            Mantissa().installSite(self.siteStore, '/')
+            Mantissa().installSite(self.siteStore, u"example.org", u"", False)
 
             self.userAccount = Create().addAccount(
                 self.siteStore, u'testuser', u'example.org', u'password')

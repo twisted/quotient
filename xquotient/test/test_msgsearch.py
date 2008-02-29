@@ -111,7 +111,7 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
 class ViewTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
-                                (MessageSearchProvider,))
+            (MessageSearchProvider,), self.mktemp(), True)
         self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
         _checkForPyLucene(self.indexer)
 

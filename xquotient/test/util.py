@@ -1,7 +1,10 @@
+
 from cStringIO import StringIO
 from email import Generator as G, MIMEMultipart as MMP, MIMEText as MT, MIMEImage as MI
 
 from zope.interface import implements
+
+from twisted.python.reflect import qual
 
 from epsilon.extime import Time
 
@@ -9,13 +12,13 @@ from axiom import store
 from axiom.item import Item
 from axiom.attributes import integer, text
 from axiom.userbase import LoginSystem
-from axiom.dependency import installOn
+from axiom.plugins.mantissacmd import Mantissa
 
 from nevow.testutil import FragmentWrapper
 
-from xmantissa.offering import installOffering
+from xmantissa.ixmantissa import IOfferingTechnician
 from xmantissa.webtheme import getLoader
-
+from xmantissa.product import Product
 from xmantissa.plugins.mailoff import plugin as quotientOffering
 
 from xquotient.inbox import Inbox
@@ -94,30 +97,29 @@ class PartMaker:
 
 class MIMEReceiverMixin:
     def createMIMEReceiver(self):
-        return self.deliveryAgent.createMIMEReceiver(u'test://' + self.dbdir)
-
-    def setUpMailStuff(self, extraPowerups=()):
-        sitedir = self.mktemp()
-        s = store.Store(sitedir)
-        def tx1():
-            loginSystem = LoginSystem(store=s)
-            installOn(loginSystem, s)
+        return self.deliveryAgent.createMIMEReceiver(
+            u'test://' + self.deliveryAgent.store.filesdir.path)
 
 
-            account = loginSystem.addAccount(u'testuser', u'example.com', None)
-            substore = account.avatars.open()
-            self.dbdir = substore.dbdir.path
+    def setUpMailStuff(self, extraPowerups=(), dbdir=None, generateCert=False):
+        filesdir = None
+        if dbdir is None:
+            filesdir = self.mktemp()
+        self.siteStore = store.Store(dbdir=dbdir, filesdir=filesdir)
+        Mantissa().installSite(self.siteStore, u"example.com", u"", generateCert)
+        IOfferingTechnician(self.siteStore).installOffering(quotientOffering)
 
-            installOffering(s, quotientOffering, {})
+        loginSystem = self.siteStore.findUnique(LoginSystem)
+        account = loginSystem.addAccount(u'testuser', u'example.com', None)
+        self.substore = account.avatars.open()
 
-            def tx2():
-                installOn(Inbox(store=substore), substore)
-                for P in extraPowerups:
-                    installOn(P(store=substore), substore)
-                self.deliveryAgent = substore.findUnique(DeliveryAgent)
-                return self.createMIMEReceiver()
-            return substore.transact(tx2)
-        return s.transact(tx1)
+        product = Product(
+            store=self.siteStore,
+            types=[qual(Inbox)] + map(qual, extraPowerups))
+        product.installProductOn(self.substore)
+
+        self.deliveryAgent = self.substore.findUnique(DeliveryAgent)
+        return self.createMIMEReceiver()
 
 
 
