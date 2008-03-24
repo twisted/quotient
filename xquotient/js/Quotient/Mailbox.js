@@ -659,7 +659,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
 /**
  * Run interference for a ScrollTable.
  *
- * @ivar contentTableGrid: An Array of the the major components of an inbox
+ * @ivar contentTableGrid: An Array of the major components of an inbox
  * view.  The first element is an array with three elements: the td element for
  * the view selection area, the td element for the scrolltable, and the td
  * element for the message detail area.  The second element is also an array

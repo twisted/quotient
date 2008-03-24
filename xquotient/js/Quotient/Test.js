@@ -2434,7 +2434,7 @@ Quotient.Test.ControllerTestCase.methods(
     /**
      * @return: a function which can be added as a callback to a deferred
      * which fires with an L{Quotient.Compose.Controller} instance.  Checks
-     * the the compose instance is inside the message detail of our
+     * the compose instance is inside the message detail of our
      * L{Quotient.Mailbox.Controller}, and has the "inline" attribute set
      */
     function _makeComposeTester(self) {
@@ -4193,7 +4193,7 @@ Quotient.Test.MsgDetailCorrespondentPeopleTestCase.methods(
 Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.PostiniConfigurationTestCase');
 /**
- * Tests for the Postini configuration form on the the Settings page.
+ * Tests for the Postini configuration form on the Settings page.
  * See L{Quotient.Spam}.
  */
 Quotient.Test.PostiniConfigurationTestCase.methods(
