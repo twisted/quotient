@@ -447,7 +447,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         req = makeRequest()
         D = deferredRender(partDisplayer, req)
         def checkLength(ign):
-            self.assertEqual(int(req.headers.get('content-length')), 31)
+            self.assertEqual(int(req.getHeader('content-length')), 31)
         D.addCallback(checkLength)
         return D
 
@@ -469,7 +469,7 @@ class WebTestCase(TestCase, MIMEReceiverMixin):
         req = makeRequest()
         D = deferredRender(partDisplayer, req)
         def checkLength(renderedBody):
-            self.assertEqual(int(req.headers.get('content-length')),
+            self.assertEqual(int(req.getHeader('content-length')),
                              len(renderedBody))
         D.addCallback(checkLength)
         return D
