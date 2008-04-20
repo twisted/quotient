@@ -197,7 +197,9 @@ class MoreComposeActionsTestCase(TestCase):
         Test that statuses requested for parent messages get set after
         the created message is sent.
         """
-        self.composer.__dict__['sendMessage'] = lambda fromA, toA, msg: None
+        # (bypass Item.__setattr__)
+        object.__setattr__(self.composer, 'sendMessage',
+                           lambda fromA, toA, msg: None)
         class MsgStub:
             impl = MIMEPart()
             statuses = None
