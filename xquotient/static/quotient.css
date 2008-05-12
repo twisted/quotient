@@ -8,7 +8,7 @@
     padding: 14px 14px 14px 52px;
     font-size: 110%;
     text-align: center;
-    background-image: url(/Quotient/static/images/warning.png);
+    background-image: url(/static/Quotient/images/warning.png);
     background-repeat: no-repeat;
     background-position: 2px 50%;
     min-height: 44px;
@@ -186,7 +186,7 @@ ul.file-list, ul.file-list li {
 
 .menubar-separator {
     width: 2px;
-    background: #7FCCE5 url(/Quotient/static/images/menubar-separator.png) top left repeat-y;
+    background: #7FCCE5 url(/static/Quotient/images/menubar-separator.png) top left repeat-y;
     margin: 0px 8px 0px 8px;
     height: 22px;
     float: left;
@@ -283,7 +283,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 .button-top-edge {
-    background-image: url(/Quotient/static/images/button-top-edge.png);
+    background-image: url(/static/Quotient/images/button-top-edge.png);
     background-position: bottom left;
 }
 
@@ -294,21 +294,21 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 .button-tl-corner {
-    background-image: url(/Quotient/static/images/button-tl-corner.png);
+    background-image: url(/static/Quotient/images/button-tl-corner.png);
     background-position: top right;
 }
 
 .button-tr-corner {
-    background-image: url(/Quotient/static/images/button-tr-corner.png);
+    background-image: url(/static/Quotient/images/button-tr-corner.png);
 }
 
 .button-bl-corner {
-    background-image: url(/Quotient/static/images/button-bl-corner.png);
+    background-image: url(/static/Quotient/images/button-bl-corner.png);
     background-position: top right;
 }
 
 .button-br-corner {
-    background-image: url(/Quotient/static/images/button-br-corner.png);
+    background-image: url(/static/Quotient/images/button-br-corner.png);
 }
 
 .button-top-edge, .button-bottom-edge {
@@ -317,16 +317,16 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 .button-bottom-edge {
-    background-image: url(/Quotient/static/images/button-bottom-edge.png);
+    background-image: url(/static/Quotient/images/button-bottom-edge.png);
 }
 
 .button-left-edge {
-    background-image: url(/Quotient/static/images/button-left-edge.png);
+    background-image: url(/static/Quotient/images/button-left-edge.png);
     background-position: top right;
 }
 
 .button-right-edge {
-    background-image: url(/Quotient/static/images/button-right-edge.png);
+    background-image: url(/static/Quotient/images/button-right-edge.png);
 }
 
 .button-left-edge, .button-right-edge {
@@ -384,7 +384,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 }
 
 #overlay {
-    background-image: url(/Quotient/static/images/overlay.png);
+    background-image: url(/static/Quotient/images/overlay.png);
 }
 
 .masthead-br {
@@ -417,14 +417,14 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
     position: relative;
     top: -6px;
     float: left;
-    background-image: url(/Quotient/static/images/inbox-bl-corner.png);
+    background-image: url(/static/Quotient/images/inbox-bl-corner.png);
 }
 
 .right-corner {
     position: relative;
     top: -6px;
     float: right;
-    background-image: url(/Quotient/static/images/inbox-br-corner.png);
+    background-image: url(/static/Quotient/images/inbox-br-corner.png);
 }
 
 .left-corner, .right-corner {
@@ -549,7 +549,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 
 .progress-bar {
     height: 4px;
-    background: #D1FFA3 url(/Quotient/static/images/progress-bar-bg.png) top left repeat-x;
+    background: #D1FFA3 url(/static/Quotient/images/progress-bar-bg.png) top left repeat-x;
 }
 
 .progress-meter {
@@ -607,7 +607,7 @@ a.button-container:link, a.button-container:visited, a.button-container:active {
 * html #overlay{
     background-color: #000;
     back\ground-color: transparent;
-    background-image: url(/Quotient/static/images/blank.gif);
+    background-image: url(/static/Quotient/images/blank.gif);
 }
 
 a.collapse-arrow {
@@ -710,7 +710,7 @@ table.header-table > tbody > tr > td {
 /* gallery stuff */
 
 .gallery-image {
-    background-image: url(/Quotient/static/images/slide-dark.png);
+    background-image: url(/static/Quotient/images/slide-dark.png);
     float: left;
     padding: 4px;
     margin-right: 4px;
@@ -725,7 +725,7 @@ table.header-table > tbody > tr > td {
 }
 
 .gallery-image-alt {
-    background-image: url(/Quotient/static/images/slide.png);
+    background-image: url(/static/Quotient/images/slide.png);
     float: left;
     padding: 4px;
     margin-right: 4px;

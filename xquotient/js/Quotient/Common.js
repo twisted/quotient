@@ -388,10 +388,10 @@ Quotient.Common.CollapsiblePane.toggle = function(element,
 
     if(body.style.position == "absolute") {
         body.style.position = "static";
-        img = "/Quotient/static/images/" + prefix + "outline-expanded.png";
+        img = "/static/Quotient/images/" + prefix + "outline-expanded.png";
     } else {
         body.style.position = "absolute";
-        img = "/Quotient/static/images/" + prefix + "outline-collapsed.png";
+        img = "/static/Quotient/images/" + prefix + "outline-collapsed.png";
     }
 
     Nevow.Athena.NodeByAttribute(element, "class", "collapse-arrow").src = img;

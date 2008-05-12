@@ -307,7 +307,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
      */
     function _makeBoomerang(self) {
         return MochiKit.DOM.IMG(
-            {"src": "/Quotient/static/images/boomerang.gif",
+            {"src": "/static/Quotient/images/boomerang.gif",
              "border": "0",
              "height": "13px"});
     },
@@ -367,7 +367,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         }
         var data = [MochiKit.Base.filter(null, cells)];
         if(0 < rowData["attachments"]) {
-            data.push(MochiKit.DOM.IMG({"src": "/Quotient/static/images/paperclip.png",
+            data.push(MochiKit.DOM.IMG({"src": "/static/Quotient/images/paperclip.png",
                                         "class": "paperclip-icon"}));
         }
         return MochiKit.DOM.TR(
@@ -447,7 +447,7 @@ Quotient.Mailbox.ScrollingWidget.methods(
         if(colName == "senderDisplay" || colName == "recipient") {
             content.unshift(
                 MochiKit.DOM.IMG({
-                    "src": "/Quotient/static/images/checkbox-off.gif",
+                    "src": "/static/Quotient/images/checkbox-off.gif",
                     "class": "checkbox-image",
                     "height": "12px",
                     "border": 0,

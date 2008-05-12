@@ -67,7 +67,7 @@
   <div nevow:pattern="view-pane" class="view-pane-content">
     <div class="views-collapsible-pane"
       onclick="Quotient.Common.CollapsiblePane.toggle(this, 'views-'); return false">
-      <img class="collapse-arrow" src="/Quotient/static/images/views-outline-collapsed.png" />
+      <img class="collapse-arrow" src="/static/Quotient/images/views-outline-collapsed.png" />
       <span class="view-pane-name"><nevow:slot name="name" /></span>
     </div>
     <nevow:slot name="pane-body" />
@@ -76,23 +76,23 @@
   <div class="inbox-content">
     <div class="quotient-menubar">
       <div style="float: right" class="mailbox-status-container">
-        <img style="display: none" class="throbber" src="/Quotient/static/images/throbber-small.gif" />
+        <img style="display: none" class="throbber" src="/static/Quotient/images/throbber-small.gif" />
         <span class="mailbox-status" />
       </div>
       <div class="complexity-icons">
-        <img src="/Quotient/static/images/complexity-selector-3-unselected.png"
+        <img src="/static/Quotient/images/complexity-selector-3-unselected.png"
             onclick="Quotient.Mailbox.Controller.get(this).setComplexity(3, this, true)"
             class="complexity-icon">
           <athena:handler event="onmouseover" handler="complexityHover" />
           <athena:handler event="onmouseout" handler="complexityHover" />
         </img>
-        <img src="/Quotient/static/images/complexity-selector-2-unselected.png"
+        <img src="/static/Quotient/images/complexity-selector-2-unselected.png"
           onclick="Quotient.Mailbox.Controller.get(this).setComplexity(2, this, true)"
           class="complexity-icon">
           <athena:handler event="onmouseover" handler="complexityHover" />
           <athena:handler event="onmouseout" handler="complexityHover" />
         </img>
-        <img src="/Quotient/static/images/complexity-selector-1-selected.png"
+        <img src="/static/Quotient/images/complexity-selector-1-selected.png"
           onclick="Quotient.Mailbox.Controller.get(this).setComplexity(1, this, true)"
           class="selected-complexity-icon">
           <athena:handler event="onmouseover" handler="complexityHover" />
@@ -116,7 +116,7 @@
       </select>
       <a href="#">
         <athena:handler event="onclick" handler="dom_compose" />
-        <img src="/Quotient/static/images/pencil.png" border="0" style="margin-top: 2px" />
+        <img src="/static/Quotient/images/pencil.png" border="0" style="margin-top: 2px" />
         <span style="color: #0099CC; position: relative; top: -4px">
           Compose
         </span>
@@ -141,7 +141,7 @@
             <td class="scrolltable-cell">
               <div class="scrolltable-container" style="top: -1000px; left: -1000px">
                 <div style="position: absolute; z-index: 99; display: none" class="throbber">
-                  <img src="/Quotient/static/images/throbber.gif" />
+                  <img src="/static/Quotient/images/throbber.gif" />
                 </div>
                 <nevow:invisible nevow:render="scroller" />
               </div>

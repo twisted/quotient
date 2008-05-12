@@ -300,7 +300,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 var dom = self.scrollingWidget.makeCellElement('senderDisplay',
                                                                data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 '/static/Quotient/images/boomerang.gif');
             });
     },
 
@@ -318,7 +318,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 self.assertEqual(data['everDeferred'], true);
                 var dom = self.scrollingWidget.findCellElement(data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 '/static/Quotient/images/boomerang.gif');
             });
     },
 
@@ -1850,7 +1850,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 var node = widget.findCellElement(model.getRowData(0));
                 self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 '/static/Quotient/images/boomerang.gif');
             });
         return d;
     },
@@ -1870,14 +1870,14 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        node, 'src', '/static/Quotient/images/boomerang.gif'
                         ).length;
                 }
                 self.assertEqual(
                     Nevow.Athena.NodesByAttribute(
                         self.controllerWidget.scrollWidget.node,
                         'src',
-                        '/Quotient/static/images/boomerang.gif').length,
+                        '/static/Quotient/images/boomerang.gif').length,
                     0);
             });
         return d;
@@ -1909,7 +1909,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        node, 'src', '/static/Quotient/images/boomerang.gif'
                         ).length;
                 }
                 var node = widget.findCellElement(model.getRowData(0));
@@ -1948,7 +1948,7 @@ Quotient.Test.ControllerTestCase.methods(
                     index = indices[i];
                     node = widget.findCellElement(model.getRowData(index));
                     self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                     '/Quotient/static/images/boomerang.gif');
+                                     '/static/Quotient/images/boomerang.gif');
                 }
             });
         return d;

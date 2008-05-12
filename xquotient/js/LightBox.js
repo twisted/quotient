@@ -33,8 +33,8 @@
 //
 
 // If you would like to use a custom loading image or close button reference them in the next two lines.
-var loadingImage = '/Quotient/static/images/loading.gif';
-var closeButton = '/Quotient/static/images/close.gif';
+var loadingImage = '/static/Quotient/images/loading.gif';
+var closeButton = '/static/Quotient/images/close.gif';
 
 //
 // getPageScroll()

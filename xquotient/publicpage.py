@@ -31,8 +31,5 @@ class PublicIndexPage(PublicPage):
         super(PublicIndexPage, self).__init__(
                 original, original.store.parent, tags.h1["QUOTIENT!"], staticContent, forUser)
 
-    def child_static(self, ctx):
-        return static.File(sibpath(__file__, 'static'))
-
     def customizeFor(self, forUser):
         return self.__class__(self.original, self.staticContent, forUser)

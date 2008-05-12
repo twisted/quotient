@@ -44,15 +44,15 @@ Quotient.Grabber.ScrollingWidget.methods(
 
                         Quotient.Grabber.EditAction(
                             "edit", "Edit", null,
-                            "/Quotient/static/images/action-edit.png"),
+                            "/static/Quotient/images/action-edit.png"),
 
                         Quotient.Grabber.RefillingAction(
                             "pause", "Pause",
-                            "/Quotient/static/images/action-pause.png"),
+                            "/static/Quotient/images/action-pause.png"),
 
                         Quotient.Grabber.RefillingAction(
                             "resume", "Resume",
-                            "/Quotient/static/images/action-resume.png")];
+                            "/static/Quotient/images/action-resume.png")];
 
         Quotient.Grabber.ScrollingWidget.upcall(self, "__init__", node, metadata, 5);
         self._scrollViewport.style.height = '100px';

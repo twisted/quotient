@@ -49,10 +49,10 @@ MAX_SENDER_LEN = 128
 senderRE = re.compile('\\w{1,%i}' % MAX_SENDER_LEN, re.U)
 
 def mimeTypeToIcon(mtype,
-                   webIconPath='/Quotient/static/images/attachment-types',
+                   webIconPath='/static/Quotient/images/attachment-types',
                    localIconPath=LOCAL_ICON_PATH,
                    extension='png',
-                   defaultIconPath='/Quotient/static/images/attachment-types/generic.png'):
+                   defaultIconPath='/static/Quotient/images/attachment-types/generic.png'):
 
     lastpart = mtype.replace('/', '-') + '.' + extension
     localpath = path.join(localIconPath, lastpart)
