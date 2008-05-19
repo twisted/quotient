@@ -244,30 +244,49 @@ Quotient.Common.Util.resizeIFrame = function(frame) {
     catch (e) {}
 }
 
-Quotient.Common.AddPerson = Nevow.Athena.Widget.subclass('Quotient.Common.AddPerson');
+/**
+ * L{Mantissa.LiveForm.FormWidget} for adding people to an address book.
+ */
+Quotient.Common.AddPerson = Mantissa.LiveForm.FormWidget.subclass('Quotient.Common.AddPerson');
 Quotient.Common.AddPerson.methods(
-    function replaceAddPersonHTMLWithPersonHTML(self, identifier) {
-        var D = self.callRemote('getPersonHTML');
-        return D.addCallback(function(HTML) {
-            var personIdentifiers = Nevow.Athena.NodesByAttribute(
-                                      document.documentElement, 'class', 'person-identifier');
-            var e = null;
-            for(var i = 0; i < personIdentifiers.length; i++) {
-                e = personIdentifiers[i];
-                if(e.firstChild.nodeValue == identifier) {
-                    e.parentNode.innerHTML = HTML;
-                }
-            }
-        });
+    function __init__(self, node, formName) {
+        Quotient.Common.AddPerson.upcall(
+            self, '__init__', node, formName);
+        self.submitDeferred = Divmod.Defer.Deferred();
     },
 
     /**
-     * Return the L{Mantissa.LiveForm.FormWidget} instance which controls our
-     * form
+     * Replace the Add Person UI with the newly created person widget.
+     *
+     * @type identifier: C{String}
+     * @param identifier: Something identifying a person.
+     *
+     * @type personHTML: C{String}
+     * @param personHTML: Some markup describing a person.
      */
-    function getAddPersonForm(self) {
-        return Nevow.Athena.Widget.get(self.node.getElementsByTagName("form")[0]);
+    function replaceWithPersonHTML(self, identifier, personHTML) {
+        var personIdentifiers = Nevow.Athena.NodesByAttribute(
+            document.documentElement, 'class', 'person-identifier');
+        var e;
+        for(var i = 0; i < personIdentifiers.length; i++) {
+            e = personIdentifiers[i];
+            if(e.childNodes[0].nodeValue == identifier) {
+                e.parentNode.innerHTML = personHTML;
+            }
+        }
+    },
+
+    /**
+     * Override L{Mantissa.LiveForm.FormWidget} and replace the Add Person UI
+     * with the newly created person widget.
+     */
+    function submitSuccess(self, result) {
+        self.replaceWithPersonHTML(
+            self.gatherInputs().email[0], result);
+        self.submitDeferred.callback(null);
+        self.submitDeferred = Divmod.Defer.Deferred();
     });
+
 
 Quotient.Common.SenderPerson = Nevow.Athena.Widget.subclass("Quotient.Common.SenderPerson");
 Quotient.Common.SenderPerson.methods(
@@ -276,48 +295,11 @@ Quotient.Common.SenderPerson.methods(
      * sender
      */
     function _preFillForm(self) {
-        var getValueOfNodeWithClass = function(cls) {
-            return self.firstNodeByAttribute("class", cls).firstChild.nodeValue;
-        }
-
-        var name = getValueOfNodeWithClass("sender-person-name");
-        var firstname = "";
-        var lastname = "";
-
-        if(name.match(/\s+/)) {
-            var split = name.split(/\s+/, 2);
-            firstname = split[0];
-            lastname  = split[1];
-        } else if(name.match(/@/)) {
-            firstname = name.split(/@/, 2)[0];
-        } else {
-            firstname = name;
-        }
-
-        self.email = getValueOfNodeWithClass("person-identifier");
-
-        /*
-         * The proportions of this hack are complete and utter.  The
-         * apportionment of responsibilities in this code are precisely
-         * reversed from what they should be.  Rather than application code
-         * (vis-a-vis a Quotient-specific UI for displaying a pre-populated
-         * person creation form) presuming knowledge of the inner workings of
-         * the person creation form, the person creation form should supply an
-         * interface for populating itself based on some external information.
-         * Should the supplied information be relevant to a portion of the
-         * form, the implementation for that portion of the form can adjust its
-         * own state in the appropriate manner. -exarkun
-         */
-        var values = {
-            'xmantissa.people.EmailContactType': {
-                'email': [self.email]}};
-        var widgets = self.addPersonFormWidget.childWidgets;
-        for (var i = 0; i < widgets.length; ++i) {
-            var child = widgets[i];
-            if (values[child.formName] !== undefined) {
-                child.setInputValues(values[child.formName]);
-            }
-        }
+        var email = self.firstNodeByAttribute(
+            'class', 'person-identifier').firstChild.nodeValue;
+        self.addPersonFormWidget.setInputValues(
+            {email: [email], nickname: [''] // shouldn't we actually default this
+        });
     },
 
     /**
@@ -327,40 +309,17 @@ Quotient.Common.SenderPerson.methods(
      */
     function showAddPerson(self) {
         var addPersonDialogNode = Nevow.Athena.FirstNodeByAttribute(
-                                    self.widgetParent.node,
-                                    "class",
-                                    "add-person-fragment");
-        self.addPersonFormWidget = Nevow.Athena.Widget.get(
-                                    Nevow.Athena.FirstNodeByAttribute(
-                                        addPersonDialogNode,
-                                        "class",
-                                        "add-person")).getAddPersonForm();
+            self.widgetParent.node, "class", "add-person-fragment");
 
+        var dialog = Quotient.Common.Util.showNodeAsDialog(addPersonDialogNode);
+        var form = dialog.node.getElementsByTagName("form")[0];
+        self.addPersonFormWidget = Nevow.Athena.Widget.get(form);
+        self.addPersonFormWidget.submitDeferred.addCallback(
+            function() {
+                dialog.hide();
+            });
         self._preFillForm();
-
-        self.dialog = Quotient.Common.Util.showNodeAsDialog(addPersonDialogNode);
-
-        /* set the handlers on the cloned node returned by showNodeAsDialog().
-         * FIXME should do a better thing here */
-        var form = self.dialog.node.getElementsByTagName("form")[0];
-        form.onsubmit = function() {
-            var liveform = Nevow.Athena.Widget.get(form);
-            liveform.submit().addCallback(
-                function() {
-                    return self._personAdded();
-                });
-            return false;
-        }
         return false;
-    },
-
-    /**
-     * Person has been added.  Tell AddPerson to replace the "Add Person"
-     * nodes with Person nodes & hide the "Add Person" dialog
-     */
-    function _personAdded(self) {
-        self.dialog.hide();
-        return self.addPersonFormWidget.widgetParent.replaceAddPersonHTMLWithPersonHTML(self.email);
     });
 
 Quotient.Common.CollapsiblePane = {};

@@ -96,3 +96,19 @@ class QuotientJavaScriptTestSuite(JavaScriptTestSuite):
         return self.onetest('test_messageActions.js')
 
 setJavascriptInterpreterOrSkip(QuotientJavaScriptTestSuite)
+
+
+
+from nevow.testutil import JavaScriptTestCase
+
+
+
+class JavaScriptTests(JavaScriptTestCase):
+    """
+    Xquotient Javascript unit tests.
+    """
+    def test_common(self):
+        """
+        Tests for C{Quotient.Common}.
+        """
+        return 'Quotient.Test.TestCommon'

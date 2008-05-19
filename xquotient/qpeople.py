@@ -4,13 +4,12 @@ from zope.interface import implements
 
 from nevow import rend, inevow, tags
 from nevow.flat import flatten
-from nevow.athena import expose
 
 from axiom.item import Item
 from axiom import attributes
 from axiom.upgrade import registerUpgrader
 from axiom.dependency import dependsOn
-from xmantissa import ixmantissa, people
+from xmantissa import ixmantissa, people, liveform
 from xmantissa.webtheme import getLoader
 from xmantissa.fragmentutils import dictFillSlots
 
@@ -41,30 +40,49 @@ def makePersonExtracts(store, person):
         person.registerExtract(imageSet)
         imageSet.person = person
 
-class AddPersonFragment(people.AddPersonFragment):
+
+
+class AddPersonFragment(liveform.LiveForm):
+    """
+    L{liveform.LiveForm} which creates a person and associates an email
+    address with them.
+    """
     jsClass = u'Quotient.Common.AddPerson'
 
-    lastPerson = None
+    def __init__(self, organizer):
+        self.organizer = organizer
+        liveform.LiveForm.__init__(
+            self, self.addPerson,
+            (liveform.Parameter(
+                'nickname',
+                liveform.TEXT_INPUT,
+                people._normalizeWhitespace,
+                'Name'),
+             liveform.Parameter(
+                 'email',
+                 liveform.TEXT_INPUT,
+                 people._normalizeWhitespace,
+                 'Email')),
+             description=u'Add Person')
 
 
-    def _addPerson(self, *a, **kw):
+    def addPerson(self, nickname, email):
         """
-        Create a person (using L{xmantissa.people.AddPersonFragment}'s method)
-        and save it, for use by the unfortunate hack below.
-        """
-        person = people.AddPersonFragment._addPerson(self, *a, **kw)
-        self.lastPerson = person
-        return person
+        Make a person with the given name and email address.
 
-    def getPersonHTML(self):
-        # come up with a better way to identify people.
-        # i kind of hate that we have to do this at all,
-        # it's really, really ugly.  once we have some
-        # kind of history thing set up, we should just
-        # reload the page.
-        assert self.lastPerson is not None
-        return people.PersonFragment(self.lastPerson)
-    expose(getPersonHTML)
+        @type nickname: C{unicode}
+
+        @type email: C{unicode}
+
+        @rtype: L{people.PersonFragment}
+        """
+        person = self.organizer.createPerson(nickname)
+        self.organizer.createContactItem(
+            people.EmailContactType(self.organizer.store),
+            person,
+            {'email': email})
+        return people.PersonFragment(person)
+
 
 
 class CorrespondentExtractor(Item):

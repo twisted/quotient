@@ -5,9 +5,8 @@ from epsilon.extime import Time
 from axiom.store import Store
 from axiom.dependency import installOn
 
-from xmantissa.people import Organizer, Person, EmailAddress, PostalContactType
-from xmantissa.people import EmailContactType
-from xmantissa.test.test_people import createAddPersonContactInfo
+from xmantissa.people import (
+    Organizer, Person, EmailAddress, PersonFragment)
 
 from xquotient.qpeople import MessageLister, AddPersonFragment
 from xquotient.test.test_inbox import testMessageFactory
@@ -26,13 +25,18 @@ class AddPersonTestCase(TestCase):
         self.organizer = Organizer(store=store)
         installOn(self.organizer, store)
         addPersonFrag = AddPersonFragment(self.organizer)
-        person = addPersonFrag.addPerson(
-            u'Captain P.', **createAddPersonContactInfo(store))
+        name = u'Captain P.'
+        email = u'foo@bar'
+        fragment = addPersonFrag.addPerson(name, email)
+        self.assertTrue(isinstance(fragment, PersonFragment))
+        person = fragment.person
         self.assertIdentical(
             store.findUnique(
                 Person,
                 Person.storeID != self.organizer.storeOwnerPerson.storeID),
-            addPersonFrag.lastPerson)
+            person)
+        self.assertEqual(person.name, name)
+        self.assertEqual(person.getEmailAddress(), email)
 
 
 

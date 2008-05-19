@@ -300,7 +300,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 var dom = self.scrollingWidget.makeCellElement('senderDisplay',
                                                                data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/static/Quotient/images/boomerang.gif');
+                                 '/Quotient/static/images/boomerang.gif');
             });
     },
 
@@ -318,7 +318,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 self.assertEqual(data['everDeferred'], true);
                 var dom = self.scrollingWidget.findCellElement(data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/static/Quotient/images/boomerang.gif');
+                                 '/Quotient/static/images/boomerang.gif');
             });
     },
 
@@ -1850,7 +1850,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 var node = widget.findCellElement(model.getRowData(0));
                 self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/static/Quotient/images/boomerang.gif');
+                                 '/Quotient/static/images/boomerang.gif');
             });
         return d;
     },
@@ -1870,14 +1870,14 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/static/Quotient/images/boomerang.gif'
+                        node, 'src', '/Quotient/static/images/boomerang.gif'
                         ).length;
                 }
                 self.assertEqual(
                     Nevow.Athena.NodesByAttribute(
                         self.controllerWidget.scrollWidget.node,
                         'src',
-                        '/static/Quotient/images/boomerang.gif').length,
+                        '/Quotient/static/images/boomerang.gif').length,
                     0);
             });
         return d;
@@ -1909,7 +1909,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/static/Quotient/images/boomerang.gif'
+                        node, 'src', '/Quotient/static/images/boomerang.gif'
                         ).length;
                 }
                 var node = widget.findCellElement(model.getRowData(0));
@@ -1948,7 +1948,7 @@ Quotient.Test.ControllerTestCase.methods(
                     index = indices[i];
                     node = widget.findCellElement(model.getRowData(index));
                     self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                     '/static/Quotient/images/boomerang.gif');
+                                     '/Quotient/static/images/boomerang.gif');
                 }
             });
         return d;
@@ -2434,7 +2434,7 @@ Quotient.Test.ControllerTestCase.methods(
     /**
      * @return: a function which can be added as a callback to a deferred
      * which fires with an L{Quotient.Compose.Controller} instance.  Checks
-     * the compose instance is inside the message detail of our
+     * the the compose instance is inside the message detail of our
      * L{Quotient.Mailbox.Controller}, and has the "inline" attribute set
      */
     function _makeComposeTester(self) {
@@ -3912,7 +3912,7 @@ Quotient.Test.MsgDetailTagsTestCase.methods(
 
 
 Quotient.Test.MsgDetailAddPersonTestCase = Nevow.Athena.Test.TestCase.subclass(
-                                                'Quotient.Test.MsgDetailAddPersonTestCase');
+    'Quotient.Test.MsgDetailAddPersonTestCase');
 
 /**
  * Test case for the interaction between L{Quotient.Common.SenderPerson} and
@@ -4193,7 +4193,7 @@ Quotient.Test.MsgDetailCorrespondentPeopleTestCase.methods(
 Quotient.Test.PostiniConfigurationTestCase = Nevow.Athena.Test.TestCase.subclass(
     'Quotient.Test.PostiniConfigurationTestCase');
 /**
- * Tests for the Postini configuration form on the Settings page.
+ * Tests for the Postini configuration form on the the Settings page.
  * See L{Quotient.Spam}.
  */
 Quotient.Test.PostiniConfigurationTestCase.methods(
