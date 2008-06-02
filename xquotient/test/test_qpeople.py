@@ -97,3 +97,9 @@ class MessageListerTestCase(TestCase):
 
         self.assertEquals(getMessages(p11, 11), p11messages[3:])
 
+
+    def test_name(self):
+        """
+        L{MessageLister} should define a C{name} attribute.
+        """
+        self.assertEqual(MessageLister.name, u'Messages')

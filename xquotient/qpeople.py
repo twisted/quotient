@@ -113,9 +113,6 @@ class PersonFragmentColumn(UnsortableColumn):
         return TYPE_FRAGMENT
 
 class MessageList(rend.Fragment):
-    implements(ixmantissa.IPersonFragment)
-    title = 'Messages'
-
     def __init__(self, messageLister, person):
         self.messageLister = messageLister
         self.person = person
@@ -179,6 +176,8 @@ class MessageLister(Item):
     installedOn = attributes.reference()
     powerupInterfaces = (ixmantissa.IOrganizerPlugin,)
     organizer = dependsOn(people.Organizer)
+
+    name = u'Messages'
 
     def personalize(self, person):
         return MessageList(self, person)
