@@ -36,7 +36,7 @@ plugin = offering.Offering(
         (None, popout.POP3Listener),
         (None, mail.MailTransferAgent)),
 
-    appPowerups = (publicpage.QuotientPublicPage,),
+    appPowerups = (),
     installablePowerups = ((u'quotient', u'Incoming SMTP, Address Book', Inbox),
                            (u'Extracts', u'Data-driven feature discovery, extraction, and presentation',ExtractPowerup),
                            (u'Indexing', u'Full-text email (and other stuff) indexing', MessageSearchProvider),
