@@ -1,11 +1,19 @@
+from zope.interface import directlyProvides
+
 from twisted.python import usage
+from twisted.plugin import IPlugin
+
+from axiom.scripts import axiomatic
+from axiom.iaxiom import IVersion
 
 try:
     from xquotient import dspam
 except ImportError:
     dspam = None
 
-from axiom.scripts import axiomatic
+#imported to register as a plugin
+from xquotient import version
+directlyProvides(version, IPlugin, IVersion)
 
 class SpamTrain(axiomatic.AxiomaticCommand):
 
