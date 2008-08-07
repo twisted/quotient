@@ -5,7 +5,7 @@ from twisted.python.filepath import FilePath
 from axiom import store
 from axiom.store import Store
 from axiom.dependency import installOn
-from axiom.plugins.userbasecmd import Create
+from axiom.plugins.axiom_plugins import Create
 from axiom.plugins.mantissacmd import Mantissa
 
 from xquotient import filter, mimepart
