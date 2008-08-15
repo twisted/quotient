@@ -1,4 +1,5 @@
 # -*- test-case-name: xquotient.test.test_mta -*-
+# Copyright (c) 2008 Divmod.  See LICENSE for details.
 
 """
 Support for SMTP servers in Quotient.
@@ -22,14 +23,13 @@ except ImportError:
 from zope.interface import implements
 
 from twisted.internet import protocol, defer
+from twisted.internet.ssl import PrivateCertificate, CertificateOptions
 from twisted.protocols import policies
 from twisted.python import failure
 from twisted.cred import portal, checkers, credentials
 from twisted.mail import smtp, imap4
 from twisted.mail.smtp import IMessageDeliveryFactory
 from twisted.application.service import IService
-
-from epsilon import sslverify
 
 from axiom import item, attributes, userbase, batch
 from axiom.attributes import reference, integer, bytes
@@ -302,9 +302,9 @@ class MailTransferAgent(item.Item):
     def getFactory(self):
         if self.factory is None:
             if self.certificateFile is not None:
-                cert = sslverify.PrivateCertificate.loadPEM(
+                cert = PrivateCertificate.loadPEM(
                     file(self.certificateFile).read())
-                certOpts = sslverify.OpenSSLCertificateOptions(
+                certOpts = CertificateOptions(
                     cert.privateKey.original,
                     cert.original,
                     requireCertificate=False,
