@@ -21,7 +21,7 @@ class MessageSearchProvider(Item):
 
     schemaVersion = 2
 
-    indexer = dependsOn(fulltext.PyLuceneIndexer, doc="""
+    indexer = dependsOn(fulltext.NaiveIndexer, doc="""
     The actual fulltext indexing implementation object which will perform
     searches.  The results it returns will be wrapped up in a fragment which
     knows how to display L{exmess.Message} instances.

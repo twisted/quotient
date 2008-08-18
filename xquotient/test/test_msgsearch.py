@@ -11,7 +11,7 @@ from axiom.attributes import reference, inmemory
 from nevow.testutil import renderLivePage
 
 from xmantissa import ixmantissa
-from xmantissa.fulltext import PyLuceneIndexer
+from xmantissa.fulltext import NaiveIndexer
 
 from xquotient.quotientapp import MessageSearchProvider
 from xquotient.exmess import Message, splitAddress
@@ -19,16 +19,12 @@ from xquotient.test.util import (MIMEReceiverMixin, PartMaker,
                                  ThemedFragmentWrapper)
 from xquotient.extract import ExtractPowerup
 
-def _checkForPyLucene(indexer):
+
+def identifiersFrom(hits):
     """
-    Raise L{SkipTest} if PyLucene isn't available.
+    Convert iterable of hits into list of integer unique identifiers.
     """
-    try:
-        writer = indexer.openWriteIndex()
-    except NotImplementedError:
-        raise SkipTest("PyLucene not available")
-    else:
-        writer.close()
+    return [int(h.uniqueIdentifier) for h in hits]
 
 
 class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
@@ -36,8 +32,7 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         self.mimeReceiver = self.setUpMailStuff(
                              (MessageSearchProvider,))
 
-        self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
-        _checkForPyLucene(self.indexer)
+        self.indexer = self.mimeReceiver.store.findUnique(NaiveIndexer)
 
     def _indexSomething(self, thing):
         writer = self.indexer.openWriteIndex()
@@ -58,7 +53,8 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         self._indexSomething(msg)
 
         reader = self.indexer.openReadIndex()
-        self.assertEqual(list(reader.search(u'hello')), [msg.storeID])
+        self.assertEqual(identifiersFrom(reader.search(u'hello')),
+                         [msg.storeID])
 
     def testKeywordValuesInBodySearch(self):
         """
@@ -73,7 +69,8 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         self._indexSomething(msg)
 
         reader = self.indexer.openReadIndex()
-        self.assertEqual(list(reader.search(u'hello')), [msg.storeID])
+        self.assertEqual(identifiersFrom(reader.search(u'hello')),
+                         [msg.storeID])
 
     def testEmailAddressSplitter(self):
         """
@@ -97,13 +94,16 @@ class MsgSearchTestCase(TestCase, MIMEReceiverMixin):
         self._indexSomething(msg)
 
         reader = self.indexer.openReadIndex()
-        self.assertEqual(list(reader.search(u'', {u'subject': u'world'})),
+        self.assertEqual(identifiersFrom(reader.search(u'',
+                                                       {u'subject': u'world'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'from': u'foo'})),
+        self.assertEqual(identifiersFrom(reader.search(u'', {u'from': u'foo'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'from': u'jethro'})),
+        self.assertEqual(identifiersFrom(reader.search(u'',
+                                                       {u'from': u'jethro'})),
                          [msg.storeID])
-        self.assertEqual(list(reader.search(u'', {u'from': u'osgood'})),
+        self.assertEqual(identifiersFrom(reader.search(u'',
+                                                       {u'from': u'osgood'})),
                          [msg.storeID])
 
 
@@ -112,9 +112,7 @@ class ViewTestCase(TestCase, MIMEReceiverMixin):
     def setUp(self):
         self.mimeReceiver = self.setUpMailStuff(
             (MessageSearchProvider,), self.mktemp(), True)
-        self.indexer = self.mimeReceiver.store.findUnique(PyLuceneIndexer)
-        _checkForPyLucene(self.indexer)
-
+        self.indexer = self.mimeReceiver.store.findUnique(NaiveIndexer)
 
     def testNoResults(self):
         """
