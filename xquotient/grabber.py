@@ -836,3 +836,20 @@ class ConfiguredGrabbersView(ScrollingFragment):
 
     def action_resume(self, grabber):
         grabber.paused = False
+
+
+
+class GmailGrabber:
+    @defer.inlineCallbacks
+    def maybeChanged(self, client, mailbox):
+        if mailbox.next is None:
+            defer.returnValue(True)
+        status = yield client.status(mailbox.name, 'UIDNEXT')
+        next = int(status['UIDNEXT'])
+        defer.returnValue(mailbox.next != next)
+
+
+class Gmailbox:
+    def __init__(self, name, next=None):
+        self.name = name
+        self.next = next

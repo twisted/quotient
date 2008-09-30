@@ -11,6 +11,7 @@ from twisted.cred import error as ecred
 from epsilon import structlike, extime
 
 from epsilon.test import iosim
+from epsilon.structlike import record
 
 from axiom import store
 
@@ -423,3 +424,83 @@ class PersistentControllerTestCase(unittest.TestCase):
             self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
                                          (51, '51')]),
             [(49, '49'), (51, '51')])
+
+
+
+class StubIMAP4Client(object):
+    def __init__(self):
+        self.mailboxes = {}
+
+    def status(self, mailboxName, *fields):
+        if mailboxName.lower() == 'inbox':
+            mailboxName = 'INBOX'
+
+        mbox = self.mailboxes[mailboxName]
+        return defer.succeed(
+            dict([(f, mbox.statuses[f])
+                  for f in fields]))
+
+
+
+class StubIMAP4Mailbox(record('statuses')):
+    pass
+
+
+
+class GmailGrabberMaybeChangedTests(unittest.TestCase):
+    def test_firstTime(self):
+        """
+        The first time L{GmailGrabber.maybeChanged} is called for a particular
+        mailbox, it returns a L{Deferred} which fires with C{True}.
+        """
+        client = StubIMAP4Client()
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '1'})
+
+        gmail = grabber.GmailGrabber()
+        mailbox = grabber.Gmailbox(name=u'INBOX')
+
+        d = gmail.maybeChanged(client, mailbox)
+        d.addCallback(
+            self.assertTrue,
+            "Uninitialized mailbox should be considered potentially changed")
+        return d
+
+
+    def test_sameUIDNEXT(self):
+        """
+        L{GmailGrabber.maybeChanged} returns a L{Deferred} which fires with
+        C{False} if the status of the given mailbox indicates the I{UIDNEXT}
+        value is not changed since the previous check.
+        """
+        client = StubIMAP4Client()
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '2'})
+
+        gmail = grabber.GmailGrabber()
+        mailbox = grabber.Gmailbox(name=u'INBOX', next=2)
+
+        d = gmail.maybeChanged(client, mailbox)
+        d.addCallback(
+            self.assertFalse,
+            "UIDNEXT status matching known UIDNEXT value should indicate "
+            "no change possible")
+        return d
+
+
+    def test_differentUIDNEXT(self):
+        """
+        L{GmailGrabber.maybeChanged} returns a L{Deferred} which fires with
+        C{True} if the status of the given mailbox indicates the I{UIDNEXT}
+        value changed since the previous check.
+        """
+        client = StubIMAP4Client()
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '3'})
+
+        gmail = grabber.GmailGrabber()
+        mailbox = grabber.Gmailbox(name=u'INBOX', next=2)
+
+        d = gmail.maybeChanged(client, mailbox)
+        d.addCallback(
+            self.assertTrue,
+            "UIDNEXT status not matching known UIDNEXT value should "
+            "indicate a possible change")
+        return d
