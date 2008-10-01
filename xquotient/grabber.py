@@ -863,4 +863,7 @@ class Gmailbox:
     @defer.inlineCallbacks
     def retrieve(self, client, predictedUID):
         yield client.examine(self.name)
-        yield client.fetchMessage('%s:%s' % (self.next, predictedUID))
+        uids = '%d:%s' % (self.next, predictedUID)
+        for msg in (yield client.fetchMessage(uids, True)):
+            print msg
+
