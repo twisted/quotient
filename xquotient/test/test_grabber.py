@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from twisted.trial import unittest
 from twisted.internet import defer, error
-from twisted.mail import pop3
+from twisted.mail import pop3, imap4
 from twisted.cred import error as ecred
 
 from epsilon import structlike, extime
@@ -430,36 +430,88 @@ class PersistentControllerTestCase(unittest.TestCase):
 class StubIMAP4Client(object):
     def __init__(self):
         self.mailboxes = {}
+        self.activeMailbox = None
+        self.state = 'AUTHORIZED'
+
+
+    def _normalizeMailboxName(self, name):
+        if name.lower() == 'inbox':
+            return 'INBOX'
+        return name
+
 
     def status(self, mailboxName, *fields):
-        if mailboxName.lower() == 'inbox':
-            mailboxName = 'INBOX'
+        mailboxName = self._normalizeMailboxName(mailboxName)
+        return self.mailboxes[mailboxName].status(fields)
 
-        mbox = self.mailboxes[mailboxName]
+
+    def examine(self, mailboxName):
+        if self.state != 'AUTHORIZED':
+            raise ValueError("Cannot examine while a mailbox is active.")
+        mailboxName = self._normalizeMailboxName(mailboxName)
+        if mailboxName not in self.mailboxes:
+            raise ValueError("%r is not a known mailbox." % (mailboxName,))
+        self.state = 'SELECTING'
+        d = defer.maybeDeferred(self.mailboxes[mailboxName].examine)
+        def cbExamine(result):
+            self.state = 'SELECTED'
+            self.active = mailboxName
+            return result
+        def ebExamine(err):
+            self.state = 'AUTHORIZED'
+            return err
+        d.addCallbacks(cbExamine, ebExamine)
+        return d
+
+
+    def fetchMessage(self, which, uid=False):
+        if self.state != 'SELECTED':
+            raise ValueError("Cannot fetch while mailbox is not active.")
+        results = []
+        messages = imap4.parseIdList(which)
+        for msg in self.mailboxes[self.active].fetch([m - 1 for m in messages], uid):
+            result = {'RFC822': msg.rfc822}
+            if uid:
+                result['UID'] = msg.uid
+            results.append(result)
+        return defer.succeed(results)
+
+
+
+class StubIMAP4Mailbox(record('statuses messages')):
+    def status(self, fields):
         return defer.succeed(
-            dict([(f, mbox.statuses[f])
-                  for f in fields]))
+            dict([(f, self.statuses[f]) for f in fields]))
+
+
+    def examine(self):
+        pass
+
+
+    def fetch(self, messages, uid):
+        for m in messages:
+            if uid:
+                for m2 in self.messages:
+                    if m2.uid == uid:
+                        yield m2
+            else:
+                if m <= len(self.messages):
+                    yield self.messages[m]
 
 
 
-class StubIMAP4Mailbox(record('statuses')):
-    pass
-
-
-
-class GmailGrabberMaybeChangedTests(unittest.TestCase):
+class GmailboxMaybeChangedTests(unittest.TestCase):
     def test_firstTime(self):
         """
         The first time L{GmailGrabber.maybeChanged} is called for a particular
         mailbox, it returns a L{Deferred} which fires with C{True}.
         """
         client = StubIMAP4Client()
-        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '1'})
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '1'}, [])
 
-        gmail = grabber.GmailGrabber()
         mailbox = grabber.Gmailbox(name=u'INBOX')
 
-        d = gmail.maybeChanged(client, mailbox)
+        d = mailbox.maybeChanged(client)
         d.addCallback(
             self.assertTrue,
             "Uninitialized mailbox should be considered potentially changed")
@@ -473,12 +525,11 @@ class GmailGrabberMaybeChangedTests(unittest.TestCase):
         value is not changed since the previous check.
         """
         client = StubIMAP4Client()
-        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '2'})
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '2'}, [])
 
-        gmail = grabber.GmailGrabber()
         mailbox = grabber.Gmailbox(name=u'INBOX', next=2)
 
-        d = gmail.maybeChanged(client, mailbox)
+        d = mailbox.maybeChanged(client)
         d.addCallback(
             self.assertFalse,
             "UIDNEXT status matching known UIDNEXT value should indicate "
@@ -493,14 +544,73 @@ class GmailGrabberMaybeChangedTests(unittest.TestCase):
         value changed since the previous check.
         """
         client = StubIMAP4Client()
-        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '3'})
+        client.mailboxes[u'INBOX'] = StubIMAP4Mailbox({'UIDNEXT': '3'}, [])
 
-        gmail = grabber.GmailGrabber()
         mailbox = grabber.Gmailbox(name=u'INBOX', next=2)
 
-        d = gmail.maybeChanged(client, mailbox)
+        d = mailbox.maybeChanged(client)
         d.addCallback(
             self.assertTrue,
             "UIDNEXT status not matching known UIDNEXT value should "
             "indicate a possible change")
         return d
+
+
+
+class GmailboxRetrieveTests(unittest.TestCase):
+    def test_retrieve(self):
+        """
+        L{Gmailbox.retrieve} requests new messages using the L{IMAP4Client}
+        passed to it, stores the messages, and updates UID tracking state so
+        that subsequent checks and retrievals will not consider messages
+        downloaded by this call.
+        """
+        class X(StubIMAP4Mailbox):
+            pass
+
+        client = StubIMAP4Client()
+        client.mailboxes[u'INBOX'] = X({'UIDNEXT': '7'}, [object()])
+
+        mailbox = grabber.Gmailbox(name=u'INBOX', next=3)
+
+        d = mailbox.retrieve(client, '7')
+        def cbRetrieved(ignored):
+            self.assertEqual(mailbox.next, 7)
+        d.addCallback(cbRetrieved)
+        return d
+
+
+
+class UnchangedMailbox(object):
+    def maybeChanged(self, client):
+        return defer.succeed(False)
+
+
+
+class GmailGrabberCheckTests(unittest.TestCase):
+    def test_unchangedStatus(self):
+        """
+        If the I{UIDNEXT} status of a mailbox is unchanged,
+        L{GmailGrabber.check} makes no attempt to examine the mailbox or
+        retrieve messages from it.
+        """
+        class UnexaminableMailbox(StubIMAP4Mailbox):
+            def examine(self):
+                raise RuntimeError(
+                    "Cannot examine this mailbox, nor should you want to.")
+
+        mailbox = UnchangedMailbox()
+
+        client = StubIMAP4Client()
+        client.mailboxes[u'INBOX'] = UnexaminableMailbox({'UIDNEXT': '3'}, [])
+
+        gmail = grabber.GmailGrabber()
+        # This has no interesting result except to not fail as a consequence of
+        # trying to examine an unchanged and unexaminable mailbox.
+        return gmail.check(client, mailbox)
+
+
+    def test_retrieveMessages(self):
+        """
+        L
+        """
