@@ -472,7 +472,7 @@ class StubIMAP4Client(object):
         for msg in self._mailboxes[self._active].fetch([m - 1 for m in messages], uid):
             result = {'RFC822': msg.rfc822}
             if uid:
-                result['UID'] = msg.uid
+                result['UID'] = str(msg.uid)
             results.append(result)
         return defer.succeed(results)
 
@@ -570,26 +570,34 @@ class GmailboxRetrieveTests(unittest.TestCase):
     def test_retrieve(self):
         """
         L{Gmailbox.retrieve} requests new messages using the L{IMAP4Client}
-        passed to it and passes each in turn to the message recorder object
-        passed to it.
+        passed to it and calls L{Gmailbox.record} with each.
         """
-        class X(StubIMAP4Mailbox):
-            pass
-
         client = StubIMAP4Client()
-        client._mailboxes[u'INBOX'] = X(
+        client._mailboxes[u'INBOX'] = StubIMAP4Mailbox(
             {'UIDNEXT': '7'},
             [StubIMAP4Message(6, 'some text')])
 
-        recorder = StubRecorder()
-
         mailbox = grabber.Gmailbox(name=u'INBOX', next=3)
 
-        d = mailbox.retrieve(recorder, client, '7')
+        recorded = []
+        mailbox.record = lambda *args: recorded.append(args)
+
+        d = mailbox.retrieve(client, '7')
         def cbRetrieved(ignored):
-            self.assertEqual(mailbox.next, 7)
+            self.assertEqual(recorded, [(6, 'some text')])
         d.addCallback(cbRetrieved)
         return d
+
+
+    def test_record(self):
+        """
+        L{Gmailbox.record} creates a new L{Message} for the retrieved message
+        and updates the C{next} attribute of the L{Gmailbox} instance.
+        """
+        store = store.Store()
+        mailbox = grabber.Gmailbox(store=store, name=u'INBOX', next=4)
+        mailbox.record(6, 'some text')
+        self.assertEqual(store.query(Message).count(), 1)
 
 
 

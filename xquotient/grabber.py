@@ -860,10 +860,14 @@ class Gmailbox:
         defer.returnValue(self.next != next)
 
 
+    def record(self, message):
+        pass
+
+
     @defer.inlineCallbacks
     def retrieve(self, client, predictedUID):
         yield client.examine(self.name)
         uids = '%d:%s' % (self.next, predictedUID)
         for msg in (yield client.fetchMessage(uids, True)):
-            print msg
+            self.record(int(msg['UID']), msg['RFC822'])
 
