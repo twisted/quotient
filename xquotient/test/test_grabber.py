@@ -557,18 +557,21 @@ class GmailboxMaybeChangedTests(unittest.TestCase):
 
 
 
-class StubMessage(record('uid rfc822')):
+class StubIMAP4Message(record('uid rfc822')):
     pass
 
+
+
+class StubRecorder:
+    pass
 
 
 class GmailboxRetrieveTests(unittest.TestCase):
     def test_retrieve(self):
         """
         L{Gmailbox.retrieve} requests new messages using the L{IMAP4Client}
-        passed to it, stores the messages, and updates UID tracking state so
-        that subsequent checks and retrievals will not consider messages
-        downloaded by this call.
+        passed to it and passes each in turn to the message recorder object
+        passed to it.
         """
         class X(StubIMAP4Mailbox):
             pass
@@ -576,11 +579,13 @@ class GmailboxRetrieveTests(unittest.TestCase):
         client = StubIMAP4Client()
         client._mailboxes[u'INBOX'] = X(
             {'UIDNEXT': '7'},
-            [StubMessage(6, 'some text')])
+            [StubIMAP4Message(6, 'some text')])
+
+        recorder = StubRecorder()
 
         mailbox = grabber.Gmailbox(name=u'INBOX', next=3)
 
-        d = mailbox.retrieve(client, '7')
+        d = mailbox.retrieve(recorder, client, '7')
         def cbRetrieved(ignored):
             self.assertEqual(mailbox.next, 7)
         d.addCallback(cbRetrieved)
