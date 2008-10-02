@@ -845,14 +845,39 @@ class GmailGrabber:
         yield None
 
 
-class Gmailbox:
-    def __init__(self, name, next=None):
-        self.name = name
-        self.next = next
+class Gmailbox(item.Item):
+    """
+    L{Gmailbox} represents one IMAP4 folder present in one Gmail IMAP4 account.
+    """
+    name = attributes.text(
+        doc="""
+        C{name} is the name of the IMAP4 folder represented by this
+        L{Gmailbox}.
+        """, allowNone=False)
+
+    next = attributes.integer(
+        doc="""
+        C{next} is the smallest possible UID of a message in this folder which
+        has not been downloaded.  Before the first-ever message is retrieved,
+        C{next} is C{None}.
+        """, default=None)
 
 
     @defer.inlineCallbacks
     def maybeChanged(self, client):
+        """
+        Check the folder to see if it might contain a new message.
+
+        @param client: An IMAP4 client connection in the I{authenticated}
+            state.
+        @type client: L{IMAP4Client}
+
+        @return: A L{Deferred} which fires with C{True} if there may be new
+            messages or with C{False} otherwise.  It may errback with any
+            failure the L{Deferred} returned by L{IMAP4Client.status} may
+            errback with.
+        @rtype: L{Deferred}
+        """
         if self.next is None:
             defer.returnValue(True)
         status = yield client.status(self.name, 'UIDNEXT')
@@ -866,8 +891,24 @@ class Gmailbox:
 
     @defer.inlineCallbacks
     def retrieve(self, client, predictedUID):
+        """
+        Request any new messages from the folder and create L{Message} items
+        corresponding to them.
+
+        @param client: An IMAP4 client connection in the I{authenticated}
+            state.
+        @type client: L{IMAP4Client}
+
+        @param predictedUID: A UIDNEXT value recently returned from a I{status}
+            check on this folder.
+        @type predictedUID: C{int}
+
+        @return: A L{Deferred} which fires when any new messages in the folder
+            have been downloaded and stored.
+        @rtype: L{Deferred}
+        """
         yield client.examine(self.name)
         uids = '%d:%s' % (self.next, predictedUID)
         for msg in (yield client.fetchMessage(uids, True)):
             self.record(int(msg['UID']), msg['RFC822'])
-
+        yield client.close()

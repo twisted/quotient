@@ -13,7 +13,7 @@ from epsilon import structlike, extime
 from epsilon.test import iosim
 from epsilon.structlike import record
 
-from axiom import store
+from axiom.store import Store
 
 from xquotient import grabber, mimepart
 
@@ -366,7 +366,7 @@ class PersistentControllerTestCase(unittest.TestCase):
     Tests for the Axiom-y parts of L{xquotient.grabber.POP3Grabber}.
     """
     def setUp(self):
-        self.store = store.Store()
+        self.store = Store()
         self.grabber = grabber.POP3Grabber(
             store=self.store,
             username=u"testuser",
@@ -431,7 +431,7 @@ class StubIMAP4Client(object):
     def __init__(self):
         self._mailboxes = {}
         self._activeMailbox = None
-        self._state = 'AUTHORIZED'
+        self._state = 'AUTHENTICATED'
 
 
     def _normalizeMailboxName(self, name):
@@ -446,7 +446,7 @@ class StubIMAP4Client(object):
 
 
     def examine(self, mailboxName):
-        if self._state != 'AUTHORIZED':
+        if self._state != 'AUTHENTICATED':
             raise ValueError("Cannot examine while a mailbox is active.")
         mailboxName = self._normalizeMailboxName(mailboxName)
         if mailboxName not in self._mailboxes:
@@ -458,10 +458,17 @@ class StubIMAP4Client(object):
             self._active = mailboxName
             return result
         def ebExamine(err):
-            self._state = 'AUTHORIZED'
+            self._state = 'AUTHENTICATED'
             return err
         d.addCallbacks(cbExamine, ebExamine)
         return d
+
+
+    def close(self):
+        if self._state != 'SELECTED':
+            raise ValueError("Cannot close unless a mailbox is selected")
+        self._state = 'AUTHENTICATED'
+        self._active = None
 
 
     def fetchMessage(self, which, uid=False):
@@ -570,7 +577,9 @@ class GmailboxRetrieveTests(unittest.TestCase):
     def test_retrieve(self):
         """
         L{Gmailbox.retrieve} requests new messages using the L{IMAP4Client}
-        passed to it and calls L{Gmailbox.record} with each.
+        passed to it and calls L{Gmailbox.record} with each.  The
+        L{IMAP4Client} is returned to the I{authenticated} state before the
+        returned L{Deferred} fires.
         """
         client = StubIMAP4Client()
         client._mailboxes[u'INBOX'] = StubIMAP4Mailbox(
@@ -580,11 +589,12 @@ class GmailboxRetrieveTests(unittest.TestCase):
         mailbox = grabber.Gmailbox(name=u'INBOX', next=3)
 
         recorded = []
-        mailbox.record = lambda *args: recorded.append(args)
+        mailbox.__dict__['record'] = lambda *args: recorded.append(args)
 
         d = mailbox.retrieve(client, '7')
         def cbRetrieved(ignored):
             self.assertEqual(recorded, [(6, 'some text')])
+            self.assertEqual(client._state, 'AUTHENTICATED')
         d.addCallback(cbRetrieved)
         return d
 
@@ -594,7 +604,7 @@ class GmailboxRetrieveTests(unittest.TestCase):
         L{Gmailbox.record} creates a new L{Message} for the retrieved message
         and updates the C{next} attribute of the L{Gmailbox} instance.
         """
-        store = store.Store()
+        store = Store()
         mailbox = grabber.Gmailbox(store=store, name=u'INBOX', next=4)
         mailbox.record(6, 'some text')
         self.assertEqual(store.query(Message).count(), 1)
