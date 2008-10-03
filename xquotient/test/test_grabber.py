@@ -601,12 +601,14 @@ class GmailboxRetrieveTests(unittest.TestCase):
 
     def test_record(self):
         """
-        L{Gmailbox.record} creates a new L{Message} for the retrieved message
-        and updates the C{next} attribute of the L{Gmailbox} instance.
+        L{Gmailbox.record} uses the store's L{IMIMEDelivery} to deliver the
+        message passed to it and updates the C{next} attribute of the
+        L{Gmailbox} instance.
         """
         store = Store()
         mailbox = grabber.Gmailbox(store=store, name=u'INBOX', next=4)
         mailbox.record(6, 'some text')
+        self.assertEqual(mailbox.next, 7)
         self.assertEqual(store.query(Message).count(), 1)
 
 

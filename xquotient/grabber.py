@@ -885,8 +885,13 @@ class Gmailbox(item.Item):
         defer.returnValue(self.next != next)
 
 
-    def record(self, message):
-        pass
+    def record(self, uid, message):
+        """
+        Update the message UID tracking state for this folder and create a
+        persistent local representation of the given message (ie, a
+        L{Message}).
+        """
+        self.next = uid + 1
 
 
     @defer.inlineCallbacks
