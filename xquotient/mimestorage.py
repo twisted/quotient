@@ -32,10 +32,10 @@ class Header(item.Item):
 
     name = attributes.text(
         "The name of this header.  What it is called.",
-        allowNone=False)
+        allowNone=False, caseSensitive=True)
     value = attributes.text(
         "The decoded value of this header.",
-        allowNone=False)
+        allowNone=False, caseSensitive=True)
     index = attributes.integer(
         "The position of this header within a part.",
         indexed=True, allowNone=False)

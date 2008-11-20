@@ -5,15 +5,17 @@ from twisted.trial import unittest
 from twisted.python import filepath
 
 from epsilon import extime
+from axiom import attributes
 from axiom.store import Store, AtomicFile
+from axiom.test.util import assertSchema
 
 from xquotient import mimepart, smtpout
-from xquotient.mimestorage import Part, ExistingMessageMIMEStorer
+from xquotient.mimestorage import Header, Part, ExistingMessageMIMEStorer
 from xquotient.test import test_grabber
 from xquotient.test.util import MIMEReceiverMixin, PartMaker
 from xquotient.exmess import (
     SENDER_RELATION, RECIPIENT_RELATION, COPY_RELATION, BLIND_COPY_RELATION,
-    RESENT_TO_RELATION, RESENT_FROM_RELATION)
+    RESENT_TO_RELATION, RESENT_FROM_RELATION, Message)
 
 from xquotient.test.historic.stub_message5to6 import (
     msg as multipartMessageWithEmbeddedMultipartMessage)
@@ -51,6 +53,24 @@ class UtilTest(unittest.TestCase):
         """
         self.assertEquals(u'\N{REPLACEMENT CHARACTER}',
                           mimepart._safelyDecode('\xe1', "utf8"))
+
+
+
+class HeaderTestCase(unittest.TestCase):
+    """
+    Tests for L{Header}.
+    """
+
+    def test_schema(self):
+        """
+        Verify L{Header}'s schema.
+        """
+        assertSchema(self, Header, dict(
+            message = attributes.reference(reftype=Message, whenDeleted=attributes.reference.CASCADE),
+            part = attributes.reference(),
+            name = attributes.text(allowNone=False, caseSensitive=True),
+            value = attributes.text(allowNone=False, caseSensitive=True),
+            index = attributes.integer(indexed=True, allowNone=False)))
 
 
 
