@@ -12,6 +12,7 @@ from axiom import attributes
 from axiom.dependency import installOn
 from axiom.plugins.axiom_plugins import Create
 from axiom.plugins.mantissacmd import Mantissa
+from axiom.test.util import assertSchema
 
 from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
@@ -732,3 +733,22 @@ class CreateMessage(unittest.TestCase):
             u'Sup dood', u'A body', u'', u'', u'')
 
         self.assertEqual(msg.impl.getContentType(), 'text/plain')
+
+
+
+class FileTestCase(unittest.TestCase):
+    """
+    Tests for L{compose.File}.
+    """
+
+    def test_schema(self):
+        """
+        Verify L{compose.File}'s schema.
+        """
+        assertSchema(self, compose.File, dict(
+            type = attributes.text(allowNone=False),
+            body = attributes.path(allowNone=False),
+            name = attributes.text(allowNone=False),
+            message = attributes.reference(),
+            cabinet = attributes.reference(
+                allowNone=False, whenDeleted=attributes.reference.CASCADE)))

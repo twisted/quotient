@@ -92,7 +92,8 @@ class File(item.Item):
     name = attributes.text(allowNone=False)
 
     message = attributes.reference()
-    cabinet = attributes.reference(allowNone=False)
+    cabinet = attributes.reference(
+        allowNone=False, whenDeleted=attributes.reference.CASCADE)
 
 class FileCabinet(item.Item):
     typeName = 'quotient_file_cabinet'
@@ -896,6 +897,6 @@ class Draft(item.Item):
     empty = attributes.reference()
 
 item.declareLegacyItem('quotient_draft', 1,
-                       dict(message=attributes.reference(allowNone=False)))
+                       dict(message=attributes.reference()))
 
 registerDeletionUpgrader(Draft, 1, 2)
