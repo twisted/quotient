@@ -756,7 +756,6 @@ class MIMEMessageReceiver(object):
 
     def messageDone(self):
         localNow = time.time()
-        gmtDate = time.gmtime(localNow)
         if self.parser.part.bodyOffset is None:
             # This block for handling invalid, bodiless messages.
             self.parser.finishHeader()
@@ -764,10 +763,6 @@ class MIMEMessageReceiver(object):
             self.parser.part.bodyLength = 0
         else:
             self.parser.part.bodyLength = (self.bytecount - self.parser.part.bodyOffset)
-        try:
-            rdate = time.struct_time(rfc822.parsedate(self.part['received'].split(';')[-1]))
-        except:
-            rdate = gmtDate
 
         self._detectLoop()
 

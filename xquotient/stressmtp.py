@@ -35,7 +35,6 @@ class MessageSendingController:
 
     def send(self, nConns=1, bps=None):
         d = []
-        i = iter(self.messages)
         pb = self.messages.append
         for c in range(nConns):
             d.append(MessageSender(self.host, self.port, self.recip, self.next, bps, pb
@@ -100,9 +99,8 @@ def finished(bytes, nMsgs, startTime):
 def main(path, host, port, recip, conns=4):
     log.startLogging(sys.stdout)
 
-    started = time.time()
     c = sendDirectory(path, host, int(port), recip)
-    d = c.send(int(conns)
+    c.send(int(conns)
         ).addCallback(finished, len(c.messages), time.time(),
         ).addBoth(lambda _: reactor.stop()
         )

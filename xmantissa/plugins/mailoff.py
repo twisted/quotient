@@ -18,7 +18,7 @@ from xquotient.popout import POP3Up
 from xquotient.filter import MailingListFilteringPowerup, RuleFilteringPowerup, Focus
 from xquotient.spam import SpambayesFilter
 from xquotient.qpeople import MessageLister
-from xquotient import mail,  popout, publicpage
+from xquotient import mail,  popout
 import xquotient
 
 

@@ -11,7 +11,7 @@ from xquotient.mimestorage import Part
 from xquotient.mimepart import FlowedParagraph
 from twisted.mail import smtp
 
-from xquotient import renderers, mimeutil
+from xquotient import mimeutil
 
 
 def _fileItemToEmailPart(fileItem):

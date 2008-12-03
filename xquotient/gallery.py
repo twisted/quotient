@@ -152,7 +152,6 @@ class GalleryScreen(athena.LiveFragment):
         self.items = list(d['__item__'] for d in self.tdm.currentPage())
         lastMessageID = None
         imageClasses = itertools.cycle(('gallery-image', 'gallery-image-alt'))
-        placedImages = 0
 
         if 0 < len(self.items):
             for (i, image) in enumerate(self.items):

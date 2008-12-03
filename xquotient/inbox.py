@@ -328,7 +328,6 @@ def upgradeInbox1to2(oldInbox):
     Create the extra state tracking items necessary for efficiently determining
     distinct source addresses.
     """
-    s = oldInbox.store
     newInbox = oldInbox.upgradeVersion(
         'quotient_inbox', 1, 2,
         installedOn=oldInbox.installedOn,

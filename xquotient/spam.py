@@ -402,7 +402,7 @@ class SpambayesFilter(item.Item):
             else:
                 if self.classify(item) > SPAM_THRESHHOLD:
                     break
-        sc = self.classify(item)
+        self.classify(item)
         p = self._classifierPath()
         if not p.parent().exists():
             p.parent().makedirs()
