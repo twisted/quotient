@@ -359,22 +359,10 @@ def inbox3to4(old):
     version of the schema either to a L{xquotient.spam.Filter} that exists
     in the store, or to a new one.
     """
-    # The PrivateApplication might not have been upgraded yet.  If not, look
-    # backward through older schema versions to try to find it.  Axiom makes no
-    # guarantees about the order in which upgraders are run (not even that it
-    # will be the same order for two different upgrade runs).
-    from xmantissa.webapp import PrivateApplicationV2, PrivateApplicationV3
-    privAppTypes = [
-        PrivateApplication, PrivateApplicationV3, PrivateApplicationV2]
-    for privAppType in privAppTypes:
-        privapp = old.store.findFirst(privAppType)
-        if privapp is not None:
-            break
-    else:
-        # Nominally an error!  But not all of the upgrader tests create a
-        # realistic database (ie, they don't create a PrivateApplication).  So
-        # cannot treat this as an error. -exarkun
-        pass
+    privapp = old.store.findFirst(PrivateApplication)
+    if privapp is None:
+        from xmantissa.webapp import PrivateApplicationV3
+        privapp = old.store.findFirst(PrivateApplicationV3)
     new = old.upgradeVersion(
         Inbox.typeName, 3, 4,
         privateApplication=privapp,
