@@ -50,19 +50,30 @@ information about SSL certificates.
    green.
 
 
-3. Create a Quotient signup
+3. Create a Quotient product
+
+  * Mouse over the Admin tab in the top-left corner, a menu should drop
+    down.
+  * Click the Products menu item
+  * Check all of the Quotient powerups which look interesting (or just check
+    them all)
+  * Click the "Installable Powerups" button at the bottom to create a
+    product with these powerups
+
+
+4. Create a Quotient signup
 
 This allows users to sign up for accounts on your Mantissa server and have
 access to the Quotient offering.
 
- * Click on the Divmod icon in the top-left corner, a menu should appear.
- * Follow the menu to Admin, then Signups
- * Check all of the benefactors
+ * Mouse over the Admin tab again
+ * Click the Signups menu item
+ * Select the product created in step 3
  * Select the "Required User Information" signup type
  * Click the "Create Signup" button.
 
 
-4. Sign up for a Quotient-enabled account
+5. Sign up for a Quotient-enabled account
 
  * Logout of the admin@localhost account
  * Sign up as a new user
