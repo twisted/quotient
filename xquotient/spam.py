@@ -8,10 +8,9 @@ from spambayes import hammie, classifier
 from zope.interface import implements
 
 from twisted.python import log, components
+from twisted.internet.task import coiterate
 
 from nevow import athena
-
-from epsilon import cooperator
 
 from axiom import iaxiom, item, attributes, userbase
 from axiom.scheduler import SubScheduler
@@ -195,7 +194,7 @@ class Filter(item.Item):
                     f.train(msg._spam, msg)
                 yield None
             self.reclassify()
-        return cooperator.iterateInReactor(go())
+        return coiterate(go())
 
 registerAttributeCopyingUpgrader(Filter, 1, 2)
 

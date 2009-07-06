@@ -12,10 +12,9 @@ from zope.interface import implements
 from twisted.internet import defer
 from twisted.python.components import registerAdapter
 from twisted.mail import smtp
+from twisted.internet.task import coiterate
 
 from nevow import inevow
-
-from epsilon import cooperator
 
 from xquotient import equotient, renderers
 
@@ -774,7 +773,7 @@ class MIMEMessageReceiver(object):
     # utility methods
 
     def feedFile(self, fObj):
-        return cooperator.iterateInReactor(self._deliverer(fObj).next)
+        return coiterate(self._deliverer(fObj))
 
     def feedString(self, s):
         """Feed a string in.

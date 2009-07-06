@@ -1,15 +1,17 @@
 # -*- test-case-name: xquotient.test.test_inbox -*-
-import itertools
 
+import itertools
 from datetime import timedelta
+
 from zope.interface import implements
+
 from twisted.python.components import registerAdapter
 from twisted.internet import defer
+from twisted.internet.task import coiterate
 
 from nevow import tags as T, inevow, athena
 from nevow.page import renderer
 from nevow.athena import expose, LiveElement
-from epsilon import cooperator
 
 from axiom.item import Item, transacted, declareLegacyItem
 from axiom import tags
@@ -287,7 +289,7 @@ class Inbox(Item):
 
 
     def performMany(self, actionName, messages, args=None,
-                    scheduler=cooperator.iterateInReactor):
+                    scheduler=coiterate):
         """
         Perform the action with name C{actionName} on the messages in
         C{messages}, passing C{args} as extra arguments to the action method
@@ -302,8 +304,7 @@ class Inbox(Item):
         @type args: None or a C{dict}
 
         @param scheduler: callable which takes an iterator of deferreds and
-        consumes them appropriately.  expected to return a deferred.  defaults
-        to L{epsilon.cooperator.iterateInReactor}
+        consumes them appropriately.  expected to return a deferred.
         @type scheduler: callable
 
         @return: the number of affected messages which have been read and the

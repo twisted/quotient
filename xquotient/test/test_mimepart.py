@@ -1,5 +1,11 @@
+
+"""
+Tests for L{xquotient.mimepart}.
+"""
+
 import os
 import email.quopriMIME
+from StringIO import StringIO
 
 from twisted.trial import unittest
 from twisted.python import filepath
@@ -366,6 +372,8 @@ oTZw+Ovl1BvLcE+pK9VFxxY=
                           'message/rfc822', 'multipart/mixed',
                           'text/plain', 'image/jpeg'])
 
+
+
 class ParsingTestCase(unittest.TestCase, MessageTestMixin):
     def _messageTest(self, source, assertMethod):
         deliveryDir = self.mktemp()
@@ -376,7 +384,6 @@ class ParsingTestCase(unittest.TestCase, MessageTestMixin):
         mr = mimepart.MIMEMessageReceiver(f)
         msg = mr.feedStringNow(source)
         assertMethod(msg)
-
 
 
 
@@ -1214,3 +1221,31 @@ class ExistingMessageStorerTests(unittest.TestCase):
         self.assertEqual(message.source, source)
         self.assertEqual(message.recipient, u'<No Recipient>')
         self.assertEqual(message.subject, u'<No Subject>')
+
+
+
+class FeedTests(unittest.TestCase):
+    """
+    Tests for L{MIMEMessageReceiver} methods beginning with I{feed}.
+    """
+    def test_feedFile(self):
+        """
+        L{MIMEMessageReceiver.feedFile} accepts a file-like object and
+        returns a L{Deferred} which fires when a message has been completely
+        read and parsed from it.
+        """
+        temp = filepath.FilePath(self.mktemp())
+        temp.makedirs()
+        outFileObj = AtomicFile(
+            temp.child("tmp.eml").path, temp.child("message.eml"))
+        receiver = mimepart.MIMEMessageReceiver(outFileObj)
+        inFileObj = StringIO(
+            "Subject: hello\r\n"
+            "Date: today\r\n"
+            "\r\n"
+            "Some text, hello.\r\n")
+        d = receiver.feedFile(inFileObj)
+        def cbFed(ignored):
+            self.assertTrue(receiver.done)
+        d.addCallback(cbFed)
+        return d

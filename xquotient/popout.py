@@ -10,8 +10,7 @@ from twisted.protocols import policies
 from twisted.cred import portal
 from twisted.mail import pop3
 from twisted.application.service import IService
-
-from epsilon.cooperator import iterateInReactor as coiterate
+from twisted.internet.task import coiterate
 
 from axiom import item, attributes
 from axiom.item import declareLegacyItem
