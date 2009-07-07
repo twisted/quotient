@@ -509,7 +509,6 @@ class MailDeliveryAgent(item.Item):
 
     powerupInterfaces = (smtp.IMessageDeliveryFactory,)
 
-
     def getMessageDelivery(self):
         realm = portal.IRealm(self.store.parent)
         chk = checkers.ICredentialsChecker(self.store.parent)
@@ -517,6 +516,13 @@ class MailDeliveryAgent(item.Item):
             iquotient.IMIMEDelivery(self.store),
             iquotient.IMessageSender(self.store))
 
+
+    # Sometimes (depending on upgrader order) this can be used as an
+    # IService (because MailTransferAgent used to be an IService powerup,
+    # and an upgrade replaced some MailTransferAgent instances with
+    # MailDeliveryAgent instances).  See #2922.
+    def setServiceParent(self, parent):
+        pass
 
 
 class AuthenticatedMessageDelivery(object):
