@@ -279,16 +279,27 @@ class DeliveryToAddress(item.Item):
         self.running = False
 
 
-    def getMailExchange(self, recipientDomain):
+    def _createCalculator(self):
+        """
+        Return a L{relaymanager.MXCalculator} which can be used to look up
+        the mail exchange for a domain.
+        """
         resolver = client.Resolver(resolv='/etc/resolv.conf')
-        mxc = relaymanager.MXCalculator(resolver)
-        d = mxc.getMX(recipientDomain)
+        return relaymanager.MXCalculator(resolver)
 
-        def gotMX(mx):
-            resolver.protocol.transport.stopListening()
-            return mx
-        d.addCallback(gotMX)
-        return d
+
+    def getMailExchange(self, recipientDomain):
+        """
+        Look up the mail exchange host for the given domain.
+
+        @param recipientDomain: A C{str} giving the mail domain for which to
+            perform the lookup.
+
+        @return: A L{Deferred} which will fire with a C{str} giving the mail
+            exchange hostname, or which will will errback if no mail
+            exchange can be found.
+        """
+        return self._createCalculator().getMX(recipientDomain)
 
 
     def _getMessageSource(self):

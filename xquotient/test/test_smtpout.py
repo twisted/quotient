@@ -1,3 +1,5 @@
+
+from twisted.internet.defer import succeed
 from twisted.mail import smtp
 from twisted.python.failure import Failure
 from twisted.trial import unittest
@@ -319,3 +321,35 @@ class FromAddressTestCase(unittest.TestCase):
         fa = smtpout.FromAddress(store=ss)
         self.assertIdentical(smtpout.FromAddress.findSystemAddress(ss), fa)
         self.assertEquals(fa.address, 'foo@host')
+
+
+
+class DeliveryToAddressTests(unittest.TestCase):
+    """
+    Tests for L{smtpout.DeliveryToAddress}.
+    """
+    def test_getMailExchange(self):
+        """
+        L{smtpout.DeliveryToAddress.getMailExchange} returns a L{Deferred}
+        which fires with with a C{str} giving the mail exchange hostname for
+        the given domain name.
+        """
+        # Being a little lazy here; getMailExchange doesn't use any of the
+        # persistent attributes, so I'm not going to populate them.  I hope
+        # this does not cause you any difficulties, dear reader. -exarkun
+        delivery = smtpout.DeliveryToAddress()
+
+        # Stub out the actual MX calculator so that we just test its usage.  It
+        # would probably be nice to leave this in place and run it against a
+        # fake reactor instead, but Twisted's DNS resolver doesn't make this
+        # easy.  See Twisted ticket #3908.
+        class FakeCalculator(dict):
+            def getMX(self, domain):
+                return succeed(self[domain])
+        object.__setattr__(
+            delivery, '_createCalculator',
+            lambda: FakeCalculator({'example.com': 'mail.example.com'}))
+
+        d = delivery.getMailExchange('example.com')
+        d.addCallback(self.assertEquals, 'mail.example.com')
+        return d
