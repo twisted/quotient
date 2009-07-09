@@ -2431,6 +2431,7 @@ Quotient.Test.ControllerTestCase.methods(
         return result;
     },
 
+
     /**
      * @return: a function which can be added as a callback to a deferred
      * which fires with an L{Quotient.Compose.Controller} instance.  Checks
@@ -2773,6 +2774,30 @@ Quotient.Test.EmptyControllerTestCase.methods(
                                  'No more messages.');
             });
         return d;
+    },
+
+
+    /**
+     * After the composer is dismissed, if there are no messages in the
+     * selected view, the message detail area remains blank.
+     */
+    function test_emptyMessageViewAfterDismissingComposer(self) {
+        var result = self.setUp();
+        result.addCallback(
+            function(ignored) {
+                return self.controllerWidget.compose(false);
+            });
+        result.addCallback(
+            function(composer) {
+                var finished = self.controllerWidget.reloadMessageAfterComposeCompleted(composer);
+                composer.cancel();
+                return finished;
+            });
+        result.addCallback(
+            function(ignored) {
+                self.assertEqual(self.controllerWidget.messageDetail.firstChild, null);
+            });
+        return result;
     });
 
 

@@ -875,7 +875,12 @@ Quotient.Mailbox.Controller.methods(
      */
     function reloadMessageAfterComposeCompleted(self, composer) {
         composer.completionDeferred.addCallback(function (x) {
-            return self._getMessageDetail(x)});
+                /* If there aren't any messages, don't try to get a message detail.
+                 */
+                if (self.scrollWidget.model.rowCount()) {
+                    return self._getMessageDetail(x);
+                }
+            });
         return composer.completionDeferred;
     },
 
