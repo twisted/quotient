@@ -566,11 +566,20 @@ class ComposeFragment(liveform.LiveFormFragment, renderers.ButtonRenderingMixin,
         self.parentAction = parentAction
 
     def invoke(self, formPostEmulator):
-        coerced = self._coerced(formPostEmulator)
-        # we want to allow the javascript to submit an
-        # list of filenames of arbitrary length with the form
-        coerced['files'] = formPostEmulator.get('files', ())
-        return self.callable(**coerced)
+        """
+        Send the message or save it as a draft.
+
+        The base implementation is overridden to support the slightly
+        unusual I{files} parameter.  LiveForm has no support for this weird
+        list of previously uploaded files type of data.
+        """
+        coerced = self.fromInputs(formPostEmulator)
+        def cbCoerced(values):
+            # we want to allow the javascript to submit an
+            # list of filenames of arbitrary length with the form
+            values['files'] = formPostEmulator.get('files', ())
+            return self.callable(**values)
+        return coerced.addCallback(cbCoerced)
     expose(invoke)
 
 

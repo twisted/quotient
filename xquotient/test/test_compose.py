@@ -13,6 +13,8 @@ from axiom.dependency import installOn
 from axiom.plugins.axiom_plugins import Create
 from axiom.plugins.mantissacmd import Mantissa
 
+from xmantissa.ixmantissa import IWebTranslator
+
 from xquotient import compose, mail, mimeutil, exmess, equotient, smtpout
 from xquotient.test.util import PartMaker
 from xquotient.mimebakery import createMessage, sendMail
@@ -36,41 +38,31 @@ class CompositionTestMixin(object):
     def setUp(self, dbdir=None):
         self.reactor = Reactor()
         self._originalSendmail = smtpout._esmtpSendmail
-        smtpout._esmtpSendmail = self._esmtpSendmail
+        self.patch(smtpout, '_esmtpSendmail', self._esmtpSendmail)
 
-        try:
-            self.dbdir = self.mktemp()
-            self.siteStore = store.Store(self.dbdir)
-            Mantissa().installSite(self.siteStore, u"example.org", u"", False)
+        self.dbdir = self.mktemp()
+        self.siteStore = store.Store(self.dbdir)
+        Mantissa().installSite(self.siteStore, u"example.org", u"", False)
 
-            self.userAccount = Create().addAccount(
-                self.siteStore, u'testuser', u'example.org', u'password')
-            self.userStore = self.userAccount.avatars.open()
+        self.userAccount = Create().addAccount(
+            self.siteStore, u'testuser', u'example.org', u'password')
+        self.userStore = self.userAccount.avatars.open()
 
-            self.composer = compose.Composer(store=self.userStore)
-            installOn(self.composer, self.userStore)
+        self.composer = compose.Composer(store=self.userStore)
+        installOn(self.composer, self.userStore)
 
-            # Make another address and make it the default (XXX There
-            # should probably be tests covering the behavior when
-            # there /isn't/ another from address like this).
-            self.defaultFromAddr = smtpout.FromAddress(
-                                    store=self.userStore,
-                                    smtpHost=u'mail.example.com',
-                                    smtpUsername=u'radix',
-                                    smtpPassword=u'secret',
-                                    address=u'radix@example.com')
-            self.defaultFromAddr.setAsDefault()
-        except:
-            smtpout._esmtpSendmail = self._esmtpSendmail
-            raise
+        self.defaultFromAddr = smtpout.FromAddress(
+                                store=self.userStore,
+                                smtpHost=u'mail.example.com',
+                                smtpUsername=u'radix',
+                                smtpPassword=u'secret',
+                                address=u'radix@example.com')
+        self.defaultFromAddr.setAsDefault()
 
 
     def _esmtpSendmail(self, *args, **kwargs):
         kwargs['reactor'] = self.reactor
         return self._originalSendmail(*args, **kwargs)
-
-    def tearDown(self):
-        smtpout._esmtpSendmail = self._originalSendmail
 
 
 
@@ -307,6 +299,51 @@ class ComposeFragmentTest(CompositionTestMixin, unittest.TestCase):
         installOn(da, self.userStore)
         self.cabinet = compose.FileCabinet(store=self.userStore)
         self.cf = compose.ComposeFragment(self.composer)
+
+
+    def test_invoke(self):
+        """
+        L{ComposeFragment.invoke} accepts a browser-generated structure
+        representing the values in the compose form, coerces it according to
+        the L{Parameters} it defines, and passes the result to the LiveForm
+        callable.
+        """
+        # The from addresses are web ids for FromAddress items.
+        fromAddr = IWebTranslator(self.userStore).toWebID(self.defaultFromAddr)
+
+        # Override the callable to see what happens.
+        sent = []
+        expectedResult = object()
+        def fakeSend(fromAddress, toAddresses, subject, messageBody, cc, bcc, files, draft):
+            sent.append((fromAddress, toAddresses, subject, messageBody, cc, bcc, files, draft))
+            return expectedResult
+        self.cf.callable = fakeSend
+
+        toAddresses = [mimeutil.EmailAddress(u'alice@example.com', False),
+                       mimeutil.EmailAddress(u'bob@example.org', False)]
+        subject = u'Hello World'
+        body = u'How are you'
+        cc = [mimeutil.EmailAddress(u'carol@example.net', False)]
+        bcc = [mimeutil.EmailAddress(u'dennis@example.edu', False)]
+        draft = True
+
+        invokeDeferred = self.cf.invoke({
+                u'fromAddress': [fromAddr],
+                u'toAddresses': [mimeutil.flattenEmailAddresses(toAddresses)],
+                u'subject': [subject],
+                u'messageBody': [body],
+                u'cc': [mimeutil.flattenEmailAddresses(cc)],
+                u'bcc': [mimeutil.flattenEmailAddresses(bcc)],
+                u'draft': [draft]})
+
+        def cbInvoked(invokeResult):
+            self.assertEquals(
+                sent,
+                [(self.defaultFromAddr, toAddresses, subject, body, cc, bcc, (), draft)])
+            self.assertIdentical(invokeResult, expectedResult)
+        invokeDeferred.addCallback(cbInvoked)
+        return invokeDeferred
+
 
     def test_createReply(self):
         """
