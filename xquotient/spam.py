@@ -13,7 +13,6 @@ from twisted.internet.task import coiterate
 from nevow import athena
 
 from axiom import iaxiom, item, attributes, userbase
-from axiom.scheduler import SubScheduler
 from axiom.upgrade import registerAttributeCopyingUpgrader
 from axiom.dependency import dependsOn
 from axiom.upgrade import registerUpgrader
@@ -50,7 +49,7 @@ class Filter(item.Item):
     C{Filter} can also be configured to just look at Postini headers and make a
     determination based on them.
     """
-    schemaVersion = 3
+    schemaVersion = 4
 
     usePostiniScore = attributes.boolean(doc="""
     Indicate whether or not to classify based on Postini headers.
@@ -62,7 +61,6 @@ class Filter(item.Item):
     """, default=0.03)
 
     _filters = attributes.inmemory()
-    scheduler = dependsOn(SubScheduler)
     messageSource = dependsOn(MessageSource)
     tiSource = dependsOn(_TrainingInstructionSource)
 
@@ -213,12 +211,31 @@ def _filter2to3(old):
     s = old.store
     filter.usePostiniScore = old.usePostiniScore
     filter.postiniThreshhold = old.postiniThreshhold
-    filter.scheduler = s.findOrCreate(SubScheduler)
     filter.messageSource = s.findOrCreate(MessageSource)
     filter.tiSource = s.findOrCreate(_TrainingInstructionSource)
     return filter
 
 registerUpgrader(_filter2to3, Filter.typeName, 2, 3)
+
+item.declareLegacyItem(Filter.typeName, 3,
+    dict(messageSource=attributes.reference(),
+         scheduler=attributes.reference(),
+         tiSource=attributes.reference(),
+         usePostiniScore=attributes.boolean(default=False,allowNone=False),
+         postiniThreshhold=attributes.ieee754_double(default=0.03)))
+
+def _filter3to4(old):
+    """
+    Drop the scheduler reference, preserve everything else.
+    """
+    return old.upgradeVersion(
+        old.typeName, 3, 4,
+        usePostiniScore=old.usePostiniScore,
+        postiniThreshhold=old.postiniThreshhold,
+        messageSource=old.messageSource,
+        tiSource=old.tiSource)
+
+registerUpgrader(_filter3to4, Filter.typeName, 3, 4)
 
 
 class HamFilterFragment(ThemedFragment):

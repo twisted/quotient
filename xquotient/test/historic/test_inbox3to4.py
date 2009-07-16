@@ -38,9 +38,7 @@ class InboxUpgradeTestCase(StubbedTest):
         """
         filter = self.store.findUnique(spam.Filter)
         self.failIf(
-            (filter.messageSource is None
-                or filter.tiSource is None
-                or filter.scheduler is None),
+            (filter.messageSource is None or filter.tiSource is None),
             'spam.Filter was not installed properly')
 
 

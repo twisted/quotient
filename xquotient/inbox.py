@@ -18,7 +18,6 @@ from axiom import tags
 from axiom import attributes
 from axiom.upgrade import registerUpgrader, registerAttributeCopyingUpgrader
 from axiom.dependency import dependsOn, installOn, installedOn, _DependencyConnector
-from axiom.scheduler import SubScheduler
 
 from xmantissa import ixmantissa, webnav, people, webtheme
 from xmantissa.webapp import PrivateApplication
@@ -96,12 +95,11 @@ class Inbox(Item):
     implements(ixmantissa.INavigableElement)
 
     typeName = 'quotient_inbox'
-    schemaVersion = 5
+    schemaVersion = 6
 
     powerupInterfaces = (ixmantissa.INavigableElement,)
 
     privateApplication = dependsOn(PrivateApplication)
-    scheduler = dependsOn(SubScheduler)
     messageSource = dependsOn(MessageSource)
     quotientPrefs = dependsOn(QuotientPreferenceCollection)
     deliveryAgent = dependsOn(DeliveryAgent)
@@ -379,7 +377,6 @@ def inbox3to4(old):
     new = old.upgradeVersion(
         Inbox.typeName, 3, 4,
         privateApplication=privapp,
-        scheduler=old.store.findOrCreate(SubScheduler),
         messageSource=old.store.findOrCreate(MessageSource),
         quotientPrefs=old.store.findOrCreate(QuotientPreferenceCollection),
         deliveryAgent=old.store.findOrCreate(DeliveryAgent),
@@ -414,7 +411,6 @@ def inbox4to5(old):
     new = old.upgradeVersion(
         Inbox.typeName, 4, 5,
         privateApplication=old.privateApplication,
-        scheduler=old.scheduler,
         messageSource=old.messageSource,
         quotientPrefs=old.quotientPrefs,
         deliveryAgent=old.deliveryAgent,
@@ -428,20 +424,56 @@ def inbox4to5(old):
         _DependencyConnector(installee=src, target=old.store,
                              explicitlyInstalled=True,
                              store=old.store)
-    # Cannot do either of these before the upgradeVersion call: while
-    # examining dependencies, it is likely that the Inbox being upgraded
-    # will be encountered, causing this upgrade function to run again.
-    # Repeat until the stack is full, then explode. -exarkun
     filter = new.store.findFirst(spam.Filter, default=None)
     if filter is None:
         filter = spam.Filter(store=new.store)
-        installOn(filter, new.store)
     new.filter = filter
 
-    installOn(focus, old.store)
     new.focus = focus
     return new
 registerUpgrader(inbox4to5, Inbox.typeName, 4, 5)
+
+declareLegacyItem(Inbox.typeName, 5,
+                  dict(privateApplication=attributes.reference(),
+                       scheduler=attributes.reference(),
+                       messageSource=attributes.reference(),
+                       quotientPrefs=attributes.reference(),
+                       deliveryAgent=attributes.reference(),
+                       messageDisplayPrefs=attributes.reference(),
+                       uiComplexity=attributes.integer(),
+                       showMoreDetail=attributes.boolean(),
+                       filter=attributes.reference(),
+                       focus=attributes.reference()))
+
+def inbox5to6(old):
+    """
+    Copy over all attributes except C{scheduler}.
+    """
+    new = old.upgradeVersion(
+        Inbox.typeName, 5, 6,
+        privateApplication=old.privateApplication,
+        messageSource=old.messageSource,
+        quotientPrefs=old.quotientPrefs,
+        messageDisplayPrefs=old.messageDisplayPrefs,
+        deliveryAgent=old.deliveryAgent,
+        uiComplexity=old.uiComplexity,
+        showMoreDetail=old.showMoreDetail,
+        filter=old.filter,
+        focus=old.focus)
+
+    # If the old item was original schema version 5 in the database, focus and
+    # filter have already been installed, because the 4 to 5 upgrader used to
+    # install them.  However, now that 5 is not the newest version of Inbox, it
+    # cannot do that.  Only the upgrader to the newest version can.  So do it
+    # here, instead, if it is necessary (which is when the original schema
+    # version was older than 5).
+    if installedOn(new.filter) is None:
+        installOn(new.filter, new.store)
+    if installedOn(new.focus) is None:
+        installOn(new.focus, new.store)
+    return new
+
+registerUpgrader(inbox5to6, Inbox.typeName, 5, 6)
 
 
 class MailboxScrollingFragment(Scrollable, ScrollableView, LiveElement):

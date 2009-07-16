@@ -30,7 +30,6 @@ plugin = offering.Offering(
     ''',
 
     siteRequirements = (
-        (iaxiom.IScheduler, scheduler.Scheduler),
         (userbase.IRealm, userbase.LoginSystem),
         (None, website.WebSite),
         (None, popout.POP3Listener),

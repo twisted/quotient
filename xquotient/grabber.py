@@ -17,7 +17,6 @@ from nevow.athena import expose
 from epsilon import descriptor, extime
 
 from axiom import item, attributes, iaxiom
-from axiom.scheduler import SubScheduler
 from axiom.dependency import dependsOn
 from axiom.upgrade import registerUpgrader
 
@@ -99,14 +98,13 @@ class GrabberConfiguration(item.Item):
     Manages the creation, operation, and destruction of grabbers
     (items which retrieve information from remote sources).
     """
-    schemaVersion = 2
+    schemaVersion = 3
 
     paused = attributes.boolean(doc="""
     Flag indicating whether grabbers created by this Item will be
     allowed to run.
     """, default=False)
 
-    scheduler = dependsOn(SubScheduler)
     privateApplication = dependsOn(PrivateApplication)
     deliveryAgent = dependsOn(DeliveryAgent)
 
@@ -129,18 +127,37 @@ class GrabberConfiguration(item.Item):
         self.scheduler.schedule(pg, extime.Time())
         # OR MAYBE A LITTLE LATER
 
-item.declareLegacyItem(GrabberConfiguration, 1, dict(
+item.declareLegacyItem(GrabberConfiguration.typeName, 1, dict(
     paused=attributes.boolean(default=False),
     installedOn=attributes.reference()))
 
 def _grabberConfiguration1to2(old):
     new = old.upgradeVersion(GrabberConfiguration.typeName, 1, 2,
                              paused=old.paused,
-                             scheduler = old.store.findOrCreate(SubScheduler),
                              privateApplication = old.store.findOrCreate(PrivateApplication),
                              deliveryAgent = old.store.findOrCreate(DeliveryAgent))
     return new
 registerUpgrader(_grabberConfiguration1to2, GrabberConfiguration.typeName, 1, 2)
+
+item.declareLegacyItem(GrabberConfiguration.typeName, 2, dict(
+    paused=attributes.boolean(default=False),
+    scheduler=attributes.reference(),
+    privateApplication=attributes.reference(),
+    deliveryAgent=attributes.reference(),
+    ))
+
+
+def _grabberConfiguration2to3(old):
+    """
+    Copy all the remaining attributes.
+    """
+    new = old.upgradeVersion(GrabberConfiguration.typeName, 2, 3,
+                             paused=old.paused,
+                             privateApplication = old.store.findOrCreate(PrivateApplication),
+                             deliveryAgent = old.store.findOrCreate(DeliveryAgent))
+    return new
+registerUpgrader(_grabberConfiguration2to3, GrabberConfiguration.typeName, 2, 3)
+
 
 class POP3UID(item.Item):
     grabberID = attributes.text(doc="""
@@ -425,7 +442,7 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         self.setStatus(u"Logging in...")
         yield d
         try:
-            loginResult = d.getResult()
+            d.getResult()
         except pop3client.ServerErrorResponse, e:
             self.setStatus(
                 u'Login failed: ' + str(e).decode('ascii', 'replace'),

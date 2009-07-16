@@ -7,6 +7,7 @@ from twisted.internet import defer
 
 from epsilon.extime import Time
 
+from axiom.iaxiom import IScheduler
 from axiom.store import Store
 from axiom.dependency import installOn
 
@@ -153,11 +154,11 @@ class MessageRetrievalTestCase(_MessageRetrievalMixin, TestCase):
 class InboxTest(TestCase):
     def setUp(self):
         self.store = Store()
+        self.scheduler = IScheduler(self.store)
         self.inbox = Inbox(store=self.store)
         installOn(self.inbox, self.store)
         self.translator = self.inbox.privateApplication
         self.inboxScreen = InboxScreen(self.inbox)
-        self.scheduler = self.inbox.scheduler
         self.viewSelection = dict(self.inboxScreen.viewSelection)
 
 
@@ -543,8 +544,7 @@ class PopulatedInboxTest(InboxTest):
         Test fast forwarding to a particular message by id sets that message
         to read.
         """
-        fragment = self.inboxScreen.fastForward(
-            self.viewSelection, self.msgIds[2])
+        self.inboxScreen.fastForward(self.viewSelection, self.msgIds[2])
         self.failUnless(self.msgs[2].read)
 
 

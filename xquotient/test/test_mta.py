@@ -10,9 +10,7 @@ from twisted.test.proto_helpers import StringTransport
 from twisted.internet.address import IPv4Address
 from twisted.python import failure
 
-from epsilon.scripts import certcreate
-
-from axiom import store, userbase, scheduler
+from axiom import store, userbase
 from axiom.item import Item
 from axiom.attributes import text, reference
 from axiom.test.util import getPristineStore
@@ -40,7 +38,6 @@ def createStore(testCase):
         which will be used as the origin and destination of various test
         messages.
         """
-        installOn(scheduler.Scheduler(store=s), s)
         login = userbase.LoginSystem(store=s)
         installOn(login, s)
 
@@ -475,7 +472,7 @@ class MailTests(unittest.TestCase):
         Test that only one sent message object is created even if a messages is
         destined for multiple recipients.
         """
-        sender = self.installStubSender(u'testuser', u'localhost')
+        self.installStubSender(u'testuser', u'localhost')
         account = self.login.accountByAddress(u'testuser', u'localhost')
         factory = smtp.IMessageDeliveryFactory(account)
         delivery = factory.getMessageDelivery()

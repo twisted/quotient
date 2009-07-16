@@ -13,7 +13,7 @@ from twisted.mail import smtp
 from nevow import inevow, rend, json
 from nevow.athena import expose
 
-from axiom import attributes, item, scheduler
+from axiom import attributes, item
 from axiom.upgrade import (
     registerUpgrader, registerAttributeCopyingUpgrader,
     registerDeletionUpgrader)
@@ -156,12 +156,11 @@ class Composer(item.Item):
     implements(ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     typeName = 'quotient_composer'
-    schemaVersion = 5
+    schemaVersion = 6
 
     powerupInterfaces = (ixmantissa.INavigableElement, iquotient.IMessageSender)
 
     privateApplication = dependsOn(PrivateApplication)
-    scheduler = dependsOn(scheduler.SubScheduler)
     mda = dependsOn(MailDeliveryAgent)
     deliveryAgent = dependsOn(DeliveryAgent)
     prefs = dependsOn(ComposePreferenceCollection)
@@ -376,7 +375,6 @@ def composer3to4(old):
     composer = old.upgradeVersion(old.typeName, 3, 4)
     s = old.store
     composer.privateApplication = s.findOrCreate(PrivateApplication)
-    composer.scheduler = s.findOrCreate(scheduler.SubScheduler)
     composer.mda = s.findOrCreate(MailDeliveryAgent)
     composer.deliveryAgent = s.findOrCreate(DeliveryAgent)
     composer.prefs = s.findOrCreate(ComposePreferenceCollection)
@@ -402,7 +400,6 @@ def composer4to5(old):
     return old.upgradeVersion(
         old.typeName, 4, 5,
         privateApplication=old.privateApplication,
-        scheduler=old.scheduler,
         mda=old.mda,
         deliveryAgent=old.deliveryAgent,
         prefs=old.prefs)
@@ -410,6 +407,25 @@ def composer4to5(old):
 
 registerUpgrader(composer4to5, Composer.typeName, 4, 5)
 
+item.declareLegacyItem(Composer.typeName, 5,
+                       dict(privateApplication=attributes.reference(),
+                            scheduler=attributes.reference(),
+                            mda=attributes.reference(),
+                            deliveryAgent=attributes.reference(),
+                            prefs=attributes.reference()))
+
+def composer5to6(old):
+    """
+    Upgrader to remove the C{scheduler} attribute.
+    """
+    return old.upgradeVersion(
+        old.typeName, 5, 6,
+        privateApplication=old.privateApplication,
+        mda=old.mda,
+        deliveryAgent=old.deliveryAgent,
+        prefs=old.prefs)
+
+registerUpgrader(composer5to6, Composer.typeName, 5, 6)
 
 
 class _ComposeFragmentMixin:

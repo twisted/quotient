@@ -4,7 +4,8 @@ from twisted.mail import smtp
 from twisted.python.failure import Failure
 from twisted.trial import unittest
 
-from axiom import attributes, item, scheduler, store, userbase
+from axiom.iaxiom import IScheduler
+from axiom import attributes, item, store, userbase
 from axiom.dependency import installOn
 
 from xquotient import exmess, smtpout, compose
@@ -35,8 +36,7 @@ class SendingTest(unittest.TestCase):
         self.store = store.Store()
         self.composer = MockComposer(store=self.store)
         self.composer.log = []
-        self.scheduler = scheduler.Scheduler(store=self.store)
-        installOn(self.scheduler, self.store)
+        self.scheduler = IScheduler(self.store)
         messageData = DummyMessageImplementation(store=self.store)
         self.message = exmess.Message.createDraft(self.store, messageData,
                                                   u'test')

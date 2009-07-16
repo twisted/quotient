@@ -3,7 +3,6 @@ from twisted.trial import unittest
 
 from axiom import store, userbase
 from axiom.dependency import installOn
-from axiom.scheduler import Scheduler
 
 from xquotient import spam
 from xquotient.test.test_dspam import MessageCreationMixin
@@ -14,7 +13,6 @@ class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
     def setUp(self):
         dbdir = self.mktemp()
         self.store = s = store.Store(dbdir)
-        installOn(Scheduler(store=s), s)
         ls = userbase.LoginSystem(store=s)
         installOn(ls, s)
         acc = ls.addAccount('username', 'dom.ain', 'password')
