@@ -5,6 +5,17 @@
 // import Quotient.Mailbox
 // import Quotient.Compose
 
+Nevow.Athena.Test.TestCase.subclass(Quotient.Test, '_QuotientTestBase').methods(
+    /**
+     * Construct and return a string giving a relative URL to the Quotient
+     * static content indicated by C{path}.
+     */
+    function staticURL(self, path) {
+        return '/static/Quotient' + path;
+    });
+
+
+
 Quotient.Test.ThrobberTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ThrobberTestCase');
 Quotient.Test.ThrobberTestCase.methods(
     function setUp(self) {
@@ -198,8 +209,7 @@ Quotient.Test.ScrollTableTestCase.methods(
     });
 
 
-Quotient.Test.ScrollingWidgetTestCase = Nevow.Athena.Test.TestCase.subclass('Quotient.Test.ScrollingWidgetTestCase');
-Quotient.Test.ScrollingWidgetTestCase.methods(
+Quotient.Test._QuotientTestBase.subclass(Quotient.Test, 'ScrollingWidgetTestCase').methods(
     function setUp(self) {
         var result = self.callRemote('getScrollingWidget', 5);
         result.addCallback(function(widgetInfo) {
@@ -219,6 +229,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
             });
         return result;
     },
+
 
     /**
      * Test that a row can be added to the group selection with
@@ -300,7 +311,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 var dom = self.scrollingWidget.makeCellElement('senderDisplay',
                                                                data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 self.staticURL('/images/boomerang.gif'));
             });
     },
 
@@ -318,7 +329,7 @@ Quotient.Test.ScrollingWidgetTestCase.methods(
                 self.assertEqual(data['everDeferred'], true);
                 var dom = self.scrollingWidget.findCellElement(data);
                 self.assertEqual(dom.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 self.staticURL('/images/boomerang.gif'));
             });
     },
 
@@ -350,9 +361,7 @@ Quotient.Test._getMessageDetail = function _getMessageDetail(self) {
             "message-detail-fragment"));
 },
 
-Quotient.Test.ControllerTestCase = Nevow.Athena.Test.TestCase.subclass(
-    'Quotient.Test.ControllerTestCase');
-Quotient.Test.ControllerTestCase.methods(
+Quotient.Test._QuotientTestBase.subclass(Quotient.Test, 'ControllerTestCase').methods(
     /**
      * Utility method to extract data from display nodes and return it as an
      * array of objects mapping column names to values.
@@ -1850,7 +1859,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 var node = widget.findCellElement(model.getRowData(0));
                 self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                 '/Quotient/static/images/boomerang.gif');
+                                 self.staticURL('/images/boomerang.gif'));
             });
         return d;
     },
@@ -1870,14 +1879,14 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        node, 'src', self.staticURL('/images/boomerang.gif')
                         ).length;
                 }
                 self.assertEqual(
                     Nevow.Athena.NodesByAttribute(
                         self.controllerWidget.scrollWidget.node,
                         'src',
-                        '/Quotient/static/images/boomerang.gif').length,
+                        self.staticURL('/images/boomerang.gif')).length,
                     0);
             });
         return d;
@@ -1909,7 +1918,7 @@ Quotient.Test.ControllerTestCase.methods(
             function(ignored) {
                 function boomerangCount(node) {
                     return Nevow.Athena.NodesByAttribute(
-                        node, 'src', '/Quotient/static/images/boomerang.gif'
+                        node, 'src', self.staticURL('/images/boomerang.gif')
                         ).length;
                 }
                 var node = widget.findCellElement(model.getRowData(0));
@@ -1948,7 +1957,7 @@ Quotient.Test.ControllerTestCase.methods(
                     index = indices[i];
                     node = widget.findCellElement(model.getRowData(index));
                     self.assertEqual(node.childNodes[2].getAttribute('src'),
-                                     '/Quotient/static/images/boomerang.gif');
+                                     self.staticURL('/images/boomerang.gif'));
                 }
             });
         return d;
