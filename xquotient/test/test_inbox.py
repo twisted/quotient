@@ -220,6 +220,20 @@ class InboxTestCase(InboxTest):
                           [u'tag1', u'taga', u'tagstart'])
 
 
+    def test_userTagNamesAlphabetized(self):
+        """
+        L{InboxScreen.getUserTagNames} returns tags sorted alphabetically.
+        """
+        m = testMessageFactory(store=self.store)
+        c = Catalog(store=self.store)
+        c.tag(m, u'B')
+        c.tag(m, u'A')
+        c.tag(m, u'C')
+
+        self.assertEquals(
+            self.inboxScreen.getUserTagNames(), [u'A', u'B', u'C'])
+
+
     def test_defer(self):
         """
         Test that L{action_defer} moves a message to the DEFERRED status.

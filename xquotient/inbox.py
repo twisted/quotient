@@ -665,9 +665,12 @@ class InboxScreen(webtheme.ThemedElement, renderers.ButtonRenderingMixin):
 
     def getUserTagNames(self):
         """
-        Return a list of unique tag names as unicode strings.
+        Return an alphabetically sorted list of unique tag names as unicode
+        strings.
         """
-        return list(self.inbox.store.findOrCreate(tags.Catalog).tagNames())
+        names = list(self.inbox.store.findOrCreate(tags.Catalog).tagNames())
+        names.sort()
+        return names
 
 
     def viewPane(self, request, tag):
