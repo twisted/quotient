@@ -25,6 +25,7 @@ from xmantissa import people
 from xquotient.exmess import (Message, MessageDetail, PartDisplayer,
                               _addMessageSource, getMessageSources,
                               MessageSourceFragment, SENDER_RELATION,
+                              RECIPIENT_RELATION, COPY_RELATION,
                               MessageDisplayPreferenceCollection,
                               MessageBodyFragment, Correspondent,
                               REPLIED_STATUS, PrintableMessageResource,
@@ -297,11 +298,15 @@ class PartItem(Item):
 
 
 
-class MessageTestCase(TestCase):
+class MessageTests(TestCase):
+    """
+    Tests for L{Message}, the beating heart of Quotient.
+    """
     def testDeletion(self):
         s = Store()
         m = Message(store=s)
         m.deleteFromStore()
+
 
     def testAttachmentZipping(self):
         s = Store(self.mktemp())
@@ -315,6 +320,42 @@ class MessageTestCase(TestCase):
 
         self.assertEqual(zf.read('foo.bar'), 'XXX')
         self.assertEqual(zf.read('bar.baz'), 'YYY')
+
+
+    def test_getCorrespondents(self):
+        """
+        L{Message.getCorrespondents} returns an iterable of L{Correspondent}
+        items which have the specified relationship to the L{Message} instance
+        on which it is called.
+        """
+        store = Store()
+        message = Message(store=store)
+
+        # Populate the db with some dummy data for us to find.
+        correspondents = [
+            (u"alice@example.com", SENDER_RELATION),
+            (u"bob@example.com", RECIPIENT_RELATION),
+            (u"carol@example.com", COPY_RELATION),
+            (u"dennis@example.com", COPY_RELATION)]
+
+        for (address, relation) in correspondents:
+            Correspondent(
+                store=store, message=message,
+                address=address, relation=relation)
+
+        senders = list(message.getCorrespondents(SENDER_RELATION))
+        self.assertEquals(len(senders), 1)
+        self.assertEquals(senders[0].address, u"alice@example.com")
+
+        recipients = list(message.getCorrespondents(RECIPIENT_RELATION))
+        self.assertEquals(len(senders), 1)
+        self.assertEquals(senders[0].address, u"bob@example.com")
+
+        copied = list(message.getCorrespondents(COPY_RELATION))
+        self.assertEquals(len(copied), 2)
+        self.assertEquals(copied[0].address, u"carol@example.com")
+        self.assertEquals(copied[1].address, u"dennis@example.com")
+
 
 
 class PartWrapperTestCase(TestCase):

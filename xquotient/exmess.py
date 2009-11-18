@@ -2266,7 +2266,12 @@ class MessageBodyFragment(ThemedElement):
 
 
 class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingMixin):
-    '''i represent the viewable facet of some kind of message'''
+    """
+    L{MessageDetail} is the view implementation for a message.
+
+    There is no interface defined for messages yet.  They need to be a lot like
+    L{Message}.
+    """
 
     implements(ixmantissa.INavigableFragment)
     fragmentName = 'message-detail'
