@@ -2421,6 +2421,21 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
             personStan = tags.span(title=email.email)[email.anyDisplayName()]
         return personStan
 
+
+    def _recipientsView(self, relation, slotName):
+        addresses = [
+            c.address for c in self.original.getCorrespondents(relation)]
+        if not addresses:
+            return ''
+        views = [
+            self.personStanFromEmailAddress(mimeutil.parseEmailAddresses(address, False)[0])
+            for address in addresses]
+        filledViews = [
+            self.patterns[slotName + '-address'].fillSlots(slotName, view)
+            for view in views]
+        return filledViews
+
+
     def render_headerPanel(self, ctx, data):
         tzinfo = pytz.timezone(self.prefs.getPreferenceValue('timezone').encode('ascii'))
         sentWhen = self.original.sentWhen
@@ -2429,17 +2444,9 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         sentWhenDetailed = sentWhen.asRFC2822(tzinfo)
         receivedWhenDetailed = self.original.receivedWhen.asRFC2822(tzinfo)
 
-        try:
-            cc = self.original.impl.getHeader(u'cc')
-        except equotient.NoSuchHeader:
-            ccStan = ''
-        else:
-            addresses = mimeutil.parseEmailAddresses(cc, mimeEncoded=False)
-            ccStan = list(self.personStanFromEmailAddress(address)
-                        for address in addresses)
-            ccStan = list(self.patterns['cc-address'].fillSlots('cc', cc)
-                        for cc in ccStan)
-            ccStan = self.patterns['cc-detailed'].fillSlots('cc', ccStan)
+        ccStan = self._recipientsView(COPY_RELATION, 'cc')
+        ccStan = self.patterns['cc-detailed'].fillSlots('cc', ccStan)
+        recipientStan = self._recipientsView(RECIPIENT_RELATION, 'to')
 
         sender = self.original.sender
         senderDisplay = self.original.senderDisplay
@@ -2448,13 +2455,9 @@ class MessageDetail(athena.LiveFragment, rend.ChildLookupMixin, ButtonRenderingM
         senderEmail = mimeutil.EmailAddress(sender, mimeEncoded=False)
         senderStan = self.personStanFromEmailAddress(senderEmail)
 
-        recipient = self.original.recipient
-        recipientEmail = mimeutil.EmailAddress(recipient, mimeEncoded=False)
-        recipientStan = self.personStanFromEmailAddress(recipientEmail)
-
         return dictFillSlots(ctx.tag,
                     {'sender': senderStan,
-                     'recipient': recipientStan,
+                     'recipients': recipientStan,
                      'cc-detailed': ccStan,
                      'subject': self.original.subject,
                      'sent': sentWhenTerse,
