@@ -348,8 +348,8 @@ class MessageTests(TestCase):
         self.assertEquals(senders[0].address, u"alice@example.com")
 
         recipients = list(message.getCorrespondents(RECIPIENT_RELATION))
-        self.assertEquals(len(senders), 1)
-        self.assertEquals(senders[0].address, u"bob@example.com")
+        self.assertEquals(len(recipients), 1)
+        self.assertEquals(recipients[0].address, u"bob@example.com")
 
         copied = list(message.getCorrespondents(COPY_RELATION))
         self.assertEquals(len(copied), 2)

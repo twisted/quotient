@@ -1521,6 +1521,16 @@ class Message(item.Item):
             '%r does not have any of the statuses i know about' % (self,))
 
 
+    def getCorrespondents(self, relation):
+        """
+        Return an iterable of L{Correspondent} items which have the given
+        relationship to this message.
+        """
+        return self.store.query(
+            Correspondent, attributes.AND(
+                Correspondent.message == self, Correspondent.relation == relation))
+
+
 
 item.declareLegacyItem(Message.typeName, 3,
                        dict(archived=attributes.boolean(),
