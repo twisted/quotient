@@ -16,8 +16,17 @@ setuphelper.autosetup(
         Divmod Mantissa.
         """,
     classifiers=[
-        "Intended Audience :: Developers",
-        "Programming Language :: Python",
         "Development Status :: 2 - Pre-Alpha",
-        "Topic :: Internet"],
+        "Framework :: Twisted",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python",
+        "Topic :: Communications :: Email",
+        "Topic :: Communications :: Email :: Address Book",
+        "Topic :: Communications :: Email :: Email Clients (MUA)",
+        "Topic :: Communications :: Email :: Filters",
+        "Topic :: Communications :: Email :: Post-Office :: POP3",
+        "Topic :: Internet",
+        "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+        ],
     )

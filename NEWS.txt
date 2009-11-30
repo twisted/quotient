@@ -1,3 +1,18 @@
+0.3.0 (2009-09-25):
+  - Switch to `twisted.internet.ssl` from `epsilon.sslverify`.
+  - Delete some dead code.
+  - Update the quick start guide to reflect a more recent reality.
+  - Fix a bug when dismissing a compose view to return to an empty message
+    view which resulted in an unhandled error dialog.
+  - Use the new Twisted 8.2 MX lookup API which takes care of cleaning up
+    the UDP port itself.
+  - Avoid using private implementation details of LiveForm in the compose
+    page, fixing a bug in the process.
+  - Stop depending on or instantiating Scheduler or SubScheduler; instead
+    just adapt to IScheduler where necessary.
+  - Sort the contents of the tag list in the message detail view
+    alphabetically.
+
 0.2.19 (2008-08-12):
   - Removed xquotient.indexinghelp.
   - Updates to match new Mantissa API.
