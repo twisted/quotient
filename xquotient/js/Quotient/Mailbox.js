@@ -2136,10 +2136,12 @@ Quotient.Mailbox.Controller.methods(
         if (name == "next-message") {
             return {
                 'fillSlots': function(key, value) {
+                    var result = value.replace(new RegExp('&', 'g'), '&amp;');
+                    result = result.replace(new RegExp('<', 'g'), '&lt;');
+                    result = result.replace(new RegExp('>', 'g'), '&gt;');
                     return (
                         '<div xmlns="http://www.w3.org/1999/xhtml">Next: ' +
-                        value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') +
-                        '</div>');
+                        result + '</div>');
                 }
             };
         } else if (name == "no-more-messages") {

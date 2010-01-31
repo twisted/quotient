@@ -105,10 +105,17 @@ from nevow.testutil import JavaScriptTestCase
 
 class JavaScriptTests(JavaScriptTestCase):
     """
-    Xquotient Javascript unit tests.
+    xQuotient Javascript unit tests.
     """
     def test_common(self):
         """
         Tests for C{Quotient.Common}.
         """
         return 'Quotient.Test.TestCommon'
+
+
+    def test_mailboxController(self):
+        """
+        Tests for C{Quotient.Mailbox.Controller}.
+        """
+        return 'Quotient.Test.TestController'
