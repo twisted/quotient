@@ -140,8 +140,7 @@ class Inbox(Item):
         if organizer is None:
             return iter(())
         return iter(self.store.query(
-            people.Person,
-            people.Person.storeID != organizer.storeOwnerPerson.storeID))
+            people.Person, sort=people.Person.name.ascending))
 
 
     def getBaseComparison(self, viewSelection):

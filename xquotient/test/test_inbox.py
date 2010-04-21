@@ -188,20 +188,21 @@ class InboxTestCase(InboxTest):
         L{Inbox.getPeople} should return an empty sequence if there is not an
         L{Organizer} in the store.
         """
-        self.assertEqual(list(self.inbox.getPeople()), [])
+        self.assertEquals(list(self.inbox.getPeople()), [])
 
 
-
-    def test_getPeopleExcludesStoreOwner(self):
+    def test_getPeople(self):
         """
-        L{Inbox.getPeople} should return all L{Person} items in the store, with the
-        exception of L{Organizer.storeOwnerPerson}.
+        L{Inbox.getPeople} should return all L{Person} items in the store,
+        sorted in the naive alphabetical way.
         """
         organizer = Organizer(store=self.store)
         installOn(organizer, self.store)
+        organizer.storeOwnerPerson.name = u'Carol'
         bob = Person(store=self.store, organizer=organizer, name=u'Bob')
-        self.assertEqual(
-            list(self.inbox.getPeople()), [bob])
+        self.assertEquals(
+            list(self.inbox.getPeople()),
+            [bob, organizer.storeOwnerPerson])
 
 
     def test_userTagNames(self):
