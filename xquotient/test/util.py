@@ -78,7 +78,7 @@ class PartMaker:
         elif major == 'image':
             p = MI.MIMEImage(self.body, minor)
         else:
-            assert (False,
+            raise ValueError(
                     "Must be 'multipart', 'text' or 'image' (got %r)"
                     % (major,))
 
