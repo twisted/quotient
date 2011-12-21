@@ -6,16 +6,34 @@ from xquotient import mimeutil
 
 class MIMEUtilTests(unittest.TestCase):
 
-    def testheaderToUnicode(self):
-        expected = [('=?ISO-8859-1?Q?C=E9sar?=', u'C\u00e9sar', ()),
-                    ('=?ISO-8859-1?Q?C=E9sar?= fu bar', u'C\u00e9sar fu bar', ()),
-                    ('=?ISO-FUBAR1?Q?C=E9sar?= fu bar', u'C\ufffdr fu bar', ()),
-                    ('=?ISO-FUBAR1?Q?C=E9sar?= fu bar', u'C\u00e9sar fu bar', ('iso-8859-1',))]
+    def test_headerToUnicode(self):
+        """
+        L{mimeutil.headerToUnicode} accepts a C{str} giving an encoded
+        RFC 2822 header value and decodes it to C{unicode} according
+        to any embedded charset declarations, or using a fallback
+        charset if necessary.
+        """
+        expected = [
+            # Nice simple Latin-1 case
+            ('=?ISO-8859-1?Q?C=E9sar?=', u'C\u00e9sar', ()),
+            # Same case, but with some bytes after the non-ascii
+            # section, to be preserved in the output.
+            ('=?ISO-8859-1?Q?C=E9sar?= fu bar', u'C\u00e9sar fu bar', ()),
+            # A case where the charset is unrecognized and the bytes
+            # are not a valid UTF-8 encoding of any character,
+            # producing a replacement character in their place.
+            # Python 2.6 and earlier do not handle this case well,
+            # they eat a couple extra bytes after the 0xE9, so this
+            # test will fail there.  Use Python 2.7.
+            ('=?ISO-FUBAR1?Q?C=E9sar?= fu bar', u'C\ufffdsar fu bar', ()),
+            # The same case, but with Latin-1 specified as the fallback charset.
+            ('=?ISO-FUBAR1?Q?C=E9sar?= fu bar', u'C\u00e9sar fu bar', ('iso-8859-1',))]
 
         for source, expected, args in expected:
             result = mimeutil.headerToUnicode(source, *args)
             self.failUnless(isinstance(result, unicode))
             self.assertEquals(result, expected, "from %r got %r, expected %r" % (source, result, expected))
+
 
     dates = [
         ("Wed, 08 Dec 2004 16:44:11 -0500", (2004, 12, 8, 21, 44, 11, 2, 343, 0)),
