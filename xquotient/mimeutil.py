@@ -153,6 +153,10 @@ class EmailAddress(object):
         return cmp((self.email, self.display), (other.email, other.display))
 
 
+    def __hash__(self):
+        return hash((self.email, self.display))
+
+
     def __nonzero__(self):
         return bool(self.display or self.email)
 

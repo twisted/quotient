@@ -903,12 +903,25 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         msgSource = msg(relatedAddressesMessage % headers)
 
         def checkRelatedAddresses(part):
+            # Keep track of the relations we see to do duplicate checking.
+            seen = set()
+
+            # Keep track of whether the relation we're looking for in particular
+            # has been found or not.
+            found = False
+
             for (kind, addr) in part.relatedAddresses():
+                if (kind, addr.email) in seen:
+                    self.fail("Saw duplicate relation: %r" % (
+                            (kind, addr.email),))
+                seen.add((kind, addr.email))
+
                 if kind == relation:
                     self.assertEqual(addr.email, email)
                     self.assertEqual(addr.display, display)
-                    break
-            else:
+                    found = True
+
+            if not found:
                 self.fail("Did not find %r" % (relation,))
 
         self._messageTest(msgSource, checkRelatedAddresses)
@@ -984,10 +997,13 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
         msgSource = msg(relatedAddressesMessage % self.headers)
 
         def checkRelations(msg):
-            ccAddrs = [(addr.email, addr.display) for (kind, addr) in msg.relatedAddresses()
-                       if kind == COPY_RELATION]
-            self.assertEqual([(self.ccEmail, self.ccDisplay),
-                              (self.bccEmail, self.bccDisplay)], ccAddrs)
+            ccAddrs = set([(addr.email, addr.display) for (kind, addr)
+                           in msg.relatedAddresses()
+                           if kind == COPY_RELATION])
+            self.assertEqual(
+                set([(self.ccEmail, self.ccDisplay),
+                     (self.bccEmail, self.bccDisplay)]),
+                ccAddrs)
 
         self._messageTest(msgSource, checkRelations)
 
@@ -1044,6 +1060,20 @@ class MessageDataTestCase(unittest.TestCase, PersistenceMixin):
             self.assertEqual(list(msg.relatedAddresses()), [])
 
         self._messageTest(msgSource, checkRelations)
+
+
+    def test_uniqueRelations(self):
+        """
+        L{Part.relatedAddresses} only returns one kind of relation per address,
+        even if the address appears in multiple parts of the message associated
+        with that kind of relation.
+        """
+        self.headers['to'] = self._header(
+            'to', 'alice@example.com, alice@example.com')
+
+        self._relationTest(
+            self.headers, RECIPIENT_RELATION, 'alice@example.com', '')
+
 
     alternateMessage = PartMaker('multipart/alternative', 'alt',
         PartMaker('text/plain', 'plain'),

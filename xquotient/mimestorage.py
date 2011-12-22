@@ -467,6 +467,8 @@ class Part(item.Item):
         Implement L{IMessageData.relatedAddresses} by looking at relevant
         RFC2822 headers for sender and recipient addresses.
         """
+        result = set()
+
         for header in (u'from', u'sender', u'reply-to'):
             try:
                 v = self.getHeader(header)
@@ -474,7 +476,7 @@ class Part(item.Item):
                 continue
 
             email = mimeutil.EmailAddress(v, mimeEncoded=False)
-            yield (exmess.SENDER_RELATION, email)
+            result.add((exmess.SENDER_RELATION, email))
             break
 
         for header, relationship in [
@@ -489,7 +491,8 @@ class Part(item.Item):
                 pass
             else:
                 for addressObject in mimeutil.parseEmailAddresses(v, mimeEncoded=False):
-                    yield (relationship, addressObject)
+                    result.add((relationship, addressObject))
+        return iter(result)
 
 
     def guessSentTime(self, default=None):

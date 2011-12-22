@@ -71,11 +71,41 @@ class MIMEUtilTests(unittest.TestCase):
 
 
 class EmailAddressTests(unittest.TestCase):
+    equalAddresses = [
+        ('    ', ''),
+        ('Fu@bAr', '  fu  @ bar  '),
+        ('bleh <Fu@bAr>', ('  bleh  ', '  fu  @ bar  ')),
+        ]
+
+    notEqualAddresses = [
+        ('bleh <Fu@bAr>', '  fu  @ bar  '),
+        ]
+
     def test_cmp(self):
-        self.assertEquals(mimeutil.EmailAddress('    '), mimeutil.EmailAddress(''))
-        self.assertEquals(mimeutil.EmailAddress('Fu@bAr'), mimeutil.EmailAddress('  fu  @ bar  '))
-        self.assertEquals(mimeutil.EmailAddress('bleh <Fu@bAr>'), mimeutil.EmailAddress(('  bleh  ', '  fu  @ bar  ')))
-        self.assertNotEquals(mimeutil.EmailAddress('bleh <Fu@bAr>'), mimeutil.EmailAddress('  fu  @ bar  '))
+        for (a, b) in self.equalAddresses:
+            self.assertEqual(
+                mimeutil.EmailAddress(a), mimeutil.EmailAddress(b))
+        for (a, b) in self.notEqualAddresses:
+            self.assertNotEqual(
+                mimeutil.EmailAddress(a), mimeutil.EmailAddress(b))
+
+
+    def test_hash(self):
+        """
+        Two L{mimeutil.EmailAddress} instances representing the same address
+        hash the same.
+        """
+        for (a, b) in self.equalAddresses:
+            self.assertEqual(
+                hash(mimeutil.EmailAddress(a)),
+                hash(mimeutil.EmailAddress(b)),
+                "hash %r != hash %r" % (a, b))
+        for (a, b) in self.notEqualAddresses:
+            self.assertNotEqual(
+                hash(mimeutil.EmailAddress(a)),
+                hash(mimeutil.EmailAddress(b)),
+                "hash %r == hash %r" % (a, b))
+
 
     def _parseTestCase(self, input, display, email, anyDisplayName, pseudoFormat, localpart, domain):
         """
