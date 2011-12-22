@@ -359,12 +359,19 @@ class MailboxSelector(object):
         else:
             return attributes.AND(*comp)
 
+
+    def _maybeDistinct(self, query):
+        if len(self.statuses) > 1 or self.addresses:
+            return query.distinct()
+        return query
+
+
     def _basicQuery(self):
         comp = self._getComparison()
-        return self.store.query(
-            Message, comp,
-            sort=self.sortColumn,
-            limit=self.limit).distinct()
+        return self._maybeDistinct(
+            self.store.query(
+                Message, comp, sort=self.sortColumn, limit=self.limit))
+
 
     def offsetQuery(self, offset, limit):
         """
@@ -381,12 +388,11 @@ class MailboxSelector(object):
         @return: a list of the given messages.
         """
         comp = self._getComparison()
-        return list(self.store.query(
-                Message, comp,
-                sort=self.sortColumn,
-                offset=offset,
-                limit=limit,
-                ).distinct())
+        return list(
+            self._maybeDistinct(
+                self.store.query(
+                    Message,
+                    comp, sort=self.sortColumn, offset=offset, limit=limit)))
 
 
     def count(self):
@@ -395,8 +401,9 @@ class MailboxSelector(object):
         """
         if self.earlyOut:
             return 0
-        return self.store.query(Message, self._getComparison(),
-                                limit=self.limit).distinct().count()
+        return self._maybeDistinct(
+            self.store.query(
+                Message, self._getComparison(), limit=self.limit)).count()
 
 
     def __iter__(self):
