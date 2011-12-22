@@ -94,6 +94,23 @@ def testMessageFactory(store, archived=False, spam=None, read=False,
         # Cheat so that nit test setup will work; this is gross, but inverting
         # it to be specified properly (in the tests' impl) would be even more
         # of a pain in the ass right now... -glyph
+
+        # Addendum: It's largely the _Part using tests in livetest_inbox.py
+        # that depend on this behavior.  The _Part they use never knows
+        # about any related addresses, so no correspondents are created as
+        # part of normal message creation, as one might expect.  This
+        # Correspondent may end up being a duplicate of a Correspondent
+        # already created by createIncoming or createDraft in cases when a
+        # real message implemtation is used (as is the case for most or all
+        # tests except those in livetest_inbox).  This is wrong, or at least
+        # lacks verisimilitude, but it accidentally provides test coverage
+        # for an otherwise uncovered case: the case where there exists a
+        # Person with two addresses and a message is received which is
+        # either from or to both of those addresses, resulting in two
+        # Correspondent items associated with a single Person.  This is an
+        # important case because it requires the use of a DISTINCT query by
+        # MailboxSelector if a person restriction is being applied. 
+        # -exarkun
         Correspondent(store=store,
                       relation=SENDER_RELATION,
                       message=m,
