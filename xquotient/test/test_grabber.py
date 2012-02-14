@@ -360,6 +360,19 @@ class POP3GrabberTestCase(unittest.TestCase):
 
 
 
+class ControlledPOP3GrabberTestCase(unittest.TestCase):
+    """
+    Tests for L{xquotient.grabber.ControlledPOP3GrabberProtocol}.
+    """
+    def test_stoppedRunningWithGrabber(self):
+        """
+        When L{ControlledPOP3GrabberProtocol.stoppedRunning} is called and the
+        protocol instance has an associated grabber, that grabber is rescheduled
+        to run immediately.
+        """
+        protocol = grabber.ControlledPOP3GrabberProtocol()
+
+
 class PersistentControllerTestCase(unittest.TestCase):
     """
     Tests for the Axiom-y parts of L{xquotient.grabber.POP3Grabber}.
