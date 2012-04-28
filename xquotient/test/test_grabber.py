@@ -12,7 +12,7 @@ from epsilon import structlike, extime
 
 from epsilon.test import iosim
 
-from axiom import iaxiom, store, substore
+from axiom import iaxiom, store, substore, scheduler
 
 from xquotient import grabber, mimepart
 
@@ -195,7 +195,7 @@ class DelayedListMailbox(ListMailbox):
 
 
 
-class POP3GrabberTestCase(unittest.TestCase):
+class POP3GrabberProtocolTestCase(unittest.TestCase):
     testMessageStrings = ['First message', 'Second message', 'Last message']
 
 
@@ -425,8 +425,10 @@ class PersistentControllerTestCase(unittest.TestCase):
     """
     def setUp(self):
         self.store = store.Store()
+        self.config = grabber.GrabberConfiguration(store=self.store)
         self.grabber = grabber.POP3Grabber(
             store=self.store,
+            config=self.config,
             username=u"testuser",
             domain=u"example.com",
             password=u"password")
@@ -482,3 +484,17 @@ class PersistentControllerTestCase(unittest.TestCase):
             self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
                                          (51, '51')]),
             [(49, '49'), (51, '51')])
+
+
+    def test_delete(self):
+        """
+        L{POP3Grabber.delete} unschedules the grabber.
+        """
+        store = self.grabber.store
+        iaxiom.IScheduler(store).schedule(self.grabber, extime.Time())
+        self.grabber.delete()
+
+        # Can't query for the TimedEvent directly, but we know nothing *else*
+        # was scheduled either.
+        self.assertEqual(
+            [], list(store.query(scheduler.TimedEvent)))

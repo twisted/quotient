@@ -275,7 +275,7 @@ class POP3Grabber(item.Item):
             self.status = Status(store=self.store, message=u'idle')
 
     def delete(self):
-        self.config.scheduler.unscheduleAll(self)
+        iaxiom.IScheduler(self.store).unscheduleAll(self)
         if self.running:
             if self.protocol is not None:
                 self.protocol.stop()
