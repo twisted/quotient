@@ -633,7 +633,7 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
             return
         self.grabber.running = False
         if self._transient:
-            self.grabber.config.scheduler.reschedule(
+            iaxiom.IScheduler(self.grabber.store).reschedule(
                 self.grabber,
                 self.grabber.scheduled,
                 extime.Time())
@@ -645,6 +645,11 @@ class POP3GrabberFactory(protocol.ClientFactory):
     protocol = ControlledPOP3GrabberProtocol
 
     def __init__(self, grabber, ssl):
+        """
+        @param grabber: The L{POP3Grabber} item driving this factory.
+
+        @param ssl: A flag indicating whether an SSL connection will be attempted.
+        """
         self.grabber = grabber
         self.ssl = ssl
 

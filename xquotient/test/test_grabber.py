@@ -12,7 +12,7 @@ from epsilon import structlike, extime
 
 from epsilon.test import iosim
 
-from axiom import store
+from axiom import iaxiom, store, substore
 
 from xquotient import grabber, mimepart
 
@@ -366,11 +366,32 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
     """
     def test_stoppedRunningWithGrabber(self):
         """
-        When L{ControlledPOP3GrabberProtocol.stoppedRunning} is called and the
-        protocol instance has an associated grabber, that grabber is rescheduled
-        to run immediately.
+        When L{ControlledPOP3GrabberProtocol.stoppedRunning} is called after a
+        transient failure, and the protocol instance has an associated grabber,
+        that grabber is rescheduled to run immediately.
         """
-        protocol = grabber.ControlledPOP3GrabberProtocol()
+        siteStore = store.Store()
+        subStore = substore.SubStore.createNew(siteStore, ['grabber'])
+        userStore = subStore.open()
+        scheduler = iaxiom.IScheduler(userStore)
+
+        grabberItem = grabber.POP3Grabber(
+            store=userStore, username=u"alice", domain=u"example.com",
+            password=u"secret", running=True,
+            config=grabber.GrabberConfiguration(store=userStore))
+        grabberItem.scheduled = extime.Time()
+        scheduler.schedule(grabberItem, grabberItem.scheduled)
+
+        factory = grabber.POP3GrabberFactory(grabberItem, False)
+        protocol = factory.buildProtocol(None)
+        protocol.transientFailure(None)
+        protocol.stoppedRunning()
+        self.assertEqual(False, grabberItem.running)
+
+        scheduled = list(scheduler.scheduledTimes(grabberItem))
+        self.assertEqual(1, len(scheduled))
+        self.assertTrue(scheduled[0] <= extime.Time())
+
 
 
 class PersistentControllerTestCase(unittest.TestCase):
