@@ -93,6 +93,7 @@ class GrabberBenefactor(item.Item):
     """, default=0)
     powerupNames = ["xquotient.grabber.GrabberConfiguration"]
 
+
 class GrabberConfiguration(item.Item):
     """
     Manages the creation, operation, and destruction of grabbers
@@ -124,7 +125,7 @@ class GrabberConfiguration(item.Item):
             config=self,
             ssl=ssl)
         # DO IT *NOW*
-        self.scheduler.schedule(pg, extime.Time())
+        iaxiom.IScheduler(self.store).schedule(pg, extime.Time())
         # OR MAYBE A LITTLE LATER
 
 item.declareLegacyItem(GrabberConfiguration.typeName, 1, dict(

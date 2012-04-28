@@ -394,6 +394,31 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
 
 
 
+class GrabberConfigurationTestCase(unittest.TestCase):
+    """
+    Tests for L{xquotient.grabber.GrabberConfiguration}.
+    """
+    def test_addGrabber(self):
+        """
+        L{GrabberConfiguration.addGrabber} creates a new L{POP3Grabber} item
+        scheduled to run immediately.
+        """
+        siteStore = store.Store()
+        subStore = substore.SubStore.createNew(siteStore, ['grabber'])
+        userStore = subStore.open()
+        scheduler = iaxiom.IScheduler(userStore)
+
+        config = grabber.GrabberConfiguration(store=userStore)
+        config.addGrabber(u"alice", u"secret", u"example.com", False)
+        grabberItems = list(userStore.query(grabber.POP3Grabber))
+
+        self.assertEqual(1, len(grabberItems))
+        scheduled = list(scheduler.scheduledTimes(grabberItems[0]))
+        self.assertEqual(1, len(scheduled))
+        self.assertTrue(scheduled[0] <= extime.Time())
+
+
+
 class PersistentControllerTestCase(unittest.TestCase):
     """
     Tests for the Axiom-y parts of L{xquotient.grabber.POP3Grabber}.
