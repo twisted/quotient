@@ -7,6 +7,8 @@ from twisted.trial import unittest
 from twisted.internet import defer, error
 from twisted.mail import pop3
 from twisted.cred import error as ecred
+from twisted.test.proto_helpers import StringTransport
+from twisted.python.failure import Failure
 
 from epsilon import structlike, extime
 
@@ -391,6 +393,35 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
         scheduled = list(scheduler.scheduledTimes(grabberItem))
         self.assertEqual(1, len(scheduled))
         self.assertTrue(scheduled[0] <= extime.Time())
+
+
+    def test_stoppedRunningAfterTimeout(self):
+        """
+        When L{ControlledPOP3GrabberProtocol} times out the connection
+        due to inactivity, the controlling grabber's status is set to
+        reflect this.
+        """
+        siteStore = store.Store()
+        subStore = substore.SubStore.createNew(siteStore, ['grabber'])
+        userStore = subStore.open()
+        scheduler = iaxiom.IScheduler(userStore)
+
+        grabberItem = grabber.POP3Grabber(
+            store=userStore, username=u"alice", domain=u"example.com",
+            password=u"secret", running=True,
+            config=grabber.GrabberConfiguration(store=userStore))
+        grabberItem.scheduled = extime.Time()
+        scheduler.schedule(grabberItem, grabberItem.scheduled)
+
+        factory = grabber.POP3GrabberFactory(grabberItem, False)
+        protocol = factory.buildProtocol(None)
+        protocol.makeConnection(StringTransport())
+        protocol.timeoutConnection()
+        protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
+
+        self.assertEqual(
+            grabberItem.status.message,
+            u"Timed out waiting for server response.")
 
 
 

@@ -409,10 +409,11 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         Disassociate the protocol object from the POP3Grabber and drop the
         connection.
         """
+        msg = u"Timed out waiting for server response."
         addr, peer = self.transport.getHost(), self.transport.getPeer()
         log.msg("POP3GrabberProtocol/%s->%s timed out" % (addr, peer))
-        self.transientFailure(failure.Failure(
-            error.TimeoutError("Timed out waiting for server response.")))
+        self.setStatus(msg)
+        self.transientFailure(failure.Failure(error.TimeoutError(msg)))
         self.stoppedRunning()
         self.transport.loseConnection()
 
