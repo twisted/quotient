@@ -366,31 +366,36 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
     """
     Tests for L{xquotient.grabber.ControlledPOP3GrabberProtocol}.
     """
+    def setUp(self):
+        """
+        Create a grabber in a user store.
+        """
+        self.siteStore = store.Store()
+        self.subStore = substore.SubStore.createNew(self.siteStore, ['grabber'])
+        self.userStore = self.subStore.open()
+        self.scheduler = iaxiom.IScheduler(self.userStore)
+
+        self.grabberItem = grabber.POP3Grabber(
+            store=self.userStore, username=u"alice", domain=u"example.com",
+            password=u"secret", running=True,
+            config=grabber.GrabberConfiguration(store=self.userStore))
+        self.grabberItem.scheduled = extime.Time()
+        self.scheduler.schedule(self.grabberItem, self.grabberItem.scheduled)
+
+
     def test_stoppedRunningWithGrabber(self):
         """
         When L{ControlledPOP3GrabberProtocol.stoppedRunning} is called after a
         transient failure, and the protocol instance has an associated grabber,
         that grabber is rescheduled to run immediately.
         """
-        siteStore = store.Store()
-        subStore = substore.SubStore.createNew(siteStore, ['grabber'])
-        userStore = subStore.open()
-        scheduler = iaxiom.IScheduler(userStore)
-
-        grabberItem = grabber.POP3Grabber(
-            store=userStore, username=u"alice", domain=u"example.com",
-            password=u"secret", running=True,
-            config=grabber.GrabberConfiguration(store=userStore))
-        grabberItem.scheduled = extime.Time()
-        scheduler.schedule(grabberItem, grabberItem.scheduled)
-
-        factory = grabber.POP3GrabberFactory(grabberItem, False)
+        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
         protocol = factory.buildProtocol(None)
         protocol.transientFailure(None)
         protocol.stoppedRunning()
-        self.assertEqual(False, grabberItem.running)
+        self.assertEqual(False, self.grabberItem.running)
 
-        scheduled = list(scheduler.scheduledTimes(grabberItem))
+        scheduled = list(self.scheduler.scheduledTimes(self.grabberItem))
         self.assertEqual(1, len(scheduled))
         self.assertTrue(scheduled[0] <= extime.Time())
 
@@ -401,26 +406,14 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
         due to inactivity, the controlling grabber's status is set to
         reflect this.
         """
-        siteStore = store.Store()
-        subStore = substore.SubStore.createNew(siteStore, ['grabber'])
-        userStore = subStore.open()
-        scheduler = iaxiom.IScheduler(userStore)
-
-        grabberItem = grabber.POP3Grabber(
-            store=userStore, username=u"alice", domain=u"example.com",
-            password=u"secret", running=True,
-            config=grabber.GrabberConfiguration(store=userStore))
-        grabberItem.scheduled = extime.Time()
-        scheduler.schedule(grabberItem, grabberItem.scheduled)
-
-        factory = grabber.POP3GrabberFactory(grabberItem, False)
+        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
         protocol = factory.buildProtocol(None)
         protocol.makeConnection(StringTransport())
         protocol.timeoutConnection()
         protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
 
         self.assertEqual(
-            grabberItem.status.message,
+            self.grabberItem.status.message,
             u"Timed out waiting for server response.")
 
 
