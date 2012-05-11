@@ -417,6 +417,37 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
             u"Timed out waiting for server response.")
 
 
+    def test_stoppedRunningAfterListTimeout(self):
+        """
+        When L{ControlledPOP3GrabberProtocol} times out the connection
+        due to inactivity while waiting for a response to a I{UIDL}
+        (list UIDs) command, the controlling grabber's status is set
+        to reflect this.
+        """
+        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
+        protocol = factory.buildProtocol(None)
+        protocol.allowInsecureLogin = True
+        protocol.makeConnection(StringTransport())
+        # Server greeting
+        protocol.dataReceived("+OK Hello\r\n") 
+        # CAPA response
+        protocol.dataReceived("+OK\r\nUSER\r\nUIDL\r\n.\r\n")
+        # USER response
+        protocol.dataReceived("+OK\r\n")
+        # PASS response
+        protocol.dataReceived("+OK\r\n")
+        # Sanity check, we should have gotten to sending the UIDL
+        self.assertTrue(
+            protocol.transport.value().endswith("\r\nUIDL\r\n"),
+            "Failed to get to UIDL: %r" % (protocol.transport.value(),))
+
+        protocol.timeoutConnection()
+        protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
+        self.assertEqual(
+            self.grabberItem.status.message,
+            u"Timed out waiting for server response.")
+
+
 
 class GrabberConfigurationTestCase(unittest.TestCase):
     """

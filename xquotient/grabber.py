@@ -594,7 +594,8 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
 
 
     def setStatus(self, msg, success=True):
-        self._transact(self.grabber.status.setStatus, msg, success)
+        if self.grabber is not None:
+            self._transact(self.grabber.status.setStatus, msg, success)
 
 
     def shouldRetrieve(self, uidList):
