@@ -393,7 +393,7 @@ class SpambayesFilter(item.Item):
             log.err()
             c = classifier.Classifier()
         self.classifier = c
-        self.guesser = hammie.Hammie(c)
+        self.guesser = hammie.Hammie(c, mode='w')
 
 
     # IHamFilter
@@ -432,7 +432,7 @@ class SpambayesFilter(item.Item):
         if p.exists():
             p.remove()
             self.classifier = classifier.Classifier()
-            self.guesser = hammie.Hammie(self.classifier)
+            self.guesser = hammie.Hammie(self.classifier, mode='w')
 
 
 item.declareLegacyItem(SpambayesFilter.typeName, 1, dict(
