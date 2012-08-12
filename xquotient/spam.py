@@ -638,6 +638,18 @@ item.declareLegacyItem(SpambayesFilter.typeName, 2, dict(
 def _sbFilter2to3(old):
     sbf = old.upgradeVersion(
         SpambayesFilter.typeName, 2, 3, filter=old.filter)
+    path = sbf.store.newFilePath('spambayes-%d-classifier.pickle' % (sbf.storeID,))
+    fObj = path.open()
+    try:
+        dataset = cPickle.load(fObj)
+    finally:
+        fObj.close()
+
+    words = dataset._wordinfokeys()
+    sbf.classifier._bulkwordinfoset(
+        ((word, dataset._wordinfoget(word)) for word in words))
+    sbf.classifier.nspam = dataset.nspam
+    sbf.classifier.nham = dataset.nham
     return sbf
 registerUpgrader(_sbFilter2to3, SpambayesFilter.typeName, 2, 3)
 
