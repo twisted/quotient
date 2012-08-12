@@ -2,6 +2,7 @@
 
 import cPickle, errno
 from decimal import Decimal
+import sqlite3
 
 from spambayes import hammie, classifier
 
@@ -362,38 +363,233 @@ def _dspamFilter1to2(old):
     return df
 registerUpgrader(_dspamFilter1to2, DSPAMFilter.typeName, 1, 2)
 
+class _SQLite3Classifier(object, classifier.Classifier):
+    """
+    A Spambayes classifier which implements training dataset persistence in a
+    SQLite3 database.
+
+    The dataset is persisted in a dedicated SQLite3 database rather than in the
+    user store because the database is currently accessed from multiple
+    processes.  A dedicated database will lead to fewer contention problems than
+    re-using the user store.
+
+    Axiom is not used for the training dataset database because of the
+    complicated, inflexible hooks supplied by the base
+    L{spambayes.classifier.Classifier}, which in particular make getting
+    transaction management difficult with Axiom.
+    """
+
+    SCHEMA = [
+        "CREATE TABLE bayes ("
+        "  word TEXT NOT NULL DEFAULT '',"
+        "  nspam INTEGER NOT NULL DEFAULT 0,"
+        "  nham INTEGER NOT NULL DEFAULT 0,"
+        "  PRIMARY KEY(word)"
+        ")",
+        "CREATE INDEX bayes_word ON bayes(word)",
+        "CREATE TABLE state ("
+        "  nspam INTEGER NOT NULL,"
+        "  nham INTEGER NOT NULL"
+        ")",
+        "INSERT INTO state (nspam, nham) VALUES (0, 0)",
+        ]
+
+    def nspam():
+        """
+        Define an C{nspam} property which reflects the number of messages
+        trained as spam, while also automatically persisting any changes to this
+        value (which the base class will make) to the database.
+        """
+        def get(self):
+            return self._nspam
+        def set(self, value):
+            self._nspam = value
+            self._recordState()
+        return get, set
+    nspam = property(*nspam())
+
+    def nham():
+        """
+        Define a C{nham} property which reflects the number of messages trained
+        as ham, while also automatically persisting any changes to this value
+        (which the base class will make) to the database.
+        """
+        def get(self):
+            return self._nham
+        def set(self, value):
+            self._nham = value
+            self._recordState()
+        return get, set
+    nham = property(*nham())
+
+    db = cursor = databaseName = None
+
+    def __init__(self, databaseName):
+        """
+        Initialize this classifier.
+
+        @param databaseName: The path to the SQLite3 database from which to load
+            and to which to store training data.
+        """
+        classifier.Classifier.__init__(self)
+        self.databaseName = databaseName
+        # Open the database, possibly initializing it if it has not yet been
+        # initialized, and then load the necessary global state from it (nspam,
+        # nham).
+        self.load()
+
+
+    def load(self):
+        """
+        Open the training dataset database, initializing it if necessary, and
+        loading necessary initial state from it.
+        """
+        self.db = sqlite3.connect(self.databaseName, isolation_level='IMMEDIATE')
+        self.cursor = self.db.cursor()
+        try:
+            for statement in self.SCHEMA:
+                self.cursor.execute(statement)
+        except sqlite3.OperationalError as e:
+            # Table already exists
+            self.db.rollback()
+        else:
+            self.db.commit()
+
+        self.cursor.execute('SELECT nspam, nham FROM state')
+        rows = self.cursor.fetchall()
+        self._nspam, self._nham = rows[0]
+
+
+    def close(self):
+        """
+        Close the training dataset database.
+        """
+        self.cursor.close()
+        self.db.close()
+        self.db = self.cursor = None
+
+
+    def _recordState(self):
+        """
+        Save nspam and nham, if the database has been opened (it will not have
+        been opened when this gets run from the nspam/nham property setters
+        invoked from Classifier.__init__, and that's just fine with us).
+        """
+        if self.cursor is not None:
+            self.cursor.execute('UPDATE state SET nspam=?, nham=?', (self._nspam, self._nham))
+
+
+    def _get_row(self, word):
+        """
+        Load the training data for the given word.
+
+        @param word: A word (or any other kind of token) to load information about.
+        @type word: C{str} or C{unicode} (but really, C{unicode} please)
+
+        @return: C{None} if there is no training data for the given word,
+            otherwise a two-sequence of the number of times the token has been
+            trained as spam and the number of times it has been trained as ham.
+        """
+        if isinstance(word, str):
+            word = word.decode('utf-8', 'replace')
+
+        self.cursor.execute(
+            "SELECT word, nspam, nham FROM bayes WHERE word=?", (word,))
+        rows = self.cursor.fetchall()
+        if rows:
+            return rows[0]
+        return None
+
+
+    def _set_row(self, word, nspam, nham):
+        """
+        Update the training data for a particular word.
+
+        @param word: A word (or any other kind of token) to store training
+            information about.
+        @type word: C{str} or C{unicode} (but really, C{unicode} please)
+
+        @param nspam: The number of times the token has been trained as spam.
+        @param nham: The number of times the token has been trained as ham.
+        """
+        if isinstance(word, str):
+            word = word.decode('utf-8', 'replace')
+        self.cursor.execute(
+            "INSERT OR REPLACE INTO bayes (word, nspam, nham) "
+            "VALUES (?, ?, ?)",
+            (word, nspam, nham))
+
+
+    def _delete_row(self, word):
+        """
+        Forget the training data for a particular word.
+
+        @param word: A word (or any other kind of token) to lose training
+            information about.
+        @type word: C{str} or C{unicode} (but really, C{unicode} please)
+        """
+        if isinstance(word, str):
+            word = word.decode('utf-8', 'replace')
+        self.cursor.execute("DELETE FROM bayes WHERE word=?", (word,))
+
+
+    def _post_training(self):
+        """
+        L{Classifier} hook invoked after all other steps of training a message
+        have been completed.  This is used to commit the currently active
+        transaction, which contains all of the database modifications for each
+        token in that message.
+        """
+        self.db.commit()
+
+
+    def _bulkwordinfoset(self, words):
+        self.cursor.executemany(
+            "INSERT OR REPLACE INTO bayes (word, nspam, nham) "
+            "VALUES (?, ?, ?)",
+            ((word.decode('utf-8', 'replace'), record.spamcount, record.hamcount)
+             for (word, record)
+             in words))
+        self.db.commit()
+
+
+    def _wordinfoset(self, word, record):
+        self._set_row(word, record.spamcount, record.hamcount)
+
+
+    def _wordinfoget(self, word):
+        row = self._get_row(word)
+        if row:
+            item = self.WordInfoClass()
+            item.__setstate__((row[1], row[2]))
+            return item
+        return None
+
+
+    def _wordinfodel(self, word):
+        self._delete_row(word)
+
+
+
 class SpambayesFilter(item.Item):
     """
     Spambayes-based L{iquotient.IHamFilter} powerup.
     """
     implements(iquotient.IHamFilter)
-    schemaVersion = 2
+    schemaVersion = 3
     classifier = attributes.inmemory()
     guesser = attributes.inmemory()
     filter = dependsOn(Filter)
 
     powerupInterfaces = (iquotient.IHamFilter,)
 
-
-
     def _classifierPath(self):
-        return self.store.newFilePath('spambayes-%d-classifier.pickle' % (self.storeID,))
+        return self.store.newFilePath('spambayes-%d-classifier.sqlite' % (self.storeID,))
 
 
     def activate(self):
-        try:
-            try:
-                c = cPickle.load(self._classifierPath().open())
-            except IOError, e:
-                if e.errno != errno.ENOENT:
-                    raise
-                c = classifier.Classifier()
-        except:
-            log.msg("Loading Spambayes trained state failed:")
-            log.err()
-            c = classifier.Classifier()
-        self.classifier = c
-        self.guesser = hammie.Hammie(c, mode='r')
+        self.classifier = _SQLite3Classifier(self._classifierPath().path)
+        self.guesser = hammie.Hammie(self.classifier, mode='r')
 
 
     # IHamFilter
@@ -418,21 +614,13 @@ class SpambayesFilter(item.Item):
             else:
                 if self.classify(item) > SPAM_THRESHHOLD:
                     break
-        self.classify(item)
-        p = self._classifierPath()
-        if not p.parent().exists():
-            p.parent().makedirs()
-        t = p.temporarySibling()
-        cPickle.dump(self.classifier, t.open())
-        t.moveTo(p)
 
 
     def forgetTraining(self):
         p = self._classifierPath()
         if p.exists():
             p.remove()
-            self.classifier = classifier.Classifier()
-            self.guesser = hammie.Hammie(self.classifier, mode='r')
+            self.activate()
 
 
 item.declareLegacyItem(SpambayesFilter.typeName, 1, dict(
@@ -443,6 +631,15 @@ def _sbFilter1to2(old):
                             filter=old.store.findOrCreate(Filter))
     return sbf
 registerUpgrader(_sbFilter1to2, SpambayesFilter.typeName, 1, 2)
+
+item.declareLegacyItem(SpambayesFilter.typeName, 2, dict(
+    filter=attributes.reference()))
+
+def _sbFilter2to3(old):
+    sbf = old.upgradeVersion(
+        SpambayesFilter.typeName, 2, 3, filter=old.filter)
+    return sbf
+registerUpgrader(_sbFilter2to3, SpambayesFilter.typeName, 2, 3)
 
 
 class SpambayesBenefactor(item.Item):
