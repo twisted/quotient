@@ -550,7 +550,6 @@ class _SQLite3Classifier(object, classifier.Classifier):
             ((word.decode('utf-8', 'replace'), record.spamcount, record.hamcount)
              for (word, record)
              in words))
-        self.db.commit()
 
 
     def _wordinfoset(self, word, record):
@@ -650,6 +649,7 @@ def _sbFilter2to3(old):
         ((word, dataset._wordinfoget(word)) for word in words))
     sbf.classifier.nspam = dataset.nspam
     sbf.classifier.nham = dataset.nham
+    sbf.classifier._post_training()
     return sbf
 registerUpgrader(_sbFilter2to3, SpambayesFilter.typeName, 2, 3)
 

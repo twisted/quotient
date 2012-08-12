@@ -15,15 +15,15 @@ class SpambayesFilterTestCase(SpambayesFilterTestCase):
         bayes = self.store.findUnique(SpambayesFilter)
         db = sqlite3.connect(bayes._classifierPath().path)
         cursor = db.cursor()
-        self.addCleanup(cursor.close)
         self.addCleanup(db.close)
+        self.addCleanup(cursor.close)
 
         cursor.execute('SELECT word, nham, nspam FROM bayes')
         expected = set(
-            [(word, 0, 1) for word in SPAM_A] +
-            [(word, 0, 1) for word in SPAM_B] +
+            [(word, 0, 10) for word in SPAM_A] +
+            [(word, 0, 10) for word in SPAM_B] +
             [(word, 1, 0) for word in HAM] +
-            [(AMBIGUOUS, 1, 1)])
+            [(AMBIGUOUS, 1, 10)])
         found = set(cursor.fetchall())
 
         # There may be extra tokens due to funny extra spambayes logic.  That's
@@ -34,4 +34,4 @@ class SpambayesFilterTestCase(SpambayesFilterTestCase):
         cursor.execute('SELECT nham, nspam FROM state')
         nham, nspam = cursor.fetchone()
         self.assertEqual(nham, 1)
-        self.assertEqual(nspam, 2)
+        self.assertEqual(nspam, 20)
