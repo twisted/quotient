@@ -3,7 +3,7 @@ from xquotient.spam import SpambayesFilter, Filter
 
 
 class SpambayesFilterTestCase(stubloader.StubbedTest):
-    def testUpgrade(self):
+    def test_upgradedFields(self):
         """
         Ensure upgraded fields refer to correct items.
         """
