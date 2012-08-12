@@ -638,7 +638,13 @@ def _sbFilter2to3(old):
     sbf = old.upgradeVersion(
         SpambayesFilter.typeName, 2, 3, filter=old.filter)
     path = sbf.store.newFilePath('spambayes-%d-classifier.pickle' % (sbf.storeID,))
-    fObj = path.open()
+    try:
+        fObj = path.open()
+    except IOError, e:
+        if e.errno != errno.ENOENT:
+            raise
+        else:
+            return sbf
     try:
         dataset = cPickle.load(fObj)
     finally:
