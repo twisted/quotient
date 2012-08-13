@@ -369,9 +369,9 @@ class _SQLite3Classifier(object, classifier.Classifier):
     SQLite3 database.
 
     The dataset is persisted in a dedicated SQLite3 database rather than in the
-    user store because the database is currently accessed from multiple
-    processes.  A dedicated database will lead to fewer contention problems than
-    re-using the user store.
+    user store because the data is accessed from the batch process.  A dedicated
+    database will lead to fewer contention problems than re-using the user
+    store.
 
     Axiom is not used for the training dataset database because of the
     complicated, inflexible hooks supplied by the base
