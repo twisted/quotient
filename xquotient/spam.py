@@ -650,7 +650,11 @@ registerUpgrader(_sbFilter1to2, SpambayesFilter.typeName, 1, 2)
 item.declareLegacyItem(SpambayesFilter.typeName, 2, dict(
     filter=attributes.reference()))
 
+
 def _sbFilter2to3(old):
+    """
+    Convert the pickled spambayes data to a SQLite3 database of the same data.
+    """
     sbf = old.upgradeVersion(
         SpambayesFilter.typeName, 2, 3, filter=old.filter)
     path = sbf.store.newFilePath('spambayes-%d-classifier.pickle' % (sbf.storeID,))
