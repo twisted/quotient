@@ -479,7 +479,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
             self.cursor.execute('UPDATE state SET nspam=?, nham=?', (self._nspam, self._nham))
 
 
-    def _get_row(self, word):
+    def _get(self, word):
         """
         Load the training data for the given word.
 
@@ -501,7 +501,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
         return None
 
 
-    def _set_row(self, word, nspam, nham):
+    def _set(self, word, nspam, nham):
         """
         Update the training data for a particular word.
 
@@ -520,7 +520,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
             (word, nspam, nham))
 
 
-    def _delete_row(self, word):
+    def _delete(self, word):
         """
         Forget the training data for a particular word.
 
@@ -544,6 +544,10 @@ class _SQLite3Classifier(object, classifier.Classifier):
 
 
     def _bulkwordinfoset(self, words):
+        """
+        Upgrade helper for recording spam and ham information for many words at
+        once.
+        """
         self.cursor.executemany(
             "INSERT OR REPLACE INTO bayes (word, nspam, nham) "
             "VALUES (?, ?, ?)",
@@ -553,11 +557,19 @@ class _SQLite3Classifier(object, classifier.Classifier):
 
 
     def _wordinfoset(self, word, record):
-        self._set_row(word, record.spamcount, record.hamcount)
+        """
+        L{Classifier} hook invoked to record a changed spam and ham data for a
+        single word.
+        """
+        self._set(word, record.spamcount, record.hamcount)
 
 
     def _wordinfoget(self, word):
-        row = self._get_row(word)
+        """
+        L{Classifier} hook invoked to retrieve persisted spam and ham data for a
+        single word.
+        """
+        row = self._get(word)
         if row:
             item = self.WordInfoClass()
             item.__setstate__((row[1], row[2]))
@@ -566,7 +578,11 @@ class _SQLite3Classifier(object, classifier.Classifier):
 
 
     def _wordinfodel(self, word):
-        self._delete_row(word)
+        """
+        L{Classifier} hook invoked to discard the persisted spam and ham data
+        for a single word.
+        """
+        self._delete(word)
 
 
 
