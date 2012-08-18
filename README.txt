@@ -15,7 +15,7 @@ the near future.  Watch http://divmod.org/ for an announcement!)
 Dependencies
 ------------
 
-Quotient is an offering for Divmod Mantissa. It depends on SpamBayes 1.0 and
+Quotient is an offering for Divmod Mantissa. It depends on SpamBayes 1.1a6 and
 Divmod Mantissa. See DEPS.txt in the Mantissa release for more information on
 Mantissa dependencies.
 
