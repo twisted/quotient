@@ -377,6 +377,11 @@ class _SQLite3Classifier(object, classifier.Classifier):
     complicated, inflexible hooks supplied by the base
     L{spambayes.classifier.Classifier}, which in particular make getting
     transaction management difficult with Axiom.
+
+    @cvar SCHEMA: A C{list} of C{str} giving the schema initialization
+        statements.  These are executed any time the classifier database is
+        opened, with the expected failure which occurs any time the schema has
+        already been initialized handled and disregarded.
     """
 
     SCHEMA = [
@@ -395,31 +400,31 @@ class _SQLite3Classifier(object, classifier.Classifier):
         ]
 
     def nspam():
-        """
-        Define an C{nspam} property which reflects the number of messages
-        trained as spam, while also automatically persisting any changes to this
-        value (which the base class will make) to the database.
+        doc = """
+        A property which reflects the number of messages trained as spam, while
+        also automatically persisting any changes to this value (which the base
+        class will make) to the database.
         """
         def get(self):
             return self._nspam
         def set(self, value):
             self._nspam = value
             self._recordState()
-        return get, set
+        return get, set, None, doc
     nspam = property(*nspam())
 
     def nham():
-        """
-        Define a C{nham} property which reflects the number of messages trained
-        as ham, while also automatically persisting any changes to this value
-        (which the base class will make) to the database.
+        doc = """
+        A property which reflects the number of messages trained as ham, while
+        also automatically persisting any changes to this value (which the base
+        class will make) to the database.
         """
         def get(self):
             return self._nham
         def set(self, value):
             self._nham = value
             self._recordState()
-        return get, set
+        return get, set, None, doc
     nham = property(*nham())
 
     db = cursor = databaseName = None
