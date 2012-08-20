@@ -108,7 +108,7 @@ class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
         items it processes.
         """
         self.store.transact(self.f.processItem, self._message())
-        # XXX And the actual test here would be ... ?
+        # XXX And the actual test here would be ... ?  lp:#1039197
 
 
     def test_messageTraining(self):
@@ -119,7 +119,7 @@ class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
         m = self._message()
         self.df.classify(m)
         self.df.train(True, m)
-        # XXX Really, unit tests should make _some_ assertions.
+        # XXX Really, unit tests should make _some_ assertions.  lp:#1039197
 
 
     def test_messageRetraining(self):
@@ -129,4 +129,4 @@ class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
         self.test_messageTraining()
         self.df.forgetTraining()
         # XXX The docstring is a total lie, there is no actual testing going on
-        # here.
+        # here.  lp:#1039197
