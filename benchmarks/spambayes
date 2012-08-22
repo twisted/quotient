@@ -1,0 +1,44 @@
+#!/usr/bin/python
+
+# Benchmark of Quotient spambayes filter, both training and classification.
+
+import sys, tempfile, random, time
+
+from xquotient.spam import _SQLite3Classifier
+
+words = list(open('/usr/share/dict/words', 'r'))
+
+TRAINING_FACTOR = 50
+MESSAGE_FACTOR = 500
+
+def adj(duration):
+   return duration / (TRAINING_FACTOR * MESSAGE_FACTOR) * 1000.0
+
+
+def main(argv):
+   prng = random.Random()
+   prng.seed(12345)
+   prng.shuffle(words)
+
+   classifier = _SQLite3Classifier(tempfile.mktemp())
+
+   before = time.time()
+   for i in range(TRAINING_FACTOR):
+      classifier.learn(words[i:i + MESSAGE_FACTOR], True)
+
+   for i in range(TRAINING_FACTOR, TRAINING_FACTOR * 2):
+      classifier.learn(words[i:i + MESSAGE_FACTOR], False)
+   after = time.time()
+
+   print 'Learning: %.2f ms/word' % (adj(after - before),)
+
+   before = time.time()
+   for i in range(TRAINING_FACTOR * 2):
+      classifier.spamprob(words[i:i + MESSAGE_FACTOR])
+   after = time.time()
+
+   print 'Guessing: %.2f ms/word' % (adj(after - before),)
+
+
+if __name__ == '__main__':
+   main(sys.argv)
