@@ -438,6 +438,8 @@ class _SQLite3Classifier(object, classifier.Classifier):
         """
         classifier.Classifier.__init__(self)
         self.databaseName = databaseName
+        self._wordinfocache = {}
+
         # Open the database, possibly initializing it if it has not yet been
         # initialized, and then load the necessary global state from it (nspam,
         # nham).
@@ -484,6 +486,47 @@ class _SQLite3Classifier(object, classifier.Classifier):
             self.cursor.execute('UPDATE state SET nspam=?, nham=?', (self._nspam, self._nham))
 
 
+    def _getclues(self, wordstream):
+        """
+        Hook into the classification process to speed it up.
+
+        See the base implementation for details about what C{_getclues} is
+        supposed to do.  This implementation extends the base to look into
+        wordstream and load all the necessary information with the minimum
+        amount of SQLite3 work, then calls up to the base implementation to let
+        it do the actual classification-related work.
+
+        @param wordstream: An iterable (probably a generator) of tokens from the
+            document to be classified.
+        """
+        # Make sure we can consume it and give it to the base implementation for
+        # consumption.
+        wordstream = list(wordstream)
+
+        # Find all the tokens we don't have in memory already
+        missing = []
+        for word in wordstream:
+            if isinstance(word, str):
+                word = word.decode('utf-8', 'replace')
+            if word not in self._wordinfocache:
+                missing.append(word)
+
+        # Load their state
+        self.cursor.execute(
+            "SELECT word, nspam, nham FROM bayes WHERE word IN (%s)" % (
+                ", ".join("?" * len(missing))),
+            missing)
+        rows = self.cursor.fetchall()
+
+        # Save them for later
+        for row in rows:
+            self._wordinfocache[row[0]] = row
+
+        # Let the base class do its thing, which will involve asking us about
+        # that state we just cached.
+        return classifier.Classifier._getclues(self, wordstream)
+
+
     def _get(self, word):
         """
         Load the training data for the given word.
@@ -498,12 +541,22 @@ class _SQLite3Classifier(object, classifier.Classifier):
         if isinstance(word, str):
             word = word.decode('utf-8', 'replace')
 
-        self.cursor.execute(
-            "SELECT word, nspam, nham FROM bayes WHERE word=?", (word,))
-        rows = self.cursor.fetchall()
-        if rows:
-            return rows[0]
-        return None
+        try:
+            # Check to see if we already have this word's info in memory.
+            row = self._wordinfocache[word]
+        except KeyError:
+            # If not, load it from the database.
+            self.cursor.execute(
+                "SELECT word, nspam, nham FROM bayes WHERE word=?", (word,))
+            rows = self.cursor.fetchall()
+            if rows:
+                # Add it to the cache and return it.
+                self._wordinfocache[rows[0][0]] = rows[0]
+                return rows[0]
+            return None
+        else:
+            # Otherwise return what we knew already.
+            return row
 
 
     def _set(self, word, nspam, nham):
