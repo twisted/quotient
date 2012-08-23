@@ -42,6 +42,54 @@ class SQLite3ClassifierTests(unittest.TestCase):
         self.assertEqual(bayes.nspam, 1)
 
 
+    def test_spamTokenRecorded(self):
+        """
+        The first time a token is encountered during spam training, a row is
+        inserted into the database counting it as once a spam token, never a ham
+        token.
+        """
+        self.classifier.train(StringIO("spam bad gross"), True)
+        bayes = spam._SQLite3Classifier(self.path)
+        wordInfo = bayes._get(u"spam")
+        self.assertEqual((u"spam", 1, 0), wordInfo)
+
+
+    def test_hamTokenRecorded(self):
+        """
+        The first time a token is encountered during ham training, a row is
+        inserted into the database counting it as never a spam token, once a ham
+        token.
+        """
+        self.classifier.train(StringIO("justice sunshine puppies"), False)
+        bayes = spam._SQLite3Classifier(self.path)
+        wordInfo = bayes._get(u"sunshine")
+        self.assertEqual((u"sunshine", 0, 1), wordInfo)
+
+
+    def test_spamTokenIncremented(self):
+        """
+        Encountered on a subsequent spam training operation, an existing word
+        info row has its spam count incremented and its ham count left alone.
+        """
+        self.classifier.train(StringIO("justice sunshine puppies"), False)
+        self.classifier.train(StringIO("spam bad puppies"), True)
+        bayes = spam._SQLite3Classifier(self.path)
+        wordInfo = bayes._get(u"puppies")
+        self.assertEqual((u"puppies", 1, 1), wordInfo)
+
+
+    def test_hamTokenIncremented(self):
+        """
+        Encountered on a subsequent ham training operation, an existing word
+        info row has its spam count left alone and its ham count incremented.
+        """
+        self.classifier.train(StringIO("spam bad puppies"), True)
+        self.classifier.train(StringIO("justice sunshine puppies"), False)
+        bayes = spam._SQLite3Classifier(self.path)
+        wordInfo = bayes._get(u"puppies")
+        self.assertEqual((u"puppies", 1, 1), wordInfo)
+
+
     def test_nham(self):
         """
         L{SQLite3Classifier} tracks, in memory, the number of ham messages it
@@ -71,6 +119,17 @@ class SQLite3ClassifierTests(unittest.TestCase):
             self.classifier.score(StringIO("spamfulness words of spam")) > 0.99)
 
 
+    def test_spamClassificationWithoutCache(self):
+        """
+        Like L{test_spamClassification}, but ensure no instance cache is used to
+        satisfied word info lookups.
+        """
+        self.classifier.train(StringIO("spam words of spamfulness"), True)
+        classifier = Hammie(spam._SQLite3Classifier(self.path), mode='r')
+        self.assertTrue(
+            classifier.score(StringIO("spamfulness words of spam")) > 0.99)
+
+
     def test_hamClassification(self):
         """
         L{SQLite3Classifier} can be trained with a ham message so as to later
@@ -79,6 +138,17 @@ class SQLite3ClassifierTests(unittest.TestCase):
         self.classifier.train(StringIO("very nice words"), False)
         self.assertTrue(
             self.classifier.score(StringIO("words, very nice")) < 0.01)
+
+
+    def test_hamClassificationWithoutCache(self):
+        """
+        Like L{test_spamClassification}, but ensure no instance cache is used to
+        satisfied word info lookups.
+        """
+        self.classifier.train(StringIO("very nice words"), False)
+        classifier = Hammie(spam._SQLite3Classifier(self.path), mode='r')
+        self.assertTrue(
+            classifier.score(StringIO("words, very nice")) < 0.01)
 
 
 
