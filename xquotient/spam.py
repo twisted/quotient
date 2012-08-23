@@ -382,6 +382,21 @@ class _SQLite3Classifier(object, classifier.Classifier):
         statements.  These are executed any time the classifier database is
         opened, with the expected failure which occurs any time the schema has
         already been initialized handled and disregarded.
+
+    @ivar _readCache: Word information that is already known, either because it
+        has already been read from the database once or because we wrote the
+        information to the database.  Keys are unicode tokens, values are
+        three-sequences of token, nspam, and nham counts.  This is used to hold
+        word info between two different Spambayes hooks, C{_getclues} and
+        C{_wordinfoget}.  The former has access to all tokens in a particular
+        document, the latter is a potato-programming mistake.  Loading all of
+        the values at once in C{_getclues} is a big performance win.
+
+    @ivar _writeCache: Word information that is on its way to the database due
+        to training.  This has the same shape as C{_readCache}.  Word info is
+        held here until training on one document is complete, then all the word
+        info is dumped into the database in a single SQL operation (via
+        I{executemany}).
     """
 
     SCHEMA = [
@@ -413,6 +428,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
         return get, set, None, doc
     nspam = property(*nspam())
 
+
     def nham():
         doc = """
         A property which reflects the number of messages trained as ham, while
@@ -438,7 +454,8 @@ class _SQLite3Classifier(object, classifier.Classifier):
         """
         classifier.Classifier.__init__(self)
         self.databaseName = databaseName
-        self._wordinfocache = {}
+        self._readCache = {}
+        self._writeCache = {}
 
         # Open the database, possibly initializing it if it has not yet been
         # initialized, and then load the necessary global state from it (nspam,
@@ -508,7 +525,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
         for word in wordstream:
             if isinstance(word, str):
                 word = word.decode('utf-8', 'replace')
-            if word not in self._wordinfocache:
+            if word not in self._readCache:
                 missing.append(word)
 
         # Load their state
@@ -520,7 +537,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
 
         # Save them for later
         for row in rows:
-            self._wordinfocache[row[0]] = row
+            self._readCache[row[0]] = row
 
         # Let the base class do its thing, which will involve asking us about
         # that state we just cached.
@@ -540,10 +557,9 @@ class _SQLite3Classifier(object, classifier.Classifier):
         """
         if isinstance(word, str):
             word = word.decode('utf-8', 'replace')
-
         try:
             # Check to see if we already have this word's info in memory.
-            row = self._wordinfocache[word]
+            row = self._readCache[word]
         except KeyError:
             # If not, load it from the database.
             self.cursor.execute(
@@ -551,7 +567,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
             rows = self.cursor.fetchall()
             if rows:
                 # Add it to the cache and return it.
-                self._wordinfocache[rows[0][0]] = rows[0]
+                self._readCache[rows[0][0]] = rows[0]
                 return rows[0]
             return None
         else:
@@ -572,10 +588,7 @@ class _SQLite3Classifier(object, classifier.Classifier):
         """
         if isinstance(word, str):
             word = word.decode('utf-8', 'replace')
-        self.cursor.execute(
-            "INSERT OR REPLACE INTO bayes (word, nspam, nham) "
-            "VALUES (?, ?, ?)",
-            (word, nspam, nham))
+        self._readCache[word] = self._writeCache[word] = (word, nspam, nham)
 
 
     def _delete(self, word):
@@ -585,10 +598,12 @@ class _SQLite3Classifier(object, classifier.Classifier):
         @param word: A word (or any other kind of token) to lose training
             information about.
         @type word: C{str} or C{unicode} (but really, C{unicode} please)
+
+        @raise NotImplementedError: Deletion is not actually supported in this
+            backend.  Fortunately, Quotient does not need it (it never calls
+            C{unlearn}).
         """
-        if isinstance(word, str):
-            word = word.decode('utf-8', 'replace')
-        self.cursor.execute("DELETE FROM bayes WHERE word=?", (word,))
+        raise NotImplementedError("There is no support for deletion.")
 
 
     def _post_training(self):
@@ -598,6 +613,11 @@ class _SQLite3Classifier(object, classifier.Classifier):
         transaction, which contains all of the database modifications for each
         token in that message.
         """
+        writes = self._writeCache.itervalues()
+        self._writeCache = {}
+        self.cursor.executemany(
+            "INSERT OR REPLACE INTO bayes (word, nspam, nham) "
+            "VALUES (?, ?, ?)", writes)
         self.db.commit()
 
 
