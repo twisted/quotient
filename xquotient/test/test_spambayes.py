@@ -152,6 +152,23 @@ class SQLite3ClassifierTests(unittest.TestCase):
 
 
 
+    def test_largeDocumentClassification(self):
+        """
+        A document with more than 999 tokens can be successfully classified.
+        """
+        words = []
+        for i in range(1000):
+            word = "word%d" % (i,)
+            words.append(word)
+        document = " ".join(words)
+        self.classifier.train(StringIO(document), False)
+
+        classifier = Hammie(spam._SQLite3Classifier(self.path), mode='r')
+        self.assertTrue(
+            classifier.score(StringIO(document)) < 0.01)
+
+
+
 class SpambayesFilterTestCase(unittest.TestCase, MessageCreationMixin):
     """
     Tests for L{xquotient.spam.SpambayesFilter}.

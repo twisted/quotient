@@ -529,15 +529,19 @@ class _SQLite3Classifier(object, classifier.Classifier):
                 missing.append(word)
 
         # Load their state
-        self.cursor.execute(
-            "SELECT word, nspam, nham FROM bayes WHERE word IN (%s)" % (
-                ", ".join("?" * len(missing))),
-            missing)
-        rows = self.cursor.fetchall()
+        while missing:
+            # SQLite3 allows a maximum of 999 variables.
+            load = missing[:999]
+            del missing[:999]
+            self.cursor.execute(
+                "SELECT word, nspam, nham FROM bayes WHERE word IN (%s)" % (
+                    ", ".join("?" * len(load))),
+                load)
+            rows = self.cursor.fetchall()
 
-        # Save them for later
-        for row in rows:
-            self._readCache[row[0]] = row
+            # Save them for later
+            for row in rows:
+                self._readCache[row[0]] = row
 
         # Let the base class do its thing, which will involve asking us about
         # that state we just cached.
