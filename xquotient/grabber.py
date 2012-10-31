@@ -183,6 +183,14 @@ class POP3UID(item.Item):
     """, indexed=True, default=False)
 
 
+def _pop3uid1to2(old):
+    return old.upgradeVersion(
+        POP3UID.typeName, 1, 2,
+        value=old.value, failed=old.failed, grabberID=old.grabberID,
+        retrieved=extime.Time())
+registerUpgrader(_pop3uid1to2, POP3UID.typeName, 1, 2)
+
+
 
 class POP3Grabber(item.Item):
     """
