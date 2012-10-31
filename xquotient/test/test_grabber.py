@@ -490,7 +490,8 @@ class PersistentControllerTestCase(unittest.TestCase):
         for i in xrange(100, 200):
             grabber.POP3UID(store=self.store,
                             grabberID=self.grabber.grabberID,
-                            value=str(i))
+                            value=str(i),
+                            retrieved=extime.Time())
 
 
     def testShouldRetrieve(self):
@@ -539,6 +540,35 @@ class PersistentControllerTestCase(unittest.TestCase):
             self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
                                          (51, '51')]),
             [(49, '49'), (51, '51')])
+
+
+
+    def test_successTimestamp(self):
+        """
+        The L{POP3UID} instance created by L{POP3Grabber.markSuccess} has its
+        C{retrieved} attribute set to the current time as reported by
+        L{POP3Grabber.now}.
+        """
+        now = extime.Time()
+        self.grabber.now = lambda: now
+        self.grabber.markSuccess(b'123abc', StubMessage())
+        [pop3uid] = list(self.store.query(
+                grabber.POP3UID, grabber.POP3UID.value == b'123abc'))
+        self.assertEqual(now, pop3uid.retrieved)
+
+
+    def test_failureTimestamp(self):
+        """
+        The L{POP3UID} instance created by L{POP3Grabber.markFailure} has its
+        C{retrieved} attribute set to the current time as reported by
+        L{POP3Grabber.now}.
+        """
+        now = extime.Time()
+        self.grabber.now = lambda: now
+        self.grabber.markFailure(b'123abc', object())
+        [pop3uid] = list(self.store.query(
+                grabber.POP3UID, grabber.POP3UID.value == b'123abc'))
+        self.assertEqual(now, pop3uid.retrieved)
 
 
     def test_delete(self):

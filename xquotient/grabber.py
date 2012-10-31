@@ -165,8 +165,8 @@ class POP3UID(item.Item):
 
     # TODO index this one probably
     retrieved = attributes.timestamp(doc="""
-    When this POP3 UID was retrieved (or when retrieval of it failed).
-    """)
+    When this POP3 UID was retrieved (or when retrieval failed).
+    """, allowNone=False)
 
     grabberID = attributes.text(doc="""
     A string identifying the email-address/port parts of a
@@ -359,7 +359,10 @@ class POP3Grabber(item.Item):
         downloaded long enough ago that they can be deleted now.
         """
         # Limit to POP3UIDs which were retrieved at least DELETE_DELAY ago.
-        where = POP3UID.retrieved < self.now() - self.DELETE_DELAY
+        # Failed attempts do not count.
+        where = attributes.AND(
+            POP3UID.retrieved < self.now() - self.DELETE_DELAY,
+            POP3UID.failed == False)
 
         # Here are the server-side POP3 UIDs which we have downloaded and which
         # are old enough, so we should delete them.
@@ -415,13 +418,22 @@ class POP3Grabber(item.Item):
             msg.archive()
         log.msg(interface=iaxiom.IStatEvent, stat_messages_grabbed=1,
                 userstore=self.store)
-        POP3UID(store=self.store, grabberID=self.grabberID, value=uid)
+        POP3UID(
+            store=self.store,
+            grabberID=self.grabberID,
+            value=uid,
+            retrieved=self.now())
         if self._pop3uids is not None:
             self._pop3uids.add(uid)
 
 
     def markFailure(self, uid, err):
-        POP3UID(store=self.store, grabberID=self.grabberID, value=uid, failed=True)
+        POP3UID(
+            store=self.store,
+            grabberID=self.grabberID,
+            value=uid,
+            retrieved=self.now(),
+            failed=True)
         if self._pop3uids is not None:
             self._pop3uids.add(uid)
 
