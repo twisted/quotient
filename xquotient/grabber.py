@@ -360,6 +360,8 @@ class POP3Grabber(item.Item):
         """
         # Limit to POP3UIDs which were retrieved at least DELETE_DELAY ago.
         # Failed attempts do not count.
+
+        # XXX Add a grabberID term here
         where = attributes.AND(
             POP3UID.retrieved < self.now() - self.DELETE_DELAY,
             POP3UID.failed == False)
@@ -436,6 +438,11 @@ class POP3Grabber(item.Item):
             failed=True)
         if self._pop3uids is not None:
             self._pop3uids.add(uid)
+
+
+    def markDeleted(self, uid):
+        # XXX Add a grabberID term here
+        self.store.query(POP3UID, POP3UID.value == uid).deleteFromStore()
 
 
 
@@ -617,6 +624,8 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
             d = defer.waitForDeferred(self.delete(index))
             yield d
             d.getResult()
+
+            self.markDeleted(uid)
 
         self.setStatus(u"Logging out...")
         d = defer.waitForDeferred(self.quit())

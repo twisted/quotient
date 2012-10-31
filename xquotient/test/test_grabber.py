@@ -90,6 +90,10 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
         self.events.append(('failure', uid, reason))
 
 
+    def markDeleted(self, uid):
+        self.events.append(('markDeleted', uid))
+
+
     def paused(self):
         self.events.append(('paused',))
         return False
@@ -277,8 +281,12 @@ class POP3GrabberProtocolTestCase(unittest.TestCase):
             [event for event in self.client.events if event[0] == 'delete'])
         self.assertEqual("DELE 3\r\n", transport.value())
 
+        del self.client.events[:]
+
         # DELE response
         self.client.dataReceived("+OK\r\n")
+
+        self.assertEquals(('markDeleted', 'xyz'), self.client.events[0])
 
 
     def testLineTooLong(self):
@@ -719,3 +727,16 @@ class PersistentControllerTestCase(unittest.TestCase):
         """
         self.assertTrue(extime.Time() <= self.grabber.now())
         self.assertTrue(self.grabber.now() <= extime.Time())
+
+
+    def test_markDeleted(self):
+        """
+        L{POP3Grabber.markDeleted} deletes the L{POP3UID} corresponding to the
+        message UID passed in.
+        """
+        uid = b'abcdef'
+        self.grabber.markSuccess(uid, StubMessage())
+        self.grabber.markDeleted(uid)
+        persistentUIDs = list(self.store.query(
+                grabber.POP3UID, grabber.POP3UID.value == uid))
+        self.assertEqual([], persistentUIDs)
