@@ -190,6 +190,10 @@ def _pop3uid1to2(old):
         retrieved=extime.Time())
 registerUpgrader(_pop3uid1to2, POP3UID.typeName, 1, 2)
 
+POP3UIDv1 = item.declareLegacyItem(POP3UID.typeName, 1, dict(
+        grabberID=attributes.text(indexed=True),
+        value=attributes.bytes(indexed=True),
+        failed=attributes.boolean(indexed=True, default=False)))
 
 
 class POP3Grabber(item.Item):
@@ -309,6 +313,14 @@ class POP3Grabber(item.Item):
         # Don't run concurrently, ever.
         if self.running:
             return
+
+        # Don't run while POP3UIDs are being upgraded.  Any that have not yet
+        # been upgraded won't be returned from query(POP3UID) calls, which will
+        # confuse the logic about which messages to download.  Eventually
+        # they'll all be upgraded and we'll resume grabbing.
+        if self.store.query(POP3UIDv1).count():
+            return
+
         self.running = True
 
         from twisted.internet import reactor

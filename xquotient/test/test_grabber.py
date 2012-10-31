@@ -535,6 +535,21 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
                 (b"+OK\r\n1 abc\r\n.\r\n", b"DELE 1\r\n")])
 
 
+    def test_notGrabWhileUpgrading(self):
+        """
+        As long as any old (schemaVersion less than most recent) L{POP3UID}
+        items remain in the database, L{POP3Grabber.grab} does not try to grab
+        any messages.
+        """
+        grabber.POP3UIDv1(
+            store=self.userStore,
+            grabberID=self.grabberItem.grabberID,
+            failed=False,
+            value=b'xyz')
+        self.grabberItem.grab()
+        self.assertFalse(self.grabberItem.running)
+
+
 
 class GrabberConfigurationTestCase(unittest.TestCase):
     """
