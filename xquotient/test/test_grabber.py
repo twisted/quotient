@@ -782,3 +782,20 @@ class PersistentControllerTestCase(unittest.TestCase):
         persistentUIDs = list(self.store.query(
                 grabber.POP3UID, grabber.POP3UID.value == uid))
         self.assertEqual([], persistentUIDs)
+
+
+    def test_markDeletedOtherGrabber(self):
+        """
+        L{POP3Grabber.markDeleted} does not delete a L{POP3UID} with a matching
+        message UID but which belongs to a different grabber.
+        """
+        uid = b'abcdef'
+        pop3uid = grabber.POP3UID(
+            store=self.store,
+            grabberID=u'bob@example.org:default',
+            value=uid,
+            retrieved=extime.Time())
+        self.grabber.markDeleted(uid)
+        persistentUIDs = list(self.store.query(
+                grabber.POP3UID, grabber.POP3UID.value == uid))
+        self.assertEqual([pop3uid], persistentUIDs)

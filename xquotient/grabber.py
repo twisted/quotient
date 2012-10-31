@@ -441,8 +441,10 @@ class POP3Grabber(item.Item):
 
 
     def markDeleted(self, uid):
-        # XXX Add a grabberID term here
-        self.store.query(POP3UID, POP3UID.value == uid).deleteFromStore()
+        where = attributes.AND(
+            POP3UID.value == uid, POP3UID.grabberID == self.grabberID)
+        query = self.store.query(POP3UID, where)
+        query.deleteFromStore()
 
 
 
