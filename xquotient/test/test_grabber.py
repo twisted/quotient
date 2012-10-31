@@ -460,21 +460,38 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
         self.assertTrue(scheduled[0] <= extime.Time())
 
 
+    def _timeoutTest(self, exchange):
+        """
+        Exercise handling of a connection timeout at some phase of the
+        interaction.
+        """
+        transport = StringTransport()
+        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
+        protocol = factory.buildProtocol(None)
+        protocol.allowInsecureLogin = True
+        protocol.makeConnection(transport)
+
+        for (serverMessage, clientMessage) in exchange:
+            protocol.dataReceived(serverMessage)
+            self.assertEqual(clientMessage, transport.value())
+            transport.clear()
+
+        protocol.timeoutConnection()
+        self.assertTrue(transport.disconnecting)
+        protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
+
+        self.assertEqual(
+            self.grabberItem.status.message,
+            u"Timed out waiting for server response.")
+
+
     def test_stoppedRunningAfterTimeout(self):
         """
         When L{ControlledPOP3GrabberProtocol} times out the connection
         due to inactivity, the controlling grabber's status is set to
         reflect this.
         """
-        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
-        protocol = factory.buildProtocol(None)
-        protocol.makeConnection(StringTransport())
-        protocol.timeoutConnection()
-        protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
-
-        self.assertEqual(
-            self.grabberItem.status.message,
-            u"Timed out waiting for server response.")
+        self._timeoutTest([])
 
 
     def test_stoppedRunningAfterListTimeout(self):
@@ -484,28 +501,38 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
         (list UIDs) command, the controlling grabber's status is set
         to reflect this.
         """
-        factory = grabber.POP3GrabberFactory(self.grabberItem, False)
-        protocol = factory.buildProtocol(None)
-        protocol.allowInsecureLogin = True
-        protocol.makeConnection(StringTransport())
-        # Server greeting
-        protocol.dataReceived("+OK Hello\r\n")
-        # CAPA response
-        protocol.dataReceived("+OK\r\nUSER\r\nUIDL\r\n.\r\n")
-        # USER response
-        protocol.dataReceived("+OK\r\n")
-        # PASS response
-        protocol.dataReceived("+OK\r\n")
-        # Sanity check, we should have gotten to sending the UIDL
-        self.assertTrue(
-            protocol.transport.value().endswith("\r\nUIDL\r\n"),
-            "Failed to get to UIDL: %r" % (protocol.transport.value(),))
+        self._timeoutTest([
+                # Server greeting
+                (b"+OK Hello\r\n", b"CAPA\r\n"),
+                # CAPA response
+                (b"+OK\r\nUSER\r\nUIDL\r\n.\r\n", b"USER alice\r\n"),
+                # USER response
+                (b"+OK\r\n", b"PASS secret\r\n"),
+                # PASS response
+                (b"+OK\r\n", b"UIDL\r\n")])
 
-        protocol.timeoutConnection()
-        protocol.connectionLost(Failure(error.ConnectionLost("Simulated")))
-        self.assertEqual(
-            self.grabberItem.status.message,
-            u"Timed out waiting for server response.")
+
+    def test_stoppedRunningAfterDeleteTimeout(self):
+        # Set up some good state to want to delete
+        uid = b'abc'
+        delay = self.grabberItem.DELETE_DELAY
+        future = extime.Time()
+        now = future - delay - timedelta(seconds=1)
+        self.grabberItem.now = lambda: now
+        self.grabberItem.markSuccess(uid, StubMessage())
+        now = future
+
+        self._timeoutTest([
+                # Server greeting
+                (b"+OK Hello\r\n", b"CAPA\r\n"),
+                # CAPA response
+                (b"+OK\r\nUSER\r\nUIDL\r\n.\r\n", b"USER alice\r\n"),
+                # USER response
+                (b"+OK\r\n", b"PASS secret\r\n"),
+                # PASS response
+                (b"+OK\r\n", b"UIDL\r\n"),
+                # UIDL response
+                (b"+OK\r\n1 abc\r\n.\r\n", b"DELE 1\r\n")])
 
 
 

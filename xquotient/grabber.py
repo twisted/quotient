@@ -623,7 +623,10 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         for (index, uid) in uidDeleteList:
             d = defer.waitForDeferred(self.delete(index))
             yield d
-            d.getResult()
+            try:
+                d.getResult()
+            except (error.ConnectionDone, error.ConnectionLost):
+                return
 
             self.markDeleted(uid)
 
@@ -673,6 +676,11 @@ class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
     def shouldRetrieve(self, uidList):
         if self.grabber is not None:
             return self._transact(self.grabber.shouldRetrieve, uidList)
+
+
+    def shouldDelete(self, uidList):
+        # XXX None check and transact
+        return self.grabber.shouldDelete(uidList)
 
 
     def createMIMEReceiver(self, source):
