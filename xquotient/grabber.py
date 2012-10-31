@@ -345,18 +345,10 @@ class POP3Grabber(item.Item):
     grabberID = property(_grabberID)
 
 
-    def shouldDelete(self, uidList):
+    def _getPOP3UIDs(self):
         """
-        Return a list of (index, uid) pairs from C{uidList} which were
-        downloaded long enough ago that they can be deleted now.
-        """
-        return uidList
-
-
-    def shouldRetrieve(self, uidList):
-        """
-        Return a list of (index, uid) pairs from C{uidList} which have not
-        already been grabbed.
+        Return all the L{POP3UID} instances created by this grabber which still
+        exist, perhaps from an in-memory cache.
         """
         if self._pop3uids is None:
             before = time.time()
@@ -365,8 +357,26 @@ class POP3Grabber(item.Item):
             self._pop3uids = set(self.store.query(POP3UID, POP3UID.grabberID == self.grabberID).getColumn("value"))
             after = time.time()
             log.msg(interface=iaxiom.IStatEvent, stat_pop3uid_load_time=after - before)
+        return self._pop3uids
+
+
+    def shouldDelete(self, uidList):
+        """
+        Return a list of (index, uid) pairs from C{uidList} which were
+        downloaded long enough ago that they can be deleted now.
+        """
+        pop3uids = self._getPOP3UIDs()
+        return [pair for pair in uidList if pair[1] in pop3uids]
+
+
+    def shouldRetrieve(self, uidList):
+        """
+        Return a list of (index, uid) pairs from C{uidList} which have not
+        already been grabbed.
+        """
+        pop3uids = self._getPOP3UIDs()
         log.msg(interface=iaxiom.IStatEvent, stat_pop3uid_check=len(uidList))
-        return [pair for pair in uidList if pair[1] not in self._pop3uids]
+        return [pair for pair in uidList if pair[1] not in pop3uids]
 
 
     def markSuccess(self, uid, msg):
