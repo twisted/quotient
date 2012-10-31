@@ -553,3 +553,80 @@ class PersistentControllerTestCase(unittest.TestCase):
         # was scheduled either.
         self.assertEqual(
             [], list(store.query(scheduler.TimedEvent)))
+
+
+    def test_shouldDeleteOldMessage(self):
+        """
+        C{shouldDelete} accepts a list of (index, uid) pairs and returns a list
+        of (index, uid) pairs corresponding to messages which may now be deleted
+        from the POP3 server (due to having been downloaded more than a fixed
+        number of days in the past).
+        """
+        epoch = extime.Time()
+        now = epoch - (self.grabber.DELETE_DELAY + timedelta(days=1))
+
+        self.grabber.now = lambda: now
+
+        # Generate some state representing a past success
+        oldEnough = b'123abc'
+        self.grabber.markSuccess(oldEnough, StubMessage())
+
+        # Wind the clock forward far enough so that oldEnough should be
+        # considered old enough for deletion.
+        now = epoch
+
+        self.assertEqual(
+            [(3, oldEnough)], self.grabber.shouldDelete([(3, oldEnough)]))
+
+
+    def test_shouldDeleteNewMessage(self):
+        """
+        Messages downloaded less than a fixed number of days in the past are not
+        indicated as deletable by C{shouldDelete}.
+        """
+        epoch = extime.Time()
+        now = epoch - (self.grabber.DELETE_DELAY - timedelta(days=1))
+
+        self.grabber.now = lambda: now
+
+        # Generate some state representing a *recently* past success
+        newEnough = b'xyz123'
+        self.grabber.markSuccess(newEnough, StubMessage())
+
+        # Wind the clock forward, but not so far forward that newEnough is
+        # considered old enough for deletion.
+        now = epoch
+
+        self.assertEqual(
+            [], self.grabber.shouldDelete([(5, newEnough)]))
+
+
+    def test_shouldDeleteFailedMessage(self):
+        """
+        Messages for which the download failed are not indicated as deletable by
+        C{shouldDelete}.
+        """
+        epoch = extime.Time()
+        now = epoch - (self.grabber.DELETE_DELAY + timedelta(days=1))
+
+        self.grabber.now = lambda: now
+
+        # Generate some state representing a past failure
+        failed = b'xyz123'
+        self.grabber.markFailure(failed, object())
+
+        # Wind the clock forward enough so that the failed message would be old
+        # enough - if it had been a success.
+        now = epoch
+
+        self.assertEqual(
+            [], self.grabber.shouldDelete([(7, failed)]))
+
+
+    def test_shouldDeleteUnknownMessage(self):
+        """
+        Messages which have not been downloaded are not indicated as deletable
+        by C{shouldDelete}.
+        """
+        self.assertEqual(
+            [], self.grabber.shouldDelete([(7, b'9876wxyz')]))
