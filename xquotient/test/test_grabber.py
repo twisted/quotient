@@ -695,6 +695,21 @@ class PersistentControllerTestCase(unittest.TestCase):
             [(3, oldEnough)], self.grabber.shouldDelete([(3, oldEnough)]))
 
 
+    def test_shouldDeleteOtherGrabberState(self):
+        """
+        Messages downloaded by an unrelated grabber are not considered by
+        C{shouldDelete}.
+        """
+        uid = b'abcdef'
+        then = extime.Time() - self.grabber.DELETE_DELAY - timedelta(days=1)
+        grabber.POP3UID(
+            store=self.store, grabberID=u'bob@example.org:default', value=uid,
+            retrieved=then)
+
+        self.assertEqual([], self.grabber.shouldDelete([(5, uid)]))
+
+
+
     def test_shouldDeleteNewMessage(self):
         """
         Messages downloaded less than a fixed number of days in the past are not

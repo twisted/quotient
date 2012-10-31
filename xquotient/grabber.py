@@ -3,7 +3,7 @@
 from epsilon import hotfix
 hotfix.require('twisted', 'deferredgenerator_tfailure')
 
-import time, datetime
+import time, datetime, functools
 
 from twisted.mail import pop3, pop3client
 from twisted.internet import protocol, defer, ssl, error
@@ -361,8 +361,8 @@ class POP3Grabber(item.Item):
         # Limit to POP3UIDs which were retrieved at least DELETE_DELAY ago.
         # Failed attempts do not count.
 
-        # XXX Add a grabberID term here
         where = attributes.AND(
+            POP3UID.grabberID == self.grabberID,
             POP3UID.retrieved < self.now() - self.DELETE_DELAY,
             POP3UID.failed == False)
 
@@ -659,61 +659,68 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
 
 
 
+def _requiresGrabberItem(f):
+    """
+    Decorator for a method on ControlledPOP3GrabberProtocol which makes it safe
+    to call even after the connection has been lost.
+    """
+    @functools.wraps(f)
+    def safe(self, *args, **kwargs):
+        if self.grabber is not None:
+            return self.grabber.store.transact(f, self, *args, **kwargs)
+    return safe
+
+
+
 class ControlledPOP3GrabberProtocol(POP3GrabberProtocol):
-    def _transact(self, *a, **kw):
-        return self.grabber.store.transact(*a, **kw)
-
-
-    def getSource(self):
-        return u'pop3://' + self.grabber.grabberID
-
-
-    def setStatus(self, msg, success=True):
-        if self.grabber is not None:
-            self._transact(self.grabber.status.setStatus, msg, success)
-
-
-    def shouldRetrieve(self, uidList):
-        if self.grabber is not None:
-            return self._transact(self.grabber.shouldRetrieve, uidList)
-
-
-    def shouldDelete(self, uidList):
-        # XXX None check and transact
-        return self.grabber.shouldDelete(uidList)
-
-
-    def createMIMEReceiver(self, source):
-        if self.grabber is not None:
-            def createIt():
-                agent = self.grabber.config.deliveryAgent
-                return agent.createMIMEReceiver(source)
-            return self._transact(createIt)
-
-
-    def markSuccess(self, uid, msg):
-        if self.grabber is not None:
-            return self._transact(self.grabber.markSuccess, uid, msg)
-
-
-    def markFailure(self, uid, reason):
-        if self.grabber is not None:
-            return self._transact(self.grabber.markFailure, uid, reason)
-
-
-    def paused(self):
-        if self.grabber is not None:
-            return self.grabber.paused
-
-
     _transient = False
     def transientFailure(self, f):
         self._transient = True
 
 
+    @_requiresGrabberItem
+    def getSource(self):
+        return u'pop3://' + self.grabber.grabberID
+
+
+    @_requiresGrabberItem
+    def setStatus(self, msg, success=True):
+        return self.grabber.status.setStatus(msg, success)
+
+
+    @_requiresGrabberItem
+    def shouldRetrieve(self, uidList):
+        return self.grabber.shouldRetrieve(uidList)
+
+
+    @_requiresGrabberItem
+    def shouldDelete(self, uidList):
+        return self.grabber.shouldDelete(uidList)
+
+
+    @_requiresGrabberItem
+    def createMIMEReceiver(self, source):
+        agent = self.grabber.config.deliveryAgent
+        return agent.createMIMEReceiver(source)
+
+
+    @_requiresGrabberItem
+    def markSuccess(self, uid, msg):
+        return self.grabber.markSuccess(uid, msg)
+
+
+    @_requiresGrabberItem
+    def markFailure(self, uid, reason):
+        return self.grabber.markFailure(uid, reason)
+
+
+    @_requiresGrabberItem
+    def paused(self):
+        return self.grabber.paused
+
+
+    @_requiresGrabberItem
     def stoppedRunning(self):
-        if self.grabber is None:
-            return
         self.grabber.running = False
         if self._transient:
             iaxiom.IScheduler(self.grabber.store).reschedule(
