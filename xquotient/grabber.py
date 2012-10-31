@@ -528,6 +528,9 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
         # All the (index, uid) pairs which should be retrieved
         uidList = []
 
+        # All of the (index, uid) pairs which should be deleted
+        uidDeleteList = []
+
         # Consumer for listUID - adds to the working set and processes
         # a batch if appropriate.
         def consumeUIDLine(ent):
@@ -536,9 +539,14 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                 processBatch()
 
         def processBatch():
-            L = self.shouldRetrieve(uidWorkingSet)
-            L.sort()
-            uidList.extend(L)
+            toRetrieve = self.shouldRetrieve(uidWorkingSet)
+            toRetrieve.sort()
+            uidList.extend(toRetrieve)
+
+            toDelete = self.shouldDelete(uidWorkingSet)
+            toDelete.sort()
+            uidDeleteList.extend(toDelete)
+
             del uidWorkingSet[:]
 
 
@@ -603,6 +611,12 @@ class POP3GrabberProtocol(pop3.AdvancedPOP3Client):
                     self.markFailure(uid, f)
                 else:
                     self.markSuccess(uid, rece.message)
+
+        # Delete any old messages that should now be deleted
+        for (index, uid) in uidDeleteList:
+            d = defer.waitForDeferred(self.delete(index))
+            yield d
+            d.getResult()
 
         self.setStatus(u"Logging out...")
         d = defer.waitForDeferred(self.quit())

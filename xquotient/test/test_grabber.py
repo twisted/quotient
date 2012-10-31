@@ -3,8 +3,11 @@ import StringIO
 
 from datetime import timedelta
 
+from zope.interface import directlyProvides
+
 from twisted.trial import unittest
 from twisted.internet import defer, error
+from twisted.internet.interfaces import ISSLTransport
 from twisted.mail import pop3
 from twisted.cred import error as ecred
 from twisted.test.proto_helpers import StringTransport
@@ -50,6 +53,8 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
     def connectionMade(self):
         grabber.POP3GrabberProtocol.connectionMade(self)
         self.events = []
+        self.uidsForDeletion = set()
+        self.uidsNotForRetrieval = set()
 
 
     def getSource(self):
@@ -62,8 +67,13 @@ class TestPOP3Grabber(grabber.POP3GrabberProtocol):
 
 
     def shouldRetrieve(self, uidList):
-        self.events.append(('retrieve', uidList))
-        return list(uidList)
+        self.events.append(('retrieve', list(uidList)))
+        return [pair for pair in uidList if pair[1] not in self.uidsNotForRetrieval]
+
+
+    def shouldDelete(self, uidList):
+        self.events.append(('delete', list(uidList)))
+        return [pair for pair in uidList if pair[1] in self.uidsForDeletion]
 
 
     def createMIMEReceiver(self, source):
@@ -227,6 +237,48 @@ class POP3GrabberProtocolTestCase(unittest.TestCase):
         self.assertEquals(
             [evt[0] for evt in self.client.events if evt[0] != 'status'][-1],
             'stopped')
+
+
+    def test_deletion(self):
+        """
+        Messages indicated by C{shouldDelete} to be ready for deleted are
+        deleted using the I{DELE} POP3 protocol action.
+        """
+        transport = StringTransport()
+        # Convince the client to log in
+        directlyProvides(transport, ISSLTransport)
+
+        self.client.makeConnection(transport)
+        self.addCleanup(self.client.connectionLost, error.ConnectionLost("Simulated"))
+
+        self.client.uidsForDeletion.add(b'xyz')
+        self.client.uidsNotForRetrieval.add(b'abc')
+        self.client.uidsNotForRetrieval.add(b'xyz')
+
+        # Server greeting
+        self.client.dataReceived("+OK Hello\r\n")
+        # CAPA response
+        self.client.dataReceived("+OK\r\nUSER\r\nUIDL\r\n.\r\n")
+        # USER response
+        self.client.dataReceived("+OK\r\n")
+        # PASS response
+        self.client.dataReceived("+OK\r\n")
+
+        del self.client.events[:]
+        transport.clear()
+
+        # UIDL response
+        self.client.dataReceived('+OK \r\n1 abc\r\n3 xyz\r\n.\r\n')
+
+        # Protocol should consult shouldDelete with the UIDs and start issuing
+        # delete commands.
+        self.assertEquals(
+            [('delete', [(0, 'abc'), (2, 'xyz')])],
+            [event for event in self.client.events if event[0] == 'delete'])
+        self.assertEqual("DELE 3\r\n", transport.value())
+
+        # DELE response
+        self.client.dataReceived("+OK\r\n")
 
 
     def testLineTooLong(self):
@@ -429,7 +481,7 @@ class ControlledPOP3GrabberTestCase(unittest.TestCase):
         protocol.allowInsecureLogin = True
         protocol.makeConnection(StringTransport())
         # Server greeting
-        protocol.dataReceived("+OK Hello\r\n") 
+        protocol.dataReceived("+OK Hello\r\n")
         # CAPA response
         protocol.dataReceived("+OK\r\nUSER\r\nUIDL\r\n.\r\n")
         # USER response
@@ -540,7 +592,6 @@ class PersistentControllerTestCase(unittest.TestCase):
             self.grabber.shouldRetrieve([(49, '49'), (50, '50'),
                                          (51, '51')]),
             [(49, '49'), (51, '51')])
-
 
 
     def test_successTimestamp(self):
