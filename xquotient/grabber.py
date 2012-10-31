@@ -161,6 +161,13 @@ registerUpgrader(_grabberConfiguration2to3, GrabberConfiguration.typeName, 2, 3)
 
 
 class POP3UID(item.Item):
+    schemaVersion = 2
+
+    # TODO index this one probably
+    retrieved = attributes.timestamp(doc="""
+    When this POP3 UID was retrieved (or when retrieval of it failed).
+    """)
+
     grabberID = attributes.text(doc="""
     A string identifying the email-address/port parts of a
     configured grabber
@@ -276,6 +283,7 @@ class POP3Grabber(item.Item):
         self._pop3uids = None
         self.running = False
         self.protocol = None
+        self.now = extime.Time
         if self.status is None:
             self.status = Status(store=self.store, message=u'idle')
 
@@ -345,6 +353,21 @@ class POP3Grabber(item.Item):
     grabberID = property(_grabberID)
 
 
+    def shouldDelete(self, uidList):
+        """
+        Return a list of (index, uid) pairs from C{uidList} which were
+        downloaded long enough ago that they can be deleted now.
+        """
+        # Limit to POP3UIDs which were retrieved at least DELETE_DELAY ago.
+        where = POP3UID.retrieved < self.now() - self.DELETE_DELAY
+
+        # Here are the server-side POP3 UIDs which we have downloaded and which
+        # are old enough, so we should delete them.
+        pop3uids = set(self.store.query(POP3UID, where).getColumn("value"))
+
+        return [pair for pair in uidList if pair[1] in pop3uids]
+
+
     def _getPOP3UIDs(self):
         """
         Return all the L{POP3UID} instances created by this grabber which still
@@ -358,15 +381,6 @@ class POP3Grabber(item.Item):
             after = time.time()
             log.msg(interface=iaxiom.IStatEvent, stat_pop3uid_load_time=after - before)
         return self._pop3uids
-
-
-    def shouldDelete(self, uidList):
-        """
-        Return a list of (index, uid) pairs from C{uidList} which were
-        downloaded long enough ago that they can be deleted now.
-        """
-        pop3uids = self._getPOP3UIDs()
-        return [pair for pair in uidList if pair[1] in pop3uids]
 
 
     def shouldRetrieve(self, uidList):

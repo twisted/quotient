@@ -630,3 +630,11 @@ class PersistentControllerTestCase(unittest.TestCase):
         """
         self.assertEqual(
             [], self.grabber.shouldDelete([(7, b'9876wxyz')]))
+
+
+    def test_now(self):
+        """
+        L{POP3Grabber.now} returns the current time.
+        """
+        self.assertTrue(extime.Time() <= self.grabber.now())
+        self.assertTrue(self.grabber.now() <= extime.Time())
