@@ -181,6 +181,11 @@ class POP3Grabber(item.Item):
     """
     Item for retrieving email messages from a remote POP server.
     """
+    DELETE_DELAY = datetime.timedelta(days=7)
+
+    now = attributes.inmemory(doc="""
+    A callable returning a Time instance representing the current time.
+    """)
 
     config = attributes.reference(doc="""
     The L{GrabberConfiguration} which created this grabber.
@@ -338,6 +343,14 @@ class POP3Grabber(item.Item):
 
         return '%s@%s:%s' % (self.username, self.domain, port)
     grabberID = property(_grabberID)
+
+
+    def shouldDelete(self, uidList):
+        """
+        Return a list of (index, uid) pairs from C{uidList} which were
+        downloaded long enough ago that they can be deleted now.
+        """
+        return uidList
 
 
     def shouldRetrieve(self, uidList):
