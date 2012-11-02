@@ -179,7 +179,7 @@ class POP3UID(item.Item):
     failed = attributes.boolean(doc="""
     When set, indicates that an attempt was made to retrieve this UID,
     but for some reason was unsuccessful.
-    """, indexed=True, default=False)
+    """, default=False)
 
     attributes.compoundIndex(grabberID, retrieved)
 
