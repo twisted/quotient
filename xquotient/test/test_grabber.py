@@ -18,6 +18,7 @@ from epsilon import structlike, extime
 from epsilon.test import iosim
 
 from axiom import iaxiom, store, substore, scheduler
+from axiom.test.util import QueryCounter
 
 from xquotient import grabber, mimepart
 
@@ -814,3 +815,62 @@ class PersistentControllerTestCase(unittest.TestCase):
         persistentUIDs = list(self.store.query(
                 grabber.POP3UID, grabber.POP3UID.value == uid))
         self.assertEqual([pop3uid], persistentUIDs)
+
+
+
+class ShouldDeleteComplexityTests(unittest.TestCase):
+    """
+    Tests for the query complexity of L{POP3Grabber.shouldDelete}.
+    """
+    def test_otherGrabber(self):
+        """
+        The database complexity of L{POP3Grabber.shouldDelete} is independent of
+        the number of L{POP3UID} items which belong to another L{POP3Grabber}.
+        """
+        self._complexityTest(
+            lambda grabberItem: grabber.POP3UID(
+                store=grabberItem.store, retrieved=extime.Time(), failed=False,
+                grabberID=grabberItem.grabberID + b'unrelated', value=b'123'))
+
+
+    def test_shouldNotDelete(self):
+        """
+        The database complexity of L{POP3Grabber.shouldDelete} is independent of
+        the number of L{POP3UID} items which exist in the database but do not
+        yet merit deletion.
+        """
+        self._complexityTest(
+            lambda grabberItem: grabber.POP3UID(
+                store=grabberItem.store, retrieved=extime.Time(), failed=False,
+                grabberID=grabberItem.grabberID, value=b'def'))
+
+
+    def _complexityTest(self, makePOP3UID):
+        s = store.Store()
+        counter = QueryCounter(s)
+
+        config = grabber.GrabberConfiguration(store=s)
+        grabberItem = grabber.POP3Grabber(
+            store=s,
+            config=config,
+            username=u"testuser",
+            domain=u"example.com",
+            password=u"password")
+
+        # Create at least one POP3UID, since zero-items-in-table is always
+        # different from any-items-in-table.
+        for i in range(5):
+            grabber.POP3UID(
+                store=s, retrieved=extime.Time(), failed=False,
+                grabberID=grabberItem.grabberID, value=b'abc' + str(i))
+
+        fewer = counter.measure(
+            lambda: grabberItem.shouldDelete([b"123"]))
+
+        # Create another non-matching POP3UID
+        makePOP3UID(grabberItem)
+
+        more = counter.measure(
+            lambda: grabberItem.shouldDelete([b"123"]))
+
+        self.assertEqual(fewer, more)

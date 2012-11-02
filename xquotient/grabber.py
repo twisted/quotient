@@ -163,7 +163,6 @@ registerUpgrader(_grabberConfiguration2to3, GrabberConfiguration.typeName, 2, 3)
 class POP3UID(item.Item):
     schemaVersion = 2
 
-    # TODO index this one probably
     retrieved = attributes.timestamp(doc="""
     When this POP3 UID was retrieved (or when retrieval failed).
     """, allowNone=False)
@@ -181,6 +180,8 @@ class POP3UID(item.Item):
     When set, indicates that an attempt was made to retrieve this UID,
     but for some reason was unsuccessful.
     """, indexed=True, default=False)
+
+    attributes.compoundIndex(grabberID, retrieved)
 
 
 def _pop3uid1to2(old):
