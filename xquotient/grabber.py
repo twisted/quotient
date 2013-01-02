@@ -379,13 +379,18 @@ class POP3Grabber(item.Item):
         Return a list of (index, uid) pairs from C{uidList} which were
         downloaded long enough ago that they can be deleted now.
         """
-        # Limit to POP3UIDs which were retrieved at least DELETE_DELAY ago.
-        # Failed attempts do not count.
+        # Find at most 996 of them.  Combined with the other query variables in
+        # the statement below, this reaches the SQLite3 query variable limit.
+        # Any additional will be picked up in the future.
+        uidList = uidList[:996]
 
+        # And further limit them to POP3UIDs which were retrieved at least
+        # DELETE_DELAY ago.  Failed attempts do not count.
         where = attributes.AND(
             POP3UID.grabberID == self.grabberID,
             POP3UID.retrieved < self.now() - self.DELETE_DELAY,
-            POP3UID.failed == False)
+            POP3UID.failed == False,
+            POP3UID.value.oneOf([pair[1] for pair in uidList]))
 
         # Here are the server-side POP3 UIDs which we have downloaded and which
         # are old enough, so we should delete them.

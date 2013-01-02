@@ -779,6 +779,27 @@ class PersistentControllerTestCase(unittest.TestCase):
             [], self.grabber.shouldDelete([(7, b'9876wxyz')]))
 
 
+    def test_shouldDeleteMessageLimit(self):
+        """
+        At most around 1000 (the exact value of the limit will be imposed by
+        SQLite3) messages are considered for deletion by C{shouldDelete}.
+        """
+        epoch = extime.Time()
+        now = epoch - (self.grabber.DELETE_DELAY + timedelta(days=1))
+        self.grabber.now = lambda: now
+
+        uidList = []
+        for i in range(1100):
+            uid = b'%dabc' % (i,)
+            uidList.append((i, uid))
+            self.grabber.markSuccess(uid, StubMessage())
+    
+        # Spin the clock forward so all those messages are considered deletable.
+        now = epoch
+        self.assertEqual(
+            uidList[:996], self.grabber.shouldDelete(uidList))
+
+
     def test_now(self):
         """
         L{POP3Grabber.now} returns the current time.
